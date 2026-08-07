@@ -20,7 +20,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const getSupabase = () => (supabaseRef.current ??= createClient());
   const router = useRouter();
   const profileRequestRef = useRef<string | null>(null);
 
@@ -33,7 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (profileRequestRef.current === userId) return;
     profileRequestRef.current = userId;
     try {
-      const { data } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
+      const { data } = await getSupabase().from('user_profiles').select('*').eq('id', userId).single();
       setProfile(data);
     } catch {
       setProfile(null);
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getSupabase().auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
@@ -52,7 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = getSupabase().auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
@@ -64,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, metadata: Record<string, any> = {}) => {
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await getSupabase().auth.signUp({
       email,
       password,
       options: {
@@ -83,7 +84,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) throw error;
     // Activity session is started automatically by useActivityTracker when
     // `user` is set by onAuthStateChange. No manual POST needed here.
@@ -102,7 +103,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch {
       /* best effort */
     }
-    const { error } = await supabase.auth.signOut();
+    const { error } = await getSupabase().auth.signOut();
     if (error) throw error;
     setProfile(null);
     router.push('/sign-up-login');
@@ -110,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback?next=/reset-password`,
     });
     if (error) throw error;
@@ -120,14 +121,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser();
+    } = await getSupabase().auth.getUser();
     if (error) throw error;
     return user;
   };
 
   const getUserProfile = async () => {
     if (!user) return null;
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('user_profiles')
       .select('*')
       .eq('id', user.id)
