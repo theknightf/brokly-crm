@@ -1,0 +1,27 @@
+
+> realtyflow@0.1.0 start
+> next dev -p 4028
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:4028
+   - Network:      http://26.240.141.39:4028
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 6.9s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 953ms (172 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 19.6s (3183 modules)
+ GET / 200 in 28146ms
+ ○ Compiling /api/reports/summary ...
+ ✓ Compiled /api/auth/session in 5.9s (3199 modules)
+ GET / 200 in 362ms
+ ○ Compiling /leads-management ...
+ POST /api/auth/session 500 in 8092ms
+ GET /api/reports/summary 200 in 12623ms
+ GET /api/reports/summary 200 in 12791ms
+ GET /api/reports/summary 200 in 12896ms
+ ✓ Compiled /leads-management in 7.5s (3268 modules)
+ GET /leads-management 200 in 8800ms
+ GET /leads-management 200 in 245ms

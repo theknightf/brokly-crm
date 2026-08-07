@@ -1,0 +1,267 @@
+'use client';
+import React, { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, Check, GripVertical } from 'lucide-react';
+import { leadsService } from '@/lib/services/crmService';
+import { ALL_STATUSES, STATUS_COLORS } from '@/app/leads-management/components/mockLeads';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
+
+const STATUS_ICONS: Record<string, string> = {
+  'Fresh Leads': '🌱',
+  'Cold Calls': '📞',
+  'Pending Leads': '⏳',
+  'Following Up': '🔄',
+  Meeting: '🤝',
+  Interested: '⭐',
+  'Not Interested': '❌',
+  Cancellation: '🚫',
+  'Done Deal': '✅',
+  'Duplicate Leads': '📋',
+  'Wrong Number': '📵',
+  'Data Rotation': '🔃',
+  'Closed Number': '🔒',
+  'No Answer': '📴',
+  'No Answer At All': '🔕',
+  'Low Budget': '💰',
+  'Reschedule Meeting': '📅',
+};
+
+interface StatusCardProps {
+  status: string;
+  count: number;
+  total: number;
+  colorClass: string;
+}
+
+function StatusCard({ status, count, total, colorClass }: StatusCardProps) {
+  const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+  const [bg, text] = colorClass.split(' ');
+  const icon = STATUS_ICONS[status] || '📊';
+
+  return (
+    <div
+      className={`rounded-2xl border border-border bg-card p-4 flex flex-col gap-2 hover:shadow-md transition-shadow`}
+    >
+      <div className="flex items-start justify-between">
+        <div
+          className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${bg} bg-opacity-60`}
+        >
+          {icon}
+        </div>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${bg} ${text}`}>
+          {pct}%
+        </span>
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-foreground tabular-nums">{count.toLocaleString()}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{status}</p>
+      </div>
+    </div>
+  );
+}
+
+function sanitize(keys: string[]): string[] {
+  return ALL_STATUSES.filter((s) => keys.includes(s));
+}
+
+export default function KPIBentoGrid() {
+  const { user, profile } = useAuth();
+  const isOwnerOrAdmin = isAdminRole(profile?.role);
+  const storageKey = user?.id ? `brokly:kpiCardOrder:${user.id}` : null;
+
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const [order, setOrder] = useState<string[]>(ALL_STATUSES);
+  const [hydrated, setHydrated] = useState(false);
+  const [edit, setEdit] = useState(false);
+  const [dragged, setDragged] = useState<string | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+
+  useEffect(() => {
+    leadsService
+      .getStatusCounts()
+      .then((data: any) => {
+        const c = data || {};
+        const t = Object.values(c).reduce((sum: number, v: any) => sum + Number(v), 0);
+        setCounts(c);
+        setTotal(t);
+      })
+      .catch(() => {
+        setCounts({});
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!storageKey) {
+      setHydrated(true);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) setOrder(sanitize(JSON.parse(raw)));
+    } catch {
+      // ignore corrupt data
+    }
+    setHydrated(true);
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!hydrated || !storageKey) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(order));
+    } catch {
+      // ignore quota/availability errors
+    }
+  }, [order, hydrated, storageKey]);
+
+  const move = (status: string, dir: -1 | 1) => {
+    setOrder((prev) => {
+      const i = prev.indexOf(status);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+
+  const startDrag = (e: React.DragEvent, status: string) => {
+    e.dataTransfer.effectAllowed = 'move';
+    setDragged(status);
+  };
+
+  const drop = (target: string) => {
+    if (!dragged || dragged === target) {
+      setDragged(null);
+      setOver(null);
+      return;
+    }
+    setOrder((prev) => {
+      const next = prev.filter((s) => s !== dragged);
+      const ti = next.indexOf(target);
+      next.splice(ti, 0, dragged);
+      return next;
+    });
+    setDragged(null);
+    setOver(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-2xl border border-border bg-card p-4 h-24 animate-pulse bg-muted/30"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="hidden lg:flex justify-end">
+        {isOwnerOrAdmin && (
+          <button
+            onClick={() => setEdit((v) => !v)}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors active:scale-95 ${
+              edit ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
+            }`}
+            aria-pressed={edit}
+          >
+            {edit ? <Check size={14} /> : <GripVertical size={14} />}
+            {edit ? 'Done' : 'Edit cards'}
+          </button>
+        )}
+      </div>
+
+      {/* Total leads hero card */}
+      <div className="rounded-2xl border border-border bg-card px-6 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground font-medium">Total Leads</p>
+          <p className="text-4xl font-bold text-foreground tabular-nums mt-0.5">
+            {total.toLocaleString()}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">All statuses combined</p>
+          <p className="text-sm font-semibold text-primary mt-1">
+            {ALL_STATUSES.length} categories tracked
+          </p>
+        </div>
+      </div>
+
+      {/* Status cards grid (admin-reorderable) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+        {order.map((status) => {
+          const colorClass =
+            (STATUS_COLORS as Record<string, string>)[status] || 'bg-muted text-muted-foreground';
+          const pos = order.indexOf(status);
+          return (
+            <div
+              key={status}
+              className={`relative ${edit ? (over === status ? 'ring-2 ring-primary/60 rounded-2xl' : '') : ''}`}
+              onDragOver={(e) => {
+                if (!edit) return;
+                e.preventDefault();
+                setOver(status);
+              }}
+              onDragLeave={() => setOver((k) => (k === status ? null : k))}
+              onDrop={(e) => {
+                if (!edit) return;
+                e.preventDefault();
+                drop(status);
+              }}
+            >
+              {edit && (
+                <div className="absolute -top-2.5 right-2 z-10 flex items-center gap-0.5 bg-card border border-border rounded-lg px-1 py-0.5 shadow-sm">
+                  <span
+                    draggable
+                    onDragStart={(e) => startDrag(e, status)}
+                    onDragEnd={() => {
+                      setDragged(null);
+                      setOver(null);
+                    }}
+                    className="cursor-grab active:cursor-grabbing p-1 rounded text-muted-foreground hover:text-primary transition-colors"
+                    title="Drag to reorder"
+                  >
+                    <GripVertical size={13} />
+                  </span>
+                  <button
+                    onClick={() => move(status, -1)}
+                    disabled={pos === 0}
+                    className="p-1 rounded text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors"
+                    aria-label={`Move ${status} up`}
+                  >
+                    <ArrowUp size={12} />
+                  </button>
+                  <button
+                    onClick={() => move(status, 1)}
+                    disabled={pos === order.length - 1}
+                    className="p-1 rounded text-muted-foreground hover:text-primary disabled:opacity-30 transition-colors"
+                    aria-label={`Move ${status} down`}
+                  >
+                    <ArrowDown size={12} />
+                  </button>
+                </div>
+              )}
+              <div className={dragged === status ? 'opacity-50' : ''}>
+                <StatusCard
+                  status={status}
+                  count={counts[status] || 0}
+                  total={total}
+                  colorClass={colorClass}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

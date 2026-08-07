@@ -1,0 +1,147 @@
+export type Lang = 'en' | 'ar';
+
+type Dict = Record<string, Record<Lang, string>>;
+
+export const dictionaries: Dict = {
+  'common.search': { en: 'Search leads, customers…', ar: 'ابحث عن العملاء والمتوقعين…' },
+  'common.notifications': { en: 'Notifications', ar: 'الإشعارات' },
+  'common.markAllRead': { en: 'Mark all read', ar: 'تحديد الكل كمقروء' },
+  'common.menu': { en: 'Menu', ar: 'القائمة' },
+  'common.home': { en: 'Home', ar: 'الرئيسية' },
+  'common.leads': { en: 'Leads', ar: 'العملاء المتوقعون' },
+  'common.customers': { en: 'Customers', ar: 'العملاء' },
+  'common.followups': { en: 'Follow-ups', ar: 'المتابعات' },
+  'common.workspace': { en: 'Workspace', ar: 'مساحة العمل' },
+  'common.projects': { en: 'Projects', ar: 'المشاريع' },
+  'common.teams': { en: 'Teams', ar: 'الفرق' },
+  'common.reports': { en: 'Reports', ar: 'التقارير' },
+  'common.admin': { en: 'Admin', ar: 'الإدارة' },
+  'common.settings': { en: 'Settings', ar: 'الإعدادات' },
+  'common.dashboard': { en: 'Dashboard', ar: 'لوحة التحكم' },
+  'common.unitCalculator': { en: 'Unit Calculator', ar: 'حاسبة الوحدات' },
+  'common.logout': { en: 'Log out', ar: 'تسجيل الخروج' },
+  'common.save': { en: 'Save', ar: 'حفظ' },
+  'common.cancel': { en: 'Cancel', ar: 'إلغاء' },
+  'common.apply': { en: 'Apply', ar: 'تطبيق' },
+  'common.reset': { en: 'Reset', ar: 'إعادة تعيين' },
+  'common.refresh': { en: 'Refresh', ar: 'تحديث' },
+  'common.loading': { en: 'Loading…', ar: 'جارٍ التحميل…' },
+  'common.filter': { en: 'Filters', ar: 'الفلاتر' },
+  'common.close': { en: 'Close', ar: 'إغلاق' },
+  'common.done': { en: 'Done', ar: 'تم' },
+  'common.toDo': { en: 'To do', ar: 'معلق' },
+  'common.cancelled': { en: 'Cancelled', ar: 'ملغي' },
+  'common.overdue': { en: 'Overdue', ar: 'متأخر' },
+  'common.dueToday': { en: 'Due today', ar: 'مستحق اليوم' },
+  'common.dueTomorrow': { en: 'Due tomorrow', ar: 'مستحق غدًا' },
+  'common.percentage': { en: 'Percentage', ar: 'نسبة مئوية' },
+  'common.fixed': { en: 'Fixed (EGP)', ar: 'مبلغ ثابت (ج.م)' },
+  'common.optional': { en: 'optional', ar: 'اختياري' },
+  'common.nothingHere': { en: 'Nothing here', ar: 'لا يوجد شيء هنا' },
+
+  'nav.overview': { en: 'Overview', ar: 'نظرة عامة' },
+  'nav.pipeline': { en: 'Pipeline', ar: 'خط الأنابيب' },
+  'nav.management': { en: 'Management', ar: 'الإدارة' },
+  'nav.system': { en: 'System', ar: 'النظام' },
+
+  'dashboard.greeting': { en: 'Good morning, {name} 👋', ar: 'صباح الخير، {name} 👋' },
+  'dashboard.subtitle': {
+    en: "Here's what needs your attention today — {date}",
+    ar: 'إليك ما يحتاج إلى اهتمامك اليوم — {date}',
+  },
+  'dashboard.last30': { en: 'Last 30 days', ar: 'آخر 30 يومًا' },
+
+  'calculator.title': { en: 'Unit price calculator', ar: 'حاسبة سعر الوحدة' },
+  'calculator.subtitle': {
+    en: 'Enter meter price, unit size and fees to get the total.',
+    ar: 'أدخل سعر المتر ومساحة الوحدة والرسوم للحصول على الإجمالي.',
+  },
+  'calculator.meterPrice': { en: 'Meter price (EGP)', ar: 'سعر المتر (ج.م)' },
+  'calculator.totalMeters': { en: 'Total meters', ar: 'إجمالي الأمتار' },
+  'calculator.maintenance': { en: 'Maintenance', ar: 'الصيانة' },
+  'calculator.maintenancePct': { en: 'Maintenance %', ar: 'نسبة الصيانة %' },
+  'calculator.maintenanceAmount': { en: 'Maintenance amount (EGP)', ar: 'مبلغ الصيانة (ج.م)' },
+  'calculator.garageFee': { en: 'Garage fee (EGP)', ar: 'رسوم الجراج (ج.م)' },
+  'calculator.downPayment': { en: 'Down payment', ar: 'الدفعة المقدمة' },
+  'calculator.downPaymentPct': { en: 'Down payment %', ar: 'نسبة الدفعة المقدمة %' },
+  'calculator.downPaymentAmount': {
+    en: 'Down payment amount (EGP)',
+    ar: 'مبلغ الدفعة المقدمة (ج.م)',
+  },
+  'calculator.handover': { en: 'Handover payment', ar: 'دفعة التسليم' },
+  'calculator.handoverPct': { en: 'Handover %', ar: 'نسبة التسليم %' },
+  'calculator.handoverAmount': { en: 'Handover payment (EGP)', ar: 'مبلغ التسليم (ج.م)' },
+  'calculator.discount': { en: 'Discount fee', ar: 'رسوم الخصم' },
+  'calculator.discountPct': { en: 'Discount %', ar: 'نسبة الخصم %' },
+  'calculator.discountAmount': { en: 'Discount amount (EGP)', ar: 'مبلغ الخصم (ج.م)' },
+  'calculator.installments': { en: 'Installments', ar: 'الأقساط' },
+  'calculator.installmentYears': { en: 'Number of years', ar: 'عدد السنوات' },
+  'calculator.installmentFrequency': { en: 'Installments per year', ar: 'أقساط في السنة' },
+  'calculator.freqMonthly': { en: '12 (monthly)', ar: '12 (شهريًا)' },
+  'calculator.freqQuarterly': { en: '4 (quarterly)', ar: '4 (ربع سنوي)' },
+  'calculator.freqSemi': { en: '2 (semi-annual)', ar: '2 (نصف سنوي)' },
+  'calculator.freqAnnual': { en: '1 (yearly)', ar: '1 (سنوي)' },
+  'calculator.eachInstallment': { en: 'Each installment', ar: 'القسط الواحد' },
+  'calculator.installmentsCount': { en: 'Installments', ar: 'عدد الأقساط' },
+  'calculator.unitValue': { en: 'Unit value', ar: 'قيمة الوحدة' },
+  'calculator.totalPrice': { en: 'Total price', ar: 'السعر الإجمالي' },
+  'calculator.remaining': { en: 'Remaining', ar: 'المتبقي' },
+  'calculator.totalAfter': {
+    en: 'Total − Down payment = Remaining',
+    ar: 'الإجمالي − الدفعة المقدمة = المتبقي',
+  },
+  'calculator.totalFormula': {
+    en: 'Total − Discount − Down payment − Handover = Remaining',
+    ar: 'الإجمالي − الخصم − الدفعة المقدمة − التسليم = المتبقي',
+  },
+  'calculator.installmentFormula': {
+    en: 'Remaining ÷ {count} installments = Each installment',
+    ar: 'المتبقي ÷ {count} قسطًا = القسط الواحد',
+  },
+
+  'workspace.title': { en: 'Workspace', ar: 'مساحة العمل' },
+  'workspace.subtitle': {
+    en: 'Manage your follow-ups by due date.',
+    ar: 'إدارة متابعاتك حسب تاريخ الاستحقاق.',
+  },
+  'workspace.all': { en: 'All', ar: 'الكل' },
+  'workspace.late': { en: 'Late / Overdue', ar: 'متأخرة' },
+  'workspace.today': { en: 'Today', ar: 'اليوم' },
+  'workspace.tomorrow': { en: 'Tomorrow', ar: 'غدًا' },
+  'workspace.uncompleted': { en: 'Uncompleted', ar: 'غير المكتملة' },
+  'workspace.count': { en: '{count} follow-up(s)', ar: '{count} متابعة(ـة)' },
+  'workspace.noResults': {
+    en: 'No follow-ups match the current filter',
+    ar: 'لا توجد متابعات مطابقة للفلتر الحالي',
+  },
+  'workspace.name': { en: 'Name', ar: 'الاسم' },
+  'workspace.dueDate': { en: 'Due Date', ar: 'تاريخ الاستحقاق' },
+  'workspace.status': { en: 'Status', ar: 'الحالة' },
+  'workspace.priority': { en: 'Priority', ar: 'الأولوية' },
+  'workspace.doneCol': { en: 'Done', ar: 'تم' },
+  'workspace.filterTitle': { en: 'Filter follow-ups', ar: 'فلترة المتابعات' },
+  'workspace.dueFilter': { en: 'Due date', ar: 'تاريخ الاستحقاق' },
+  'workspace.dueAny': { en: 'Any', ar: 'أي' },
+  'workspace.dueLate': { en: 'Late / overdue', ar: 'متأخرة' },
+  'workspace.statusFilter': { en: 'Status', ar: 'الحالة' },
+  'workspace.statusNotCompleted': { en: 'Not completed', ar: 'غير مكتملة' },
+  'workspace.statusCompleted': { en: 'Completed', ar: 'مكتملة' },
+  'workspace.priorityAny': { en: 'Any', ar: 'أي' },
+
+  'followups.title': { en: 'Follow-ups', ar: 'المتابعات' },
+};
+
+export function translate(
+  lang: Lang,
+  path: string,
+  vars?: Record<string, string | number>
+): string {
+  const entry = dictionaries[path];
+  let str = entry ? entry[lang] : path;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    }
+  }
+  return str;
+}

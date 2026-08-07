@@ -1,0 +1,12 @@
+
+> realtyflow@0.1.0 start
+> next start -p 4028 -p 4028
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:4028
+   - Network:      http://26.240.141.39:4028
+
+ ✓ Starting...
+ ✓ Ready in 1365ms
+(node:2172) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
