@@ -1,5 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CalendarCheck,
   CalendarClock,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { followUpsService, leadsService } from '@/lib/services/crmService';
+import { createClient } from '@/lib/supabase/client';
 
 export interface CallItem {
   id: string;
@@ -173,20 +175,63 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
         }
       }
 
-      // "Call back later" reschedules the follow-up (when we have one). This is
-      // best-effort and isolated so a reschedule hiccup never fails the saved log.
-      if (outcome === 'Call back later' && item.rescheduleId) {
+      if (outcome === 'Call back later') {
         const newDate = futureDate(callbackDays);
-        try {
-          await followUpsService.update(item.rescheduleId, {
-            dueDate: newDate,
-            status: 'Pending',
-            notes:
-              (note.trim() ? note.trim() + ' — ' : '') + `Call back after ${callbackDays} day(s)`,
-          });
-          toast.success(`Follow-up rescheduled to ${newDate}`);
-        } catch (e) {
-          toast.error(e instanceof Error ? e.message : 'Call logged, but reschedule failed');
+        if (item.rescheduleId) {
+          try {
+            await followUpsService.update(item.rescheduleId, {
+              dueDate: newDate,
+              status: 'Pending',
+              notes: `${note.trim() ? note.trim() + ' — ' : ''}Call back after ${callbackDays} day(s)`,
+            });
+            toast.success(`Follow-up rescheduled to ${newDate}`);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Call logged, but reschedule failed');
+          }
+        } else if (item.entityType === 'lead' || !item.entityType) {
+          // No scheduled follow-up yet — create one for this lead so the
+          // callback appears on the Follow-ups page on the chosen date.
+          try {
+            const supabase = createClient();
+            const {
+              data: { user: currentUser },
+            } = await supabase.auth.getUser();
+            const created = await followUpsService.create(
+              {
+                title: `Follow up: ${item.contactName}`,
+                contactName: item.contactName,
+                contactPhone: item.contactPhone || '',
+                contactType: 'Lead',
+                type: 'Call',
+                status: 'Pending',
+                priority: 'Medium',
+                dueDate: newDate,
+                dueTime: '09:00',
+                agent: '',
+                agentInitials: '',
+                notes:
+                  (note.trim() ? note.trim() + ' — ' : '') +
+                  `Call back after ${callbackDays} day(s)`,
+                propertyInterest: '',
+                relationshipStatus: 'New',
+              },
+              currentUser?.id || ''
+            );
+            // Link the fresh follow-up back to the lead so the DB trigger and
+            // future edits stay consistent.
+            if (created?.id) {
+              await supabase
+                .from('follow_ups')
+                .update({ lead_id: item.id })
+                .eq('id', created.id)
+                .then(({ error }) => {
+                  if (error) throw error;
+                });
+            }
+            toast.success(`Follow-up scheduled for ${newDate}`);
+          } catch {
+            toast.success('Call logged');
+          }
         }
       }
 
@@ -199,7 +244,7 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4"
       role="dialog"
@@ -296,7 +341,8 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

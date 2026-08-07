@@ -4,7 +4,16 @@ import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing } from 'lu
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { createClient } from '@/lib/supabase/client';
-import type { AppNotification } from '@/app/api/notifications/route';
+
+export interface AppNotification {
+  id: string;
+  type: 'assignment' | 'reminder';
+  title: string;
+  text: string;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+}
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -131,9 +140,71 @@ export default function NotificationBell() {
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await fetch('/api/notifications', { cache: 'no-store' });
-      const json = await res.json();
-      const list = Array.isArray(json.notifications) ? json.notifications : [];
+      // Read the feed directly with the same browser client used everywhere in
+      // the app (RLS still scopes rows to the signed-in user). Reading via the
+      // server API route is unreliable here because that route authenticates
+      // with cookies while this app stores its session in localStorage.
+      const client = createClient();
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+      const list: AppNotification[] = [];
+
+      // 1) Assignments: activity_log rows pushed to this user.
+      const { data: assignments } = await client
+        .from('activity_log')
+        .select('id, action_type, entity_type, entity_id, detail, created_at')
+        .eq('user_id', user.id)
+        .eq('action_type', 'Lead Assigned')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      for (const a of assignments || []) {
+        list.push({
+          id: `ass-${a.id}`,
+          type: 'assignment',
+          title: 'New lead assigned to you',
+          text: a.detail || 'A lead has been assigned to you',
+          entityType: a.entity_type || 'lead',
+          entityId: a.entity_id || '',
+          createdAt: a.created_at,
+        });
+      }
+
+      // 2) Reminders from follow-ups that are actionable & due today/overdue.
+      const { data: profile } = await client
+        .from('user_profiles')
+        .select('id, full_name, email')
+        .eq('id', user.id)
+        .single();
+      const { data: dueFollowUps } = await client
+        .from('follow_ups')
+        .select('id, title, contact_name, due_date, due_time, follow_up_status, agent, created_by')
+        .lte('due_date', tomorrow)
+        .not('follow_up_status', 'in', '("Completed","Cancelled")')
+        .order('due_date', { ascending: true })
+        .limit(100);
+
+      for (const f of dueFollowUps || []) {
+        const mine =
+          f.created_by === user.id ||
+          (profile && f.agent && profile.full_name && f.agent === profile.full_name);
+        if (!mine) continue;
+        const due = String(f.due_date || '');
+        const overdue = due < today;
+        const isToday = due === today;
+        if (!overdue && !isToday) continue;
+        list.push({
+          id: `rem-${f.id}-${due}`,
+          type: 'reminder',
+          title: overdue ? 'Overdue follow-up' : 'Follow-up due today',
+          text: f.title || `Follow up with ${f.contact_name || 'contact'}`,
+          entityType: 'follow_up',
+          entityId: f.id,
+          createdAt: new Date(`${due}T00:00:00`).toISOString(),
+        });
+      }
+
+      list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       setItems(list);
       if (pushState === 'granted') pushDueReminders(list);
     } catch {
@@ -153,11 +224,15 @@ export default function NotificationBell() {
     const client = createClient();
     let channel: ReturnType<typeof client.channel> | null = null;
     try {
+      const refresh = () => load();
       channel = client
         .channel('notif-bell')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, () =>
-          load()
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'activity_log' },
+          refresh
         )
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' }, refresh)
         .subscribe();
     } catch {
       // realtime unavailable — polling covers updates

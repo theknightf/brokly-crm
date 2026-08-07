@@ -123,11 +123,17 @@ export const leadsService = {
       .single();
     if (error) throw error;
     invalidateCache();
+    // Notify an assignee when a lead is created already assigned to someone.
+    if (data?.assigned_to) {
+      await pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
+    }
+    await followUpsService.syncFromLead(data);
     return rowToLead(data);
   },
 
   async update(id: string, lead: any) {
     const supabase = createClient();
+    const { data: prev } = await supabase.from('leads').select('assigned_to').eq('id', id).single();
     const { data, error } = await supabase
       .from('leads')
       .update(leadToRow(lead))
@@ -136,24 +142,44 @@ export const leadsService = {
       .single();
     if (error) throw error;
     invalidateCache();
+    // Notify the new assignee when a lead is (re)assigned through the edit modal.
+    const nextAssignee = data?.assigned_to || null;
+    if (nextAssignee && nextAssignee !== (prev?.assigned_to || null)) {
+      await pushAssignmentNotifications(
+        supabase,
+        [id],
+        nextAssignee,
+        lead.assignedToName || lead.agent
+      );
+    }
+    await followUpsService.syncFromLead(data);
     return rowToLead(data);
   },
 
   async updateStatus(id: string, status: string) {
     const supabase = createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('leads')
       .update({ crm_status: status, lead_status: mapCrmStatusToLegacy(status) })
-      .eq('id', id);
+      .eq('id', id)
+      .select('*')
+      .single();
     if (error) throw error;
     invalidateCache();
+    await followUpsService.syncFromLead(data);
   },
 
   async assignLead(id: string, assignedTo: string | null) {
     const supabase = createClient();
-    const { error } = await supabase.from('leads').update({ assigned_to: assignedTo }).eq('id', id);
+    const { data, error } = await supabase
+      .from('leads')
+      .update({ assigned_to: assignedTo })
+      .eq('id', id)
+      .select('*')
+      .single();
     if (error) throw error;
     await pushAssignmentNotifications(supabase, [id], assignedTo);
+    await followUpsService.syncFromLead(data);
     invalidateCache();
   },
 
@@ -202,6 +228,8 @@ export const leadsService = {
     const { error } = await supabase.from('leads').update(payload).in('id', ids);
     if (error) throw error;
     await pushAssignmentNotifications(supabase, ids, assignedTo, assigneeName);
+    const { data: synced } = await supabase.from('leads').select('*').in('id', ids);
+    await followUpsService.syncFromLead(synced || []);
     invalidateCache();
   },
 
@@ -490,6 +518,70 @@ export const followUpsService = {
     if (error) throw error;
     invalidateCache();
     return rowToFollowUp(data);
+  },
+
+  /**
+   * Derives a scheduled follow-up directly from a lead so that leads moved to
+   * a follow-up stage (Following Up / Interested / etc.) immediately show up
+   * on the Follow-ups + Workspace pages. Mirrors the DB trigger; also used as
+   * a client-side fallback so the feature works even without a trigger.
+   * Accepts a single lead row or an array.
+   */
+  async syncFromLead(leadOrArray: any) {
+    if (!leadOrArray) return;
+    const supabase = createClient();
+    try {
+      const rows = Array.isArray(leadOrArray) ? leadOrArray : [leadOrArray];
+      if (!rows.length) return;
+      const terminal = new Set([
+        'Done Deal',
+        'Not Interested',
+        'Cancellation',
+        'Duplicate Leads',
+        'Wrong Number',
+        'Closed Number',
+        'No Answer',
+        'No Answer At All',
+        'Low Budget',
+        'Data Rotation',
+        'Won',
+        'Lost',
+      ]);
+      for (const lead of rows) {
+        const status = lead.crm_status || lead.lead_status || '';
+        const due = lead.follow_up_due;
+        if (!due || terminal.has(status)) continue;
+        const assignee = lead.assigned_to || lead.created_by || null;
+        await supabase.from('follow_ups').upsert(
+          {
+            lead_id: lead.id,
+            title: `Follow up: ${lead.name || ''}`,
+            contact_name: lead.name || '',
+            contact_type: 'Lead',
+            contact_phone: lead.phone || '',
+            contact_email: lead.email || '',
+            follow_up_type: 'Call',
+            follow_up_status: 'Pending',
+            priority: 'Medium',
+            due_date: due,
+            due_time: '09:00',
+            agent: lead.agent || '',
+            agent_initials: lead.agent_initials || '',
+            notes: lead.notes || '',
+            property_interest: lead.property_type || '',
+            relationship_status: 'New',
+            created_by: assignee,
+          },
+          { onConflict: 'lead_id' }
+        );
+      }
+    } catch (err: any) {
+      // The lead_id column (added by the 20260807000000 migration) may not
+      // exist yet — then the DB trigger owns sync and this is best-effort.
+      if (!isSchemaError(err)) {
+        // ignore — the DB trigger covers scheduling when available
+      }
+    }
   },
 
   async update(id: string, fu: any) {

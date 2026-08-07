@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CalendarClock, Check, Circle, Filter, Loader2, RefreshCw, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { followUpsService } from '@/lib/services/crmService';
+import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 type DateFilter = 'any' | 'late' | 'today' | 'tomorrow' | 'custom';
@@ -79,17 +80,39 @@ export default function WorkspaceScreen() {
   const fetchList = useCallback(async (f: Filters) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.set('status', f.status);
-      params.set('priority', f.priority);
-      params.set('date', f.date);
-      if (f.date === 'custom' && f.from) params.set('from', f.from);
-      if (f.date === 'custom' && f.to) params.set('to', f.to);
-      const res = await fetch(`/api/workspace/follow-ups?${params.toString()}`, {
-        cache: 'no-store',
-      });
-      const json = await res.json();
-      setItems(json.followUps || []);
+      const all = await followUpsService.getAll();
+      const today = todayStr();
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+      const done = new Set(['Completed', 'Cancelled']);
+      let list = all;
+
+      if (f.status === 'notCompleted') list = list.filter((x) => !done.has(x.status));
+      else if (f.status === 'completed') list = list.filter((x) => x.status === 'Completed');
+
+      if (f.priority !== 'any') list = list.filter((x) => x.priority === f.priority);
+
+      if (f.date === 'late') list = list.filter((x) => x.dueDate < today);
+      else if (f.date === 'today') list = list.filter((x) => x.dueDate === today);
+      else if (f.date === 'tomorrow') list = list.filter((x) => x.dueDate === tomorrow);
+      else if (f.date === 'custom') {
+        if (f.from) list = list.filter((x) => x.dueDate >= f.from);
+        if (f.to) list = list.filter((x) => x.dueDate <= f.to);
+      }
+
+      list = [...list].sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1));
+      setItems(
+        list.map((x) => ({
+          id: x.id,
+          contactName: x.contactName,
+          title: x.title,
+          contactPhone: x.contactPhone,
+          propertyInterest: x.propertyInterest,
+          status: x.status,
+          priority: x.priority,
+          dueDate: x.dueDate,
+          dueTime: x.dueTime,
+        }))
+      );
     } catch {
       setItems([]);
       toast.error('Could not load follow-ups');
@@ -101,6 +124,29 @@ export default function WorkspaceScreen() {
   useEffect(() => {
     fetchList(filters);
   }, [fetchList, filters]);
+
+  // Keep the workspace live: refresh instantly on follow-up changes via
+  // Supabase Realtime, with a 30s polling fallback when the publication is off.
+  useEffect(() => {
+    const client = createClient();
+    let channel: ReturnType<typeof client.channel> | null = null;
+    try {
+      channel = client
+        .channel('workspace-followups')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' }, () =>
+          fetchList(filters)
+        )
+        .subscribe();
+    } catch {
+      // realtime unavailable — polling covers updates
+    }
+    const poll = setInterval(() => fetchList(filters), 30000);
+    return () => {
+      clearInterval(poll);
+      if (channel) client.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchList]);
 
   const applyTab = (key: string, preset: Filters) => {
     setTab(key);
