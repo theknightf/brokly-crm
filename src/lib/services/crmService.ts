@@ -1239,6 +1239,66 @@ export const adminSettingsService = {
   },
 };
 
+// ─── EXPENSES (admin operational costs) ───────────────────────────────────────
+
+export interface Expense {
+  id: string;
+  title: string;
+  category: string;
+  amount: number;
+  expense_date: string;
+  notes: string;
+  created_at: string;
+}
+
+export const expensesService = {
+  async getAll(filters?: { from?: string; to?: string; category?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.from) params.set('from', filters.from);
+    if (filters?.to) params.set('to', filters.to);
+    if (filters?.category && filters.category !== 'All')
+      params.set('category', filters.category);
+    const qs = params.toString();
+    const res = await fetch(`/api/expenses${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      throw new Error(j?.error || `Failed to load expenses (${res.status})`);
+    }
+    const j = await res.json();
+    return j.expenses || [];
+  },
+
+  async create(input: Partial<Expense>) {
+    const res = await fetch('/api/expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.error || 'Failed to save expense');
+    return j.expense;
+  },
+
+  async update(id: string, input: Partial<Expense>) {
+    const res = await fetch(`/api/expenses/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.error || 'Failed to update expense');
+    return j.expense;
+  },
+
+  async delete(id: string) {
+    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      throw new Error(j?.error || 'Failed to delete expense');
+    }
+  },
+};
+
 // ─── USERS (user_profiles) ────────────────────────────────────────────────────
 
 export const usersService = {
