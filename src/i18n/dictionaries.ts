@@ -16,6 +16,7 @@ export const dictionaries: Dict = {
   'common.teams': { en: 'Teams', ar: 'الفرق' },
   'common.reports': { en: 'Reports', ar: 'التقارير' },
   'common.admin': { en: 'Admin', ar: 'الإدارة' },
+  'common.expenses': { en: 'Expenses', ar: 'المصروفات' },
   'common.settings': { en: 'Settings', ar: 'الإعدادات' },
   'common.dashboard': { en: 'Dashboard', ar: 'لوحة التحكم' },
   'common.unitCalculator': { en: 'Unit Calculator', ar: 'حاسبة الوحدات' },

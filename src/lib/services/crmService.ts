@@ -131,6 +131,68 @@ export const leadsService = {
     return rowToLead(data);
   },
 
+  /**
+   * Compares a list of Egyptian mobile numbers against leads this user can
+   * already see, so duplicate detection during import respects RLS (a member
+   * only "sees" their own assigned/unassigned leade).
+   */
+  async findDuplicatePhones(phones: string[]) {
+    const clean = Array.from(new Set(phones.filter(Boolean).map((p) => p.replace(/\D/g, ''))));
+    if (!clean.length) return new Set<string>();
+    const supabase = createClient();
+    try {
+      let query: any = supabase
+        .from('leads')
+        .select('phone')
+        .or(clean.map((p) => `phone.ilike.%${p}%`).join(','));
+      // The `or` filter may exceed URL length for very large imports; chunk it.
+      const found = new Set<string>();
+      for (let i = 0; i < clean.length; i += 50) {
+        const chunk = clean.slice(i, i + 50);
+        const { data, error } = await supabase
+          .from('leads')
+          .select('phone')
+          .or(chunk.map((p) => `phone.ilike.%${p}%`).join(','));
+        if (error) continue;
+        (data || []).forEach((r: any) => {
+          if (r?.phone) found.add(String(r.phone).replace(/\D/g, ''));
+        });
+      }
+      return found;
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return new Set<string>();
+    }
+  },
+
+  /**
+   * Inserts a batch of pre-validated leads (single round-trip). createdBy is
+   * the current user id so RLS ownership + the DB trigger work for imported
+   * rows. Returns the inserted leads and syncs any follow-up rows.
+   */
+  async bulkInsert(rows: any[], userId: string) {
+    if (!rows.length) return [];
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('leads')
+      .insert(rows.map((r) => leadToRow(r, userId)))
+      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
+    if (error) throw error;
+    invalidateCache();
+    // Notify assignees when imported leads were assigned to them (best-effort).
+    const assignees = new Map<string, string[]>();
+    (data || []).forEach((l: any) => {
+      if (l.assigned_to) {
+        assignees.set(l.assigned_to, [...(assignees.get(l.assigned_to) || []), l.id]);
+      }
+    });
+    for (const [to, ids] of assignees.entries()) {
+      await pushAssignmentNotifications(supabase, ids, to, 'Lead import');
+    }
+    await followUpsService.syncFromLead(data || []);
+    return (data || []).map(rowToLead);
+  },
+
   async update(id: string, lead: any) {
     const supabase = createClient();
     const { data: prev } = await supabase.from('leads').select('assigned_to').eq('id', id).single();
@@ -167,6 +229,27 @@ export const leadsService = {
     if (error) throw error;
     invalidateCache();
     await followUpsService.syncFromLead(data);
+    return rowToLead(data);
+  },
+
+  /**
+   * Schedules (or reschedules) a follow-up on a lead. Reuses the existing
+   * `follow_up_due` DATE column — the DB trigger + syncFromLead keep the linked
+   * follow_ups row in sync, which is what the Workspace Late/Today/Tomorrow
+   * tabs read from.
+   */
+  async scheduleFollowUp(id: string, dueDate: string) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('leads')
+      .update({ follow_up_due: dueDate })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    invalidateCache();
+    await followUpsService.syncFromLead(data);
+    return rowToLead(data);
   },
 
   async assignLead(id: string, assignedTo: string | null) {
@@ -414,6 +497,12 @@ function leadToRow(lead: any, userId?: string) {
     project: lead.project || '',
     assigned_to: lead.assignedTo || null,
   };
+  // If the caller supplies an explicit creation date (e.g. lead import), keep
+  // it; otherwise the DB default applies.
+  if (lead.createdAt) {
+    const iso = String(lead.createdAt);
+    row.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
+  }
   if (userId) row.created_by = userId;
   return row;
 }
@@ -1256,15 +1345,21 @@ export const expensesService = {
     const params = new URLSearchParams();
     if (filters?.from) params.set('from', filters.from);
     if (filters?.to) params.set('to', filters.to);
-    if (filters?.category && filters.category !== 'All')
-      params.set('category', filters.category);
+    if (filters?.category && filters.category !== 'All') params.set('category', filters.category);
     const qs = params.toString();
     const res = await fetch(`/api/expenses${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
     if (!res.ok) {
       const j = await res.json().catch(() => null);
-      throw new Error(j?.error || `Failed to load expenses (${res.status})`);
+      const err: any = new Error(j?.error || `Failed to load expenses (${res.status})`);
+      if (j?.notInitialized) err.notInitialized = true;
+      throw err;
     }
     const j = await res.json();
+    if (j?.notInitialized) {
+      const err: any = new Error('Expenses table not initialized yet');
+      err.notInitialized = true;
+      throw err;
+    }
     return j.expenses || [];
   },
 

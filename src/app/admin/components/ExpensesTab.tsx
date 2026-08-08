@@ -290,6 +290,7 @@ function DeleteConfirm({
 export default function ExpensesTab() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notInitialized, setNotInitialized] = useState(false);
   const [from, setFrom] = useState(() => monthStartIso());
   const [to, setTo] = useState(() => todayIso());
   const [category, setCategory] = useState('All');
@@ -311,8 +312,13 @@ export default function ExpensesTab() {
     try {
       const data = await expensesService.getAll({ from, to, category });
       setExpenses(data);
+      setNotInitialized(false);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to load expenses');
+      if (err?.notInitialized) {
+        setNotInitialized(true);
+      } else {
+        toast.error(err?.message || 'Failed to load expenses');
+      }
     } finally {
       setLoading(false);
     }
@@ -516,6 +522,26 @@ export default function ExpensesTab() {
         {loading ? (
           <div className="flex items-center justify-center h-40">
             <Loader2 size={24} className="animate-spin text-primary" />
+          </div>
+        ) : notInitialized ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mb-3">
+              <Layers size={20} className="text-amber-600" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">Expenses not initialized</p>
+            <p className="text-xs text-muted-foreground mb-4 max-w-sm">
+              The <code className="font-mono text-xs">expenses</code> table has not been created in
+              Supabase yet. Run{' '}
+              <code className="font-mono text-xs text-primary">supabase/apply_missing_tables.sql</code>{' '}
+              or the expenses migration in the Supabase SQL Editor, then refresh.
+            </p>
+            <button
+              onClick={load}
+              className="btn-secondary text-sm flex items-center gap-2"
+            >
+              <RefreshCw size={14} />
+              Refresh
+            </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">

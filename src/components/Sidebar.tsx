@@ -18,6 +18,7 @@ import {
   LogOut,
   ListChecks,
   Calculator,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -106,6 +107,12 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
   {
     titleKey: 'nav.system',
     items: [
+      {
+        id: 'nav-expenses',
+        labelKey: 'common.expenses',
+        icon: <Receipt size={18} />,
+        href: '/expenses',
+      },
       {
         id: 'nav-admin',
         labelKey: 'common.admin',
@@ -217,7 +224,7 @@ function SidebarContent({
             ...group,
             items: group.items.filter(
               (item) =>
-                (isAdminOrOwner || item.id !== 'nav-admin') &&
+                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses')) &&
                 (canWatchTeams || item.id !== 'nav-teams')
             ),
           }))

@@ -21,7 +21,6 @@ import {
   Activity,
   Trophy,
   PhoneCall,
-  Receipt,
 } from 'lucide-react';
 import { adminSettingsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +31,6 @@ import AttendanceTab from './AttendanceTab';
 import ActivityDashboard from './ActivityDashboard';
 import ProductivityDashboard from './ProductivityDashboard';
 import CallLogsTab from './CallLogsTab';
-import ExpensesTab from './ExpensesTab';
 
 type TabKey =
   | 'leadSources'
@@ -44,8 +42,7 @@ type TabKey =
   | 'attendance'
   | 'activity'
   | 'productivity'
-  | 'callLogs'
-  | 'expenses';
+  | 'callLogs';
 
 interface AdminItem {
   id: string;
@@ -115,12 +112,6 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
     label: 'Call Logs',
     icon: <PhoneCall size={16} />,
     description: 'Every call / WhatsApp logged by the team from the app',
-  },
-  {
-    key: 'expenses',
-    label: 'Expenses',
-    icon: <Receipt size={16} />,
-    description: 'Office & branch running costs: rent, electricity, staff, supplies',
   },
 ];
 
@@ -285,7 +276,7 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('leadSources');
   const [settings, setSettings] = useState<
     Record<
-      Exclude<TabKey, 'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs' | 'expenses'>,
+      Exclude<TabKey, 'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'>,
       AdminItem[]
     >
   >({
@@ -342,13 +333,12 @@ export default function AdminScreen() {
     activeTab === 'attendance' ||
     activeTab === 'activity' ||
     activeTab === 'productivity' ||
-    activeTab === 'callLogs' ||
-    activeTab === 'expenses';
+    activeTab === 'callLogs';
   const items = !isPanelTab
     ? settings[
         activeTab as Exclude<
           TabKey,
-          'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs' | 'expenses'
+          'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'
         >
       ] || []
     : [];
@@ -499,16 +489,14 @@ export default function AdminScreen() {
             const isActivity = tab.key === 'activity';
             const isProductivity = tab.key === 'productivity';
             const isCallLogs = tab.key === 'callLogs';
-            const isExpenses = tab.key === 'expenses';
-            const isSpecial =
-              isUsers || isAttendance || isActivity || isProductivity || isCallLogs || isExpenses;
+            const isSpecial = isUsers || isAttendance || isActivity || isProductivity || isCallLogs;
             const count = isSpecial
               ? 0
               : (
                   settings[
                     tab.key as Exclude<
                       TabKey,
-                      'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs' | 'expenses'
+                      'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'
                     >
                   ] || []
                 ).length;
@@ -518,7 +506,7 @@ export default function AdminScreen() {
                   settings[
                     tab.key as Exclude<
                       TabKey,
-                      'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs' | 'expenses'
+                      'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'
                     >
                   ] || []
                 ).filter((i) => i.active).length;
@@ -543,8 +531,6 @@ export default function AdminScreen() {
                     <p className="text-xs text-muted-foreground">Sessions & usage</p>
                   ) : isProductivity ? (
                     <p className="text-xs text-muted-foreground">Leaderboard & ranking</p>
-                  ) : isExpenses ? (
-                    <p className="text-xs text-muted-foreground">Running costs</p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
                       {active}/{count} active
@@ -567,8 +553,6 @@ export default function AdminScreen() {
             <ProductivityDashboard />
           ) : activeTab === 'callLogs' ? (
             <CallLogsTab />
-          ) : activeTab === 'expenses' ? (
-            <ExpensesTab />
           ) : loading ? (
             <div className="flex items-center justify-center h-48">
               <Loader2 size={28} className="animate-spin text-primary" />

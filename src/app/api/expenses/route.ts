@@ -50,6 +50,14 @@ export async function GET(request: Request) {
 
   const { data, error } = await query;
   if (error) {
+    const msg = (error.message || '').toLowerCase();
+    const missing =
+      msg.includes('does not exist') ||
+      msg.includes('could not find') ||
+      msg.includes('schema cache');
+    if (missing) {
+      return NextResponse.json({ expenses: [], from, to, notInitialized: true });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

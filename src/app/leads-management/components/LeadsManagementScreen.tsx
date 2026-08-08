@@ -1,13 +1,15 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Download, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Plus, Download, Upload, SlidersHorizontal, Loader2, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import LeadsTable from './LeadsTable';
 import LeadsFilters from './LeadsFilters';
 import AddLeadForm from './AddLeadForm';
 import BulkActionBar from './BulkActionBar';
-import { Lead, LeadStatus, LeadSource, PropertyType } from './mockLeads';
+import ImportLeadsModal from './ImportLeadsModal';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { Lead, LeadStatus, LeadSource, PropertyType, ALL_STATUSES } from './mockLeads';
 import { leadsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import LeadCommentsSection from './LeadCommentsSection';
@@ -34,6 +36,7 @@ export default function LeadsManagementScreen() {
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [viewLead, setViewLead] = useState<Lead | null>(null);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -101,9 +104,27 @@ export default function LeadsManagementScreen() {
     try {
       await leadsService.updateStatus(id, newStatus);
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l)));
+      setViewLead((prev) => (prev?.id === id ? { ...prev, status: newStatus } : prev));
       toast.success(`Lead status updated to ${newStatus}`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update status');
+    }
+  };
+
+  const handleScheduleFollowUp = async (id: string, dueDate: string) => {
+    if (!dueDate) return;
+    const prev = viewLead;
+    // Optimistically update the picker so the UI feels instant.
+    setViewLead((v) => (v?.id === id ? { ...v, followUpDue: dueDate } : v));
+    setLeads((prevLeads) =>
+      prevLeads.map((l) => (l.id === id ? { ...l, followUpDue: dueDate } : l))
+    );
+    try {
+      await leadsService.scheduleFollowUp(id, dueDate);
+      toast.success(`Follow-up scheduled for ${dueDate}`);
+    } catch (err: any) {
+      setViewLead(prev ?? null);
+      toast.error(err?.message || 'Failed to schedule follow-up');
     }
   };
 
@@ -291,6 +312,13 @@ export default function LeadsManagementScreen() {
             <span className="hidden sm:inline">Export CSV</span>
           </button>
           <button
+            onClick={() => setImportModalOpen(true)}
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+          >
+            <Upload size={15} />
+            <span className="hidden sm:inline">Import Leads</span>
+          </button>
+          <button
             onClick={() => setAddModalOpen(true)}
             className="btn-primary flex items-center gap-1.5 text-sm"
           >
@@ -374,6 +402,16 @@ export default function LeadsManagementScreen() {
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
       </Modal>
 
+      {/* Import Leads Modal */}
+      <ImportLeadsModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onImported={() => {
+          // Refresh the list + total after a successful import.
+          fetchLeads();
+        }}
+      />
+
       {/* View Lead Modal */}
       {viewLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -401,6 +439,45 @@ export default function LeadsManagementScreen() {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
+              {/* Status update */}
+              <div className="bg-muted/40 rounded-xl px-3 py-2.5">
+                <p className="text-xs text-muted-foreground mb-2">Lead status</p>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={viewLead.status} showDot />
+                  <select
+                    aria-label="Update lead status"
+                    className="input-base appearance-none pr-8 min-w-0 flex-1"
+                    value={viewLead.status}
+                    onChange={(e) => {
+                      const next = e.target.value as LeadStatus;
+                      setViewLead({ ...viewLead, status: next });
+                      handleStatusChange(viewLead.id, next);
+                    }}
+                  >
+                    {ALL_STATUSES.map((s) => (
+                      <option key={`view-status-${viewLead.id}-${s}`} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Schedule follow-up */}
+              <div className="bg-muted/40 rounded-xl px-4 py-2">
+                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                  <CalendarClock size={12} /> Schedule follow-up
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    className="input-base h-9"
+                    value={viewLead.followUpDue || ''}
+                    onChange={(e) => handleScheduleFollowUp(viewLead.id, e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Phone', value: viewLead.phone },
