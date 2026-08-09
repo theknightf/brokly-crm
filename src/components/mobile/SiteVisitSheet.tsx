@@ -126,7 +126,7 @@ export function SiteVisitSheet({ project, onClose, onChanged }: SiteVisitSheetPr
           project_name: project.name,
           lat: latitude,
           lng: longitude,
-          note,
+          note: `[Lead: ${project.name}] check-in. ${note}`.trim(),
         }),
       });
       const json = await res.json();
