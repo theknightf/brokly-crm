@@ -17,6 +17,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { exportCSV, exportPDF, type PdfTable } from '@/lib/exportReport';
+import { ExternalLink } from 'lucide-react';
 
 type PeriodKey = 'day' | 'week' | 'month' | 'range';
 
@@ -654,7 +655,17 @@ export default function ProductivityDashboard() {
               {reportUsers.map((u) => (
                 <tr key={u.user.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-2.5">
-                    <p className="text-sm font-medium text-foreground">{u.user.full_name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">{u.user.full_name}</p>
+                      <a
+                        href={`/admin/employees/${u.user.id}`}
+                        className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                        title="View detailed report"
+                        aria-label={`Open report for ${u.user.full_name}`}
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                    </div>
                     <p className="text-xs text-muted-foreground">{u.user.role.replace('_', ' ')}</p>
                   </td>
                   <td className="text-right px-3 py-2.5 text-sm text-foreground">

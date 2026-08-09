@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole } from '@/lib/roles';
 import { teamsService } from '@/lib/services/crmService';
 import EmptyState from '@/components/ui/EmptyState';
+import AttendanceSelfCard from '@/components/AttendanceSelfCard';
 
 interface Visit {
   id: string;
@@ -159,6 +160,9 @@ export default function LocationsScreen() {
 
   return (
     <div className="space-y-5">
+      {/* Self-service attendance (check in/out with GPS) */}
+      <AttendanceSelfCard />
+
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>

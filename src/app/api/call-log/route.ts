@@ -3,6 +3,30 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
+// Best-effort audit trail insert — never fatal (table may not exist yet).
+async function audit(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  row: { user_id: string; entity_type: string; entity_id: string; action: string; description: string }
+) {
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('full_name')
+      .eq('id', row.user_id)
+      .maybeSingle();
+    await supabase.from('audit_log').insert({
+      user_id: row.user_id,
+      user_name: profile?.full_name || '',
+      entity_type: row.entity_type,
+      entity_id: row.entity_id,
+      action: row.action,
+      description: row.description,
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 // POST /api/call-log — record a call/site-visit/whatsapp touchpoint for the
 // signed-in user. Every entry is also mirrored into activity_log via the
 // log_call_added() DB trigger so it counts towards productivity analytics.
@@ -146,6 +170,15 @@ export async function POST(request: Request) {
         }
       }
     }
+
+    // Audit trail for the touchpoint (best-effort).
+    await audit(supabase, {
+      user_id: user.id,
+      entity_type: entity_type || 'lead',
+      entity_id: entity_id || '',
+      action: 'touchpoint_logged',
+      description: `${ch}${outcome ? ` · ${outcome}` : ''} — ${contact_name || contact_phone || ''}`.trim(),
+    });
 
     return NextResponse.json({ call: saved });
   } catch (e: unknown) {

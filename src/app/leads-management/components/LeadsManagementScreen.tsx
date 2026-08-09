@@ -65,6 +65,12 @@ export default function LeadsManagementScreen() {
     longitude?: number | null;
     radiusM?: number | null;
   } | null>(null);
+  const [siteVisitLead, setSiteVisitLead] = useState<{
+    id: string;
+    name: string;
+    phone: string;
+    project?: string | null;
+  } | null>(null);
 
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
@@ -329,31 +335,42 @@ export default function LeadsManagementScreen() {
     }
   };
 
-  // Fetch the project linked to a lead then open the SiteVisitSheet
-  const fetchAndOpenSiteVisit = async (lead: Lead) => {
+  // Fetch the project linked to a lead then open the SiteVisitSheet. When no
+  // project matches, the sheet falls back to a schedule-first flow for the lead.
+  const fetchAndOpenSiteVisit = (lead: Lead) => {
     const projectName = lead.project || lead.location || '';
     if (!projectName) {
-      toast.error('No project associated with this lead');
+      setSiteVisitProject(null);
+      setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: null });
       return;
     }
-    try {
-      const client = createClient();
-      const { data } = await client
-        .from('projects')
-        .select('id, name, latitude, longitude, radius_m')
-        .ilike('name', projectName)
-        .limit(1);
-      const proj = data?.[0];
-      setSiteVisitProject({
-        id: proj?.id || `lead-${lead.id}`,
-        name: (proj?.name || projectName) as string,
-        latitude: (proj as any)?.latitude ?? null,
-        longitude: (proj as any)?.longitude ?? null,
-        radiusM: (proj as any)?.radius_m ?? null,
-      });
-    } catch {
-      setSiteVisitProject({ id: `lead-${lead.id}`, name: projectName });
-    }
+    (async () => {
+      try {
+        const client = createClient();
+        const { data } = await client
+          .from('projects')
+          .select('id, name, latitude, longitude, radius_m')
+          .ilike('name', projectName)
+          .limit(1);
+        const proj = data?.[0];
+        if (proj) {
+          setSiteVisitProject({
+            id: proj.id,
+            name: (proj.name || projectName) as string,
+            latitude: (proj as any)?.latitude ?? null,
+            longitude: (proj as any)?.longitude ?? null,
+            radiusM: (proj as any)?.radius_m ?? null,
+          });
+          setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: projectName });
+        } else {
+          setSiteVisitProject(null);
+          setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: projectName });
+        }
+      } catch {
+        setSiteVisitProject(null);
+        setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: projectName });
+      }
+    })();
   };
 
   const activeFilterCount = [
@@ -705,11 +722,15 @@ export default function LeadsManagementScreen() {
         </Modal>
       )}
 
-      {/* Site Visit Sheet — opened from View Lead modal */}
-      {siteVisitProject && (
+      {/* Site Visit Sheet — opened from View Lead modal (project and/or lead) */}
+      {(siteVisitProject || siteVisitLead) && (
         <SiteVisitSheet
           project={siteVisitProject}
-          onClose={() => setSiteVisitProject(null)}
+          lead={siteVisitLead}
+          onClose={() => {
+            setSiteVisitProject(null);
+            setSiteVisitLead(null);
+          }}
           onChanged={fetchLeads}
         />
       )}
