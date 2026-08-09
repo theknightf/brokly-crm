@@ -8,6 +8,7 @@ import {
   Loader2,
   MessageCircle,
   ExternalLink,
+  Send,
 } from 'lucide-react';
 import { teamsService } from '@/lib/services/crmService';
 
@@ -30,9 +31,11 @@ interface BulkActionBarProps {
   onClear: () => void;
 }
 
-function waLink(phone?: string): string {
+function waLink(phone?: string, message?: string): string {
   const digits = (phone || '').replace(/[^0-9]/g, '');
-  return `https://wa.me/${digits}`;
+  if (!digits) return '#';
+  const base = `https://wa.me/${digits}`;
+  return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
 
 export default function BulkActionBar({
@@ -46,6 +49,7 @@ export default function BulkActionBar({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [users, setUsers] = useState<AssignableUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [waMessage, setWaMessage] = useState('');
 
   const withPhone = selectedLeads.filter((l) => l.phone);
 
@@ -60,8 +64,9 @@ export default function BulkActionBar({
   }, [open, users.length]);
 
   const openAllWhatsApp = () => {
+    const msg = waMessage.trim();
     withPhone.forEach((l, i) => {
-      setTimeout(() => window.open(waLink(l.phone), '_blank'), i * 400);
+      setTimeout(() => window.open(waLink(l.phone, msg), '_blank'), i * 400);
     });
   };
 
@@ -95,23 +100,43 @@ export default function BulkActionBar({
           {open === 'whatsapp' && withPhone.length > 0 && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setOpen('none')} />
-              <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-modal min-w-[300px] max-h-72 overflow-y-auto py-1 z-50 fade-in">
+              <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-modal min-w-[340px] max-h-[80vh] overflow-y-auto py-1 z-50 fade-in">
+                {/* Message composer */}
+                <div className="px-3 pt-3 pb-2 border-b border-border">
+                  <p className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                    <Send size={11} />
+                    Forward message to all {withPhone.length} leads
+                  </p>
+                  <textarea
+                    value={waMessage}
+                    onChange={(e) => setWaMessage(e.target.value)}
+                    placeholder="Type a message to forward… (optional — leave blank to open blank chats)"
+                    rows={3}
+                    className="w-full border border-input bg-background text-foreground text-xs rounded-lg px-3 py-2 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                  />
+                </div>
+
+                {/* Open all button */}
                 <div className="px-3 py-2 border-b border-border sticky top-0 bg-card">
                   <button
                     onClick={openAllWhatsApp}
                     className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors"
                   >
                     <ExternalLink size={13} />
-                    Open all ({withPhone.length}) — one tab per lead
+                    {waMessage.trim()
+                      ? `Send message to all (${withPhone.length}) — one tab per lead`
+                      : `Open all (${withPhone.length}) — one tab per lead`}
                   </button>
                   <p className="text-[11px] text-muted-foreground mt-1.5 text-center">
                     Your browser may ask to allow multiple tabs.
                   </p>
                 </div>
+
+                {/* Individual leads */}
                 {withPhone.map((l) => (
                   <a
                     key={l.id}
-                    href={waLink(l.phone)}
+                    href={waLink(l.phone, waMessage.trim())}
                     target="_blank"
                     rel="noreferrer"
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
@@ -121,6 +146,7 @@ export default function BulkActionBar({
                     <span className="ml-auto text-xs text-muted-foreground font-mono whitespace-nowrap">
                       {l.phone}
                     </span>
+                    <ExternalLink size={11} className="text-muted-foreground/50 flex-shrink-0" />
                   </a>
                 ))}
               </div>

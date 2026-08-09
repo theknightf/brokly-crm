@@ -149,24 +149,28 @@ export default function NotificationBell() {
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
       const list: AppNotification[] = [];
 
-      // 1) Assignments: activity_log rows pushed to this user.
-      const { data: assignments } = await client
-        .from('activity_log')
-        .select('id, action_type, entity_type, entity_id, detail, created_at')
-        .eq('user_id', user.id)
-        .eq('action_type', 'Lead Assigned')
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // 1) Leads directly assigned to this user — query the leads table directly
+      //    (the activity_log 'Lead Assigned' trigger doesn't exist in the DB so
+      //     the old query always returned zero rows).
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      const { data: assignedLeads } = await client
+        .from('leads')
+        .select('id, name, crm_status, lead_status, updated_at, created_at, assigned_to')
+        .eq('assigned_to', user.id)
+        .gte('updated_at', sevenDaysAgo)
+        .order('updated_at', { ascending: false })
+        .limit(15);
 
-      for (const a of assignments || []) {
+      for (const lead of assignedLeads || []) {
         list.push({
-          id: `ass-${a.id}`,
+          id: `ass-lead-${lead.id}`,
           type: 'assignment',
-          title: 'New lead assigned to you',
-          text: a.detail || 'A lead has been assigned to you',
-          entityType: a.entity_type || 'lead',
-          entityId: a.entity_id || '',
-          createdAt: a.created_at,
+          title: 'Lead assigned to you',
+          text: (lead.name as string) || 'A lead has been assigned to you',
+          entityType: 'lead',
+          entityId: lead.id as string,
+          createdAt:
+            (lead.updated_at as string) || (lead.created_at as string) || new Date().toISOString(),
         });
       }
 
@@ -232,22 +236,26 @@ export default function NotificationBell() {
         });
       }
 
-      // 4) Assignment push so the agent's phone also pings for new leads
-      //    (throttled per assignment id, unlike reminders which throttle by day).
-      const newAssignments = assignments?.filter(
-        (a) => a.created_at && a.created_at > (lastReadRef.current || '2000-01-01')
+      // 4) Push notification for newly assigned leads (throttled per lead id)
+      const newAssignments = (assignedLeads || []).filter(
+        (a) =>
+          ((a.updated_at as string) || (a.created_at as string) || '') >
+          (lastReadRef.current || '2000-01-01')
       );
-      if ((newAssignments || []).length > 0 && pushState === 'granted') {
+      if (newAssignments.length > 0 && pushState === 'granted') {
         try {
-          const a = newAssignments![0];
-          const pushedKey = `brokly:pushed-${a.id}`;
+          const a = newAssignments[0];
+          const pushedKey = `brokly:pushed-lead-${a.id}`;
           if (!localStorage.getItem(pushedKey)) {
             const res = await fetch(`/api/push/send?target=${encodeURIComponent(user.id)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                title: (newAssignments?.length || 1) > 1 ? 'New leads for you' : 'New lead assigned to you',
-                body: a.detail || 'A lead has been assigned to you',
+                title:
+                  newAssignments.length > 1
+                    ? `${newAssignments.length} leads assigned to you`
+                    : 'New lead assigned to you',
+                body: (a.name as string) || 'A lead has been assigned to you',
                 url: '/leads-management',
                 tag: 'brokly-assignment',
               }),

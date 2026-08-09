@@ -1,8 +1,23 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Download, Upload, SlidersHorizontal, Loader2, CalendarClock } from 'lucide-react';
+import {
+  Plus,
+  Download,
+  Upload,
+  SlidersHorizontal,
+  Loader2,
+  CalendarClock,
+  Check,
+  MessageCircle,
+  MapPin,
+  CheckCircle2,
+  ThumbsUp,
+  UserX,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
+import { createClient } from '@/lib/supabase/client';
+import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
 import LeadsFilters from './LeadsFilters';
 import AddLeadForm from './AddLeadForm';
@@ -43,6 +58,13 @@ export default function LeadsManagementScreen() {
   const [pageSize, setPageSize] = useState(10);
   const [sortKey, setSortKey] = useState<keyof Lead>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [siteVisitProject, setSiteVisitProject] = useState<{
+    id: string;
+    name: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    radiusM?: number | null;
+  } | null>(null);
 
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
@@ -278,6 +300,62 @@ export default function LeadsManagementScreen() {
     setCurrentPage(1);
   };
 
+  // Log a WhatsApp quick action for a lead (no modal — instant tap)
+  const handleWhatsAppAction = async (lead: Lead, outcome: string) => {
+    try {
+      const statusMap: Partial<Record<string, string>> = {
+        'Customer Replied': 'Following Up',
+      };
+      await fetch('/api/call-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entity_type: 'lead',
+          entity_id: lead.id,
+          contact_name: lead.name,
+          contact_phone: lead.phone,
+          channel: 'WhatsApp',
+          direction: 'outgoing',
+          outcome,
+        }),
+      });
+      const nextStatus = statusMap[outcome];
+      if (nextStatus) {
+        await handleStatusChange(lead.id, nextStatus as LeadStatus);
+      }
+      toast.success(`WhatsApp: ${outcome}`);
+    } catch {
+      toast.error('Failed to log WhatsApp action');
+    }
+  };
+
+  // Fetch the project linked to a lead then open the SiteVisitSheet
+  const fetchAndOpenSiteVisit = async (lead: Lead) => {
+    const projectName = lead.project || lead.location || '';
+    if (!projectName) {
+      toast.error('No project associated with this lead');
+      return;
+    }
+    try {
+      const client = createClient();
+      const { data } = await client
+        .from('projects')
+        .select('id, name, latitude, longitude, radius_m')
+        .ilike('name', projectName)
+        .limit(1);
+      const proj = data?.[0];
+      setSiteVisitProject({
+        id: proj?.id || `lead-${lead.id}`,
+        name: (proj?.name || projectName) as string,
+        latitude: (proj as any)?.latitude ?? null,
+        longitude: (proj as any)?.longitude ?? null,
+        radiusM: (proj as any)?.radius_m ?? null,
+      });
+    } catch {
+      setSiteVisitProject({ id: `lead-${lead.id}`, name: projectName });
+    }
+  };
+
   const activeFilterCount = [
     filters.status,
     filters.source,
@@ -449,30 +527,39 @@ export default function LeadsManagementScreen() {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
-              {/* Status update */}
+              {/* Status quick actions — vertical one-per-row layout */}
               <div className="bg-muted/40 rounded-xl px-3 py-2.5">
-                <p className="text-xs text-muted-foreground mb-2">Lead status</p>
-                <div className="flex items-center gap-2">
-                  <StatusBadge
-                    status={viewLead.status || 'Fresh Leads'}
-                    showDot
-                  />
-                  <select
-                    aria-label="Update lead status"
-                    className="input-base appearance-none pr-8 min-w-0 flex-1"
-                    value={viewLead.status || 'Fresh Leads'}
-                    onChange={(e) => {
-                      const next = e.target.value as LeadStatus;
-                      setViewLead({ ...viewLead, status: next });
-                      handleStatusChange(viewLead.id, next);
-                    }}
-                  >
-                    {ALL_STATUSES.map((s) => (
-                      <option key={`view-status-${viewLead.id}-${s}`} value={s}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-muted-foreground font-medium">Lead status</p>
+                  <StatusBadge status={viewLead.status || 'Fresh Leads'} showDot />
+                </div>
+                <div className="flex flex-col gap-1 max-h-52 overflow-y-auto -mx-1 px-1">
+                  {ALL_STATUSES.map((s) => {
+                    const isActive = s === (viewLead.status || 'Fresh Leads');
+                    return (
+                      <button
+                        key={`view-status-${viewLead.id}-${s}`}
+                        onClick={() => {
+                          if (isActive) return;
+                          const next = s as LeadStatus;
+                          setViewLead({ ...viewLead, status: next });
+                          handleStatusChange(viewLead.id, next);
+                        }}
+                        className={`w-full px-3 h-10 rounded-lg text-left text-sm flex items-center gap-2.5 transition-all active:scale-[0.98] ${
+                          isActive
+                            ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
+                            : 'text-foreground hover:bg-background/60 font-normal'
+                        }`}
+                      >
+                        {isActive ? (
+                          <Check size={13} className="flex-shrink-0 text-primary" />
+                        ) : (
+                          <span className="w-[13px] flex-shrink-0" />
+                        )}
                         {s}
-                      </option>
-                    ))}
-                  </select>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -519,21 +606,83 @@ export default function LeadsManagementScreen() {
                   <p className="text-sm text-foreground">{viewLead.notes}</p>
                 </div>
               )}
+
+              {/* WhatsApp quick actions — vertical one-per-row */}
+              {viewLead.phone && (
+                <div className="bg-muted/40 rounded-xl px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <MessageCircle size={11} />
+                    WhatsApp Actions
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      {
+                        label: 'WA Sent',
+                        icon: <CheckCircle2 size={13} />,
+                        cls: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+                        outcome: 'WhatsApp Sent',
+                      },
+                      {
+                        label: 'Customer Replied',
+                        icon: <ThumbsUp size={13} />,
+                        cls: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
+                        outcome: 'Customer Replied',
+                      },
+                      {
+                        label: 'No Reply',
+                        icon: <UserX size={13} />,
+                        cls: 'bg-muted text-muted-foreground hover:bg-muted/80',
+                        outcome: 'No Reply',
+                      },
+                      {
+                        label: 'WA Follow-up',
+                        icon: (
+                          <CalendarClock size={13} />
+                        ),
+                        cls: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+                        outcome: 'WhatsApp Follow-up',
+                      },
+                    ].map((a) => (
+                      <button
+                        key={a.outcome}
+                        onClick={() => handleWhatsAppAction(viewLead, a.outcome)}
+                        className={`w-full h-10 rounded-lg px-3 text-left text-sm font-medium flex items-center gap-2 active:scale-[0.98] transition-all ${
+                          a.cls
+                        }`}
+                      >
+                        {a.icon}
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <LeadCommentsSection leadId={viewLead.id} />
             </div>
-            <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
-              <button onClick={() => setViewLead(null)} className="btn-secondary">
-                Close
-              </button>
+            <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-2">
               <button
-                onClick={() => {
-                  setEditLead(viewLead);
-                  setViewLead(null);
-                }}
-                className="btn-primary"
+                onClick={() => fetchAndOpenSiteVisit(viewLead)}
+                className="btn-secondary flex items-center gap-1.5 text-sm"
+                title="Start a GPS-verified site visit for this lead's project"
               >
-                Edit Lead
+                <MapPin size={14} />
+                <span>Site Visit</span>
               </button>
+              <div className="flex gap-2">
+                <button onClick={() => setViewLead(null)} className="btn-secondary">
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setEditLead(viewLead);
+                    setViewLead(null);
+                  }}
+                  className="btn-primary"
+                >
+                  Edit Lead
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -554,6 +703,15 @@ export default function LeadsManagementScreen() {
             onCancel={() => setEditLead(null)}
           />
         </Modal>
+      )}
+
+      {/* Site Visit Sheet — opened from View Lead modal */}
+      {siteVisitProject && (
+        <SiteVisitSheet
+          project={siteVisitProject}
+          onClose={() => setSiteVisitProject(null)}
+          onChanged={fetchLeads}
+        />
       )}
 
       {/* Mobile one-hand FAB: add lead */}
