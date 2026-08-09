@@ -1,13 +1,13 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing } from 'lucide-react';
+import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing, MapPin } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { createClient } from '@/lib/supabase/client';
 
 export interface AppNotification {
   id: string;
-  type: 'assignment' | 'reminder';
+  type: 'assignment' | 'reminder' | 'task' | 'action';
   title: string;
   text: string;
   entityType: string;
@@ -204,6 +204,62 @@ export default function NotificationBell() {
         });
       }
 
+      // 3) Field actions: today's minutes/site-visit log for this user so the
+      //    bell doubles as a lightweight activity feed (e.g. "Started a site visit").
+      const { data: mySiteVisits } = await client
+        .from('site_visits')
+        .select('id, project_name, check_in_at, check_out_at')
+        .eq('user_id', user.id)
+        .gte('check_in_at', `${today}T00:00:00`)
+        .order('check_in_at', { ascending: false })
+        .limit(10);
+
+      for (const v of mySiteVisits || []) {
+        const ended = v.check_out_at != null;
+        const ts = new Date(v.check_in_at || new Date().toISOString()).toISOString();
+        list.push({
+          id: `visit-${v.id}`,
+          type: 'task',
+          title: ended ? 'Site visit ended' : 'Site visit in progress',
+          text: v.project_name
+            ? `${v.project_name}${ended ? ' — visit completed' : ' — GPS logged'}`
+            : ended
+              ? 'Site visit completed'
+              : 'You started a site visit',
+          entityType: 'site_visit',
+          entityId: v.id,
+          createdAt: ts,
+        });
+      }
+
+      // 4) Assignment push so the agent's phone also pings for new leads
+      //    (throttled per assignment id, unlike reminders which throttle by day).
+      const newAssignments = assignments?.filter(
+        (a) => a.created_at && a.created_at > (lastReadRef.current || '2000-01-01')
+      );
+      if ((newAssignments || []).length > 0 && pushState === 'granted') {
+        try {
+          const a = newAssignments![0];
+          const pushedKey = `brokly:pushed-${a.id}`;
+          if (!localStorage.getItem(pushedKey)) {
+            const res = await fetch(`/api/push/send?target=${encodeURIComponent(user.id)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: (newAssignments?.length || 1) > 1 ? 'New leads for you' : 'New lead assigned to you',
+                body: a.detail || 'A lead has been assigned to you',
+                url: '/leads-management',
+                tag: 'brokly-assignment',
+              }),
+            });
+            void res;
+            localStorage.setItem(pushedKey, '1');
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       setItems(list);
       if (pushState === 'granted') pushDueReminders(list);
@@ -255,6 +311,8 @@ export default function NotificationBell() {
   const iconFor = (type: string) =>
     type === 'assignment' ? (
       <UserPlus size={16} className="text-primary flex-shrink-0" />
+    ) : type === 'task' || type === 'action' ? (
+      <MapPin size={16} className="text-violet-500 flex-shrink-0" />
     ) : (
       <AlarmClockOff size={16} className="text-amber-500 flex-shrink-0" />
     );

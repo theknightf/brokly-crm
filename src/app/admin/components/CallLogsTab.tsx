@@ -1,6 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Phone, RefreshCw, Search, Filter } from 'lucide-react';
+import { verifyCall, VERIFICATION_CLS, VerificationCategory } from '@/lib/callVerification';
 
 interface CallLog {
   id: string;
@@ -47,6 +48,7 @@ export default function CallLogsTab() {
   const [search, setSearch] = useState('');
   const [channel, setChannel] = useState('');
   const [outcome, setOutcome] = useState('');
+  const [verification, setVerification] = useState('');
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -87,13 +89,19 @@ export default function CallLogsTab() {
         l.notes?.toLowerCase().includes(q);
       const matchChannel = !channel || l.channel === channel;
       const matchOutcome = !outcome || l.outcome === outcome;
-      return matchQ && matchChannel && matchOutcome;
+      const matchVerification = !verification || verifyCall(l).category === verification;
+      return matchQ && matchChannel && matchOutcome && matchVerification;
     });
-  }, [logs, search, channel, outcome]);
+  }, [logs, search, channel, outcome, verification]);
 
   const totalCalls = logs.length;
   const reached = logs.filter((l) => l.outcome === 'Reached').length;
   const callbacks = logs.filter((l) => l.outcome === 'Call back later').length;
+  const incomingCalls = logs.filter((l) => l.direction === 'incoming').length;
+  const attempts = logs.filter((l) => {
+    const v = verifyCall(l);
+    return v.category === 'No Answer' || v.category === 'Call';
+  }).length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -118,7 +126,7 @@ export default function CallLogsTab() {
           <p className="text-2xl font-bold mt-1">{totalCalls}</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-xs text-muted-foreground font-medium">Reached</p>
+          <p className="text-xs text-muted-foreground font-medium">Connected</p>
           <p className="text-2xl font-bold text-emerald-600 mt-1">{reached}</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
@@ -126,10 +134,8 @@ export default function CallLogsTab() {
           <p className="text-2xl font-bold text-amber-600 mt-1">{callbacks}</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-xs text-muted-foreground font-medium">Not interested</p>
-          <p className="text-2xl font-bold text-red-500 mt-1">
-            {logs.filter((l) => l.outcome === 'Not Interested').length}
-          </p>
+          <p className="text-xs text-muted-foreground font-medium">Incoming</p>
+          <p className="text-2xl font-bold text-sky-600 mt-1">{incomingCalls}</p>
         </div>
       </div>
 
@@ -176,6 +182,26 @@ export default function CallLogsTab() {
                 {o}
               </option>
             ))}
+          </select>
+          <Filter
+            size={13}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          />
+        </div>
+        <div className="relative">
+          <select
+            className="input-base appearance-none pr-8 min-w-[160px]"
+            value={verification}
+            onChange={(e) => setVerification(e.target.value)}
+          >
+            <option value="">All verifications</option>
+            {(['Incoming Call', 'Successful', 'Short Call', 'No Answer'] as VerificationCategory[]).map(
+              (v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              )
+            )}
           </select>
           <Filter
             size={13}
@@ -243,13 +269,22 @@ export default function CallLogsTab() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700">
-                        {l.channel || 'Call'}
-                        {l.duration_seconds
-                          ? ` · ${Math.round((l.duration_seconds || 0) / 60)}m`
-                          : ''}
-                      </span>
+<td className="px-4 py-3 text-center">
+                      {(() => {
+                        const v = verifyCall(l);
+                        return (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${VERIFICATION_CLS[v.category] || 'bg-blue-50 text-blue-700'}`}
+                          >
+                            {l.channel || 'Call'}
+                            <span className="opacity-60">·</span>
+                            {v.label}
+                            {l.duration_seconds
+                              ? ` · ${Math.round((l.duration_seconds || 0) / 60)}m`
+                              : ''}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span

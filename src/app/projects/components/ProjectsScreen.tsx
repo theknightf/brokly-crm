@@ -10,11 +10,13 @@ import {
   FolderOpen,
   Loader2,
   X,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Project, ProjectStatus } from './mockProjects';
 import { projectsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
+import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 
 interface Developer {
   id: string;
@@ -26,6 +28,24 @@ interface ProjectFormData {
   name: string;
   developerId: string;
   status: ProjectStatus;
+  latitude?: string;
+  longitude?: string;
+  radiusM?: string;
+}
+
+function parseLat(v?: string): number | null {
+  const n = v == null ? NaN : parseFloat(v);
+  return Number.isFinite(n) && n >= -90 && n <= 90 ? n : null;
+}
+
+function parseLng(v?: string): number | null {
+  const n = v == null ? NaN : parseFloat(v);
+  return Number.isFinite(n) && n >= -180 && n <= 180 ? n : null;
+}
+
+function parseOptionalInt(v?: string): number | null {
+  const n = v == null ? NaN : parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function ProjectFormModal({
@@ -151,6 +171,41 @@ function ProjectFormModal({
                 ))}
               </div>
             </div>
+            <div>
+              <label className="label-base">Site location (optional)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.latitude || ''}
+                  onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
+                  className="input-base"
+                  placeholder="Latitude"
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.longitude || ''}
+                  onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
+                  className="input-base"
+                  placeholder="Longitude"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 items-center">
+                <input
+                  type="number"
+                  value={
+                    form.radiusM === undefined ? '' : form.radiusM
+                  }
+                  onChange={(e) => setForm((f) => ({ ...f, radiusM: e.target.value }))}
+                  className="input-base"
+                  placeholder="Radius (m)"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Radius for GPS verification. Default 300&nbsp;m.
+                </p>
+              </div>
+            </div>
           </div>
           <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
             <button type="button" onClick={onClose} className="btn-secondary">
@@ -187,6 +242,7 @@ export default function ProjectsScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
+  const [visitTarget, setVisitTarget] = useState<Project | null>(null);
 
   useEffect(() => {
     loadData();
@@ -223,7 +279,17 @@ export default function ProjectsScreen() {
 
   const handleAdd = async (data: ProjectFormData) => {
     try {
-      const created = await projectsService.create(data, user?.id || '');
+      const created = await projectsService.create(
+        {
+          name: data.name,
+          developerId: data.developerId,
+          status: data.status,
+          latitude: parseLat(data.latitude),
+          longitude: parseLng(data.longitude),
+          radiusM: parseOptionalInt(data.radiusM),
+        },
+        user?.id || ''
+      );
       setProjects((prev) => [created as Project, ...prev]);
       setAddOpen(false);
       toast.success(`Project "${data.name}" added`);
@@ -235,7 +301,14 @@ export default function ProjectsScreen() {
   const handleEdit = async (data: ProjectFormData) => {
     if (!editTarget) return;
     try {
-      const updated = await projectsService.update(editTarget.id, data);
+      const updated = await projectsService.update(editTarget.id, {
+        name: data.name,
+        developerId: data.developerId,
+        status: data.status,
+latitude: parseLat(data.latitude),
+        longitude: parseLng(data.longitude),
+        radiusM: parseOptionalInt(data.radiusM),
+      });
       setProjects((prev) => prev.map((p) => (p.id === editTarget.id ? (updated as Project) : p)));
       setEditTarget(null);
       toast.success('Project updated');
@@ -428,7 +501,14 @@ export default function ProjectsScreen() {
                       : '—'}
                   </td>
                   <td className="table-td">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
+                      <button
+                        onClick={() => setVisitTarget(project)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                        title="Site visit — GPS check-in"
+                      >
+                        <MapPin size={13} />
+                      </button>
                       <button
                         onClick={() => setEditTarget(project)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -508,6 +588,20 @@ export default function ProjectsScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {visitTarget && (
+        <SiteVisitSheet
+          project={{
+            id: visitTarget.id,
+            name: visitTarget.name,
+            latitude: visitTarget.latitude,
+            longitude: visitTarget.longitude,
+            radiusM: visitTarget.radiusM,
+          }}
+          onClose={() => setVisitTarget(null)}
+          onChanged={() => setVisitTarget(null)}
+        />
       )}
     </div>
   );

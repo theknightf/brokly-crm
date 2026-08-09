@@ -2,6 +2,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  ArrowDownLeft,
+  ArrowUpRight,
   CalendarCheck,
   CalendarClock,
   Check,
@@ -31,6 +33,14 @@ export interface CallItem {
 
 export type CallChannel = 'Call' | 'WhatsApp';
 
+export type Direction = 'outgoing' | 'incoming';
+
+interface CallItemTarget {
+  item: CallItem;
+  channel: CallChannel;
+  direction: Direction;
+}
+
 export type CallOutcome =
   | 'Reached'
   | 'Interested'
@@ -41,7 +51,11 @@ export type CallOutcome =
   | 'No Answer'
   | 'Wrong Number'
   | 'Busy'
-  | 'Other';
+  | 'Other'
+  | 'WhatsApp Sent'
+  | 'Customer Replied'
+  | 'No Reply'
+  | 'WhatsApp Follow-up';
 
 const OUTCOMES: { value: CallOutcome; icon: React.ReactNode; cls: string }[] = [
   {
@@ -98,7 +112,7 @@ const OUTCOMES: { value: CallOutcome; icon: React.ReactNode; cls: string }[] = [
 
 const CALLBACK_DAYS = [1, 2, 3, 5, 7, 14, 30];
 
-/** Outcomes that map onto a CRM pipeline stage and should move the lead. */
+/** Outcomes that gate onto the CRM lead pipeline and should move the lead. */
 const OUTCOME_TO_STATUS: Partial<Record<CallOutcome, string>> = {
   Interested: 'Interested',
   'Site Visit': 'Meeting',
@@ -106,7 +120,32 @@ const OUTCOME_TO_STATUS: Partial<Record<CallOutcome, string>> = {
   'Not Interested': 'Not Interested',
   'No Answer': 'No Answer',
   'Wrong Number': 'Wrong Number',
+  'Customer Replied': 'Following Up',
 };
+
+/** WhatsApp-specific quick outcomes shown when the action is a WhatsApp touch. */
+const WHATSAPP_OUTCOMES: { value: CallOutcome; icon: React.ReactNode; cls: string }[] = [
+  {
+    value: 'WhatsApp Sent',
+    icon: <MessageCircle size={14} />,
+    cls: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  },
+  {
+    value: 'Customer Replied',
+    icon: <ThumbsUp size={14} />,
+    cls: 'border-sky-200 bg-sky-50 text-sky-700',
+  },
+  {
+    value: 'No Reply',
+    icon: <UserX size={14} />,
+    cls: 'border-muted bg-muted/50 text-muted-foreground',
+  },
+  {
+    value: 'WhatsApp Follow-up',
+    icon: <CalendarClock size={14} />,
+    cls: 'border-amber-200 bg-amber-50 text-amber-700',
+  },
+];
 
 function futureDate(days: number): string {
   const d = new Date();
@@ -117,23 +156,34 @@ function futureDate(days: number): string {
 interface CallOutcomeSheetProps {
   item: CallItem;
   channel: CallChannel;
+  direction?: Direction;
   onClose: () => void;
   /** Called after the log is saved so parents can refresh their lists. */
   onSaved?: (item: CallItem) => Promise<void> | void;
 }
 
-export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcomeSheetProps) {
+export function CallOutcomeSheet({
+  item,
+  channel,
+  direction: initialDirection,
+  onClose,
+  onSaved,
+}: CallOutcomeSheetProps) {
   const [outcome, setOutcome] = useState<CallOutcome | null>(null);
+  const [direction, setDirection] = useState<'outgoing' | 'incoming'>('outgoing');
   const [callbackDays, setCallbackDays] = useState(3);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setOutcome(null);
+    setDirection(initialDirection || 'outgoing');
     setCallbackDays(3);
     setNote('');
     setSaving(false);
   }, [item]);
+
+  const outcomes = channel === 'WhatsApp' ? WHATSAPP_OUTCOMES : OUTCOMES;
 
   const save = async () => {
     if (!outcome || saving) return;
@@ -148,7 +198,7 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
           contact_name: item.contactName,
           contact_phone: item.contactPhone || '',
           channel,
-          direction: 'outgoing',
+          direction,
           outcome,
           notes: note.trim() || '',
         }),
@@ -175,14 +225,13 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
         }
       }
 
-      if (outcome === 'Call back later') {
-        const newDate = futureDate(callbackDays);
+      const scheduleFollowUp = async (newDate: string, label: string) => {
         if (item.rescheduleId) {
           try {
             await followUpsService.update(item.rescheduleId, {
               dueDate: newDate,
               status: 'Pending',
-              notes: `${note.trim() ? note.trim() + ' — ' : ''}Call back after ${callbackDays} day(s)`,
+              notes: `${note.trim() ? note.trim() + ' — ' : ''}${label} after ${callbackDays} day(s)`,
             });
             toast.success(`Follow-up rescheduled to ${newDate}`);
           } catch (e) {
@@ -211,7 +260,7 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
                 agentInitials: '',
                 notes:
                   (note.trim() ? note.trim() + ' — ' : '') +
-                  `Call back after ${callbackDays} day(s)`,
+                  `${label} after ${callbackDays} day(s)`,
                 propertyInterest: '',
                 relationshipStatus: 'New',
               },
@@ -233,6 +282,14 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
             toast.success('Call logged');
           }
         }
+      };
+
+      if (outcome === 'Call back later') {
+        scheduleFollowUp(futureDate(callbackDays), 'Call back');
+      }
+
+      if (outcome === 'WhatsApp Follow-up') {
+        scheduleFollowUp(futureDate(callbackDays), 'WhatsApp follow-up');
       }
 
       toast.success('Call logged');
@@ -275,8 +332,33 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
           </button>
         </div>
 
+        {channel === 'Call' && (
+          <div className="flex items-center gap-2 mb-4 rounded-xl border border-border bg-muted/40 p-1">
+            <button
+              onClick={() => setDirection('outgoing')}
+              className={`flex-1 h-9 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all active:scale-[0.98] ${
+                direction === 'outgoing'
+                  ? 'bg-card text-primary shadow-sm'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              <ArrowUpRight size={14} />
+              Outgoing
+            </button>
+            <button
+              onClick={() => setDirection('incoming')}
+              className={`flex-1 h-9 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all active:scale-[0.98] ${
+                direction === 'incoming' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground'
+              }`}
+            >
+              <ArrowDownLeft size={14} />
+              Incoming
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
-          {OUTCOMES.map((o) => (
+          {outcomes.map((o) => (
             <button
               key={o.value}
               onClick={() => setOutcome(o.value)}
@@ -292,11 +374,11 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
           ))}
         </div>
 
-        {outcome === 'Call back later' && (
+        {(outcome === 'Call back later' || outcome === 'WhatsApp Follow-up') && (
           <div className="mt-3 rounded-xl border border-border bg-muted/40 p-3">
             <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
               <CalendarClock size={13} className="text-amber-600" />
-              Call back after
+              {outcome === 'WhatsApp Follow-up' ? 'Follow up after' : 'Call back after'}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {CALLBACK_DAYS.map((d) => (
@@ -337,7 +419,9 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
             className="h-12 rounded-xl bg-primary text-primary-foreground text-sm font-semibold px-6 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98] transition-transform"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-            {outcome === 'Call back later' ? 'Save & schedule' : 'Save log'}
+            {outcome === 'Call back later' || outcome === 'WhatsApp Follow-up'
+              ? 'Save & schedule'
+              : 'Save log'}
           </button>
         </div>
       </div>
@@ -351,12 +435,12 @@ export function CallOutcomeSheet({ item, channel, onClose, onSaved }: CallOutcom
  * outcome sheet automatically when the app regains focus (visibilitychange).
  */
 export function useCallOutcome() {
-  const pendingRef = useRef<{ item: CallItem; channel: CallChannel } | null>(null);
+  const pendingRef = useRef<CallItemTarget | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [target, setTarget] = useState<{ item: CallItem; channel: CallChannel } | null>(null);
+  const [target, setTarget] = useState<CallItemTarget | null>(null);
 
-  const arm = useCallback((item: CallItem, channel: CallChannel) => {
-    pendingRef.current = { item, channel };
+  const arm = useCallback((item: CallItem, channel: CallChannel, direction: Direction = 'outgoing') => {
+    pendingRef.current = { item, channel, direction };
     // Fallback: on desktop (or when the phone dialer never triggers a
     // visibility event) show the sheet shortly after the tap so the popup
     // reliably appears even if the browser stays in the foreground.
@@ -390,9 +474,14 @@ export function useCallOutcome() {
     };
   }, [reveal]);
 
-  const sheet = target ? (
-    <CallOutcomeSheet item={target.item} channel={target.channel} onClose={() => setTarget(null)} />
-  ) : null;
+const sheet = target ? (
+  <CallOutcomeSheet
+    item={target.item}
+    channel={target.channel}
+    direction={target.direction}
+    onClose={() => setTarget(null)}
+  />
+) : null;
 
-  return { arm, sheet };
+return { arm, sheet };
 }

@@ -12,6 +12,9 @@ export interface Project {
   developerName: string;
   status: ProjectStatus;
   createdAt: string;
+  latitude?: number;
+  longitude?: number;
+  radiusM?: number;
 }
 
 export const DEVELOPERS: Developer[] = [

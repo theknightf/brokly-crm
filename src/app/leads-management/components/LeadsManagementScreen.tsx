@@ -386,6 +386,7 @@ export default function LeadsManagementScreen() {
       {/* Bulk action bar */}
       <BulkActionBar
         selectedCount={selectedIds.size}
+        selectedLeads={leads.filter((l) => selectedIds.has(l.id))}
         onDelete={handleBulkDelete}
         onAssign={handleBulkAssign}
         onClear={() => setSelectedIds(new Set())}

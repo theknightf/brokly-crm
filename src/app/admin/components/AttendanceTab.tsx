@@ -10,6 +10,7 @@ import {
   Users,
   CheckCircle2,
   XCircle,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -39,6 +40,15 @@ interface AttendanceRecord {
   user_id: string;
   check_in_time: string | null;
   check_out_time: string | null;
+}
+
+interface SiteVisitRecord {
+  user_id: string;
+  project_name?: string | null;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+  verified?: boolean | null;
+  within_radius?: boolean | null;
 }
 
 function formatTime(iso: string | null) {
@@ -84,6 +94,7 @@ export default function AttendanceTab() {
   const [date, setDate] = useState(() => todayLocal());
   const [users, setUsers] = useState<AttendanceUser[]>([]);
   const [records, setRecords] = useState<Record<string, AttendanceRecord>>({});
+  const [siteVisits, setSiteVisits] = useState<SiteVisitRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -101,6 +112,7 @@ export default function AttendanceTab() {
         map[r.user_id] = r;
       });
       setRecords(map);
+      setSiteVisits(data.siteVisits || []);
     } catch {
       toast.error('Failed to load attendance');
     } finally {
@@ -150,6 +162,8 @@ export default function AttendanceTab() {
 
   const presentCount = Object.values(records).filter((r) => r.check_in_time).length;
   const absentCount = users.length - presentCount;
+  const fieldVisits = siteVisits.length;
+  const fieldUserIds = new Set(siteVisits.map((s) => s.user_id));
 
   return (
     <div className="flex flex-col h-full">
@@ -179,7 +193,7 @@ export default function AttendanceTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {[
           {
             label: 'Present',
@@ -192,6 +206,12 @@ export default function AttendanceTab() {
             value: absentCount,
             color: 'text-muted-foreground',
             icon: <XCircle size={16} className="text-muted-foreground" />,
+          },
+          {
+            label: 'Field Visits',
+            value: fieldVisits,
+            color: 'text-violet-600',
+            icon: <MapPin size={16} className="text-violet-500" />,
           },
           {
             label: 'Total Users',
@@ -326,6 +346,11 @@ export default function AttendanceTab() {
                         </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                      {fieldUserIds.has(user.id) && (
+                        <span className="inline-flex items-center gap-1 text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide mt-1">
+                          <MapPin size={10} /> Field visit
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">

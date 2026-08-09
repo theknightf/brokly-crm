@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarRange, Loader2, Phone, RefreshCw } from 'lucide-react';
 import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
+import { verifyCall } from '@/lib/callVerification';
 
 interface CallLog {
   id: string;
@@ -11,6 +12,7 @@ interface CallLog {
   contact_name?: string;
   contact_phone?: string;
   channel?: string;
+  direction?: string;
   duration_seconds?: number;
   outcome?: string;
   created_at?: string;
@@ -124,6 +126,15 @@ export default function CallLogsReport() {
         notInterested: arr.filter((l) => l.outcome === 'Not Interested').length,
         noAnswer: arr.filter((l) => l.outcome === 'No Answer').length,
         callbacks: arr.filter((l) => l.outcome === 'Call back later').length,
+        incoming: arr.filter((l) => l.direction === 'incoming').length,
+        shortCalls: arr.filter((l) => {
+          const v = verifyCall(l);
+          return v.category === 'Short Call';
+        }).length,
+        connected: arr.filter((l) => {
+          const v = verifyCall(l);
+          return v.category === 'Successful';
+        }).length,
         other: arr.filter(
           (l) =>
             l.outcome &&
@@ -302,6 +313,15 @@ export default function CallLogsReport() {
                       Calls
                     </th>
                     <th className="text-center px-4 py-2.5 text-xs font-semibold text-emerald-600 uppercase tracking-wide">
+                      Connected
+                    </th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-amber-600 uppercase tracking-wide">
+                      Short
+                    </th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-sky-600 uppercase tracking-wide">
+                      Incoming
+                    </th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-emerald-600 uppercase tracking-wide">
                       Reached
                     </th>
                     <th className="text-center px-4 py-2.5 text-xs font-semibold text-red-500 uppercase tracking-wide">
@@ -324,6 +344,15 @@ export default function CallLogsReport() {
                       <td className="px-4 py-2.5 font-medium text-foreground">{a.name}</td>
                       <td className="px-4 py-2.5 text-center tabular-nums">{a.total}</td>
                       <td className="px-4 py-2.5 text-center tabular-nums text-emerald-600">
+                        {a.connected}
+                      </td>
+                      <td className="px-4 py-2.5 text-center tabular-nums text-amber-600">
+                        {a.shortCalls}
+                      </td>
+                      <td className="px-4 py-2.5 text-center tabular-nums text-sky-600">
+                        {a.incoming}
+                      </td>
+                      <td className="px-4 py-2.5 text-center tabular-nums text-emerald-700">
                         {a.reached}
                       </td>
                       <td className="px-4 py-2.5 text-center tabular-nums text-red-500">

@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const date = url.searchParams.get('date') || localToday();
 
-  const [usersRes, attendanceRes] = await Promise.all([
+  const [usersRes, attendanceRes, siteVisitsRes] = await Promise.all([
     supabase
       .from('user_profiles')
       .select('id, full_name, email, role, is_active')
@@ -54,6 +54,11 @@ export async function GET(request: Request) {
       .from('attendance')
       .select('user_id, check_in_time, check_out_time')
       .eq('attendance_date', date),
+    supabase
+      .from('site_visits')
+      .select('user_id, project_name, check_in_at, check_out_at, verified, within_radius')
+      .gte('check_in_at', `${date}T00:00:00`)
+      .lte('check_in_at', `${date}T23:59:59.999`),
   ]);
 
   if (usersRes.error) {
@@ -70,6 +75,7 @@ export async function GET(request: Request) {
     date,
     users: usersRes.data,
     attendance: attendanceRes.data,
+    siteVisits: siteVisitsRes.error ? [] : siteVisitsRes.data,
   });
 }
 

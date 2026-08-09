@@ -1159,6 +1159,9 @@ export const projectsService = {
         developer_id: project.developerId || null,
         project_status: project.status,
         created_by: userId,
+        latitude: project.latitude ?? null,
+        longitude: project.longitude ?? null,
+        radius_m: project.radiusM ?? null,
       })
       .select('*, developers(id, name)')
       .single();
@@ -1174,6 +1177,9 @@ export const projectsService = {
         name: project.name,
         developer_id: project.developerId || null,
         project_status: project.status,
+        latitude: project.latitude ?? null,
+        longitude: project.longitude ?? null,
+        radius_m: project.radiusM ?? null,
       })
       .eq('id', id)
       .select('*, developers(id, name)')
@@ -1197,6 +1203,9 @@ function rowToProject(row: any) {
     developerName: row.developers?.name || '',
     status: row.project_status,
     createdAt: row.created_at?.split('T')[0] || row.created_at,
+    latitude: row.latitude ?? undefined,
+    longitude: row.longitude ?? undefined,
+    radiusM: row.radius_m ?? 300,
   };
 }
 
