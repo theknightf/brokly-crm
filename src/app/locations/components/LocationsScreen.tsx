@@ -72,7 +72,10 @@ export default function LocationsScreen() {
     setLoading(true);
     try {
       const qs = new URLSearchParams();
-      if (filterUserId) qs.set('user_id', filterUserId);
+      if (isAdmin) {
+        if (filterUserId) qs.set('user_id', filterUserId);
+        else qs.set('all', '1');
+      }
       if (filterOpen) qs.set('open', '1');
       const res = await fetch(`/api/site-visits?${qs.toString()}`);
       const data = await res.json();
@@ -91,7 +94,7 @@ export default function LocationsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [filterUserId, filterOpen]);
+  }, [isAdmin, filterUserId, filterOpen]);
 
   useEffect(() => {
     loadUsers();
@@ -164,7 +167,7 @@ export default function LocationsScreen() {
             {isAdmin
               ? adminName
                 ? `Site visits for ${adminName}`
-                : 'Site visit locations — choose an agent to filter'
+                : 'Site visit locations for the whole team'
               : profile?.full_name || 'Your site visit locations'}
           </p>
         </div>

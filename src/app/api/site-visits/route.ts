@@ -143,8 +143,9 @@ export async function POST(request: Request) {
   }
 }
 
-// GET /api/site-visits?user_id=&open_only=1 — list site visits. Non-admins see
-// their own only; admins may pass ?user_id to see a specific agent.
+// GET /api/site-visits?user_id=&open_only=1&all=1 — list site visits.
+// Non-admins see their own only; admins/owners may pass ?user_id to see a
+// specific agent, or ?all=1 to see every user's locations at once.
 export async function GET(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -154,26 +155,33 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const openOnly = url.searchParams.get('open') === '1';
+  const all = url.searchParams.get('all') === '1';
   const userId = url.searchParams.get('user_id');
   const projectId = url.searchParams.get('project_id');
 
-  // Only admins/owners can read someone else's visits.
+  // Only admins/owners can read someone else's visits (or everyone's).
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+  const isAdmin = ['admin', 'owner'].includes(profile?.role || '');
+
   let scopedUserId = user.id;
-  if (userId && userId !== user.id) {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    if (['admin', 'owner'].includes(profile?.role || '')) scopedUserId = userId;
-  }
+  if (isAdmin && userId) scopedUserId = userId;
 
   let query = supabase
     .from('site_visits')
     .select('*, agent:user_profiles(id, full_name)')
-    .eq('user_id', scopedUserId)
     .order('check_in_at', { ascending: false })
     .limit(200);
+
+  if (all) {
+    if (!isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // keep query unscoped — every user's visits
+  } else {
+    query = query.eq('user_id', scopedUserId);
+  }
 
   if (openOnly) query = query.is('check_out_at', null);
   if (projectId) query = query.eq('project_id', projectId);
@@ -189,7 +197,8 @@ export async function GET(request: Request) {
 
   const visits = (data || []).map((v) => ({
     ...v,
-    agent_name: (v as any).user?.full_name || '',
+    agent_name:
+      (v as any).agent?.full_name || (v as any)?.user?.full_name || '',
   }));
   return NextResponse.json({ visits });
 }
