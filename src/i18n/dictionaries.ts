@@ -20,6 +20,8 @@ export const dictionaries: Dict = {
   'common.settings': { en: 'Settings', ar: 'الإعدادات' },
   'common.dashboard': { en: 'Dashboard', ar: 'لوحة التحكم' },
   'common.unitCalculator': { en: 'Unit Calculator', ar: 'حاسبة الوحدات' },
+  'common.locations': { en: 'Locations', ar: 'المواقع' },
+  'common.myLocation': { en: 'My Location', ar: 'موقعي' },
   'common.logout': { en: 'Log out', ar: 'تسجيل الخروج' },
   'common.save': { en: 'Save', ar: 'حفظ' },
   'common.cancel': { en: 'Cancel', ar: 'إلغاء' },

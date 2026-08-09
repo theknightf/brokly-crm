@@ -132,19 +132,21 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       email: data.email,
       location: data.location,
       propertyType: data.propertyType,
-      budgetMin: Number(data.budgetMin),
-      budgetMax: Number(data.budgetMax),
+      budgetMin: data.budgetMin ? Number(data.budgetMin) : undefined,
+      budgetMax: data.budgetMax ? Number(data.budgetMax) : undefined,
       source: data.source,
       agent: data.agent,
       agentInitials: data.agent
-        .split(' ')
-        .map((p) => p[0])
-        .join(''),
+        ? data.agent
+            .split(' ')
+            .map((p) => p[0])
+            .join('')
+        : '',
       status: data.status,
       assignedTo: data.assignedTo || undefined,
       assignedToName: assignedUser?.name,
       lastContact: today,
-      followUpDue: data.followUpDue || today,
+      followUpDue: data.followUpDue || undefined,
       createdAt: today,
       notes: data.notes || '',
       developer: data.developer || undefined,
@@ -170,17 +172,15 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label htmlFor="add-name" className="label-base">
-                Full name
+                Full name{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <input
                 id="add-name"
                 type="text"
                 className={`input-base ${errors.name ? 'border-red-400' : ''}`}
                 placeholder="Ahmed Hassan"
-                {...register('name', {
-                  required: 'Full name is required',
-                  minLength: { value: 2, message: 'Name must be at least 2 characters' },
-                })}
+                {...register('name')}
               />
               {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
             </div>
@@ -218,14 +218,15 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             </div>
             <div>
               <label htmlFor="add-location" className="label-base">
-                City / Location
+                City / Location{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <input
                 id="add-location"
                 type="text"
                 className={`input-base ${errors.location ? 'border-red-400' : ''}`}
                 placeholder="Cairo"
-                {...register('location', { required: 'Location is required' })}
+                {...register('location')}
               />
               {errors.location && (
                 <p className="mt-1 text-xs text-red-500">{errors.location.message}</p>
@@ -317,13 +318,14 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="add-proptype" className="label-base">
-                Property type
+                Property type{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <div className="relative">
                 <select
                   id="add-proptype"
                   className={selectClass(!!errors.propertyType)}
-                  {...register('propertyType', { required: 'Select a property type' })}
+                  {...register('propertyType')}
                 >
                   {ALL_PROPERTY_TYPES.map((p) => (
                     <option key={`add-prop-${p}`} value={p}>
@@ -342,7 +344,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             </div>
             <div>
               <label htmlFor="add-budgetmin" className="label-base">
-                Budget min <span className="text-muted-foreground font-normal">(ج.م)</span>
+                Budget min <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <input
                 id="add-budgetmin"
@@ -351,7 +354,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 className={`input-base font-mono-data ${errors.budgetMin ? 'border-red-400' : ''}`}
                 placeholder="500000"
                 {...register('budgetMin', {
-                  required: 'Minimum budget is required',
                   min: { value: 1, message: 'Must be at least 1 ج.م' },
                   valueAsNumber: true,
                 })}
@@ -362,7 +364,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             </div>
             <div>
               <label htmlFor="add-budgetmax" className="label-base">
-                Budget max <span className="text-muted-foreground font-normal">(ج.م)</span>
+                Budget max <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <input
                 id="add-budgetmax"
@@ -371,11 +374,10 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 className={`input-base font-mono-data ${errors.budgetMax ? 'border-red-400' : ''}`}
                 placeholder="800000"
                 {...register('budgetMax', {
-                  required: 'Maximum budget is required',
                   min: { value: 1, message: 'Must be at least 1 ج.م' },
                   valueAsNumber: true,
                   validate: (val) =>
-                    !budgetMin || val >= Number(budgetMin) || 'Max must be ≥ min budget',
+                    !budgetMin || !val || val >= Number(budgetMin) || 'Max must be ≥ min budget',
                 })}
               />
               {errors.budgetMax && (
@@ -398,13 +400,14 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="add-source" className="label-base">
-                Lead source
+                Lead source{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <div className="relative">
                 <select
                   id="add-source"
                   className={selectClass(!!errors.source)}
-                  {...register('source', { required: 'Select lead source' })}
+                  {...register('source')}
                 >
                   {ALL_SOURCES.map((s) => (
                     <option key={`add-source-${s}`} value={s}>
@@ -424,13 +427,14 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
 
             <div>
               <label htmlFor="add-status" className="label-base">
-                Lead status / stage
+                Lead status / stage{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <div className="relative">
                 <select
                   id="add-status"
                   className={selectClass(!!errors.status)}
-                  {...register('status', { required: 'Select initial status' })}
+                  {...register('status')}
                 >
                   {ALL_STATUSES.map((s) => (
                     <option key={`add-status-${s}`} value={s}>
@@ -450,13 +454,14 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
 
             <div>
               <label htmlFor="add-agent" className="label-base">
-                Agent name
+                Agent name{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <div className="relative">
                 <select
                   id="add-agent"
                   className={selectClass(!!errors.agent)}
-                  {...register('agent', { required: 'Assign to an agent' })}
+                  {...register('agent')}
                 >
                   <option value="">— Select Agent —</option>
                   {agentList.map((a) => (
@@ -503,13 +508,14 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
 
             <div>
               <label htmlFor="add-followup" className="label-base">
-                First follow-up date
+                First follow-up date{' '}
+                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
               </label>
               <input
                 id="add-followup"
                 type="date"
                 className={`input-base ${errors.followUpDue ? 'border-red-400' : ''}`}
-                {...register('followUpDue', { required: 'Set a follow-up date' })}
+                {...register('followUpDue')}
               />
               {errors.followUpDue && (
                 <p className="mt-1 text-xs text-red-500">{errors.followUpDue.message}</p>
@@ -535,7 +541,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       {/* Sticky footer */}
       <div className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex items-center justify-between gap-3 rounded-b-2xl">
         <p className="text-xs text-muted-foreground">
-          Fields marked as required must be filled before saving
+          Only Enter a valid phone number is required — everything else is optional
         </p>
         <div className="flex items-center gap-2">
           <button type="button" onClick={onCancel} className="btn-secondary">

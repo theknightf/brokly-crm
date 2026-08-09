@@ -18,7 +18,7 @@ interface AssignableUser {
 
 export interface BulkLead {
   id: string;
-  name: string;
+  name?: string;
   phone?: string;
 }
 

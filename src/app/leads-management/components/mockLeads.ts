@@ -42,25 +42,25 @@ export type PropertyType =
 
 export interface Lead {
   id: string;
-  name: string;
+  name?: string;
   phone: string;
-  email: string;
-  propertyType: PropertyType;
-  budgetMin: number;
-  budgetMax: number;
-  source: LeadSource;
-  agent: string;
-  agentInitials: string;
-  status: LeadStatus;
+  email?: string;
+  propertyType?: PropertyType;
+  budgetMin?: number;
+  budgetMax?: number;
+  source?: LeadSource;
+  agent?: string;
+  agentInitials?: string;
+  status?: LeadStatus;
   assignedTo?: string;
   assignedToName?: string;
   adminId?: string | null;
   adminName?: string | null;
-  lastContact: string;
-  followUpDue: string;
-  createdAt: string;
-  notes: string;
-  location: string;
+  lastContact?: string;
+  followUpDue?: string;
+  createdAt?: string;
+  notes?: string;
+  location?: string;
   developer?: string;
   project?: string;
 }

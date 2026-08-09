@@ -293,6 +293,13 @@ export default function LeadsManagementScreen() {
     );
   }
 
+  const formatDisplayBudget = (lead: Lead) => {
+    const parts: string[] = [];
+    if (lead.budgetMin != null) parts.push(`${lead.budgetMin.toLocaleString()}L`);
+    if (lead.budgetMax != null) parts.push(`${lead.budgetMax.toLocaleString()}L`);
+    return parts.length ? `₹${parts.join('–')}` : '—';
+  };
+
   return (
     <div className="space-y-5">
       {/* Page header */}
@@ -425,14 +432,16 @@ export default function LeadsManagementScreen() {
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
                   {viewLead.name
-                    .split(' ')
+                    ?.split(' ')
                     .map((n) => n[0])
                     .join('')
-                    .slice(0, 2)}
+                    .slice(0, 2) || '—'}
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">{viewLead.name}</h2>
-                  <p className="text-xs text-muted-foreground">{viewLead.location}</p>
+                  <h2 className="text-base font-semibold text-foreground">
+                    {viewLead.name || `Lead ${viewLead.id}`}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">{viewLead.location || '—'}</p>
                 </div>
               </div>
               <button onClick={() => setViewLead(null)} className="btn-ghost p-1.5 rounded-lg">
@@ -444,11 +453,14 @@ export default function LeadsManagementScreen() {
               <div className="bg-muted/40 rounded-xl px-3 py-2.5">
                 <p className="text-xs text-muted-foreground mb-2">Lead status</p>
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={viewLead.status} showDot />
+                  <StatusBadge
+                    status={viewLead.status || 'Fresh Leads'}
+                    showDot
+                  />
                   <select
                     aria-label="Update lead status"
                     className="input-base appearance-none pr-8 min-w-0 flex-1"
-                    value={viewLead.status}
+                    value={viewLead.status || 'Fresh Leads'}
                     onChange={(e) => {
                       const next = e.target.value as LeadStatus;
                       setViewLead({ ...viewLead, status: next });
@@ -484,7 +496,7 @@ export default function LeadsManagementScreen() {
                   { label: 'Phone', value: viewLead.phone },
                   { label: 'Email', value: viewLead.email || '—' },
                   { label: 'Property Type', value: viewLead.propertyType },
-                  { label: 'Budget', value: `₹${viewLead.budgetMin}–${viewLead.budgetMax}L` },
+                  { label: 'Budget', value: formatDisplayBudget(viewLead) },
                   { label: 'Source', value: viewLead.source },
                   { label: 'Agent', value: viewLead.agent },
                   { label: 'Status', value: viewLead.status },

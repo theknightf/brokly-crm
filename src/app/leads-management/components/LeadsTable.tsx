@@ -67,10 +67,13 @@ const PIPELINE: LeadStatus[] = [
   'Done Deal',
 ];
 
-function nextStage(current: LeadStatus): LeadStatus {
+function nextStage(current?: LeadStatus): LeadStatus | undefined {
+  if (!current) return undefined;
   const i = PIPELINE.indexOf(current);
   return i >= 0 && i < PIPELINE.length - 1 ? PIPELINE[i + 1] : current;
 }
+
+const FALLBACK_STATUS: LeadStatus = 'Fresh Leads';
 
 function StatusDropdown({
   currentStatus,
@@ -137,16 +140,21 @@ export default function LeadsTable({
     }
   };
 
-  const formatBudget = (min: number, max: number) =>
-    `${min.toLocaleString()}–${max.toLocaleString()} ج.م`;
+  const formatBudget = (min?: number, max?: number) => {
+    if (min == null && max == null) return '—';
+    const parts: string[] = [];
+    if (min != null) parts.push(min.toLocaleString());
+    if (max != null) parts.push(max.toLocaleString());
+    return `${parts.join('–')} ج.م`;
+  };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr?: string) => {
     if (!dateStr) return '—';
     const [y, m, d] = dateStr.split('-');
     return `${m}/${d}/${y?.slice(2)}`;
   };
 
-  const isOverdue = (dueDate: string) => {
+  const isOverdue = (dueDate?: string) => {
     if (!dueDate) return false;
     const due = new Date(dueDate);
     const today = new Date();
@@ -233,24 +241,26 @@ export default function LeadsTable({
                     checked={selectedIds.has(lead.id)}
                     onChange={(e) => onSelectRow(lead.id, e.target.checked)}
                     className="w-5 h-5 rounded border-input accent-primary cursor-pointer flex-shrink-0"
-                    aria-label={`Select ${lead.name}`}
+                    aria-label={`Select ${lead.name || lead.id}`}
                   />
                   <button
                     onClick={() => onView?.(lead)}
                     className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
                   >
                     <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {lead.name
+                      {(lead.name || lead.id)
                         .split(' ')
                         .map((n) => n[0])
                         .join('')
                         .slice(0, 2)}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-foreground truncate">{lead.name}</p>
+                      <p className="font-semibold text-foreground truncate">
+                        {lead.name || `Lead ${lead.id}`}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate flex items-center gap-0.5">
                         <MapPin size={10} className="flex-shrink-0" />
-                        {lead.location}
+                        {lead.location || '—'}
                       </p>
                     </div>
                   </button>
@@ -275,13 +285,13 @@ export default function LeadsTable({
                 {/* Status + budget */}
                 <div className="flex items-center gap-2 mt-3">
                   <StatusDropdown
-                    currentStatus={lead.status}
+                    currentStatus={lead.status || FALLBACK_STATUS}
                     leadId={lead.id}
                     onStatusChange={onStatusChange}
                   />
                   <button
-                    onClick={() => next !== lead.status && onStatusChange(lead.id, next)}
-                    disabled={next === lead.status}
+                    onClick={() => next != null && next !== lead.status && onStatusChange(lead.id, next)}
+                    disabled={!next || next === lead.status}
                     className="h-10 px-3 rounded-xl bg-primary/10 text-primary flex items-center gap-1 text-xs font-bold disabled:opacity-40 active:scale-95 transition-transform"
                     aria-label="Advance status"
                   >
@@ -292,7 +302,7 @@ export default function LeadsTable({
                     <p className="text-sm font-bold text-foreground tabular-nums leading-tight">
                       {formatBudget(lead.budgetMin, lead.budgetMax)}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">{lead.propertyType}</p>
+                    <p className="text-[11px] text-muted-foreground">{lead.propertyType || '—'}</p>
                   </div>
                 </div>
 
@@ -306,13 +316,13 @@ export default function LeadsTable({
                     </span>
                   </span>
                   <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-lg font-medium">
-                    {lead.source}
+                    {lead.source || '—'}
                   </span>
                 </div>
 
                 {/* Big thumb-zone actions */}
                 <div className="mt-3">
-                  <LeadQuickActions lead={{ id: lead.id, name: lead.name, phone: lead.phone }} />
+                  <LeadQuickActions lead={{ id: lead.id, name: lead.name || '', phone: lead.phone }} />
                 </div>
               </div>
             );
@@ -369,13 +379,13 @@ export default function LeadsTable({
                       checked={selectedIds.has(lead.id)}
                       onChange={(e) => onSelectRow(lead.id, e.target.checked)}
                       className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
-                      aria-label={`Select ${lead.name}`}
+                      aria-label={`Select ${lead.name || lead.id}`}
                     />
                   </td>
                   <td className="table-td">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {lead.name
+                        {(lead.name || lead.id)
                           .split(' ')
                           .map((n) => n[0])
                           .join('')
@@ -383,11 +393,11 @@ export default function LeadsTable({
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-foreground text-sm truncate max-w-[130px]">
-                          {lead.name}
+                          {lead.name || `Lead ${lead.id}`}
                         </p>
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                           <MapPin size={10} />
-                          {lead.location}
+                          {lead.location || '—'}
                         </span>
                       </div>
                     </div>
@@ -400,12 +410,12 @@ export default function LeadsTable({
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Mail size={10} className="flex-shrink-0" />
-                        <span className="truncate max-w-[150px]">{lead.email}</span>
+                        <span className="truncate max-w-[150px]">{lead.email || '—'}</span>
                       </div>
                     </div>
                   </td>
                   <td className="table-td">
-                    <span className="text-sm text-foreground">{lead.propertyType}</span>
+                    <span className="text-sm text-foreground">{lead.propertyType || '—'}</span>
                   </td>
                   <td className="table-td">
                     <span className="font-mono-data text-sm text-foreground tabular-nums">
@@ -414,16 +424,16 @@ export default function LeadsTable({
                   </td>
                   <td className="table-td">
                     <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
-                      {lead.source}
+                      {lead.source || '—'}
                     </span>
                   </td>
                   <td className="table-td">
                     <div className="flex items-center gap-1.5">
                       <div className="w-6 h-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {lead.agentInitials}
+                        {lead.agentInitials || '—'}
                       </div>
                       <span className="text-sm text-foreground truncate max-w-[100px]">
-                        {lead.agent?.split(' ')[0]}
+                        {lead.agent?.split(' ')[0] || '—'}
                       </span>
                     </div>
                   </td>
@@ -452,18 +462,18 @@ export default function LeadsTable({
                   <td className="table-td">
                     <div className="flex items-center gap-1.5">
                       <StatusDropdown
-                        currentStatus={lead.status}
+                        currentStatus={lead.status || FALLBACK_STATUS}
                         leadId={lead.id}
                         onStatusChange={onStatusChange}
                       />
                       <button
                         onClick={() => {
                           const next = nextStage(lead.status);
-                          if (next !== lead.status) onStatusChange(lead.id, next);
+                          if (next && next !== lead.status) onStatusChange(lead.id, next);
                         }}
                         className="w-6 h-6 rounded-md hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
                         title={
-                          nextStage(lead.status) !== lead.status
+                          nextStage(lead.status)
                             ? `One-click: move to ${nextStage(lead.status)}`
                             : 'At final pipeline stage'
                         }

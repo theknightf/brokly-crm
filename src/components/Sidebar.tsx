@@ -19,6 +19,7 @@ import {
   ListChecks,
   Calculator,
   Receipt,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -78,6 +79,12 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
   {
     titleKey: 'nav.management',
     items: [
+      {
+        id: 'nav-locations',
+        labelKey: 'common.locations',
+        icon: <MapPin size={18} />,
+        href: '/locations',
+      },
       {
         id: 'nav-projects',
         labelKey: 'common.projects',
