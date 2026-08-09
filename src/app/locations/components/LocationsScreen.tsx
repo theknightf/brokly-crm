@@ -1,6 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { MapPin, Loader2, ExternalLink, Users, RefreshCw, Navigation } from 'lucide-react';
+import { MapPin, Loader2, ExternalLink, Users, RefreshCw, Navigation, Crosshair } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -47,10 +47,12 @@ export default function LocationsScreen() {
 
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sharing, setSharing] = useState(false);
   const [fallback, setFallback] = useState(false);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [filterUserId, setFilterUserId] = useState<string>('');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [sharingError, setSharingError] = useState('');
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return;
@@ -99,6 +101,51 @@ export default function LocationsScreen() {
     loadVisits();
   }, [loadVisits]);
 
+  const shareLocation = () => {
+    if (sharing) return;
+    setSharingError('');
+    if (!navigator.geolocation) {
+      setSharingError(
+        'Geolocation is not supported. Enable it in your browser or use an HTTPS connection.'
+      );
+      return;
+    }
+    setSharing(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        try {
+          const res = await fetch('/api/site-visits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'checkin',
+              lat,
+              lng,
+              project_name: 'My Location',
+              note: `Location shared from the map`,
+            }),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || 'Failed to share location');
+          toast.success('Location shared');
+          loadVisits();
+        } catch (e: any) {
+          setSharingError(e?.message || 'Failed to share location');
+          toast.error(e?.message || 'Failed to share location');
+        } finally {
+          setSharing(false);
+        }
+      },
+      (err) => {
+        setSharingError(err.message || 'Location unavailable — check permission.');
+        setSharing(false);
+      },
+      { enableHighAccuracy: true, timeout: 12000 }
+    );
+  };
+
   const openInMaps = (lat: number, lng: number) =>
     window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
 
@@ -122,6 +169,14 @@ export default function LocationsScreen() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={shareLocation}
+            disabled={sharing}
+            className="btn-primary flex items-center gap-1.5 text-sm h-9 self-start sm:self-auto"
+          >
+            {sharing ? <Loader2 size={14} className="animate-spin" /> : <Crosshair size={14} />}
+            {sharing ? 'Getting location…' : 'Share my location'}
+          </button>
           {isAdmin && users.length > 1 && (
             <select
               aria-label="Filter by agent"
@@ -153,6 +208,13 @@ export default function LocationsScreen() {
           </button>
         </div>
       </div>
+
+      {sharingError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700 flex items-start gap-2">
+          <span className="flex-shrink-0 mt-0.5">⚠</span>
+          {sharingError}
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (
