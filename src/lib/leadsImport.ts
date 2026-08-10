@@ -14,8 +14,23 @@ export type ImportField =
   | 'date'
   | 'developer'
   | 'project'
+  | 'unit'
+  | 'interestLevel'
+  | 'assigned'
   | 'notes'
   | 'location';
+
+/** Normalized interest-level values we accept (English + Arabic). */
+const INTEREST_LEVELS = ['Hot', 'Warm', 'Cold', 'New'] as const;
+interface InterestAlias {
+  value: string;
+  matches: RegExp;
+}
+const INTEREST_ALIASES: InterestAlias[] = [
+  { value: 'Hot', matches: /hot|حار|ساخن|high|عالية|مرتفع/ },
+  { value: 'Warm', matches: /warm|دافئ|متوسط|mid/ },
+  { value: 'Cold', matches: /cold|بارد|low|منخفض|ضعيف/ },
+];
 
 /** Normalized field -> list of header aliases we accept (case/space/punct-insensitive). */
 const FIELD_ALIASES: Record<ImportField, string[]> = {
@@ -64,6 +79,45 @@ const FIELD_ALIASES: Record<ImportField, string[]> = {
   ],
   developer: ['developer', 'dev', 'المطور', 'الشركة المطورة', 'مطور'],
   project: ['project', 'compound', 'المشروع', 'مشروع', 'كمبوند'],
+  unit: [
+    'unit',
+    'unit number',
+    'unit no',
+    'apartment',
+    'apartment number',
+    'الوحدة',
+    'رقم الوحدة',
+    'شقة',
+    'رقم الشقة',
+    'فيلا',
+  ],
+  interestLevel: [
+    'interest',
+    'interest level',
+    'level',
+    'rating',
+    'lead rating',
+    'lead score',
+    'درجة الاهتمام',
+    'الاهتمام',
+    'اهتمام',
+    'تقييم',
+    'مستوى الاهتمام',
+  ],
+  assigned: [
+    'assigned',
+    'assigned to',
+    'assignee',
+    'agent',
+    'sales agent',
+    'owner',
+    'consultant',
+    'المسؤول',
+    'موظف',
+    'مندوب',
+    'العميل المسوق',
+    'مستخدم',
+  ],
   location: ['location', 'city', 'area', 'المدينة', 'المنطقة', 'موقع', 'عنوان'],
   notes: ['notes', 'note', 'comment', 'ملاحظات', 'ملاحظة'],
 };
@@ -96,6 +150,9 @@ export function detectField(header: string): ImportField | undefined {
   if (/date|التاريخ/.test(key)) return 'date';
   if (/develop|مطور/.test(key)) return 'developer';
   if (/project|مشروع/.test(key)) return 'project';
+  if (/unit|شقة|وحدة/.test(key)) return 'unit';
+  if (/interest|اهتمام|تقييم|rating/.test(key)) return 'interestLevel';
+  if (/assigned|agent|مندوب|المسؤول/.test(key)) return 'assigned';
   if (/location|مدينة/.test(key)) return 'location';
   if (/source|مصدر/.test(key)) return 'source';
   return undefined;
@@ -155,6 +212,10 @@ export interface ParsedRow {
   date?: string; // YYYY-MM-DD or ISO, may be empty
   developer?: string;
   project?: string;
+  unit?: string;
+  interestLevel?: string;
+  assignedTo?: string; // resolved user id ('' if a name was given but not found)
+  assignedName?: string;
   location?: string;
   notes?: string;
   reasons: string[]; // validation problems (empty = importable)
@@ -217,14 +278,26 @@ function getMapped(
   return '';
 }
 
+/** Normalized interest-level matching (English + Arabic aliases), else '' */
+export function normalizeInterest(raw: string): string {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  if (INTEREST_LEVELS.includes(s as any)) return s;
+  const key = s.toLowerCase();
+  for (const a of INTEREST_ALIASES) if (a.matches.test(key)) return a.value;
+  return '';
+}
+
 /**
  * Parse an uploaded .xlsx/.csv File into headers + rows + a best-guess column
  * mapping. Called from the browser; heavy libs are loaded lazily only when a
- * file is actually uploaded.
+ * file is actually uploaded. Pass `users` so "assigned to" name columns can be
+ * resolved to real user ids during parsing.
  */
 export async function parseLeadFile(
   file: File,
-  userMapping?: Record<number, ImportField>
+  userMapping?: Record<number, ImportField>,
+  users?: { id: string; name: string }[]
 ): Promise<ImportParseResult> {
   const isCsv = /\.csv$/i.test(file.name);
   const isXlsx = /\.(xlsx|xls)$/i.test(file.name);
@@ -304,6 +377,29 @@ export async function parseLeadFile(
     const isoDate = dateVal ? toIsoDate(dateVal) : '';
     if (dateVal && !isoDate) reasons.push('Unrecognized date format');
 
+    // Assigned user: resolve a name (or full name) to a user id when possible.
+    const assignedNameRaw = cellToStr(getMapped(obj, headers, mapping, 'assigned'));
+    let assignedId = '';
+    let assignedName = '';
+    if (assignedNameRaw) {
+      const lower = assignedNameRaw.toLowerCase().trim();
+      const match =
+        (users || []).find((u) => u.name.toLowerCase().trim() === lower) ||
+        (users || []).find((u) => u.name.toLowerCase().includes(lower) || lower.includes(u.name.toLowerCase()));
+      if (match) {
+        assignedId = match.id;
+        assignedName = match.name;
+      } else {
+        assignedName = assignedNameRaw;
+        reasons.push(`Unknown assigned user "${assignedNameRaw.slice(0, 40)}"`);
+      }
+    }
+
+    const interestRaw = cellToStr(getMapped(obj, headers, mapping, 'interestLevel'));
+    const interestNorm = normalizeInterest(interestRaw);
+    if (interestRaw && !interestNorm)
+      reasons.push(`Unknown interest level "${interestRaw.slice(0, 40)}"`);
+
     return {
       rowNumber: idx + 2,
       name: cellToStr(getMapped(obj, headers, mapping, 'name')) || undefined,
@@ -314,6 +410,10 @@ export async function parseLeadFile(
       date: isoDate || undefined,
       developer: cellToStr(getMapped(obj, headers, mapping, 'developer')) || undefined,
       project: cellToStr(getMapped(obj, headers, mapping, 'project')) || undefined,
+      unit: cellToStr(getMapped(obj, headers, mapping, 'unit')) || undefined,
+      interestLevel: interestNorm || undefined,
+      assignedTo: assignedId || undefined,
+      assignedName: assignedName || undefined,
       location: cellToStr(getMapped(obj, headers, mapping, 'location')) || undefined,
       notes: cellToStr(getMapped(obj, headers, mapping, 'notes')) || undefined,
       reasons,

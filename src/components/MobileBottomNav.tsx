@@ -2,7 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, UserCheck, CalendarClock, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, CalendarClock, ListChecks, Menu } from 'lucide-react';
 import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -13,10 +13,20 @@ interface MobileBottomNavProps {
 
 const items = [
   { labelKey: 'common.home', href: '/', icon: LayoutDashboard },
+  { labelKey: 'common.workspace', href: '/workspace', icon: ListChecks },
   { labelKey: 'common.leads', href: '/leads-management', icon: Users },
   { labelKey: 'common.customers', href: '/customers', icon: UserCheck },
   { labelKey: 'common.followups', href: '/follow-ups', icon: CalendarClock },
 ];
+
+function mobileNavForRole(role?: string) {
+  if (role === 'agent' || role === 'senior_agent' || role === 'telecaller') {
+    // Sales workspace first: Home, Workspace, Leads, Follow-ups
+    return [items[0], items[1], items[2], items[4]];
+  }
+  // Default / management / admin: Home, Leads, Customers, Follow-ups
+  return [items[0], items[2], items[3], items[4]];
+}
 
 export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   const pathname = usePathname();
@@ -29,10 +39,12 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   // Admin still reaches the admin area through the drawer menu.
   void isAdminRole(profile?.role);
 
+  const navItems = mobileNavForRole(profile?.role);
+
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border pb-safe">
       <div className="flex items-stretch h-16">
-        {items.map((item) => {
+        {navItems.map((item) => {
           const active = isActive(item.href);
           return (
             <Link

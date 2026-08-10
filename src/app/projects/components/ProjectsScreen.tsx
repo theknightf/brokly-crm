@@ -11,12 +11,14 @@ import {
   Loader2,
   X,
   MapPin,
+  Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Project, ProjectStatus } from './mockProjects';
 import { projectsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
+import UnitsPanel from './UnitsPanel';
 
 interface Developer {
   id: string;
@@ -243,6 +245,7 @@ export default function ProjectsScreen() {
   const [editTarget, setEditTarget] = useState<Project | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [visitTarget, setVisitTarget] = useState<Project | null>(null);
+  const [unitsTarget, setUnitsTarget] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -503,6 +506,13 @@ latitude: parseLat(data.latitude),
                   <td className="table-td">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
                       <button
+                        onClick={() => setUnitsTarget({ id: project.id, name: project.name })}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-primary hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Units & files"
+                      >
+                        <Layers size={13} />
+                      </button>
+                      <button
                         onClick={() => setVisitTarget(project)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
                         title="Site visit — GPS check-in"
@@ -601,6 +611,15 @@ latitude: parseLat(data.latitude),
           }}
           onClose={() => setVisitTarget(null)}
           onChanged={() => setVisitTarget(null)}
+        />
+      )}
+
+      {unitsTarget && (
+        <UnitsPanel
+          projectId={unitsTarget.id}
+          projectName={unitsTarget.name}
+          open={!!unitsTarget}
+          onClose={() => setUnitsTarget(null)}
         />
       )}
     </div>

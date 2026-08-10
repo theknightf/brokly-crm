@@ -18,6 +18,91 @@ function localToday(): string {
   return `${y}-${m}-${d}`;
 }
 
+interface WorkLocation {
+  lat: number;
+  lng: number;
+  radiusM: number;
+  label?: string;
+}
+
+const DEFAULT_WORK_LOCATION: WorkLocation = {
+  lat: 30.0444,
+  lng: 31.2357,
+  radiusM: 800,
+  label: 'Company office (default)',
+};
+
+/**
+ * Reads the configured work location (center + allowed radius) used to
+ * enforce the attendance GPS radius check. Priority:
+ *   1. admin_settings (category 'workLocation')
+ *   2. built-in default (Cairo office, 800 m)
+ * Gracefully falls back to the default if the settings table doesn't exist yet
+ * or no entry is found, so a missing migration never breaks attendance.
+ */
+async function getWorkLocation(supabase: any): Promise<WorkLocation> {
+  try {
+    const { data, error } = await supabase
+      .from('admin_settings')
+      .select('color')
+      .eq('category', 'workLocation')
+      .eq('name', 'default')
+      .single();
+    if (error || !data?.color) {
+      if (error && isSchemaError(error?.message)) return DEFAULT_WORK_LOCATION;
+      return DEFAULT_WORK_LOCATION;
+    }
+    try {
+      const parsed = JSON.parse(data.color);
+      const lat = parseFloat(parsed.lat);
+      const lng = parseFloat(parsed.lng);
+      const radiusM = parseFloat(parsed.radius_m ?? parsed.radiusM) || DEFAULT_WORK_LOCATION.radiusM;
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return { lat, lng, radiusM, label: parsed.label || 'Work location' };
+      }
+    } catch {
+      // malformed JSON color — fall through to default
+    }
+    return DEFAULT_WORK_LOCATION;
+  } catch {
+    return DEFAULT_WORK_LOCATION;
+  }
+}
+
+/** Haversine distance in meters between two lat/lng points. */
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Rejects a GPS check-in/out that falls outside the configured work radius. */
+async function enforceRadius(
+  supabase: any,
+  lat: number | null,
+  lng: number | null
+): Promise<{ ok: true } | { ok: false; status: number; error: string; distanceM?: number; radiusM?: number }> {
+  // Manual (no GPS) check-ins cannot be radius-validated.
+  if (lat == null || lng == null) return { ok: true };
+  const loc = await getWorkLocation(supabase);
+  const distance = haversineMeters(lat, lng, loc.lat, loc.lng);
+  if (distance > loc.radiusM) {
+    return {
+      ok: false,
+      status: 403,
+      error: `Location is outside the allowed work area (${Math.round(distance)} m from the office, max ${loc.radiusM} m).`,
+      distanceM: Math.round(distance),
+      radiusM: loc.radiusM,
+    };
+  }
+  return { ok: true };
+}
+
 // POST /api/attendance/self — employees check in/out themselves with GPS.
 // Body: { action: "checkin"|"checkout", lat?, lng?, date? }
 export async function POST(request: Request) {
@@ -39,6 +124,14 @@ export async function POST(request: Request) {
   const lng = typeof body.lng === 'number' && !Number.isNaN(body.lng) ? body.lng : null;
 
   try {
+    const radiusResult = await enforceRadius(supabase, lat, lng);
+    if (!radiusResult.ok) {
+      return NextResponse.json(
+        { error: radiusResult.error, distanceM: radiusResult.distanceM, radiusM: radiusResult.radiusM },
+        { status: radiusResult.status }
+      );
+    }
+
     if (action === 'checkout') {
       const { data, error } = await supabase
         .from('attendance')

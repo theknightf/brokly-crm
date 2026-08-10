@@ -136,6 +136,77 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
   },
 ];
 
+/**
+ * Role-based reordering: Sales users get their pipeline + calculator pushed to
+ * the top (Workspace, Leads, Customers, Follow-ups, Calculator), management
+ * users get Projects/Reports/Teams up front, admins keep the default order.
+ * Priority values: lower = shown earlier. Items not listed keep a neutral 100.
+ */
+const ROLE_ITEM_PRIORITY: Record<string, Record<string, number>> = {
+  sales: {
+    'nav-dashboard': 1,
+    'nav-workspace': 2,
+    'nav-leads': 3,
+    'nav-customers': 4,
+    'nav-followups': 5,
+    'nav-calculator': 6,
+    'nav-locations': 7,
+    'nav-projects': 8,
+    'nav-reports': 9,
+    'nav-teams': 10,
+    'nav-expenses': 11,
+    'nav-settings': 12,
+    'nav-admin': 13,
+  },
+  management: {
+    'nav-dashboard': 1,
+    'nav-projects': 2,
+    'nav-reports': 3,
+    'nav-calculator': 4,
+    'nav-teams': 5,
+    'nav-locations': 6,
+    'nav-leads': 7,
+    'nav-customers': 8,
+    'nav-followups': 9,
+    'nav-workspace': 10,
+    'nav-expenses': 11,
+    'nav-settings': 12,
+    'nav-admin': 13,
+  },
+};
+
+const ROLE_GROUP_ORDER: Record<string, string[]> = {
+  sales: ['nav.overview', 'nav.pipeline', 'nav.management', 'nav.system'],
+  management: ['nav.overview', 'nav.management', 'nav.pipeline', 'nav.system'],
+};
+
+function roleClassOf(role?: string): 'sales' | 'management' | 'admin' {
+  if (!role) return 'admin';
+  if (role === 'agent' || role === 'senior_agent' || role === 'telecaller') return 'sales';
+  if (role === 'broker' || role === 'branch_manager') return 'management';
+  return 'admin';
+}
+
+export function reorderNavForRole(
+  role?: string,
+  base: { titleKey: string; items: NavItem[] }[] = navGroups
+): { titleKey: string; items: NavItem[] }[] {
+  const cls = roleClassOf(role);
+  if (cls === 'admin') return base;
+  const priorities = ROLE_ITEM_PRIORITY[cls] || {};
+  const groupOrder = ROLE_GROUP_ORDER[cls] || [];
+  return [...base]
+    .sort((a, b) => {
+      const ia = groupOrder.indexOf(a.titleKey);
+      const ib = groupOrder.indexOf(b.titleKey);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    })
+    .map((g) => ({
+      ...g,
+      items: [...g.items].sort((a, b) => (priorities[a.id] ?? 100) - (priorities[b.id] ?? 100)),
+    }));
+}
+
 interface SidebarProps {
   collapsed: boolean;
   mobileOpen: boolean;
@@ -144,11 +215,14 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const { profile } = useAuth();
 
   const isActive = (href: string) => {
     if (href === '/dashboard' && pathname === '/') return true;
     return pathname === href || pathname.startsWith(href + '/');
   };
+
+  const nav = reorderNavForRole(profile?.role);
 
   return (
     <>
@@ -158,7 +232,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
           collapsed ? 'w-16' : 'w-60'
         }`}
       >
-        <SidebarContent collapsed={collapsed} isActive={isActive} />
+        <SidebarContent collapsed={collapsed} isActive={isActive} nav={nav} />
       </aside>
 
       {/* Mobile sidebar */}
@@ -176,7 +250,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
             <ChevronRight size={16} />
           </button>
         </div>
-        <SidebarContent collapsed={false} isActive={isActive} />
+        <SidebarContent collapsed={false} isActive={isActive} nav={nav} />
       </aside>
     </>
   );
@@ -185,9 +259,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
 function SidebarContent({
   collapsed,
   isActive,
+  nav = navGroups,
 }: {
   collapsed: boolean;
   isActive: (href: string) => boolean;
+  nav?: { titleKey: string; items: NavItem[] }[];
 }) {
   const { user, profile, signOut } = useAuth();
   const { t } = useLanguage();

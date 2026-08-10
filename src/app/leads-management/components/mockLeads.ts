@@ -40,6 +40,27 @@ export type PropertyType =
   | 'Commercial Space'
   | 'Office Space';
 
+/** Actions recorded against leads in activity_log — used by the Leads panel
+ *  action filter AND the per-user activity reports. */
+export type LeadAction =
+  | 'Lead Added'
+  | 'Lead Updated'
+  | 'Lead Status Updated'
+  | 'Lead Assigned'
+  | 'Lead Deleted'
+  | 'Comment Added'
+  | 'Call Logged';
+
+export const LEAD_ACTIONS: LeadAction[] = [
+  'Lead Added',
+  'Lead Updated',
+  'Lead Status Updated',
+  'Lead Assigned',
+  'Lead Deleted',
+  'Comment Added',
+  'Call Logged',
+];
+
 export interface Lead {
   id: string;
   name?: string;

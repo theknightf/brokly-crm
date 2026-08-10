@@ -360,6 +360,7 @@ export const leadsService = {
     source?: string;
     agent?: string;
     propertyType?: string;
+    action?: string;
     sortKey?: string;
     sortDir?: 'asc' | 'desc';
   }) {
@@ -372,6 +373,7 @@ export const leadsService = {
       source = '',
       agent = '',
       propertyType = '',
+      action = '',
       sortKey = 'createdAt',
       sortDir = 'desc',
     } = params || {};
@@ -393,6 +395,36 @@ export const leadsService = {
         .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', {
           count: 'exact',
         });
+
+      // Action filter: restrict to leads touched by a specific activity-log
+      // action (e.g. "Lead Assigned"). Respects activity_log RLS which keeps
+      // agents on their own actions and admins on everything.
+      if (action) {
+        let leadIds: string[] = [];
+        try {
+          const { data: logRows, error: logErr } = await supabase
+            .from('activity_log')
+            .select('entity_id')
+            .eq('entity_type', 'lead')
+            .eq('action_type', action);
+          if (logErr) {
+            if (isSchemaError(logErr)) throw logErr;
+            // non-schema read error — treat as empty so the filter degrades
+            leadIds = [];
+          } else {
+            leadIds = (logRows || [])
+              .map((r: any) => r.entity_id)
+              .filter((v: string | null | undefined): v is string => !!v);
+          }
+        } catch (err: any) {
+          if (isSchemaError(err)) throw err;
+          leadIds = [];
+        }
+        if (!leadIds.length) {
+          return { data: [], total: 0, page, pageSize };
+        }
+        query = query.in('id', leadIds);
+      }
 
       const q = search.trim();
       if (q) {
@@ -472,6 +504,8 @@ function rowToLead(row: any) {
     location: row.location,
     developer: row.developer,
     project: row.project,
+    unit: row.unit,
+    interestLevel: row.interest_level,
     createdAt: row.created_at?.split('T')[0] || row.created_at,
   };
 }
@@ -496,6 +530,8 @@ function leadToRow(lead: any, userId?: string) {
     developer: lead.developer || '',
     project: lead.project || '',
     assigned_to: lead.assignedTo || null,
+    unit: lead.unit || '',
+    interest_level: lead.interestLevel || '',
   };
   // If the caller supplies an explicit creation date (e.g. lead import), keep
   // it; otherwise the DB default applies.
@@ -1261,7 +1297,201 @@ export const developersService = {
   },
 };
 
-// ─── ADMIN SETTINGS ──────────────────────────────────────────────────────────
+// ─── UNITS & UNIT FILES ────────────────────────────────────────────────────────
+
+export interface UnitFile {
+  id: string;
+  unitId: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  sizeBytes: number;
+  kind: string;
+  url?: string; // signed URL, populated lazily
+}
+
+const UNIT_BUCKET = 'unit-files';
+
+function unitRowToUnit(row: any) {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    unitType: row.unit_type,
+    area: Number(row.area || 0),
+    floor: Number(row.floor || 0),
+    price: Number(row.price || 0),
+    paymentPlan: row.payment_plan,
+    downPaymentPct: Number(row.down_payment_pct || 0),
+    installmentYears: Number(row.installment_years || 0),
+    installmentFrequency: Number(row.installment_frequency || 12),
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function unitToRow(unit: any) {
+  return {
+    project_id: unit.projectId,
+    name: unit.name || '',
+    unit_type: unit.unitType || '',
+    area: unit.area ?? 0,
+    floor: unit.floor ?? 0,
+    price: unit.price ?? 0,
+    payment_plan: unit.paymentPlan || '',
+    down_payment_pct: unit.downPaymentPct ?? 0,
+    installment_years: unit.installmentYears ?? 0,
+    installment_frequency: unit.installmentFrequency ?? 12,
+    notes: unit.notes || '',
+    created_by: unit.createdBy,
+  };
+}
+
+export const unitsService = {
+  async getAll(projectId?: string) {
+    const supabase = createClient();
+    try {
+      let query = supabase
+        .from('units')
+        .select('*, unit_files(id)')
+        .order('name', { ascending: true });
+      if (projectId) query = query.eq('project_id', projectId);
+      const { data, error } = await query;
+      if (error) {
+        if (isSchemaError(error)) throw error;
+        return [];
+      }
+      return (data || []).map((row: any) => ({
+        ...unitRowToUnit(row),
+        filesCount: Array.isArray(row.unit_files) ? row.unit_files.length : 0,
+      }));
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return [];
+    }
+  },
+
+  async create(unit: any, userId?: string) {
+    const supabase = createClient();
+    if (!unit.projectId) throw new Error('Project is required');
+    const { data, error } = await supabase
+      .from('units')
+      .insert({ ...unitToRow(unit), created_by: userId || null })
+      .select()
+      .single();
+    if (error) throw error;
+    invalidateCache();
+    return unitRowToUnit(data);
+  },
+
+  async update(id: string, unit: any) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('units')
+      .update(unitToRow(unit))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    invalidateCache();
+    return unitRowToUnit(data);
+  },
+
+  async delete(id: string) {
+    const supabase = createClient();
+    const { error } = await supabase.from('units').delete().eq('id', id);
+    if (error) throw error;
+    invalidateCache();
+  },
+
+  async getFiles(unitId: string): Promise<UnitFile[]> {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('unit_files')
+        .select('*')
+        .eq('unit_id', unitId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        if (isSchemaError(error)) throw error;
+        return [];
+      }
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        unitId: row.unit_id,
+        fileName: row.file_name,
+        filePath: row.file_path,
+        mimeType: row.mime_type,
+        sizeBytes: Number(row.size_bytes || 0),
+        kind: row.kind || 'image',
+      }));
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return [];
+    }
+  },
+
+  /** Upload a picture/PDF for a unit into the private bucket + metadata row. */
+  async uploadFile(unitId: string, file: File) {
+    const supabase = createClient();
+    if (!UNIT_BUCKET) throw new Error('Storage is not available');
+    const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${unitId}/${Date.now()}-${safeName}`;
+    const { error: upErr } = await supabase.storage.from(UNIT_BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+    if (upErr) throw upErr;
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    const kind = isPdf ? 'pdf' : 'image';
+    const { data, error } = await supabase
+      .from('unit_files')
+      .insert({
+        unit_id: unitId,
+        file_name: file.name,
+        file_path: path,
+        mime_type: file.type || 'application/octet-stream',
+        size_bytes: file.size,
+        kind,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    invalidateCache();
+    return data;
+  },
+
+  /** Remove the storage object + metadata row (best-effort storage delete). */
+  async deleteFile(fileId: string) {
+    const supabase = createClient();
+    const { data: meta } = await supabase
+      .from('unit_files')
+      .select('file_path')
+      .eq('id', fileId)
+      .single();
+    const { error } = await supabase.from('unit_files').delete().eq('id', fileId);
+    if (error) throw error;
+    if (meta?.file_path) {
+      await supabase.storage.from(UNIT_BUCKET).remove([meta.file_path]);
+    }
+    invalidateCache();
+  },
+
+  /** Get a short-lived signed URL so private unit files are viewable. */
+  async getFileUrl(file: UnitFile): Promise<string> {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase.storage
+        .from(UNIT_BUCKET)
+        .createSignedUrl(file.filePath, 60 * 60);
+      if (error) throw error;
+      return data?.signedUrl || '';
+    } catch {
+      return '';
+    }
+  },
+};
 
 export const adminSettingsService = {
   async getAll() {

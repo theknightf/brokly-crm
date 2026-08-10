@@ -10,8 +10,10 @@ import {
   Handshake,
   ListChecks,
   BadgePercent,
+  Loader2,
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { unitsService } from '@/lib/services/crmService';
 
 const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -118,6 +120,27 @@ export default function UnitPriceCalculator() {
   const [discountValue, setDiscountValue] = useState('');
   const [years, setYears] = useState('');
   const [freq, setFreq] = useState(12);
+  const [units, setUnits] = useState<any[]>([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+    setLoadingUnits(true);
+    unitsService
+      .getAll()
+      .then((data: any) => {
+        if (mounted) setUnits(data || []);
+      })
+      .catch(() => {
+        if (mounted) setUnits([]);
+      })
+      .finally(() => {
+        if (mounted) setLoadingUnits(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const result = useMemo(() => {
     const price = parseFloat(meterPrice);
@@ -208,6 +231,25 @@ export default function UnitPriceCalculator() {
     years,
     freq,
   ]);
+
+  // Recommend real units from the inventory that best match the calculated
+  // total price / area. Score = weighted price delta + area delta (lower = better).
+  const recommendations = useMemo(() => {
+    if (!result.valid) return [];
+    const meters = parseFloat(totalMeters) || 0;
+    const bank: { unit: any; score: number }[] = [];
+    for (const u of units) {
+      const up = Number(u.price || 0);
+      const ua = Number(u.area || 0);
+      if (up <= 0) continue;
+      let priceDelta = Math.abs(up - result.total) / result.total;
+      let areaDelta = 0;
+      if (meters > 0 && ua > 0) areaDelta = Math.abs(ua - meters) / meters;
+      const score = priceDelta * 0.6 + areaDelta * 0.4;
+      bank.push({ unit: u, score });
+    }
+    return bank.sort((a, b) => a.score - b.score).slice(0, 4);
+  }, [units, result, totalMeters]);
 
   const gridCard = (color: string, label: string, value: string, sub?: string) => (
     <div className="bg-muted/50 rounded-xl p-3">
@@ -474,6 +516,53 @@ export default function UnitPriceCalculator() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Recommended matching units from inventory */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+            <Building2 size={15} className="text-primary" />
+            Recommended units
+          </span>
+          {loadingUnits && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+        </div>
+        {!result.valid ? (
+          <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+            Enter a meter price and area to see matching units from your inventory.
+          </div>
+        ) : recommendations.length === 0 ? (
+          <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+            No matching units found in your inventory yet — add units from the Projects screen.
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {recommendations.map(({ unit }) => (
+              <li key={unit.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{unit.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {[unit.unitType, unit.area ? `${unit.area} m²` : '', unit.floor ? `Floor ${unit.floor}` : '']
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="font-semibold tabular-nums text-foreground">
+                    EGP {fmt(Number(unit.price) || 0)}
+                  </span>
+                  {(unit.downPaymentPct > 0 || unit.installmentYears > 0) && (
+                    <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                      {unit.downPaymentPct > 0 ? `${unit.downPaymentPct}% down` : ''}
+                      {unit.downPaymentPct > 0 && unit.installmentYears > 0 ? ' · ' : ''}
+                      {unit.installmentYears > 0 ? `${unit.installmentYears} yrs` : ''}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

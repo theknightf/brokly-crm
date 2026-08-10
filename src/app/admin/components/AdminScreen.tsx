@@ -21,6 +21,7 @@ import {
   Activity,
   Trophy,
   PhoneCall,
+  Mail,
 } from 'lucide-react';
 import { adminSettingsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +32,7 @@ import AttendanceTab from './AttendanceTab';
 import ActivityDashboard from './ActivityDashboard';
 import ProductivityDashboard from './ProductivityDashboard';
 import CallLogsTab from './CallLogsTab';
+import EmailTemplatesTab from './EmailTemplatesTab';
 
 type TabKey =
   | 'leadSources'
@@ -42,7 +44,8 @@ type TabKey =
   | 'attendance'
   | 'activity'
   | 'productivity'
-  | 'callLogs';
+  | 'callLogs'
+  | 'emailTemplates';
 
 interface AdminItem {
   id: string;
@@ -112,6 +115,12 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
     label: 'Call Logs',
     icon: <PhoneCall size={16} />,
     description: 'Every call / WhatsApp logged by the team from the app',
+  },
+  {
+    key: 'emailTemplates',
+    label: 'Email Templates',
+    icon: <Mail size={16} />,
+    description: 'Reusable email subject & body templates for automated and manual emails',
   },
 ];
 
@@ -285,6 +294,7 @@ export default function AdminScreen() {
     areas: [],
     priorities: [],
     developers: [],
+    emailTemplates: [],
   });
   const [loading, setLoading] = useState(true);
   const [modalState, setModalState] = useState<{
@@ -320,6 +330,7 @@ export default function AdminScreen() {
           name: d.name,
           active: d.isActive,
         })),
+        emailTemplates: (settingsData as any)['emailTemplate'] || [],
       });
     } catch (err: any) {
       toast.error('Failed to load admin settings');
@@ -553,6 +564,8 @@ export default function AdminScreen() {
             <ProductivityDashboard />
           ) : activeTab === 'callLogs' ? (
             <CallLogsTab />
+          ) : activeTab === 'emailTemplates' ? (
+            <EmailTemplatesTab />
           ) : loading ? (
             <div className="flex items-center justify-center h-48">
               <Loader2 size={28} className="animate-spin text-primary" />

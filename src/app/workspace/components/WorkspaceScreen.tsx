@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { followUpsService } from '@/lib/services/crmService';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 type DateFilter = 'any' | 'late' | 'today' | 'tomorrow' | 'custom';
 type StatusFilter = 'any' | 'notCompleted' | 'completed';
@@ -35,14 +36,14 @@ const DEFAULT_FILTERS: Filters = { status: 'any', priority: 'any', date: 'any', 
 const TABS: { key: string; labelKey: string; preset: Filters }[] = [
   { key: 'all', labelKey: 'workspace.all', preset: { ...DEFAULT_FILTERS } },
   {
-    key: 'late',
-    labelKey: 'workspace.late',
-    preset: { status: 'notCompleted', priority: 'any', date: 'late', from: '', to: '' },
-  },
-  {
     key: 'today',
     labelKey: 'workspace.today',
     preset: { status: 'notCompleted', priority: 'any', date: 'today', from: '', to: '' },
+  },
+  {
+    key: 'late',
+    labelKey: 'workspace.late',
+    preset: { status: 'notCompleted', priority: 'any', date: 'late', from: '', to: '' },
   },
   {
     key: 'tomorrow',
@@ -69,9 +70,15 @@ function dueMeta(due: string): { label: string; cls: string } {
 
 export default function WorkspaceScreen() {
   const { t } = useLanguage();
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [draft, setDraft] = useState<Filters>(DEFAULT_FILTERS);
-  const [tab, setTab] = useState('all');
+  const { profile } = useAuth();
+  const isSales = profile?.role === 'agent' || profile?.role === 'senior_agent' || profile?.role === 'telecaller';
+  // Sales users jump straight to "Today" — their daily work list.
+  const defaultTab = isSales ? 'today' : 'all';
+  const [filters, setFilters] = useState<Filters>(
+    isSales ? TABS[1].preset : DEFAULT_FILTERS
+  );
+  const [draft, setDraft] = useState<Filters>(filters);
+  const [tab, setTab] = useState(defaultTab);
   const [panelOpen, setPanelOpen] = useState(false);
   const [items, setItems] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,9 +1,10 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 
-import { BarChart3, Loader2, RefreshCw, Users, UserCheck, DollarSign, Target } from 'lucide-react';
+import { BarChart3, Loader2, RefreshCw, Users, UserCheck, DollarSign, Target, FileDown } from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
 import { toast } from 'sonner';
+import { exportPDF, exportCSV } from '@/lib/exportReport';
 import CallLogsReport from './CallLogsReport';
 import {
   BarChart,
@@ -284,6 +285,93 @@ export default function ReportsScreen() {
     new Set(activityRows.flatMap((r) => Object.keys(r.byAction)))
   ).sort();
 
+  const exportReportsPDF = () => {
+    if (!data) return;
+    const tables: { caption: string; headers: string[]; rows: string[][]; footer?: string }[] = [];
+    if (data.monthlyLeads.length) {
+      tables.push({
+        caption: 'Monthly Leads vs Won (Last 6 Months)',
+        headers: ['Month', 'Leads', 'Won'],
+        rows: data.monthlyLeads.map((m) => [m.month, String(m.leads), String(m.won)]),
+      });
+    }
+    if (data.agentPerformance.length) {
+      tables.push({
+        caption: 'Agent Performance',
+        headers: ['Agent', 'Leads', 'Won', 'Conversion %'],
+        rows: data.agentPerformance
+          .sort((a, b) => b.leads - a.leads)
+          .map((a) => [a.name, String(a.leads), String(a.won), String(a.rate)]),
+      });
+    }
+    if (data.teamPerformance.length) {
+      tables.push({
+        caption: 'Team Performance',
+        headers: ['Member', 'Assigned', 'Closed', 'Revenue', 'Rate %'],
+        rows: data.teamPerformance
+          .sort((a, b) => b.closedDeals - a.closedDeals)
+          .map((m) => [
+            m.name,
+            String(m.assignedLeads),
+            String(m.closedDeals),
+            formatCurrency(m.totalRevenue),
+            String(m.conversionRate),
+          ]),
+      });
+    }
+    if (activityRows.length) {
+      tables.push({
+        caption: `Team Activity — Actions per Hour (${from} → ${to}; office hours 12:00–20:00)`,
+        headers: ['User', ...OFFICE_HOURS.map((h) => `${h}:00`), 'Total'],
+        rows: activityRows.map((r) => [
+          r.name,
+          ...OFFICE_HOURS.map((h) => String(r.byHour[h] || 0)),
+          String(r.total),
+        ]),
+      });
+    }
+    if (attendanceRows.length) {
+      tables.push({
+        caption: `Attendance Report (${from} → ${to})`,
+        headers: ['User', 'Days Present', 'On Time', 'Late', 'Absent'],
+        rows: attendanceRows
+          .sort((a, b) => b.late - a.late)
+          .map((r) => [r.name, String(r.present), String(r.onTime), String(r.late), String(r.absent)]),
+      });
+    }
+    exportPDF(
+      'Reports & Analytics',
+      `Generated for ${from} → ${to}`,
+      [
+        { label: 'Total Leads', value: String(data.totalLeads) },
+        { label: 'Customers', value: String(data.totalCustomers) },
+        { label: 'Revenue', value: formatCurrency(data.totalRevenue) },
+        { label: 'Conversion', value: `${data.conversionRate}%` },
+      ],
+      tables,
+      `reports-${todayIso()}`
+    );
+    toast.success('Preparing PDF report…');
+  };
+
+  const exportReportsCSV = () => {
+    if (!data) return;
+    const headers = ['Metric', 'Value'];
+    const rows: string[][] = [
+      ['Total Leads', String(data.totalLeads)],
+      ['Total Customers', String(data.totalCustomers)],
+      ['Total Revenue', String(data.totalRevenue)],
+      ['Conversion Rate %', String(data.conversionRate)],
+      ...Object.entries(data.leadsByStatus).map(([k, v]) => [`Leads By Status — ${k}`, String(v)]),
+      ...Object.entries(data.leadsBySource).map(([k, v]) => [`Leads By Source — ${k}`, String(v)]),
+      ...data.agentPerformance
+        .sort((a, b) => b.leads - a.leads)
+        .map((a) => [`Agent ${a.name}`, `leads ${a.leads}, won ${a.won}, ${a.rate}%`]),
+    ];
+    exportCSV(`reports-${todayIso()}`, headers, rows);
+    toast.success('Exported report data to CSV');
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
@@ -295,6 +383,25 @@ export default function ReportsScreen() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Live data from your CRM database</p>
         </div>
+<div className="flex items-center gap-2">
+        <button
+          onClick={exportReportsPDF}
+          disabled={loading || !data}
+          className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+          title="Export report as PDF"
+        >
+          <FileDown size={15} />
+          PDF
+        </button>
+        <button
+          onClick={exportReportsCSV}
+          disabled={loading || !data}
+          className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+          title="Export report as CSV"
+        >
+          <FileDown size={15} />
+          CSV
+        </button>
         <button
           onClick={() => {
             loadReports();
@@ -307,6 +414,7 @@ export default function ReportsScreen() {
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
+    </div>
 
       {loading ? (
         <div className="flex items-center justify-center flex-1">

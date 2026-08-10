@@ -24,7 +24,7 @@ import AddLeadForm from './AddLeadForm';
 import BulkActionBar from './BulkActionBar';
 import ImportLeadsModal from './ImportLeadsModal';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { Lead, LeadStatus, LeadSource, PropertyType, ALL_STATUSES } from './mockLeads';
+import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction, ALL_STATUSES } from './mockLeads';
 import { leadsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import LeadCommentsSection from './LeadCommentsSection';
@@ -35,6 +35,7 @@ export interface FilterState {
   source: LeadSource | '';
   agent: string;
   propertyType: PropertyType | '';
+  action: LeadAction | '';
 }
 
 export default function LeadsManagementScreen() {
@@ -48,6 +49,7 @@ export default function LeadsManagementScreen() {
     source: '',
     agent: '',
     propertyType: '',
+    action: '',
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -87,6 +89,7 @@ export default function LeadsManagementScreen() {
         source: filters.source || undefined,
         agent: filters.agent || undefined,
         propertyType: filters.propertyType || undefined,
+        action: filters.action || undefined,
         sortKey,
         sortDir,
       });
@@ -256,6 +259,7 @@ export default function LeadsManagementScreen() {
         source: filters.source || undefined,
         agent: filters.agent || undefined,
         propertyType: filters.propertyType || undefined,
+        action: filters.action || undefined,
       });
       const rows = (res.data || []).map((l) => [
         l.name,
@@ -302,7 +306,7 @@ export default function LeadsManagementScreen() {
   };
 
   const clearFilters = () => {
-    setFilters({ search: '', status: '', source: '', agent: '', propertyType: '' });
+    setFilters({ search: '', status: '', source: '', agent: '', propertyType: '', action: '' });
     setCurrentPage(1);
   };
 
@@ -378,6 +382,7 @@ export default function LeadsManagementScreen() {
     filters.source,
     filters.agent,
     filters.propertyType,
+    filters.action,
   ].filter(Boolean).length;
 
   if (loading) {

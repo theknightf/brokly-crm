@@ -23,6 +23,9 @@ const IMPORT_FIELDS: { value: ImportField; label: string; required?: boolean }[]
   { value: 'source', label: 'Source' },
   { value: 'developer', label: 'Developer' },
   { value: 'project', label: 'Project' },
+  { value: 'unit', label: 'Unit' },
+  { value: 'interestLevel', label: 'Interest Level' },
+  { value: 'assigned', label: 'Assigned To' },
   { value: 'email', label: 'Email' },
   { value: 'location', label: 'Location' },
   { value: 'notes', label: 'Notes' },
@@ -120,7 +123,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const processFile = async (file: File) => {
     setParsing(true);
     try {
-      const res = await parseLeadFile(file);
+      if (ownerList.length === 0) await loadOwners();
+      const res = await parseLeadFile(file, undefined, ownerList);
       setStoredFile(file);
       setFileName(file.name);
       setResult(res);
@@ -160,7 +164,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     setParsing(true);
     try {
       if (!storedFile) throw new Error('File not found');
-      const res = await parseLeadFile(storedFile, next);
+      const res = await parseLeadFile(storedFile, next, ownerList);
       setRows(res.rows);
       setResult(res);
       const phones = res.rows.map((r) => r.phone || '').filter(Boolean);
@@ -240,21 +244,33 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           budgetMin: undefined,
           budgetMax: undefined,
           source: row.source || 'Other',
-          agent: '',
-          agentInitials: '',
+          agent: row.assignedName || '',
+          agentInitials: row.assignedName
+            ? row.assignedName
+                .split(' ')
+                .map((p) => p[0])
+                .join('')
+                .toUpperCase()
+                .slice(0, 2)
+            : '',
           status: (row.status || 'Fresh Leads') as any,
           lastContact: row.date || new Date().toISOString().split('T')[0],
           followUpDue: row.date || new Date().toISOString().split('T')[0],
           createdAt: row.date || undefined,
           developer: row.developer || '',
           project: row.project || '',
+          unit: row.unit || '',
+          interestLevel: row.interestLevel || '',
           notes: row.notes || '',
         });
       });
 
       if (batch.length > 0) {
         const ownerId = defaultOwner || user?.id || null;
-        const withOwner = batch.map((r) => ({ ...r, assignedTo: ownerId }));
+        const withOwner = batch.map((r) => ({
+          ...r,
+          assignedTo: r.assignedTo || ownerId,
+        }));
         const imported = await leadsService.bulkInsert(withOwner, user?.id || '');
         if (!imported.length) throw new Error('No leads were inserted');
       }
@@ -382,6 +398,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   <th className="table-th">Status</th>
                   <th className="table-th">Date</th>
                   <th className="table-th">Developer</th>
+                  <th className="table-th">Unit</th>
+                  <th className="table-th">Interest</th>
                   <th className="table-th">Validation</th>
                 </tr>
               </thead>
@@ -403,6 +421,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                       </td>
                       <td className="table-td text-muted-foreground">{data.date || '—'}</td>
                       <td className="table-td text-muted-foreground">{data.developer || '—'}</td>
+                      <td className="table-td text-muted-foreground">{data.unit || '—'}</td>
+                      <td className="table-td text-muted-foreground">{data.interestLevel || '—'}</td>
                       <td className="table-td">
                         {data.reasons.length > 0 ? (
                           <span className="text-xs text-red-500 flex items-center gap-1">

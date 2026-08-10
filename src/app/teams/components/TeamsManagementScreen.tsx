@@ -46,6 +46,7 @@ interface UserProfile {
   email: string;
   role: string;
   teamId: string | null;
+  isActive?: boolean;
 }
 
 // ─── Team Form Modal ──────────────────────────────────────────────────────────
@@ -487,7 +488,7 @@ export default function TeamsManagementScreen() {
         usersService.getAll(),
       ]);
       setTeams(teamsData as Team[]);
-      setAllUsers(usersData as UserProfile[]);
+      setAllUsers((usersData as UserProfile[]).filter((u) => u.isActive !== false));
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load teams');
     } finally {

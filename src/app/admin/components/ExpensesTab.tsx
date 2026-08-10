@@ -14,8 +14,10 @@ import {
   TrendingUp,
   RefreshCw,
   Search,
+  FileDown,
 } from 'lucide-react';
 import { expensesService, type Expense } from '@/lib/services/crmService';
+import { exportPDF, exportCSV } from '@/lib/exportReport';
 import { toast } from 'sonner';
 
 const DEFAULT_CATEGORIES = [
@@ -384,6 +386,60 @@ export default function ExpensesTab() {
     }
   };
 
+  const exportPDFReport = () => {
+    if (!filtered.length) {
+      toast.error('No expenses to export');
+      return;
+    }
+    const rows = [...filtered].sort((a, b) =>
+      a.expense_date > b.expense_date ? -1 : 1
+    );
+    exportPDF(
+      'Expenses Report',
+      `Office & branch running costs · ${fmtDate(from)} → ${fmtDate(to)}${category !== 'All' ? ` · ${category}` : ''}`,
+      [
+        { label: 'Total', value: `EGP ${total.toLocaleString()}` },
+        { label: 'Entries', value: String(filtered.length) },
+        { label: 'Top Category', value: topCategory },
+      ],
+      [
+        {
+          caption: `Expense Log (${filtered.length} entries)`,
+          headers: ['Date', 'Title', 'Category', 'Amount (EGP)', 'Notes'],
+          rows: rows.map((e) => [
+            fmtDate(e.expense_date),
+            e.title || 'Untitled',
+            e.category || 'Other',
+            String(e.amount ?? 0),
+            (e.notes || '').slice(0, 80),
+          ]),
+          footer: `Total: EGP ${total.toLocaleString()}`,
+        },
+      ],
+      `expenses-${todayIso()}`
+    );
+    toast.success('Preparing expenses PDF…');
+  };
+
+  const exportCSVReport = () => {
+    if (!filtered.length) {
+      toast.error('No expenses to export');
+      return;
+    }
+    exportCSV(
+      `expenses-${todayIso()}`,
+      ['Date', 'Title', 'Category', 'Amount (EGP)', 'Notes'],
+      filtered.map((e) => [
+        e.expense_date,
+        e.title || 'Untitled',
+        e.category || 'Other',
+        String(e.amount ?? 0),
+        e.notes || '',
+      ])
+    );
+    toast.success(`Exported ${filtered.length} expenses to CSV`);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header row */}
@@ -394,13 +450,33 @@ export default function ExpensesTab() {
             Track monthly running costs — electricity, rent, kitchen staff, and more.
           </p>
         </div>
-        <button
-          onClick={() => setModal({ open: true, isEdit: false, expense: null })}
-          className="btn-primary flex items-center gap-2 text-sm"
-        >
-          <Plus size={15} />
-          Add Expense
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={exportPDFReport}
+            disabled={loading || filtered.length === 0}
+            className="btn-secondary flex items-center gap-1.5 text-sm disabled:opacity-50"
+            title="Export as PDF"
+          >
+            <FileDown size={14} />
+            PDF
+          </button>
+          <button
+            onClick={exportCSVReport}
+            disabled={loading || filtered.length === 0}
+            className="btn-secondary flex items-center gap-1.5 text-sm disabled:opacity-50"
+            title="Export as CSV"
+          >
+            <FileDown size={14} />
+            CSV
+          </button>
+          <button
+            onClick={() => setModal({ open: true, isEdit: false, expense: null })}
+            className="btn-primary flex items-center gap-2 text-sm"
+          >
+            <Plus size={15} />
+            Add Expense
+          </button>
+        </div>
       </div>
 
       {/* KPI cards */}
