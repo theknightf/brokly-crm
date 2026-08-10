@@ -157,13 +157,17 @@ function AddMemberModal({
   teamId,
   existingMemberIds,
   allUsers,
+  usersLoading,
+  usersError,
 }: {
   open: boolean;
   onClose: () => void;
-  onAdd: (userId: string, isLeader: boolean) => Promise<void>;
+  onAdd: (userId: string, isLeader: boolean) => Promise<boolean>;
   teamId: string;
   existingMemberIds: string[];
   allUsers: UserProfile[];
+  usersLoading: boolean;
+  usersError?: string | null;
 }) {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [isLeader, setIsLeader] = useState(false);
@@ -171,6 +175,7 @@ function AddMemberModal({
   const [error, setError] = useState('');
 
   const available = allUsers.filter((u) => !existingMemberIds.includes(u.id));
+  const hasMembersInOtherTeams = available.some((u) => Boolean(u.teamId));
 
   useEffect(() => {
     if (open) {
@@ -187,7 +192,8 @@ function AddMemberModal({
     }
     setSaving(true);
     try {
-      await onAdd(selectedUserId, isLeader);
+      const ok = await onAdd(selectedUserId, isLeader);
+      if (ok) onClose();
     } finally {
       setSaving(false);
     }
@@ -217,27 +223,45 @@ function AddMemberModal({
                   setSelectedUserId(e.target.value);
                   setError('');
                 }}
-                className="input-base w-full appearance-none pr-8"
+                disabled={usersLoading || available.length === 0}
+                className="input-base w-full appearance-none pr-8 disabled:opacity-60"
               >
-                <option value="">Choose a user…</option>
-                {available.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.fullName || u.email} ({u.role.replace('_', ' ')})
-                    {u.teamId ? ' — already in a team' : ''}
-                  </option>
-                ))}
+                <option value="">
+                  {usersLoading
+                    ? 'Loading users…'
+                    : available.length === 0
+                    ? 'No available users'
+                    : 'Choose a user…'}
+                </option>
+                {!usersLoading &&
+                  available.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName || u.email} ({String(u.role || 'agent').replace('_', ' ')})
+                      {u.teamId ? ' — currently in another team' : ''}
+                    </option>
+                  ))}
               </select>
               <ChevronDown
                 size={14}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
               />
             </div>
-            {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-            {available.length === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                All users are already in this team.
+            {usersLoading ? (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                <Loader2 size={12} className="animate-spin" />
+                Fetching users…
               </p>
+            ) : available.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">No available users</p>
+            ) : hasMembersInOtherTeams ? (
+              <p className="text-xs text-muted-foreground mt-1">
+                Users in another team will be reassigned to this team when added.
+              </p>
+            ) : null}
+            {usersError && (
+              <p className="text-xs text-destructive mt-1">Could not load users: {usersError}</p>
             )}
+            {error && <p className="text-xs text-destructive mt-1">{error}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">Role in Team</label>
@@ -267,7 +291,7 @@ function AddMemberModal({
           </button>
           <button
             onClick={handleAdd}
-            disabled={saving || available.length === 0}
+            disabled={saving || usersLoading || available.length === 0}
             className="btn-primary flex-1 flex items-center justify-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
@@ -334,15 +358,19 @@ function TeamDetailPanel({
   onSetLeader,
   loading,
   canManage,
+  usersLoading,
+  usersError,
 }: {
   team: Team;
   members: TeamMembership[];
   allUsers: UserProfile[];
-  onAddMember: (userId: string, isLeader: boolean) => Promise<void>;
+  onAddMember: (userId: string, isLeader: boolean) => Promise<boolean>;
   onRemoveMember: (userId: string, userName: string) => void;
   onSetLeader: (userId: string) => Promise<void>;
   loading: boolean;
   canManage: boolean;
+  usersLoading: boolean;
+  usersError?: string | null;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const existingMemberIds = members.map((m) => m.userId);
@@ -450,13 +478,12 @@ function TeamDetailPanel({
         <AddMemberModal
           open={addOpen}
           onClose={() => setAddOpen(false)}
-          onAdd={async (userId, isLeader) => {
-            await onAddMember(userId, isLeader);
-            setAddOpen(false);
-          }}
+          onAdd={onAddMember}
           teamId={team.id}
           existingMemberIds={existingMemberIds}
           allUsers={allUsers}
+          usersLoading={usersLoading}
+          usersError={usersError}
         />
       )}
     </div>
@@ -473,6 +500,8 @@ export default function TeamsManagementScreen() {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -482,16 +511,20 @@ export default function TeamsManagementScreen() {
 
   const loadTeams = useCallback(async () => {
     setLoading(true);
+    setUsersLoaded(false);
+    setUsersError(null);
     try {
       const [teamsData, usersData] = await Promise.all([
         teamsService.getAll(),
         usersService.getAll(),
       ]);
       setTeams(teamsData as Team[]);
-      setAllUsers((usersData as UserProfile[]).filter((u) => u.isActive !== false));
+      setAllUsers(usersData as UserProfile[]);
     } catch (err: any) {
+      setUsersError(err?.message || 'Failed to load users');
       toast.error(err?.message || 'Failed to load teams');
     } finally {
+      setUsersLoaded(true);
       setLoading(false);
     }
   }, []);
@@ -558,15 +591,17 @@ export default function TeamsManagementScreen() {
     }
   };
 
-  const handleAddMember = async (userId: string, isLeader: boolean) => {
-    if (!selectedTeam) return;
+  const handleAddMember = async (userId: string, isLeader: boolean): Promise<boolean> => {
+    if (!selectedTeam) return false;
     try {
       await teamsService.addMember(selectedTeam.id, userId, isLeader);
       await loadMembers(selectedTeam.id);
       await loadTeams();
       toast.success('Member added to team');
+      return true;
     } catch (err: any) {
       toast.error(err?.message || 'Failed to add member');
+      return false;
     }
   };
 
@@ -742,6 +777,8 @@ export default function TeamsManagementScreen() {
               onSetLeader={handleSetLeader}
               loading={membersLoading}
               canManage={canManage}
+              usersLoading={!usersLoaded}
+              usersError={usersError}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">

@@ -9,6 +9,8 @@ function isSchemaError(error: any): boolean {
     if (errorClass === '42') return true;
     if (errorClass === '23') return false;
     if (errorClass === '08') return true;
+    // PostgREST errors (PGRST1xx = filter/parse, PGRST2xx = resource/relation)
+    if (/^PGRST/.test(error.code)) return true;
   }
   if (error.message) {
     const schemaErrorPatterns = [
@@ -17,6 +19,8 @@ function isSchemaError(error: any): boolean {
       /function.*does not exist/i,
       /syntax error/i,
       /type.*does not exist/i,
+      /could not find a relationship/i,
+      /could not find the/i,
     ];
     return schemaErrorPatterns.some((p) => p.test(error.message));
   }
@@ -999,6 +1003,31 @@ export const teamsService = {
 
   async addMember(teamId: string, userId: string, isLeader: boolean) {
     const supabase = createClient();
+    // A user belongs to at most one team: drop any memberships they hold in
+    // other teams and remove their leader flag there (keeps teams.leader_id
+    // and user_profiles.team_id consistent).
+    const { data: other } = await supabase
+      .from('team_memberships')
+      .select('team_id, is_leader')
+      .eq('user_id', userId)
+      .neq('team_id', teamId);
+    for (const row of other || []) {
+      await supabase
+        .from('team_memberships')
+        .delete()
+        .eq('user_id', userId)
+        .eq('team_id', row.team_id);
+      if (row.is_leader) {
+        const { data: t } = await supabase
+          .from('teams')
+          .select('leader_id')
+          .eq('id', row.team_id)
+          .maybeSingle();
+        if (t?.leader_id === userId) {
+          await supabase.from('teams').update({ leader_id: null }).eq('id', row.team_id);
+        }
+      }
+    }
     // If setting as leader, clear existing leader flag in this team
     if (isLeader) {
       await supabase
@@ -1016,7 +1045,11 @@ export const teamsService = {
       );
     if (memberError) throw memberError;
     // Update user_profiles.team_id
-    await supabase.from('user_profiles').update({ team_id: teamId }).eq('id', userId);
+    const { error: profileErr } = await supabase
+      .from('user_profiles')
+      .update({ team_id: teamId })
+      .eq('id', userId);
+    if (profileErr) throw profileErr;
     // If leader, update teams.leader_id
     if (isLeader) {
       await supabase.from('teams').update({ leader_id: userId }).eq('id', teamId);
@@ -1742,6 +1775,13 @@ export const usersService = {
       throw err;
     }
     const data = await res.json();
+    if (!data?.user || typeof data.user !== 'object') {
+      // The user was created server-side but we could not read its profile
+      // back (e.g. optional admin_id/agent_code columns not migrated yet).
+      const err: any = new Error('User created but profile could not be read back');
+      err.status = 200;
+      throw err;
+    }
     return rowToUserProfile(data.user);
   },
 
@@ -1776,16 +1816,15 @@ export const usersService = {
 
   async delete(id: string) {
     const supabase = createClient();
-    // Deleting from auth.users cascades to user_profiles via FK
-    const { error } = await supabase.auth.admin.deleteUser(id);
-    if (error) {
-      // Fallback: just deactivate if admin delete not available
-      const { error: updateErr } = await supabase
-        .from('user_profiles')
-        .update({ is_active: false })
-        .eq('id', id);
-      if (updateErr) throw updateErr;
-    }
+    // The anon client cannot delete from auth.users (service-role only), so
+    // deactivation is the supported "remove" action. Hard deletion is handled
+    // server-side via /api/admin/users if ever needed.
+    const { error: updateErr } = await supabase
+      .from('user_profiles')
+      .update({ is_active: false })
+      .eq('id', id);
+    if (updateErr) throw updateErr;
+    invalidateCache();
   },
 
   async sendPasswordReset(email: string) {
@@ -1813,8 +1852,10 @@ export const usersService = {
     if (data.user) {
       await supabase
         .from('user_profiles')
-        .upsert({ id: data.user.id, email, full_name: fullName, role, is_active: true })
-        .eq('id', data.user.id);
+        .upsert(
+          { id: data.user.id, email, full_name: fullName, role, is_active: true },
+          { onConflict: 'id' }
+        );
     }
     return data.user;
   },

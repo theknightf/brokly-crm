@@ -143,13 +143,32 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: profileRow } = await serviceClient
+  // Re-read the profile with wider columns; fall back to base columns when the
+  // optional admin_id/agent_code columns haven't been migrated yet.
+  let profileRow: any = null;
+  const fullCols =
+    'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, agent_code, admin_id, created_at';
+  const baseCols = 'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, created_at';
+  let { data } = await serviceClient
     .from('user_profiles')
-    .select(
-      'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, agent_code, admin_id, created_at'
-    )
+    .select(fullCols)
     .eq('id', created.user.id)
     .maybeSingle();
+  if (!data) {
+    ({ data } = await serviceClient
+      .from('user_profiles')
+      .select(baseCols)
+      .eq('id', created.user.id)
+      .maybeSingle());
+  }
+  profileRow = data || {
+    id: created.user.id,
+    email,
+    full_name: fullName,
+    role,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
 
   return NextResponse.json({ user: profileRow }, { status: 201 });
 }

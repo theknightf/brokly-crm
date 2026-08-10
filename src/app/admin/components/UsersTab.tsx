@@ -305,6 +305,12 @@ function CreateUserModal({
 
   const isAdminRole = role === 'admin' || role === 'owner';
 
+  useEffect(() => {
+    if (admins.length > 0 && !adminId) {
+      setAdminId(admins[0].id ?? '');
+    }
+  }, [admins, adminId]);
+
   const handleSave = async () => {
     const e = validateCreateUser({ fullName, email, password, role, code, adminId });
     if (Object.keys(e).length > 0) {
@@ -459,6 +465,7 @@ function CreateUserModal({
                 className="input-base w-full appearance-none pr-8"
               >
                 <option value="">Select an admin…</option>
+                {admins.length === 0 && <option value="" disabled>No admins available</option>}
                 {admins.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.fullName || a.email}
