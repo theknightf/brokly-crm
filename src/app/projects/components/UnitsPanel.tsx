@@ -8,6 +8,7 @@ import {
   Pencil,
   Image as ImageIcon,
   FileText,
+  Film,
   Upload,
   Building2,
   Layers,
@@ -300,7 +301,7 @@ function FileUploadRow({
         <input
           ref={inputRef}
           type="file"
-          accept=".jpg,.jpeg,.png,.webp,.pdf"
+          accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.mov,.m4v,.webm,image/*,video/mp4,video/quicktime,video/webm,application/pdf"
           className="hidden"
           onChange={onPick}
         />
@@ -310,7 +311,7 @@ function FileUploadRow({
           className="btn-secondary text-xs px-2.5 py-1 flex items-center gap-1 disabled:opacity-50"
         >
           {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-          {uploading ? 'Uploading…' : 'Add picture / PDF'}
+          {uploading ? 'Uploading…' : 'Add photo / video / PDF'}
         </button>
       </div>
       {loading ? (
@@ -318,7 +319,7 @@ function FileUploadRow({
           <Loader2 size={12} className="animate-spin" /> Loading files…
         </div>
       ) : files.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No files yet — add unit pictures or brochures.</p>
+        <p className="text-xs text-muted-foreground">No files yet — add unit photos, videos, or brochures.</p>
       ) : (
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
           {files.map((f) => (
@@ -333,6 +334,21 @@ function FileUploadRow({
                   <FileText size={20} />
                   <span className="text-[9px] px-1 truncate max-w-full">{f.fileName}</span>
                 </a>
+              ) : f.kind === 'video' ? (
+                urls[f.id] ? (
+                  <video
+                    src={urls[f.id]}
+                    controls
+                    preload="metadata"
+                    className="w-full h-full object-cover"
+                    title={f.fileName}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                    <Film size={20} />
+                    <span className="text-[9px] px-1 truncate max-w-full">{f.fileName}</span>
+                  </div>
+                )
               ) : (
                 <a
                   href={urls[f.id] || '#'}

@@ -57,11 +57,30 @@ CREATE POLICY "authenticated_manage_units"
 
 -- ─── 3. UNIT FILES (pictures / PDFs) ────────────────────────────────────────
 
--- Storage bucket for unit attachments. Idempotent.
+-- Storage bucket for unit attachments (photos, videos, PDFs). Idempotent.
 INSERT INTO storage.buckets (id, name, public, allowed_mime_types)
 VALUES ('unit-files', 'unit-files', false,
-        ARRAY['image/png','image/jpeg','image/webp','image/gif','image/avif','application/pdf'])
+        ARRAY['image/png','image/jpeg','image/webp','image/gif','image/avif','application/pdf','video/mp4','video/webm','video/quicktime','video/x-msvideo','video/mp2t','video/x-matroska'])
 ON CONFLICT (id) DO NOTHING;
+
+-- Ensure video MIME types are allowed even if the bucket already existed
+-- (the INSERT above uses DO NOTHING and would not update an existing bucket).
+DO $$
+DECLARE
+  current_types TEXT[];
+BEGIN
+  SELECT allowed_mime_types INTO current_types FROM storage.buckets WHERE id = 'unit-files';
+  IF current_types IS NOT NULL AND NOT current_types @> ARRAY['video/mp4','video/webm','video/quicktime'] THEN
+    UPDATE storage.buckets
+    SET allowed_mime_types = (
+      SELECT array_agg(DISTINCT m) FROM unnest(
+        COALESCE(current_types, '{}'::TEXT[]) ||
+        ARRAY['video/mp4','video/webm','video/quicktime','video/x-msvideo','video/mp2t','video/x-matroska']
+      ) AS t(m)
+    )
+    WHERE id = 'unit-files';
+  END IF;
+END $$;
 
 DO $$
 BEGIN
@@ -107,7 +126,7 @@ CREATE TABLE IF NOT EXISTS public.unit_files (
   file_path TEXT NOT NULL DEFAULT '',
   mime_type TEXT DEFAULT '',
   size_bytes BIGINT DEFAULT 0,
-  kind TEXT DEFAULT 'image',               -- 'image' | 'pdf' | 'document'
+  kind TEXT DEFAULT 'image',               -- 'image' | 'video' | 'pdf' | 'document'
   uploaded_by UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );

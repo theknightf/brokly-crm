@@ -1465,7 +1465,7 @@ export const unitsService = {
     }
   },
 
-  /** Upload a picture/PDF for a unit into the private bucket + metadata row. */
+  /** Upload a photo/video/PDF for a unit into the private bucket + metadata row. */
   async uploadFile(unitId: string, file: File) {
     const supabase = createClient();
     if (!UNIT_BUCKET) throw new Error('Storage is not available');
@@ -1476,8 +1476,13 @@ export const unitsService = {
       upsert: false,
     });
     if (upErr) throw upErr;
-    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-    const kind = isPdf ? 'pdf' : 'image';
+    const lower = (file.name || '').toLowerCase();
+    const isPdf = file.type === 'application/pdf' || lower.endsWith('.pdf');
+    const isVideo =
+      !isPdf &&
+      (/^video\//.test(file.type || '') ||
+        /\.(mp4|mov|m4v|webm|avi|mkv)$/.test(lower));
+    const kind = isPdf ? 'pdf' : isVideo ? 'video' : 'image';
     const { data, error } = await supabase
       .from('unit_files')
       .insert({
