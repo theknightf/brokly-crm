@@ -504,31 +504,31 @@ latitude: parseLat(data.latitude),
                       : '—'}
                   </td>
                   <td className="table-td">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
+                    <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setUnitsTarget({ id: project.id, name: project.name })}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-primary hover:text-primary hover:bg-primary/10 transition-colors"
-                        title="Units & files"
+                        title="Units & media — add photos, videos, PDFs"
                       >
                         <Layers size={13} />
                       </button>
                       <button
                         onClick={() => setVisitTarget(project)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible"
                         title="Site visit — GPS check-in"
                       >
                         <MapPin size={13} />
                       </button>
                       <button
                         onClick={() => setEditTarget(project)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible"
                         title="Edit project"
                       >
                         <Pencil size={13} />
                       </button>
                       <button
                         onClick={() => setDeleteTarget(project)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible"
                         title="Delete project"
                       >
                         <Trash2 size={13} />

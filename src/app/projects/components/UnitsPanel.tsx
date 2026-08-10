@@ -231,9 +231,11 @@ function UnitFormModal({
 function FileUploadRow({
   unit,
   onChanged,
+  triggerPick,
 }: {
   unit: Unit;
   onChanged: () => void;
+  triggerPick?: number;
 }) {
   const [files, setFiles] = useState<UnitFile[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
@@ -265,6 +267,12 @@ function FileUploadRow({
   useEffect(() => {
     if (files.length) resolveUrls();
   }, [files]);
+
+  useEffect(() => {
+    if (triggerPick && triggerPick > 0 && inputRef.current) {
+      inputRef.current.click();
+    }
+  }, [triggerPick]);
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -386,6 +394,7 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pickNonce, setPickNonce] = useState(0);
 
   const saveEdit = async (data: Partial<Unit>) => {
     try {
@@ -395,6 +404,13 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
     } catch (err: any) {
       toast.error(err?.message || 'Update failed');
     }
+  };
+
+  const openFiles = () => setFilesOpen(true);
+
+  const openPicker = () => {
+    setFilesOpen(true);
+    setPickNonce((n) => n + 1);
   };
 
   const remove = async () => {
@@ -417,30 +433,41 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
           <div>
             <p className="text-sm font-medium text-foreground">{unit.name || 'Untitled unit'}</p>
             <p className="text-xs text-muted-foreground">
-              {[unit.unitType, unit.area ? `${unit.area} m²` : '', unit.floor ? `Floor ${unit.floor}` : '']
+              {[
+                unit.unitType,
+                unit.area ? `${unit.area} m²` : '',
+                unit.floor ? `Floor ${unit.floor}` : '',
+                unit.price ? `${Number(unit.price).toLocaleString('en-US')} EGP` : '',
+              ]
                 .filter(Boolean)
                 .join(' · ') || '—'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold tabular-nums text-foreground mr-1">
-            {unit.price ? `${Number(unit.price).toLocaleString('en-US')} EGP` : '—'}
-          </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
           {unit.paymentPlan && (
             <span className="hidden sm:inline text-[11px] text-muted-foreground max-w-[180px] truncate mr-2" title={unit.paymentPlan}>
               {unit.paymentPlan}
             </span>
           )}
           <button
-            onClick={() => setFilesOpen((v) => !v)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            title="Unit files"
+            onClick={filesOpen ? () => setFilesOpen(false) : openFiles}
+            className={`h-7 px-2 rounded-lg flex items-center gap-1.5 text-xs font-medium transition-colors ${filesOpen ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            title="View photos, videos and PDFs"
           >
             <ImageIcon size={13} />
+            Files
             {unit.filesCount > 0 && (
-              <span className="ml-0.5 text-[10px] font-semibold">{unit.filesCount}</span>
+              <span className="text-[10px] font-bold tabular-nums">{unit.filesCount}</span>
             )}
+          </button>
+          <button
+            onClick={openPicker}
+            className="h-7 px-2 rounded-lg flex items-center gap-1.5 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            title="Add photo, video or PDF"
+          >
+            <Upload size={13} />
+            Add media
           </button>
           <button
             onClick={() => setEditOpen(true)}
@@ -461,7 +488,7 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
       </div>
       {filesOpen && (
         <div className="mt-3 pt-3 border-t border-border">
-          <FileUploadRow unit={unit} onChanged={() => {}} />
+          <FileUploadRow unit={unit} onChanged={() => {}} triggerPick={pickNonce} />
         </div>
       )}
       <UnitFormModal
