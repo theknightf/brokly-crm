@@ -14,6 +14,13 @@ import {
   UserMinus,
   Shield,
   Check,
+  Star,
+  TrendingUp,
+  PhoneCall,
+  Target,
+  Wallet,
+  DollarSign,
+  Percent,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { teamsService, usersService } from '@/lib/services/crmService';
@@ -29,6 +36,45 @@ interface Team {
   leaderName: string | null;
   memberCount: number;
   createdAt: string;
+}
+
+interface TeamPerformance {
+  id: string;
+  name: string;
+  leaderId: string | null;
+  leaderName: string;
+  memberCount: number;
+  stats: {
+    leads: number;
+    won: number;
+    revenue: number;
+    calls: number;
+    call_duration_seconds: number;
+    expenses: number;
+    profit: number;
+    profitMargin: number;
+    conversion: number;
+  };
+  leader: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    isMemberOfTeam: boolean;
+    leads: number;
+    won: number;
+    revenue: number;
+    calls: number;
+    call_duration_seconds: number;
+    expenses: number;
+  } | null;
+  leaderRating: {
+    id: string;
+    rating: number;
+    comment: string;
+    ratedByName: string;
+    updatedAt: string;
+  } | null;
 }
 
 interface TeamMembership {
@@ -348,6 +394,308 @@ function DeleteConfirmModal({
   );
 }
 
+// ─── Performance Panel ────────────────────────────────────────────────────────
+function fmtDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function fmtMoney(n: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(n || 0);
+}
+
+function StarRating({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange?: (v: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={disabled || !onChange}
+          onClick={() => onChange?.(n)}
+          className={`transition-transform ${disabled || !onChange ? '' : 'hover:scale-125 active:scale-95'}`}
+          aria-label={`${n} star${n > 1 ? 's' : ''}`}
+        >
+          <Star
+            size={20}
+            className={
+              n <= value
+                ? 'fill-amber-400 text-amber-400'
+                : 'fill-transparent text-muted-foreground/40'
+            }
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PerformancePanel({
+  team,
+  canRate,
+}: {
+  team: Team;
+  canRate: boolean;
+}) {
+  const [data, setData] = useState<TeamPerformance | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<'30' | 'all'>('all');
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async (rng: string) => {
+    setLoading(true);
+    try {
+      const from = rng === '30' ? new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0] : '';
+      const { teams } = await teamsService.getPerformance(from || undefined, undefined);
+      const mine = (teams as TeamPerformance[]).find((t) => t.id === team.id) || null;
+      setData(mine);
+      setRating(mine?.leaderRating?.rating || 0);
+      setComment(mine?.leaderRating?.comment || '');
+    } catch {
+      // keep previous data
+    } finally {
+      setLoading(false);
+    }
+  }, [team.id]);
+
+  useEffect(() => {
+    load(range);
+  }, [load, range]);
+
+  const saveRating = async () => {
+    if (!data?.leaderId || !rating) return;
+    setSaving(true);
+    try {
+      await teamsService.rateLeader(data.id, data.leaderId, rating, comment);
+      await load(range);
+      toast.success('Leader rating saved');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not save rating');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const s = data?.stats;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+            <TrendingUp size={14} className="text-primary" />
+            Performance & Profitability
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {team.name} — team KPIs, leader performance & rating
+          </p>
+        </div>
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+          {(
+            [
+              { value: '30', label: 'Last 30 days' },
+              { value: 'all', label: 'All time' },
+            ] as const
+          ).map((r) => (
+            <button
+              key={r.value}
+              onClick={() => setRange(r.value)}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+                range === r.value ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground'
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 size={24} className="animate-spin text-primary" />
+          </div>
+        ) : !data ? (
+          <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+            <TrendingUp size={28} className="opacity-30" />
+            <p className="text-sm">No performance data yet</p>
+            <p className="text-xs text-center max-w-xs">
+              Log calls and close deals to populate this team&apos;s performance.
+            </p>
+          </div>
+        ) : (
+          <div className="p-5 space-y-5">
+            {/* Team KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="card-base !p-3.5">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Users size={11} /> Members
+                </p>
+                <p className="text-xl font-bold tabular-nums mt-1">{data.memberCount}</p>
+              </div>
+              <div className="card-base !p-3.5">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <PhoneCall size={11} /> Calls
+                </p>
+                <p className="text-xl font-bold tabular-nums mt-1">{s?.calls ?? 0}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {fmtDuration(s?.call_duration_seconds ?? 0)}
+                </p>
+              </div>
+              <div className="card-base !p-3.5">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Target size={11} /> Leads / Won
+                </p>
+                <p className="text-xl font-bold tabular-nums mt-1">
+                  {s?.leads ?? 0}
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {' '}
+                    / {s?.won ?? 0}
+                  </span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {s?.conversion ?? 0}% conversion
+                </p>
+              </div>
+              <div className="card-base !p-3.5">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <DollarSign size={11} /> Revenue
+                </p>
+                <p className="text-lg font-bold tabular-nums mt-1">{fmtMoney(s?.revenue ?? 0)}</p>
+              </div>
+              <div className="card-base !p-3.5">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Wallet size={11} /> Expenses
+                </p>
+                <p className="text-lg font-bold tabular-nums mt-1">{fmtMoney(s?.expenses ?? 0)}</p>
+              </div>
+              <div className="card-base !p-3.5">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Percent size={11} /> Profit
+                </p>
+                <p
+                  className={`text-lg font-bold tabular-nums mt-1 ${
+                    (s?.profit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'
+                  }`}
+                >
+                  {fmtMoney(s?.profit ?? 0)}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {(s?.profitMargin ?? 0).toFixed(1)}% margin
+                </p>
+              </div>
+            </div>
+
+            {/* Team leader section */}
+            <div className="card-base !p-4 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Crown size={15} className="text-amber-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {data.leaderName || data.leader?.name || 'Team Leader'}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {data.leader?.email || ''}
+                  </p>
+                </div>
+              </div>
+
+              {data.leader && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Calls</p>
+                    <p className="text-sm font-bold tabular-nums">
+                      {data.leader.calls}
+                      <span className="text-[11px] font-medium text-muted-foreground ml-1">
+                        {fmtDuration(data.leader.call_duration_seconds)}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Leads / Won</p>
+                    <p className="text-sm font-bold tabular-nums">
+                      {data.leader.leads} / {data.leader.won}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground">Revenue</p>
+                    <p className="text-sm font-bold tabular-nums">{fmtMoney(data.leader.revenue)}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Leader rating */}
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <p className="text-xs font-semibold text-foreground">Team Leader Rating</p>
+                  {data.leaderRating && (
+                    <p className="text-[11px] text-muted-foreground">
+                      by {data.leaderRating.ratedByName || 'an admin'} ·{' '}
+                      {new Date(data.leaderRating.updatedAt).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <StarRating value={rating} disabled={!canRate} onChange={setRating} />
+                </div>
+                {canRate ? (
+                  <>
+                    <textarea
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      rows={2}
+                      placeholder="Add a comment about this team leader… (optional)"
+                      className="input-base w-full mt-3 resize-none text-sm"
+                    />
+                    <button
+                      onClick={saveRating}
+                      disabled={saving || !rating || !data.leaderId}
+                      className="btn-primary mt-3 flex items-center gap-1.5 text-sm disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                      Save Rating
+                    </button>
+                  </>
+                ) : data.leaderRating?.comment ? (
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    “{data.leaderRating.comment}”
+                  </p>
+                ) : null}
+                {!canRate && !data.leaderRating && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Rating not set yet — ask your Owner/Admin.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Team Detail Panel ────────────────────────────────────────────────────────
 function TeamDetailPanel({
   team,
@@ -373,6 +721,7 @@ function TeamDetailPanel({
   usersError?: string | null;
 }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [tab, setTab] = useState<'members' | 'performance'>('members');
   const existingMemberIds = members.map((m) => m.userId);
 
   return (
@@ -384,7 +733,7 @@ function TeamDetailPanel({
             {members.length} member{members.length !== 1 ? 's' : ''}
           </p>
         </div>
-        {canManage && (
+        {canManage && tab === 'members' && (
           <button
             onClick={() => setAddOpen(true)}
             className="btn-primary flex items-center gap-1.5 text-xs px-3 py-1.5"
@@ -395,84 +744,111 @@ function TeamDetailPanel({
         )}
       </div>
 
-      {team.description && (
+      <div className="flex items-center gap-1 px-5 pt-3 border-b border-border flex-shrink-0">
+        <button
+          onClick={() => setTab('members')}
+          className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
+            tab === 'members'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Members
+        </button>
+        <button
+          onClick={() => setTab('performance')}
+          className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
+            tab === 'performance'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Performance
+        </button>
+      </div>
+
+      {team.description && tab === 'members' && (
         <div className="px-5 py-3 bg-muted/30 border-b border-border">
           <p className="text-xs text-muted-foreground">{team.description}</p>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <Loader2 size={24} className="animate-spin text-primary" />
-          </div>
-        ) : members.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
-            <Users size={28} className="opacity-30" />
-            <p className="text-sm">No members yet</p>
-            {canManage && (
-              <button
-                onClick={() => setAddOpen(true)}
-                className="text-xs text-primary hover:underline"
-              >
-                Add the first member
-              </button>
-            )}
-          </div>
-        ) : (
-          <ul className="divide-y divide-border">
-            {members.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
-                  {(m.userName || m.userEmail)
-                    .split(' ')
-                    .map((p) => p[0])
-                    .join('')
-                    .toUpperCase()
-                    .slice(0, 2)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {m.userName || m.userEmail}
-                    </p>
-                    {m.isLeader && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 flex-shrink-0">
-                        <Crown size={10} />
-                        Leader
-                      </span>
-                    )}
+      {tab === 'performance' ? (
+        <PerformancePanel team={team} canRate={canManage} />
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 size={24} className="animate-spin text-primary" />
+            </div>
+          ) : members.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+              <Users size={28} className="opacity-30" />
+              <p className="text-sm">No members yet</p>
+              {canManage && (
+                <button
+                  onClick={() => setAddOpen(true)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Add the first member
+                </button>
+              )}
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {members.map((m) => (
+                <li
+                  key={m.id}
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
+                    {(m.userName || m.userEmail)
+                      .split(' ')
+                      .map((p) => p[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{m.userEmail}</p>
-                </div>
-                {canManage && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {!m.isLeader && (
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {m.userName || m.userEmail}
+                      </p>
+                      {m.isLeader && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 flex-shrink-0">
+                          <Crown size={10} />
+                          Leader
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{m.userEmail}</p>
+                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {!m.isLeader && (
+                        <button
+                          onClick={() => onSetLeader(m.userId)}
+                          className="btn-ghost p-1.5 rounded-lg text-muted-foreground hover:text-amber-600"
+                          title="Set as Team Leader"
+                        >
+                          <Crown size={13} />
+                        </button>
+                      )}
                       <button
-                        onClick={() => onSetLeader(m.userId)}
-                        className="btn-ghost p-1.5 rounded-lg text-muted-foreground hover:text-amber-600"
-                        title="Set as Team Leader"
+                        onClick={() => onRemoveMember(m.userId, m.userName || m.userEmail)}
+                        className="btn-ghost p-1.5 rounded-lg text-muted-foreground hover:text-destructive"
+                        title="Remove from team"
                       >
-                        <Crown size={13} />
+                        <UserMinus size={13} />
                       </button>
-                    )}
-                    <button
-                      onClick={() => onRemoveMember(m.userId, m.userName || m.userEmail)}
-                      className="btn-ghost p-1.5 rounded-lg text-muted-foreground hover:text-destructive"
-                      title="Remove from team"
-                    >
-                      <UserMinus size={13} />
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {canManage && (
         <AddMemberModal

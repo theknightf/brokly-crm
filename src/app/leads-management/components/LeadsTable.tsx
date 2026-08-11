@@ -322,7 +322,14 @@ export default function LeadsTable({
 
                 {/* Big thumb-zone actions */}
                 <div className="mt-3">
-                  <LeadQuickActions lead={{ id: lead.id, name: lead.name || '', phone: lead.phone }} />
+                  <LeadQuickActions
+                    lead={{
+                      id: lead.id,
+                      name: lead.name || '',
+                      phone: lead.phone,
+                      project: lead.project,
+                    }}
+                  />
                 </div>
               </div>
             );

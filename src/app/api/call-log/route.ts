@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     duration_seconds,
     outcome,
     notes,
+    client_ref,
   } = body as {
     entity_type?: string;
     entity_id?: string;
@@ -58,10 +59,63 @@ export async function POST(request: Request) {
     duration_seconds?: number;
     outcome?: string;
     notes?: string;
+    client_ref?: string;
   };
 
   const validChannels = ['Call', 'Video Call', 'WhatsApp', 'Email', 'Site Visit', 'Meeting'];
   const ch = validChannels.includes(channel || '') ? channel : 'Call';
+
+  // Idempotency key: the same client_ref (regenerated per user interaction)
+  // can never create a second row, even if the client retries or double-taps.
+  const ref =
+    client_ref || `${user.id}-${entity_id || 'none'}-${ch}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  // Resolve the project linked to the entity so every call log carries
+  // project/lead context for the reports.
+  let projectName = '';
+  if (entity_id) {
+    try {
+      if (entity_type === 'follow_up') {
+        const { data: fu } = await supabase
+          .from('follow_ups')
+          .select('lead_id')
+          .eq('id', entity_id)
+          .maybeSingle();
+        if (fu?.lead_id) {
+          const { data: lead } = await supabase
+            .from('leads')
+            .select('project')
+            .eq('id', fu.lead_id)
+            .maybeSingle();
+          projectName = lead?.project || '';
+        }
+      } else {
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('project')
+          .eq('id', entity_id)
+          .maybeSingle();
+        projectName = lead?.project || '';
+      }
+    } catch {
+      // project name is best-effort — the call is still logged
+    }
+  }
+
+  const row = {
+    user_id: user.id,
+    entity_type: entity_type || 'lead',
+    entity_id: entity_id || '',
+    contact_name: contact_name || '',
+    contact_phone: contact_phone || '',
+    channel: ch,
+    direction: direction || 'outgoing',
+    duration_seconds: Math.max(0, Math.floor(Number(duration_seconds) || 0)),
+    outcome: outcome || '',
+    notes: notes || '',
+    client_ref: ref,
+    project_name: projectName,
+  };
 
   // Call outcomes that map to a CRM pipeline stage are synced back onto the
   // lead so the pipeline reflects what happened on the call. Never fatal.
@@ -95,44 +149,58 @@ export async function POST(request: Request) {
   };
 
   try {
+    // Idempotent save: upsert on client_ref so retries/double-taps return the
+    // existing record instead of creating a duplicate call log.
     const { data, error } = await supabase
       .from('call_logs')
-      .insert({
-        user_id: user.id,
-        entity_type: entity_type || 'lead',
-        entity_id: entity_id || '',
-        contact_name: contact_name || '',
-        contact_phone: contact_phone || '',
-        channel: ch,
-        direction: direction || 'outgoing',
-        duration_seconds: Math.max(0, Math.floor(Number(duration_seconds) || 0)),
-        outcome: outcome || '',
-        notes: notes || '',
-      })
+      .upsert(row, { onConflict: 'client_ref' })
       .select()
       .single();
 
     let saved: any;
     if (error) {
       const msg = (error.message || '').toLowerCase();
-      if (
+      if (msg.includes('client_ref') || msg.includes('project_name')) {
+        // New columns not provisioned yet — retry without them (no dedup).
+        const { client_ref: _cr, project_name: _pn, ...plainRow } = row;
+        const { data: plainData, error: plainErr } = await supabase
+          .from('call_logs')
+          .insert(plainRow)
+          .select()
+          .single();
+        if (plainErr) {
+          const pm = (plainErr.message || '').toLowerCase();
+          if (
+            pm.includes('does not exist') ||
+            pm.includes('could not find') ||
+            pm.includes('schema cache')
+          ) {
+            const rec = { ...plainRow, created_at: new Date().toISOString() };
+            const { error: qe } = await supabase.from('admin_settings').insert({
+              category: 'call_log_fallback',
+              name: user.id,
+              color: JSON.stringify(rec),
+              sort_order: Math.floor(Date.now() / 1000),
+              is_active: true,
+            });
+            if (qe) return NextResponse.json({ error: qe.message }, { status: 500 });
+            saved = { id: 'tmp-' + Date.now(), ...rec };
+          } else {
+            throw plainErr;
+          }
+        } else {
+          saved = plainData;
+        }
+      } else if (
         msg.includes('does not exist') ||
         msg.includes('could not find') ||
         msg.includes('schema cache')
       ) {
-        // Real call_logs table not provisioned yet. Fall back to admin_settings
-        // (writable by any authenticated user) so the log genuinely SAVES now.
+        // Real call_logs table not provisioned yet — fall back to
+        // admin_settings (writable by any authenticated user) so the log
+        // genuinely SAVES now.
         const rec = {
-          user_id: user.id,
-          entity_type: entity_type || 'lead',
-          entity_id: entity_id || '',
-          contact_name: contact_name || '',
-          contact_phone: contact_phone || '',
-          channel: ch,
-          direction: direction || 'outgoing',
-          duration_seconds: Math.max(0, Math.floor(Number(duration_seconds) || 0)),
-          outcome: outcome || '',
-          notes: notes || '',
+          ...row,
           created_at: new Date().toISOString(),
         };
         const { error: qe } = await supabase.from('admin_settings').insert({
@@ -199,11 +267,15 @@ export async function GET(request: Request) {
   const from = url.searchParams.get('from') || '';
   const to = url.searchParams.get('to') || '';
   const userId = url.searchParams.get('user_id');
+  const entityType = url.searchParams.get('entity_type');
+  const entityId = url.searchParams.get('entity_id');
 
   let query = supabase.from('call_logs').select('*').order('created_at', { ascending: false });
   if (from) query = query.gte('created_at', `${from}T00:00:00`);
   if (to) query = query.lte('created_at', `${to}T23:59:59.999`);
   if (userId) query = query.eq('user_id', userId);
+  if (entityType) query = query.eq('entity_type', entityType);
+  if (entityId) query = query.eq('entity_id', entityId);
 
   const { data, error } = await query.limit(500);
 
@@ -248,7 +320,7 @@ export async function GET(request: Request) {
       const list = (calls as any[]).map((c) => ({ ...c, agent_name: names[c.user_id] || '' }));
       return NextResponse.json({ calls: list, fallback: true });
     }
-    return NextResponse.json({ calls: [], error: error.message });
+    return NextResponse.json({ calls: [], error: error.message }, { status: 500 });
   }
 
   // Attach agent display names (admin view needs them).

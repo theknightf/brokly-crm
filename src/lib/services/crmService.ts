@@ -1196,6 +1196,48 @@ export const teamsService = {
       }
     });
   },
+
+  /**
+   * Per-team performance & profitability + team leader rating.
+   * GET /api/teams/performance is RLS-scoped, so non-admins only ever
+   * receive the teams they are allowed to see.
+   */
+  async getPerformance(from?: string, to?: string) {
+    try {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      const res = await fetch(`/api/teams/performance${qs ? `?${qs}` : ''}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || 'Failed to load team performance');
+      }
+      const body = await res.json();
+      return {
+        teams: body.teams || [],
+        canRate: !!body.canRate,
+      };
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return { teams: [], canRate: false };
+    }
+  },
+
+  /** Owner/Admin rates a team leader (1–5) — stored in team_leader_ratings. */
+  async rateLeader(teamId: string, leaderId: string, rating: number, comment?: string) {
+    const res = await fetch('/api/teams/performance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ team_id: teamId, leader_id: leaderId, rating, comment }),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error || 'Failed to save rating');
+    invalidateCache();
+    return body.rating;
+  },
 };
 
 // ─── PROJECTS ────────────────────────────────────────────────────────────────
@@ -1231,6 +1273,11 @@ export const projectsService = {
         latitude: project.latitude ?? null,
         longitude: project.longitude ?? null,
         radius_m: project.radiusM ?? null,
+        pitch_summary: project.pitchSummary ?? '',
+        why_buy: project.whyBuy ?? '',
+        selling_points: Array.isArray(project.sellingPoints)
+          ? project.sellingPoints.filter(Boolean).join('\n')
+          : project.sellingPoints ?? '',
       })
       .select('*, developers(id, name)')
       .single();
@@ -1249,6 +1296,11 @@ export const projectsService = {
         latitude: project.latitude ?? null,
         longitude: project.longitude ?? null,
         radius_m: project.radiusM ?? null,
+        pitch_summary: project.pitchSummary ?? '',
+        why_buy: project.whyBuy ?? '',
+        selling_points: Array.isArray(project.sellingPoints)
+          ? project.sellingPoints.filter(Boolean).join('\n')
+          : project.sellingPoints ?? '',
       })
       .eq('id', id)
       .select('*, developers(id, name)')
@@ -1264,6 +1316,14 @@ export const projectsService = {
   },
 };
 
+function splitSellingPoints(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((s) => String(s)).filter(Boolean);
+  return String(value || '')
+    .split(/\r?\n|,/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function rowToProject(row: any) {
   return {
     id: row.id,
@@ -1275,6 +1335,9 @@ function rowToProject(row: any) {
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
     radiusM: row.radius_m ?? 300,
+    pitchSummary: row.pitch_summary || '',
+    whyBuy: row.why_buy || '',
+    sellingPoints: splitSellingPoints(row.selling_points),
   };
 }
 

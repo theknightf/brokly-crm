@@ -48,6 +48,7 @@ export default function MobileTodayFollowUps() {
         contactPhone: item.contactPhone,
         entityType: 'follow_up',
         rescheduleId: item.id,
+        projectName: item.propertyInterest,
       },
       channel
     );

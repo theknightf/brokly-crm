@@ -29,6 +29,8 @@ export interface CallItem {
   entityType?: 'lead' | 'follow_up';
   /** follow-up id to reschedule when the user picks "call back later" */
   rescheduleId?: string;
+  /** project name (e.g. lead.project) — used to load the project pitch */
+  projectName?: string;
 }
 
 export type CallChannel = 'Call' | 'WhatsApp';
@@ -153,6 +155,12 @@ function futureDate(days: number): string {
   return d.toISOString().split('T')[0];
 }
 
+interface ProjectPitch {
+  summary: string;
+  whyBuy: string;
+  sellingPoints: string[];
+}
+
 interface CallOutcomeSheetProps {
   item: CallItem;
   channel: CallChannel;
@@ -174,6 +182,9 @@ export function CallOutcomeSheet({
   const [callbackDays, setCallbackDays] = useState(3);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pitch, setPitch] = useState<ProjectPitch | null>(null);
+  const [pitchLoading, setPitchLoading] = useState(false);
+  const startedAtRef = useRef<number>(0);
 
   useEffect(() => {
     setOutcome(null);
@@ -181,6 +192,37 @@ export function CallOutcomeSheet({
     setCallbackDays(3);
     setNote('');
     setSaving(false);
+    setPitch(null);
+    setPitchLoading(false);
+    startedAtRef.current = Date.now();
+
+    // Load the project pitch so the agent can read it while on the call.
+    let cancelled = false;
+    (async () => {
+      if (!item.id) return;
+      setPitchLoading(true);
+      try {
+        const params = new URLSearchParams({
+          entity_type: item.entityType || 'lead',
+          entity_id: item.id,
+        });
+        if (item.projectName) params.set('project', item.projectName);
+        const res = await fetch(`/api/projects/pitch?${params.toString()}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (cancelled) return;
+        if (body?.pitch) setPitch(body.pitch);
+      } catch {
+        // pitch is best-effort — never block the call flow
+      } finally {
+        if (!cancelled) setPitchLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [item]);
 
   const outcomes = channel === 'WhatsApp' ? WHATSAPP_OUTCOMES : OUTCOMES;
@@ -189,6 +231,12 @@ export function CallOutcomeSheet({
     if (!outcome || saving) return;
     setSaving(true);
     try {
+      const durationSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+      const clientRef =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
       const res = await fetch('/api/call-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,6 +249,8 @@ export function CallOutcomeSheet({
           direction,
           outcome,
           notes: note.trim() || '',
+          duration_seconds: durationSeconds,
+          client_ref: clientRef,
         }),
       });
 
@@ -356,6 +406,40 @@ export function CallOutcomeSheet({
             </button>
           </div>
         )}
+
+        {pitchLoading ? (
+          <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 size={14} className="animate-spin" />
+            Loading project pitch…
+          </div>
+        ) : pitch &&
+          (pitch.summary || pitch.whyBuy || pitch.sellingPoints.length > 0) ? (
+          <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-primary mb-1.5 flex items-center gap-1.5">
+              <MessageCircle size={13} />
+              Project Pitch — say this
+            </p>
+            {pitch.summary && (
+              <p className="text-[13px] leading-snug text-foreground mb-1.5">{pitch.summary}</p>
+            )}
+            {pitch.whyBuy && (
+              <p className="text-[13px] leading-snug text-muted-foreground mb-1.5">
+                <span className="font-semibold text-foreground">Why buy: </span>
+                {pitch.whyBuy}
+              </p>
+            )}
+            {pitch.sellingPoints.length > 0 && (
+              <ul className="mt-1 space-y-1">
+                {pitch.sellingPoints.map((s, i) => (
+                  <li key={i} className="flex items-start gap-1.5 text-[13px] text-muted-foreground">
+                    <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-primary" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-2">
           {outcomes.map((o) => (

@@ -17,7 +17,7 @@ import { QuickNoteSheet } from './QuickNoteSheet';
 import { useCallOutcome, CallChannel, CallOutcomeSheet, Direction, CallItem } from './CallOutcomeSheet';
 
 interface LeadQuickActionsProps {
-  lead: { id: string; name: string; phone?: string };
+  lead: { id: string; name: string; phone?: string; project?: string };
 }
 
 function waLink(phone: string): string {
@@ -65,14 +65,20 @@ export function LeadQuickActions({ lead }: LeadQuickActionsProps) {
 
   const armCall = (channel: CallChannel) => {
     arm(
-      { id: lead.id, contactName: lead.name, contactPhone: lead.phone, entityType: 'lead' },
+      {
+        id: lead.id,
+        contactName: lead.name,
+        contactPhone: lead.phone,
+        entityType: 'lead',
+        projectName: lead.project,
+      },
       channel
     );
   };
 
   const handleWaQuick = async (outcome: string) => {
     try {
-      await fetch('/api/call-log', {
+      const res = await fetch('/api/call-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,6 +91,10 @@ export function LeadQuickActions({ lead }: LeadQuickActionsProps) {
           outcome,
         }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Could not log action (${res.status})`);
+      }
       toast.success(outcome);
     } catch {
       toast.error('Could not log action');
@@ -151,7 +161,13 @@ export function LeadQuickActions({ lead }: LeadQuickActionsProps) {
         <button
           onClick={() =>
             setIncoming({
-              item: { id: lead.id, contactName: lead.name, contactPhone: lead.phone, entityType: 'lead' },
+              item: {
+                id: lead.id,
+                contactName: lead.name,
+                contactPhone: lead.phone,
+                entityType: 'lead',
+                projectName: lead.project,
+              },
               direction: 'incoming',
             })
           }

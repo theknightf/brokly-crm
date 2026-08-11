@@ -15,6 +15,9 @@ export interface Project {
   latitude?: number;
   longitude?: number;
   radiusM?: number;
+  pitchSummary?: string;
+  whyBuy?: string;
+  sellingPoints?: string[];
 }
 
 export const DEVELOPERS: Developer[] = [

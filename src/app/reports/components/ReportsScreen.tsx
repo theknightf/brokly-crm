@@ -208,12 +208,38 @@ interface ReportData {
   monthlyLeads: { month: string; leads: number; won: number }[];
   agentPerformance: { name: string; leads: number; won: number; rate: string }[];
   teamPerformance: {
+    id: string;
     name: string;
-    closedDeals: number;
+    leaderId: string | null;
+    leaderName: string;
     assignedLeads: number;
+    closedDeals: number;
     totalRevenue: number;
     conversionRate: number;
+    calls: number;
+    callDurationSeconds: number;
+    expenses: number;
+    profit: number;
+    profitMargin: number;
+    leaderRating: number | null;
+    leaderRatingComment: string;
+    leaderRatingAt: string | null;
   }[];
+  callsByEmployee: {
+    userId: string;
+    name: string;
+    calls: number;
+    totalDurationSeconds: number;
+    connected: number;
+    noAnswer: number;
+    incoming: number;
+  }[];
+}
+
+function fmtMinutes(seconds: number): string {
+  const m = Math.round(seconds / 60);
+  if (m >= 60) return `${Math.floor(m / 60)}h ${m % 60}m`;
+  return `${m}m`;
 }
 
 export default function ReportsScreen() {
@@ -650,50 +676,167 @@ export default function ReportsScreen() {
           {/* Team Performance Table */}
           {data.teamPerformance.length > 0 && (
             <div className="bg-card border border-border rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Team Performance</h2>
+              <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Team Performance & Profitability
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Per-team calls, deals, revenue, expenses and leader rating — scoped to your
+                    role
+                  </p>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm table-mobile">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Member
+                        Team
+                      </th>
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        Leader
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Assigned
+                        Leads
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
                         Closed
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        Calls
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
                         Revenue
                       </th>
                       <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Rate
+                        Expenses
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-emerald-600">
+                        Profit
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        Margin
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-amber-600">
+                        Rating
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.teamPerformance
-                      .sort((a, b) => b.closedDeals - a.closedDeals)
+                      .slice()
+                      .sort((a, b) => b.profit - a.profit)
                       .map((member, i) => (
                         <tr
-                          key={i}
+                          key={member.id || i}
                           className="border-b border-border/50 hover:bg-muted/30 transition-colors"
                         >
-                          <td className="py-2.5 px-3 font-medium text-foreground">{member.name}</td>
+                          <td className="py-2.5 px-3 font-medium text-foreground">
+                            {member.name}
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground">
+                            {member.leaderName || '—'}
+                          </td>
                           <td className="py-2.5 px-3 text-right text-muted-foreground">
                             {member.assignedLeads}
                           </td>
                           <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
                             {member.closedDeals}
                           </td>
+                          <td className="py-2.5 px-3 text-right text-muted-foreground">
+                            {member.calls}
+                          </td>
                           <td className="py-2.5 px-3 text-right text-foreground">
                             {formatCurrency(member.totalRevenue)}
                           </td>
+                          <td className="py-2.5 px-3 text-right text-muted-foreground">
+                            {formatCurrency(member.expenses)}
+                          </td>
+                          <td
+                            className={`py-2.5 px-3 text-right font-bold ${member.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}
+                          >
+                            {formatCurrency(member.profit)}
+                          </td>
                           <td className="py-2.5 px-3 text-right">
                             <span className="text-xs bg-blue-50 text-primary px-2 py-0.5 rounded-full font-medium">
-                              {member.conversionRate}%
+                              {member.profitMargin}%
                             </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {member.leaderRating ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-semibold"
+                                title={member.leaderRatingComment || 'Leader rating'}
+                              >
+                                ★ {member.leaderRating}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Calls by Employee */}
+          {data.callsByEmployee.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h2 className="text-sm font-semibold text-foreground mb-4">
+                Calls by Employee
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm table-mobile">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        Employee
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        Calls
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-emerald-600">
+                        Connected
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        No answer
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-sky-600">
+                        Incoming
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        Duration
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.callsByEmployee
+                      .slice()
+                      .sort((a, b) => b.calls - a.calls)
+                      .map((emp, i) => (
+                        <tr
+                          key={emp.userId || i}
+                          className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                        >
+                          <td className="py-2.5 px-3 font-medium text-foreground">{emp.name}</td>
+                          <td className="py-2.5 px-3 text-right font-bold text-foreground">
+                            {emp.calls}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
+                            {emp.connected}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-muted-foreground">
+                            {emp.noAnswer}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-sky-600 font-medium">
+                            {emp.incoming}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-muted-foreground">
+                            {fmtMinutes(emp.totalDurationSeconds)}
                           </td>
                         </tr>
                       ))}

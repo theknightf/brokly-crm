@@ -1,7 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarRange, Loader2, Phone, RefreshCw } from 'lucide-react';
-import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { verifyCall } from '@/lib/callVerification';
 
@@ -45,15 +44,13 @@ const fmtDate = (iso?: string) => {
 };
 
 export default function CallLogsReport() {
-  const { profile, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const [logs, setLogs] = useState<CallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [period, setPeriod] = useState<Period>('week');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-
-  const isAdmin = isAdminRole(profile?.role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -180,9 +177,8 @@ export default function CallLogsReport() {
     );
   }
 
-  // Non-admins never see this section.
-  if (!isAdmin) return null;
-
+  // Data is scoped server-side by role/RLS: admins see everyone, team leaders
+  // see their team, sales see only their own call logs.
   const total = scoped.length;
   const reached = scoped.filter((l) => l.outcome === 'Reached').length;
   const callbacks = scoped.filter((l) => l.outcome === 'Call back later').length;
@@ -201,7 +197,7 @@ export default function CallLogsReport() {
         <div className="flex items-center gap-2">
           <CalendarRange size={14} className="text-primary" />
           <p className="text-xs text-muted-foreground">
-            Call activity across the whole team — who called, when, and the outcome.
+            Call activity you can see — who called, when, and the outcome.
           </p>
         </div>
         <button

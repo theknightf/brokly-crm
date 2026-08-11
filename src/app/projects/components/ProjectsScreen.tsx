@@ -33,6 +33,9 @@ interface ProjectFormData {
   latitude?: string;
   longitude?: string;
   radiusM?: string;
+  pitchSummary: string;
+  whyBuy: string;
+  sellingPoints: string;
 }
 
 function parseLat(v?: string): number | null {
@@ -66,14 +69,30 @@ function ProjectFormModal({
   developers: Developer[];
 }) {
   const [form, setForm] = useState<ProjectFormData>(
-    initial ?? { name: '', developerId: developers[0]?.id || '', status: 'Active' }
+    initial ?? {
+      name: '',
+      developerId: developers[0]?.id || '',
+      status: 'Active',
+      pitchSummary: '',
+      whyBuy: '',
+      sellingPoints: '',
+    }
   );
   const [errors, setErrors] = useState<Partial<ProjectFormData>>({});
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     if (open) {
-      setForm(initial ?? { name: '', developerId: developers[0]?.id || '', status: 'Active' });
+      setForm(
+        initial ?? {
+          name: '',
+          developerId: developers[0]?.id || '',
+          status: 'Active',
+          pitchSummary: '',
+          whyBuy: '',
+          sellingPoints: '',
+        }
+      );
       setErrors({});
     }
   }, [open, initial]);
@@ -208,6 +227,39 @@ function ProjectFormModal({
                 </p>
               </div>
             </div>
+            <div>
+              <label className="label-base">Pitch summary (optional)</label>
+              <textarea
+                value={form.pitchSummary}
+                onChange={(e) => setForm((f) => ({ ...f, pitchSummary: e.target.value }))}
+                rows={2}
+                className="input-base resize-none"
+                placeholder="One-liner agents read to the customer, e.g. “Premium compound with private gardens & smart home tech.”"
+              />
+            </div>
+            <div>
+              <label className="label-base">Why buy (optional)</label>
+              <textarea
+                value={form.whyBuy}
+                onChange={(e) => setForm((f) => ({ ...f, whyBuy: e.target.value }))}
+                rows={2}
+                className="input-base resize-none"
+                placeholder="The main buying reason, e.g. “Best location in the district with direct access to the ring road.”"
+              />
+            </div>
+            <div>
+              <label className="label-base">Selling points (optional)</label>
+              <textarea
+                value={form.sellingPoints}
+                onChange={(e) => setForm((f) => ({ ...f, sellingPoints: e.target.value }))}
+                rows={3}
+                className="input-base resize-none"
+                placeholder="One per line — shown as bullet points in the call sheet, e.g.&#10;60% finished & handed over&#10;0% down payment"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                These appear in the call outcome sheet while the agent is on a call.
+              </p>
+            </div>
           </div>
           <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
             <button type="button" onClick={onClose} className="btn-secondary">
@@ -290,6 +342,9 @@ export default function ProjectsScreen() {
           latitude: parseLat(data.latitude),
           longitude: parseLng(data.longitude),
           radiusM: parseOptionalInt(data.radiusM),
+          pitchSummary: data.pitchSummary,
+          whyBuy: data.whyBuy,
+          sellingPoints: data.sellingPoints,
         },
         user?.id || ''
       );
@@ -308,9 +363,12 @@ export default function ProjectsScreen() {
         name: data.name,
         developerId: data.developerId,
         status: data.status,
-latitude: parseLat(data.latitude),
+        latitude: parseLat(data.latitude),
         longitude: parseLng(data.longitude),
         radiusM: parseOptionalInt(data.radiusM),
+        pitchSummary: data.pitchSummary,
+        whyBuy: data.whyBuy,
+        sellingPoints: data.sellingPoints,
       });
       setProjects((prev) => prev.map((p) => (p.id === editTarget.id ? (updated as Project) : p)));
       setEditTarget(null);
@@ -565,6 +623,9 @@ latitude: parseLat(data.latitude),
                 name: editTarget.name,
                 developerId: editTarget.developerId,
                 status: editTarget.status,
+                pitchSummary: editTarget.pitchSummary || '',
+                whyBuy: editTarget.whyBuy || '',
+                sellingPoints: (editTarget.sellingPoints || []).join('\n'),
               }
             : undefined
         }

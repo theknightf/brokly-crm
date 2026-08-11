@@ -13,6 +13,10 @@ import {
   CheckCircle2,
   ThumbsUp,
   UserX,
+  PhoneCall,
+  Clock,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -36,6 +40,122 @@ export interface FilterState {
   agent: string;
   propertyType: PropertyType | '';
   action: LeadAction | '';
+}
+
+interface CallHistoryRow {
+  id: string;
+  contact_name?: string;
+  contact_phone?: string;
+  channel?: string;
+  direction?: string;
+  duration_seconds?: number;
+  outcome?: string;
+  notes?: string;
+  agent_name?: string;
+  created_at?: string;
+}
+
+function fmtCallTime(iso?: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function fmtCallDuration(seconds?: number): string {
+  const s = Number(seconds) || 0;
+  if (s <= 0) return '';
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function LeadCallHistory({ leadId }: { leadId: string }) {
+  const [rows, setRows] = useState<CallHistoryRow[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setRows(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/call-log?entity_type=lead&entity_id=${encodeURIComponent(leadId)}`,
+          { cache: 'no-store' }
+        );
+        const body = await res.json().catch(() => null);
+        if (!alive) return;
+        setRows(body?.calls || body?.call_logs || []);
+      } catch {
+        if (alive) setRows([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [leadId]);
+
+  return (
+    <div className="bg-muted/40 rounded-xl px-3 py-2.5">
+      <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+        <PhoneCall size={11} />
+        Call History
+      </p>
+      {rows === null ? (
+        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <Loader2 size={11} className="animate-spin" />
+          Loading…
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No calls logged for this lead yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li
+              key={r.id}
+              className="bg-card border border-border rounded-lg px-2.5 py-2 flex items-start gap-2"
+            >
+              {r.direction === 'incoming' ? (
+                <ArrowDownLeft size={13} className="text-sky-500 mt-0.5 flex-shrink-0" />
+              ) : (
+                <ArrowUpRight size={13} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-foreground">
+                    {r.outcome || r.channel || 'Call'}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {fmtCallTime(r.created_at)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2">
+                  <span>{r.channel || 'Call'}</span>
+                  {r.duration_seconds ? (
+                    <span className="flex items-center gap-0.5">
+                      <Clock size={9} />
+                      {fmtCallDuration(r.duration_seconds)}
+                    </span>
+                  ) : null}
+                  {r.agent_name ? <span>· {r.agent_name}</span> : null}
+                </p>
+                {r.notes ? (
+                  <p className="text-[11px] text-muted-foreground mt-0.5 italic truncate">
+                    {r.notes}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export default function LeadsManagementScreen() {
@@ -316,7 +436,7 @@ export default function LeadsManagementScreen() {
       const statusMap: Partial<Record<string, string>> = {
         'Customer Replied': 'Following Up',
       };
-      await fetch('/api/call-log', {
+      const res = await fetch('/api/call-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -329,6 +449,10 @@ export default function LeadsManagementScreen() {
           outcome,
         }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to log WhatsApp action (${res.status})`);
+      }
       const nextStatus = statusMap[outcome];
       if (nextStatus) {
         await handleStatusChange(lead.id, nextStatus as LeadStatus);
@@ -680,6 +804,7 @@ export default function LeadsManagementScreen() {
                 </div>
               )}
 
+              <LeadCallHistory leadId={viewLead.id} />
               <LeadCommentsSection leadId={viewLead.id} />
             </div>
             <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-2">
