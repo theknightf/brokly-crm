@@ -48,6 +48,104 @@ function invalidateCache(): void {
   crmCache.clear();
 }
 
+/** Best-effort activity_log insert (lead timeline). Never throws. */
+async function logActivity(actionType: string, entityType: string, entityId: string, detail = '') {
+  try {
+    const supabase = createClient();
+    await supabase.from('activity_log').insert({
+      action_type: actionType,
+      entity_type: entityType,
+      entity_id: entityId,
+      detail,
+    });
+  } catch {
+    // non-fatal
+  }
+}
+
+// ─── LEAD ROTATION ───────────────────────────────────────────────────────────
+// Admin toggle lives in admin_settings (category "rotation",
+// item "rotation_enabled", is_active = on/off). When on, new/imported leads
+// without an explicit assignee go to the least-recently-assigned active
+// salesperson (DB-backed, respects RLS; counter fallback on read errors).
+
+let rotationStateCache: {
+  at: number;
+  enabled: boolean;
+  agents: { id: string; name: string }[];
+} | null = null;
+
+async function getRotationState() {
+  if (rotationStateCache && Date.now() - rotationStateCache.at < 30_000) {
+    return { enabled: rotationStateCache.enabled, agents: rotationStateCache.agents };
+  }
+  try {
+    const settings = await adminSettingsService.getAll();
+    const items = settings['rotation'] || [];
+    const enabled = !!items.find((i: any) => i.name === 'rotation_enabled')?.active;
+    let agents: { id: string; name: string }[] = [];
+    if (enabled) {
+      const all = await teamsService.getAssignableUsers();
+      agents = (all as any[])
+        .filter((u) => u.role !== 'admin' && u.role !== 'owner')
+        .map((u) => ({ id: u.id, name: u.name }));
+    }
+    rotationStateCache = { at: Date.now(), enabled, agents };
+    return { enabled, agents };
+  } catch {
+    return { enabled: false, agents: [] };
+  }
+}
+
+function agentInitials(name: string): string {
+  return String(name || '')
+    .split(' ')
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Least-recently-assigned ordering of the rotation agents (stable per call). */
+async function rotationOrder(): Promise<{ id: string; name: string }[]> {
+  const { agents } = await getRotationState();
+  if (!agents.length) return [];
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('leads')
+      .select('assigned_to, updated_at')
+      .in('assigned_to', agents.map((a) => a.id))
+      .order('updated_at', { ascending: false })
+      .limit(agents.length * 3);
+    const latest = new Map<string, number>();
+    for (const r of data || []) {
+      if (!latest.has(r.assigned_to)) {
+        latest.set(r.assigned_to, new Date(r.updated_at || 0).getTime());
+      }
+    }
+    return [...agents].sort((a, b) => (latest.get(a.id) ?? 0) - (latest.get(b.id) ?? 0));
+  } catch {
+    return [...agents];
+  }
+}
+
+/**
+ * Returns a Map<rowIndex, agent> for rows that should be auto-assigned by
+ * rotation (only rows without an explicit assignee). At most one DB round-trip.
+ */
+async function computeRotationAssignments(rows: any[]): Promise<Map<number, { id: string; name: string }>> {
+  const out = new Map<number, { id: string; name: string }>();
+  const order = await rotationOrder();
+  if (!order.length) return out;
+  rows.forEach((row, i) => {
+    if (!row.assignedTo && !row.agent) {
+      out.set(i, order[i % order.length]);
+    }
+  });
+  return out;
+}
+
 // ─── LEADS ───────────────────────────────────────────────────────────────────
 
 /**
@@ -120,6 +218,15 @@ export const leadsService = {
 
   async create(lead: any, userId: string) {
     const supabase = createClient();
+    // Auto-assignment when the admin rotation toggle is on.
+    const rotation = await computeRotationAssignments([lead]);
+    const rot = rotation.get(0);
+    if (rot) {
+      lead.assignedTo = rot.id;
+      lead.assignedToName = rot.name;
+      lead.agent = rot.name;
+      lead.agentInitials = agentInitials(rot.name);
+    }
     const { data, error } = await supabase
       .from('leads')
       .insert(leadToRow(lead, userId))
@@ -177,9 +284,22 @@ export const leadsService = {
   async bulkInsert(rows: any[], userId: string) {
     if (!rows.length) return [];
     const supabase = createClient();
+    // Auto-assignment for unassigned imported rows when rotation is on.
+    const rotation = await computeRotationAssignments(rows);
+    const finalRows = rows.map((r, i) => {
+      const rot = rotation.get(i);
+      if (!rot) return r;
+      return {
+        ...r,
+        assignedTo: rot.id,
+        assignedToName: rot.name,
+        agent: rot.name,
+        agentInitials: agentInitials(rot.name),
+      };
+    });
     const { data, error } = await supabase
       .from('leads')
-      .insert(rows.map((r) => leadToRow(r, userId)))
+      .insert(finalRows.map((r) => leadToRow(r, userId)))
       .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
     if (error) throw error;
     invalidateCache();
@@ -320,6 +440,14 @@ export const leadsService = {
     invalidateCache();
   },
 
+  /** Bulk-assign a team label (leads.team) to the selected leads. */
+  async bulkSetTeam(ids: string[], teamName: string) {
+    const supabase = createClient();
+    const { error } = await supabase.from('leads').update({ team: teamName }).in('id', ids);
+    if (error) throw error;
+    invalidateCache();
+  },
+
   async getStatusCounts() {
     const supabase = createClient();
     try {
@@ -432,9 +560,24 @@ export const leadsService = {
 
       const q = search.trim();
       if (q) {
-        query = query.or(
-          `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
-        );
+        // lead_number was added later — retry without it if the column is
+        // missing so search never breaks on an un-migrated database.
+        try {
+          const withNumber = await query
+            .or(
+              `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%,lead_number.ilike.%${q}%`
+            )
+            .order(column, { ascending: sortDir !== 'desc' })
+            .range(0, 0);
+          if (withNumber.error) throw withNumber.error;
+          query = query.or(
+            `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%,lead_number.ilike.%${q}%`
+          );
+        } catch {
+          query = query.or(
+            `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
+          );
+        }
       }
       if (status) query = query.eq('crm_status', status);
       if (source) query = query.eq('source', source);
@@ -510,6 +653,29 @@ function rowToLead(row: any) {
     project: row.project,
     unit: row.unit,
     interestLevel: row.interest_level,
+    leadNumber: row.lead_number || '',
+    leadRating: row.lead_rating || '',
+    priority: row.priority || 'Normal',
+    team: row.team || '',
+    csAgent: row.cs_agent || '',
+    unitId: row.unit_id || null,
+    unitArea: Number(row.unit_area || 0),
+    unitPrice: Number(row.unit_price || 0),
+    totalPrice: Number(row.total_price || 0),
+    downPayment: Number(row.down_payment || 0),
+    downPaymentPct: Number(row.down_payment_pct || 0),
+    installmentAmount: Number(row.installment_amount || 0),
+    installmentCount: Number(row.installment_count || 0),
+    installmentFrequency: Number(row.installment_frequency || 12),
+    paymentStartDate: row.payment_start_date || '',
+    reservationAmount: Number(row.reservation_amount || 0),
+    maintenanceFees: Number(row.maintenance_fees || 0),
+    remainingAmount: Number(row.remaining_amount || 0),
+    paymentStatus: row.payment_status || 'Not Started',
+    reservationDate: row.reservation_date || '',
+    closingDate: row.closing_date || '',
+    finalPrice: Number(row.final_price || 0),
+    commission: Number(row.commission || 0),
     createdAt: row.created_at?.split('T')[0] || row.created_at,
   };
 }
@@ -536,6 +702,28 @@ function leadToRow(lead: any, userId?: string) {
     assigned_to: lead.assignedTo || null,
     unit: lead.unit || '',
     interest_level: lead.interestLevel || '',
+    lead_rating: lead.leadRating || '',
+    priority: lead.priority || 'Normal',
+    team: lead.team || '',
+    cs_agent: lead.csAgent || '',
+    unit_id: lead.unitId || null,
+    unit_area: lead.unitArea ?? 0,
+    unit_price: lead.unitPrice ?? 0,
+    total_price: lead.totalPrice ?? 0,
+    down_payment: lead.downPayment ?? 0,
+    down_payment_pct: lead.downPaymentPct ?? 0,
+    installment_amount: lead.installmentAmount ?? 0,
+    installment_count: lead.installmentCount ?? 0,
+    installment_frequency: lead.installmentFrequency ?? 12,
+    payment_start_date: lead.paymentStartDate || null,
+    reservation_amount: lead.reservationAmount ?? 0,
+    maintenance_fees: lead.maintenanceFees ?? 0,
+    remaining_amount: lead.remainingAmount ?? 0,
+    payment_status: lead.paymentStatus || 'Not Started',
+    reservation_date: lead.reservationDate || null,
+    closing_date: lead.closingDate || null,
+    final_price: lead.finalPrice ?? 0,
+    commission: lead.commission ?? 0,
   };
   // If the caller supplies an explicit creation date (e.g. lead import), keep
   // it; otherwise the DB default applies.
@@ -543,6 +731,9 @@ function leadToRow(lead: any, userId?: string) {
     const iso = String(lead.createdAt);
     row.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
   }
+  // Only push the DB-generated lead number on explicit user edits — never
+  // overwrite the sequence-assigned value with null/empty on partial updates.
+  if (lead.leadNumber) row.lead_number = lead.leadNumber;
   if (userId) row.created_by = userId;
   return row;
 }
@@ -558,6 +749,7 @@ function mapCrmStatusToLegacy(crmStatus: string): string {
     'Not Interested': 'Lost',
     Cancellation: 'Lost',
     'Done Deal': 'Won',
+    Reservation: 'Negotiation',
     'Duplicate Leads': 'Lost',
     'Wrong Number': 'Lost',
     'Data Rotation': 'Contacted',
@@ -1278,6 +1470,11 @@ export const projectsService = {
         selling_points: Array.isArray(project.sellingPoints)
           ? project.sellingPoints.filter(Boolean).join('\n')
           : project.sellingPoints ?? '',
+        image_path: project.imagePath || '',
+        location: project.location || '',
+        full_description: project.fullDescription || '',
+        developer_description: project.developerDescription || '',
+        payment_plan_summary: project.paymentPlanSummary || '',
       })
       .select('*, developers(id, name)')
       .single();
@@ -1301,6 +1498,11 @@ export const projectsService = {
         selling_points: Array.isArray(project.sellingPoints)
           ? project.sellingPoints.filter(Boolean).join('\n')
           : project.sellingPoints ?? '',
+        image_path: project.imagePath || '',
+        location: project.location || '',
+        full_description: project.fullDescription || '',
+        developer_description: project.developerDescription || '',
+        payment_plan_summary: project.paymentPlanSummary || '',
       })
       .eq('id', id)
       .select('*, developers(id, name)')
@@ -1313,6 +1515,35 @@ export const projectsService = {
     const supabase = createClient();
     const { error } = await supabase.from('projects').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  /** Upload a cover image into the project-images bucket (client-side). */
+  async uploadImage(projectId: string, file: File) {
+    const supabase = createClient();
+    if (!PROJECT_IMAGE_BUCKET) throw new Error('Storage is not available');
+    const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${projectId}/${Date.now()}-${safeName}`;
+    const { error: upErr } = await supabase.storage.from(PROJECT_IMAGE_BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+    if (upErr) throw upErr;
+    return path;
+  },
+
+  /** Signed URL so the private cover image is viewable. */
+  async getImageUrl(path?: string | null): Promise<string> {
+    if (!path) return '';
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase.storage
+        .from(PROJECT_IMAGE_BUCKET)
+        .createSignedUrl(path, 60 * 60);
+      if (error) throw error;
+      return data?.signedUrl || '';
+    } catch {
+      return '';
+    }
   },
 };
 
@@ -1338,6 +1569,11 @@ function rowToProject(row: any) {
     pitchSummary: row.pitch_summary || '',
     whyBuy: row.why_buy || '',
     sellingPoints: splitSellingPoints(row.selling_points),
+    imagePath: row.image_path || '',
+    location: row.location || '',
+    fullDescription: row.full_description || '',
+    developerDescription: row.developer_description || '',
+    paymentPlanSummary: row.payment_plan_summary || '',
   };
 }
 
@@ -1407,11 +1643,13 @@ export interface UnitFile {
 }
 
 const UNIT_BUCKET = 'unit-files';
+const PROJECT_IMAGE_BUCKET = 'project-images';
 
 function unitRowToUnit(row: any) {
   return {
     id: row.id,
     projectId: row.project_id,
+    projectName: row.projects?.name || '',
     name: row.name,
     unitType: row.unit_type,
     area: Number(row.area || 0),
@@ -1421,6 +1659,8 @@ function unitRowToUnit(row: any) {
     downPaymentPct: Number(row.down_payment_pct || 0),
     installmentYears: Number(row.installment_years || 0),
     installmentFrequency: Number(row.installment_frequency || 12),
+    status: row.status || 'Available',
+    imagePath: row.image_path || '',
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1439,6 +1679,8 @@ function unitToRow(unit: any) {
     down_payment_pct: unit.downPaymentPct ?? 0,
     installment_years: unit.installmentYears ?? 0,
     installment_frequency: unit.installmentFrequency ?? 12,
+    status: unit.status || 'Available',
+    image_path: unit.imagePath || '',
     notes: unit.notes || '',
     created_by: unit.createdBy,
   };
@@ -1450,11 +1692,29 @@ export const unitsService = {
     try {
       let query = supabase
         .from('units')
-        .select('*, unit_files(id)')
+        .select('*, unit_files(id), projects(name)')
         .order('name', { ascending: true });
       if (projectId) query = query.eq('project_id', projectId);
       const { data, error } = await query;
       if (error) {
+        // projects(name) was added later — retry without the join on
+        // databases that have not run the migration yet.
+        if (/projects.*(not found|does not exist)|violates/i.test(String(error.message))) {
+          let retry: any = supabase
+            .from('units')
+            .select('*, unit_files(id)')
+            .order('name', { ascending: true });
+          if (projectId) retry = retry.eq('project_id', projectId);
+          const { data: retryData, error: retryError } = await retry;
+          if (retryError) {
+            if (isSchemaError(retryError)) throw retryError;
+            return [];
+          }
+          return (retryData || []).map((row: any) => ({
+            ...unitRowToUnit(row),
+            filesCount: Array.isArray(row.unit_files) ? row.unit_files.length : 0,
+          }));
+        }
         if (isSchemaError(error)) throw error;
         return [];
       }
@@ -1465,6 +1725,28 @@ export const unitsService = {
     } catch (err: any) {
       if (isSchemaError(err)) throw err;
       return [];
+    }
+  },
+
+  async getById(id: string) {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('units')
+        .select('*, unit_files(id), projects(name)')
+        .eq('id', id)
+        .single();
+      if (error) {
+        if (isSchemaError(error)) throw error;
+        return null;
+      }
+      return {
+        ...unitRowToUnit(data),
+        filesCount: Array.isArray(data.unit_files) ? data.unit_files.length : 0,
+      };
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return null;
     }
   },
 
@@ -1593,10 +1875,137 @@ export const unitsService = {
     }
   },
 };
+// ─── RECOMMENDED UNITS (CALCULATOR → LEAD) ──────────────────────────────────
+
+export const recommendedUnitsService = {
+  async listByLead(leadId: string) {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('lead_recommended_units')
+        .select('*, unit:units(*, projects(name))')
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        if (isSchemaError(error)) throw error;
+        return [];
+      }
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        leadId: row.lead_id,
+        unitId: row.unit_id,
+        createdAt: row.created_at,
+        unit: row.unit ? unitRowToUnit(row.unit) : null,
+      }));
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return [];
+    }
+  },
+
+  async add(leadId: string, unitId: string, userId?: string) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('lead_recommended_units')
+      .insert({ lead_id: leadId, unit_id: unitId, created_by: userId || null })
+      .select('*')
+      .single();
+    if (error) throw error;
+    // Keep the lead timeline readable.
+    await logActivity('Recommended Unit Added', 'lead', leadId, unitId).catch(() => {});
+    return data;
+  },
+
+  async remove(leadId: string, unitId: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('lead_recommended_units')
+      .delete()
+      .eq('lead_id', leadId)
+      .eq('unit_id', unitId);
+    if (error) throw error;
+    await logActivity('Recommended Unit Removed', 'lead', leadId, unitId).catch(() => {});
+  },
+};
+
+// ─── MESSAGE LOGS (BULK EMAIL / SMS) ────────────────────────────────────────
+
+export const messageLogsService = {
+  /** Send one personalized email. payload: {to, name, subject, html} */
+  async sendEmail(payload: {
+    to: string;
+    name?: string;
+    subject: string;
+    html: string;
+    entityType?: string;
+    entityId?: string;
+  }) {
+    const res = await fetch('/api/messages/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, entity_type: payload.entityType, entity_id: payload.entityId }),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error || 'Failed to send email');
+    invalidateCache();
+    return body.log;
+  },
+
+  /** Send one personalized SMS. payload: {to, name, message} */
+  async sendSms(payload: {
+    to: string;
+    name?: string;
+    message: string;
+    entityType?: string;
+    entityId?: string;
+  }) {
+    const res = await fetch('/api/messages/sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, entity_type: payload.entityType, entity_id: payload.entityId }),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error || 'Failed to send SMS');
+    invalidateCache();
+    return body.log;
+  },
+
+  async listByEntity(entityType: string, entityId: string) {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('message_logs')
+        .select('*')
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        if (isSchemaError(error)) throw error;
+        return [];
+      }
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        channel: row.channel,
+        recipientName: row.recipient_name,
+        recipientPhone: row.recipient_phone,
+        recipientEmail: row.recipient_email,
+        subject: row.subject,
+        message: row.message,
+        status: row.status,
+        error: row.error,
+        createdAt: row.created_at,
+      }));
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return [];
+    }
+  },
+};
 
 export const adminSettingsService = {
   async getAll() {
     const supabase = createClient();
+
     try {
       const { data, error } = await supabase
         .from('admin_settings')

@@ -13,6 +13,7 @@ export const dictionaries: Dict = {
   'common.followups': { en: 'Follow-ups', ar: 'المتابعات' },
   'common.workspace': { en: 'Workspace', ar: 'مساحة العمل' },
   'common.projects': { en: 'Projects', ar: 'المشاريع' },
+  'common.units': { en: 'Units', ar: 'الوحدات' },
   'common.teams': { en: 'Teams', ar: 'الفرق' },
   'common.reports': { en: 'Reports', ar: 'التقارير' },
   'common.admin': { en: 'Admin', ar: 'الإدارة' },

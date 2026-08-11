@@ -46,6 +46,9 @@ interface Visit {
   within_radius?: boolean;
   outcome?: string;
   next_action?: string;
+  visit_type?: string;
+  meeting_link?: string;
+  platform?: string;
 }
 
 interface SiteVisitSheetProps {
@@ -89,6 +92,9 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
   const [outcome, setOutcome] = useState('');
   const [nextAction, setNextAction] = useState('');
   const [scheduleAt, setScheduleAt] = useState('');
+  const [visitType, setVisitType] = useState<'In-person' | 'Online' | 'Phone'>('In-person');
+  const [meetingLink, setMeetingLink] = useState('');
+  const [platform, setPlatform] = useState('');
 
   // Lead selector state
   const [selectedLead, setSelectedLead] = useState<LeadOption | null>(
@@ -215,6 +221,9 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
           outcome: outcome || (action === 'checkout' ? 'Site Visit Done' : ''),
           next_action: nextAction || '',
           scheduled_at: scheduleAt ? new Date(scheduleAt).toISOString() : null,
+          visit_type: visitType,
+          meeting_link: meetingLink.trim(),
+          platform: platform.trim(),
         }),
       });
       const json = await res.json();
@@ -379,7 +388,7 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                 </p>
                 <p className={`mt-0.5 text-xs ${verified ? 'text-emerald-700' : isScheduled ? 'text-sky-700' : 'text-amber-700'}`}>
                   {isScheduled
-                    ? `Scheduled${openVisit.lead_name ? ` for ${openVisit.lead_name}` : ''}${openVisit.check_in_at ? ` · ${new Date(openVisit.check_in_at).toLocaleString()}` : ''}`
+                    ? `Scheduled${openVisit.lead_name ? ` for ${openVisit.lead_name}` : ''}${openVisit.visit_type && openVisit.visit_type !== 'In-person' ? ` · ${openVisit.visit_type}` : ''}${openVisit.check_in_at ? ` · ${new Date(openVisit.check_in_at).toLocaleString()}` : ''}`
                     : verified
                       ? 'You are at the site — visit verified.'
                       : openVisit.distance_m != null
@@ -458,6 +467,52 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                 onChange={(e) => setScheduleAt(e.target.value)}
                 className="input-base w-full h-11 text-sm"
               />
+            </>
+          )}
+
+          {/* Visit type */}
+          {!openVisit && (
+            <>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">Visit type</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['In-person', 'Online', 'Phone'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setVisitType(t)}
+                      className={`h-10 rounded-xl text-xs font-semibold transition-colors ${
+                        visitType === t
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {visitType === 'Online' && (
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Platform</p>
+                    <input
+                      value={platform}
+                      onChange={(e) => setPlatform(e.target.value)}
+                      placeholder="e.g. Zoom, Google Meet, Teams"
+                      className="input-base w-full h-10 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Meeting link</p>
+                    <input
+                      value={meetingLink}
+                      onChange={(e) => setMeetingLink(e.target.value)}
+                      placeholder="https://meet.google.com/…"
+                      className="input-base w-full h-10 text-sm"
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
 

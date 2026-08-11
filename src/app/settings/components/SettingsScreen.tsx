@@ -18,6 +18,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { isAdminRole } from '@/lib/roles';
 
 type SettingsTab = 'profile' | 'notifications' | 'appearance' | 'security' | 'brokerage';
 
@@ -215,6 +216,83 @@ function BrokerageTab({ profile, user }: { profile: any; user: any }) {
           Save Changes
         </button>
       </div>
+
+      <div className="border-t border-border pt-6">
+        <RotationToggle profile={profile} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Lead Rotation Toggle (admin) ─────────────────────────────────────────────
+function RotationToggle({ profile }: { profile: any }) {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch('/api/rotation', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { enabled: false }))
+      .then((body) => {
+        if (mounted) setEnabled(!!body.enabled);
+      })
+      .catch(() => {
+        if (mounted) setEnabled(false);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const toggle = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/rotation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Failed to save');
+      setEnabled(!enabled);
+      toast.success(enabled ? 'Lead rotation turned off' : 'Lead rotation turned on');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save rotation setting');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isAdminRole(profile?.role)) return null;
+
+  return (
+    <div className="flex items-start justify-between gap-4 p-5 bg-card border border-border rounded-xl">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">Lead Rotation</h3>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          When on, new and imported leads without an explicit assignee are
+          automatically assigned to the least-recently-assigned active
+          salesperson (round-robin).
+        </p>
+      </div>
+      {loading ? (
+        <Loader2 size={18} className="animate-spin text-primary flex-shrink-0 mt-1" />
+      ) : (
+        <button
+          onClick={toggle}
+          disabled={saving}
+          className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-primary' : 'bg-muted'}`}
+          aria-label="Toggle lead rotation"
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'}`}
+          />
+        </button>
+      )}
     </div>
   );
 }

@@ -12,10 +12,14 @@ import {
   X,
   MapPin,
   Layers,
+  Eye,
+  Upload,
+  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Project, ProjectStatus } from './mockProjects';
-import { projectsService, developersService } from '@/lib/services/crmService';
+import { projectsService, developersService, unitsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import UnitsPanel from './UnitsPanel';
@@ -24,6 +28,26 @@ interface Developer {
   id: string;
   name: string;
   isActive: boolean;
+}
+
+interface Unit {
+  id: string;
+  projectId: string;
+  name: string;
+  unitType: string;
+  area: number;
+  floor: number;
+  price: number;
+  paymentPlan: string;
+  status: string;
+}
+
+interface UnitStats {
+  minPrice: number | null;
+  available: number;
+  reserved: number;
+  sold: number;
+  units: Unit[];
 }
 
 interface ProjectFormData {
@@ -36,7 +60,19 @@ interface ProjectFormData {
   pitchSummary: string;
   whyBuy: string;
   sellingPoints: string;
+  location: string;
+  fullDescription: string;
+  developerDescription: string;
+  paymentPlanSummary: string;
+  imageFile: File | null;
+  imagePath?: string;
 }
+
+const STATUS_COLORS: Record<string, string> = {
+  Available: 'bg-emerald-50 text-emerald-700',
+  Reserved: 'bg-amber-50 text-amber-700',
+  Sold: 'bg-blue-50 text-blue-700',
+};
 
 function parseLat(v?: string): number | null {
   const n = v == null ? NaN : parseFloat(v);
@@ -53,6 +89,88 @@ function parseOptionalInt(v?: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function formatEGP(n: number | null): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return '—';
+  return `EGP ${new Intl.NumberFormat('en-US').format(Math.round(n))}`;
+}
+
+function buildPayload(data: ProjectFormData) {
+  return {
+    name: data.name,
+    developerId: data.developerId,
+    status: data.status,
+    latitude: parseLat(data.latitude),
+    longitude: parseLng(data.longitude),
+    radiusM: parseOptionalInt(data.radiusM),
+    pitchSummary: data.pitchSummary,
+    whyBuy: data.whyBuy,
+    sellingPoints: data.sellingPoints,
+    location: data.location,
+    fullDescription: data.fullDescription,
+    developerDescription: data.developerDescription,
+    paymentPlanSummary: data.paymentPlanSummary,
+  };
+}
+
+const emptyForm = (developerId: string): ProjectFormData => ({
+  name: '',
+  developerId,
+  status: 'Active',
+  pitchSummary: '',
+  whyBuy: '',
+  sellingPoints: '',
+  location: '',
+  fullDescription: '',
+  developerDescription: '',
+  paymentPlanSummary: '',
+  imageFile: null,
+});
+
+/** Resolves the signed URL for a project cover image, with a branded fallback. */
+function ProjectCover({
+  project,
+  className,
+  iconSize = 28,
+}: {
+  project: { imagePath?: string; name: string };
+  className?: string;
+  iconSize?: number;
+}) {
+  const [url, setUrl] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    if (!project.imagePath) {
+      setUrl('');
+      return;
+    }
+    projectsService.getImageUrl(project.imagePath).then((u) => {
+      if (alive) setUrl(u);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [project.imagePath]);
+
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={project.name}
+        className={`object-cover w-full h-full ${className || ''}`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-400 ${className || ''}`}
+    >
+      <Building2 size={iconSize} className="text-white/90" />
+    </div>
+  );
+}
+
 function ProjectFormModal({
   open,
   onClose,
@@ -64,38 +182,47 @@ function ProjectFormModal({
   open: boolean;
   onClose: () => void;
   onSave: (data: ProjectFormData) => void;
-  initial?: ProjectFormData;
+  initial?: Partial<ProjectFormData>;
   title: string;
   developers: Developer[];
 }) {
   const [form, setForm] = useState<ProjectFormData>(
-    initial ?? {
-      name: '',
-      developerId: developers[0]?.id || '',
-      status: 'Active',
-      pitchSummary: '',
-      whyBuy: '',
-      sellingPoints: '',
-    }
+    initial
+      ? ({ ...emptyForm(''), ...initial } as ProjectFormData)
+      : emptyForm(developers[0]?.id || '')
   );
   const [errors, setErrors] = useState<Partial<ProjectFormData>>({});
   const [saving, setSaving] = useState(false);
+  const [existingImageUrl, setExistingImageUrl] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (open) {
       setForm(
-        initial ?? {
-          name: '',
-          developerId: developers[0]?.id || '',
-          status: 'Active',
-          pitchSummary: '',
-          whyBuy: '',
-          sellingPoints: '',
-        }
+        initial
+          ? ({ ...emptyForm(''), ...initial } as ProjectFormData)
+          : emptyForm(developers[0]?.id || '')
       );
       setErrors({});
+      setPreviewUrl('');
+      setExistingImageUrl('');
+      if (initial?.imagePath) {
+        projectsService.getImageUrl(initial.imagePath).then(setExistingImageUrl);
+      }
     }
-  }, [open, initial]);
+  }, [open, initial, developers]);
+
+  const handleFile = (file: File | null) => {
+    setForm((f) => ({ ...f, imageFile: file }));
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setPreviewUrl(String(reader.result));
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl('');
+    }
+  };
 
   const validate = () => {
     const e: Partial<ProjectFormData> = {};
@@ -122,52 +249,55 @@ function ProjectFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-md fade-in">
+      <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-2xl fade-in max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
           <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">
             <X size={16} />
           </button>
         </div>
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="px-6 py-5 space-y-4">
-            <div>
-              <label className="label-base">Developer</label>
-              <div className="relative">
-                <select
-                  value={form.developerId}
-                  onChange={(e) => setForm((f) => ({ ...f, developerId: e.target.value }))}
-                  className="input-base appearance-none pr-8"
-                >
-                  <option value="">Select developer</option>
-                  {developers
-                    .filter((d) => d.isActive)
-                    .map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col min-h-0">
+          <div className="px-6 py-5 space-y-4 overflow-y-auto">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label-base">Developer</label>
+                <div className="relative">
+                  <select
+                    value={form.developerId}
+                    onChange={(e) => setForm((f) => ({ ...f, developerId: e.target.value }))}
+                    className="input-base appearance-none pr-8"
+                  >
+                    <option value="">Select developer</option>
+                    {developers
+                      .filter((d) => d.isActive)
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                </div>
+                {errors.developerId && (
+                  <p className="mt-1 text-xs text-red-500">{errors.developerId}</p>
+                )}
               </div>
-              {errors.developerId && (
-                <p className="mt-1 text-xs text-red-500">{errors.developerId}</p>
-              )}
+              <div>
+                <label className="label-base">Project Name</label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className={`input-base ${errors.name ? 'border-red-400' : ''}`}
+                  placeholder="e.g. Palm Hills New Cairo"
+                />
+                {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
+              </div>
             </div>
-            <div>
-              <label className="label-base">Project Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className={`input-base ${errors.name ? 'border-red-400' : ''}`}
-                placeholder="e.g. Palm Hills New Cairo"
-              />
-              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
-            </div>
+
             <div>
               <label className="label-base">Status</label>
               <div className="flex gap-3">
@@ -192,6 +322,18 @@ function ProjectFormModal({
                 ))}
               </div>
             </div>
+
+            <div>
+              <label className="label-base">Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                className="input-base"
+                placeholder="e.g. South Investors Area, New Cairo"
+              />
+            </div>
+
             <div>
               <label className="label-base">Site location (optional)</label>
               <div className="grid grid-cols-2 gap-2">
@@ -215,9 +357,7 @@ function ProjectFormModal({
               <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 items-center">
                 <input
                   type="number"
-                  value={
-                    form.radiusM === undefined ? '' : form.radiusM
-                  }
+                  value={form.radiusM === undefined ? '' : form.radiusM}
                   onChange={(e) => setForm((f) => ({ ...f, radiusM: e.target.value }))}
                   className="input-base"
                   placeholder="Radius (m)"
@@ -227,6 +367,49 @@ function ProjectFormModal({
                 </p>
               </div>
             </div>
+
+            <div>
+              <label className="label-base">Cover image</label>
+              <div className="flex items-center gap-3">
+                {(previewUrl || existingImageUrl) && (
+                  <img
+                    src={previewUrl || existingImageUrl}
+                    alt="Cover preview"
+                    className="w-16 h-12 rounded-lg object-cover border border-border"
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="btn-secondary flex items-center gap-1.5 text-sm"
+                >
+                  <Upload size={14} />
+                  {previewUrl || existingImageUrl ? 'Change image' : 'Upload image'}
+                </button>
+                {(previewUrl || existingImageUrl) && (
+                  <button
+                    type="button"
+                    onClick={() => handleFile(null)}
+                    className="btn-ghost text-xs"
+                  >
+                    Remove
+                  </button>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleFile(e.target.files?.[0] || null)}
+                />
+              </div>
+              {!previewUrl && !existingImageUrl && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  JPG / PNG. Shown as the project cover on cards.
+                </p>
+              )}
+            </div>
+
             <div>
               <label className="label-base">Pitch summary (optional)</label>
               <textarea
@@ -235,6 +418,36 @@ function ProjectFormModal({
                 rows={2}
                 className="input-base resize-none"
                 placeholder="One-liner agents read to the customer, e.g. “Premium compound with private gardens & smart home tech.”"
+              />
+            </div>
+            <div>
+              <label className="label-base">Full description (optional)</label>
+              <textarea
+                value={form.fullDescription}
+                onChange={(e) => setForm((f) => ({ ...f, fullDescription: e.target.value }))}
+                rows={3}
+                className="input-base resize-none"
+                placeholder="Longer project story — master plan, amenities, phases…"
+              />
+            </div>
+            <div>
+              <label className="label-base">Developer description (optional)</label>
+              <textarea
+                value={form.developerDescription}
+                onChange={(e) => setForm((f) => ({ ...f, developerDescription: e.target.value }))}
+                rows={2}
+                className="input-base resize-none"
+                placeholder="About the developer — track record, portfolio…"
+              />
+            </div>
+            <div>
+              <label className="label-base">Payment plan summary (optional)</label>
+              <textarea
+                value={form.paymentPlanSummary}
+                onChange={(e) => setForm((f) => ({ ...f, paymentPlanSummary: e.target.value }))}
+                rows={2}
+                className="input-base resize-none"
+                placeholder="e.g. 0% down, 8-year installments, handover 2027"
               />
             </div>
             <div>
@@ -285,10 +498,211 @@ function ProjectFormModal({
   );
 }
 
+function ProjectDetailsModal({
+  project,
+  stats,
+  onClose,
+  onEdit,
+  onUnits,
+  onVisit,
+}: {
+  project: Project;
+  stats?: UnitStats;
+  onClose: () => void;
+  onEdit: () => void;
+  onUnits: () => void;
+  onVisit: () => void;
+}) {
+  const hasGps = project.latitude != null && project.longitude != null;
+  const mapsUrl = hasGps
+    ? `https://www.google.com/maps?q=${project.latitude},${project.longitude}`
+    : '';
+  const sellingPoints = project.sellingPoints || [];
+  const units = stats?.units || [];
+
+  const section = (title: string, body?: string) =>
+    body && body.trim() ? (
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+          {title}
+        </h4>
+        <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{body}</p>
+      </div>
+    ) : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-2xl fade-in max-h-[92vh] flex flex-col">
+        <div className="relative h-44 sm:h-52 flex-shrink-0">
+          <ProjectCover project={project} iconSize={44} className="rounded-t-2xl" />
+          <div className="absolute top-3 right-3">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${project.status === 'Active' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${project.status === 'Active' ? 'bg-emerald-200' : 'bg-slate-200'}`}
+              />
+              {project.status}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 overflow-y-auto space-y-5">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">{project.name}</h2>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Building2 size={14} className="text-primary" /> {project.developerName}
+              </span>
+              {project.location && (
+                <span className="flex items-center gap-1.5">
+                  <MapPin size={14} className="text-primary" /> {project.location}
+                </span>
+              )}
+              {project.createdAt && (
+                <span className="text-xs">
+                  Added{' '}
+                  {new Date(project.createdAt).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {hasGps && (
+            <div className="flex items-center justify-between gap-3 bg-muted/50 rounded-xl px-4 py-3">
+              <div className="text-xs text-muted-foreground">
+                <p className="font-medium text-foreground text-sm">GPS Site Pin</p>
+                <p className="font-mono-data mt-0.5">
+                  {Number(project.latitude).toFixed(5)}, {Number(project.longitude).toFixed(5)}
+                  {project.radiusM ? ` · ±${project.radiusM}m` : ''}
+                </p>
+              </div>
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary flex items-center gap-1.5 text-xs !py-2"
+              >
+                <ExternalLink size={13} /> Open in Maps
+              </a>
+            </div>
+          )}
+
+          {section('Pitch', project.pitchSummary)}
+          {section('About the project', project.fullDescription)}
+          {section('About the developer', project.developerDescription)}
+          {section('Why buy', project.whyBuy)}
+
+          {sellingPoints.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                Selling points
+              </h4>
+              <ul className="space-y-1.5">
+                {sellingPoints.map((sp, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                    <CheckCircle2 size={15} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                    {sp}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {section('Payment plan', project.paymentPlanSummary)}
+
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Units overview
+            </h4>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {(
+                [
+                  { label: 'Starting price', value: formatEGP(stats?.minPrice ?? null) },
+                  { label: 'Available', value: stats ? String(stats.available) : '—' },
+                  { label: 'Reserved', value: stats ? String(stats.reserved) : '—' },
+                ] as { label: string; value: string }[]
+              ).map((s) => (
+                <div key={s.label} className="bg-muted/50 rounded-xl px-3 py-2.5">
+                  <p className="text-[11px] text-muted-foreground">{s.label}</p>
+                  <p className="text-sm font-bold text-foreground mt-0.5">{s.value}</p>
+                </div>
+              ))}
+            </div>
+            {units.length > 0 ? (
+              <div className="border border-border rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-border">
+                    {units.slice(0, 6).map((u) => (
+                      <tr key={u.id}>
+                        <td className="px-3 py-2.5">
+                          <p className="font-medium text-foreground">{u.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {u.unitType || 'Unit'}
+                            {u.area > 0 ? ` · ${u.area} m²` : ''}
+                            {u.floor > 0 ? ` · Floor ${u.floor}` : ''}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap font-medium text-foreground">
+                          {formatEGP(u.price)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_COLORS[u.status] || 'bg-slate-100 text-slate-600'}`}
+                          >
+                            {u.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {units.length > 6 && (
+                  <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground border-t border-border">
+                    +{units.length - 6} more units
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No units added yet — add units to track availability &amp; pricing.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-border flex items-center gap-2 justify-end flex-wrap">
+          <button onClick={onEdit} className="btn-secondary flex items-center gap-1.5 text-sm">
+            <Pencil size={14} /> Edit
+          </button>
+          <button onClick={onVisit} className="btn-secondary flex items-center gap-1.5 text-sm">
+            <MapPin size={14} /> Site Visit
+          </button>
+          <button onClick={onUnits} className="btn-primary flex items-center gap-1.5 text-sm">
+            <Layers size={14} /> Units &amp; Media
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectsScreen() {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [developers, setDevelopers] = useState<Developer[]>([]);
+  const [unitStats, setUnitStats] = useState<Record<string, UnitStats>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterDev, setFilterDev] = useState('');
@@ -298,6 +712,7 @@ export default function ProjectsScreen() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [visitTarget, setVisitTarget] = useState<Project | null>(null);
   const [unitsTarget, setUnitsTarget] = useState<{ id: string; name: string } | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<Project | null>(null);
 
   useEffect(() => {
     loadData();
@@ -306,12 +721,29 @@ export default function ProjectsScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [projectsData, devsData] = await Promise.all([
+      const [projectsData, devsData, unitsData] = await Promise.all([
         projectsService.getAll(),
         developersService.getAll(),
+        unitsService.getAll(),
       ]);
       setProjects(projectsData as Project[]);
       setDevelopers(devsData as Developer[]);
+      const stats: Record<string, UnitStats> = {};
+      for (const u of unitsData as Unit[]) {
+        const s = (stats[u.projectId] ||= {
+          minPrice: null,
+          available: 0,
+          reserved: 0,
+          sold: 0,
+          units: [],
+        });
+        s.units.push(u);
+        if (u.price > 0 && (s.minPrice == null || u.price < s.minPrice)) s.minPrice = u.price;
+        if (u.status === 'Available') s.available += 1;
+        else if (u.status === 'Reserved') s.reserved += 1;
+        else if (u.status === 'Sold') s.sold += 1;
+      }
+      setUnitStats(stats);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load projects');
     } finally {
@@ -324,7 +756,10 @@ export default function ProjectsScreen() {
     if (search) {
       const q = search.toLowerCase();
       r = r.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.developerName.toLowerCase().includes(q)
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.developerName.toLowerCase().includes(q) ||
+          (p.location || '').toLowerCase().includes(q)
       );
     }
     if (filterDev) r = r.filter((p) => p.developerId === filterDev);
@@ -332,23 +767,24 @@ export default function ProjectsScreen() {
     return r;
   }, [projects, search, filterDev, filterStatus]);
 
+  const persistImage = async (
+    projectId: string,
+    payload: ReturnType<typeof buildPayload>,
+    imageFile: File | null
+  ): Promise<Project> => {
+    if (!imageFile) return {} as Project;
+    const path = await projectsService.uploadImage(projectId, imageFile);
+    return (await projectsService.update(projectId, { ...payload, imagePath: path })) as Project;
+  };
+
   const handleAdd = async (data: ProjectFormData) => {
     try {
-      const created = await projectsService.create(
-        {
-          name: data.name,
-          developerId: data.developerId,
-          status: data.status,
-          latitude: parseLat(data.latitude),
-          longitude: parseLng(data.longitude),
-          radiusM: parseOptionalInt(data.radiusM),
-          pitchSummary: data.pitchSummary,
-          whyBuy: data.whyBuy,
-          sellingPoints: data.sellingPoints,
-        },
-        user?.id || ''
-      );
-      setProjects((prev) => [created as Project, ...prev]);
+      const payload = buildPayload(data);
+      const created = (await projectsService.create(payload, user?.id || '')) as Project;
+      const saved = data.imageFile
+        ? await persistImage(created.id, payload, data.imageFile)
+        : created;
+      setProjects((prev) => [saved, ...prev]);
       setAddOpen(false);
       toast.success(`Project "${data.name}" added`);
     } catch (err: any) {
@@ -359,18 +795,21 @@ export default function ProjectsScreen() {
   const handleEdit = async (data: ProjectFormData) => {
     if (!editTarget) return;
     try {
-      const updated = await projectsService.update(editTarget.id, {
-        name: data.name,
-        developerId: data.developerId,
-        status: data.status,
-        latitude: parseLat(data.latitude),
-        longitude: parseLng(data.longitude),
-        radiusM: parseOptionalInt(data.radiusM),
-        pitchSummary: data.pitchSummary,
-        whyBuy: data.whyBuy,
-        sellingPoints: data.sellingPoints,
-      });
-      setProjects((prev) => prev.map((p) => (p.id === editTarget.id ? (updated as Project) : p)));
+      const payload = buildPayload(data);
+      if (data.imageFile) {
+        const path = await projectsService.uploadImage(editTarget.id, data.imageFile);
+        const updated = (await projectsService.update(editTarget.id, {
+          ...payload,
+          imagePath: path,
+        })) as Project;
+        setProjects((prev) => prev.map((p) => (p.id === editTarget.id ? updated : p)));
+      } else {
+        const updated = (await projectsService.update(editTarget.id, {
+          ...payload,
+          imagePath: editTarget.imagePath || '',
+        })) as Project;
+        setProjects((prev) => prev.map((p) => (p.id === editTarget.id ? updated : p)));
+      }
       setEditTarget(null);
       toast.success('Project updated');
     } catch (err: any) {
@@ -451,7 +890,7 @@ export default function ProjectsScreen() {
             />
             <input
               type="search"
-              placeholder="Search projects or developers…"
+              placeholder="Search projects, developers or locations…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="input-base pl-8 h-9 text-sm"
@@ -514,95 +953,170 @@ export default function ProjectsScreen() {
           </p>
         </div>
       ) : (
-        <div className="card-base !p-0 overflow-hidden">
-          <table className="w-full table-mobile">
-            <thead className="bg-muted/40 border-b border-border">
-              <tr>
-                <th className="table-th">Project Name</th>
-                <th className="table-th">Developer</th>
-                <th className="table-th">Status</th>
-                <th className="table-th">Added</th>
-                <th className="table-th text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map((project) => (
-                <tr key={project.id} className="hover:bg-muted/30 transition-colors group">
-                  <td className="table-td">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <FolderOpen size={13} className="text-primary" />
-                      </div>
-                      <span className="font-medium text-sm text-foreground">{project.name}</span>
-                    </div>
-                  </td>
-                  <td className="table-td">
-                    <div className="flex items-center gap-1.5">
-                      <Building2 size={13} className="text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm text-foreground">{project.developerName}</span>
-                    </div>
-                  </td>
-                  <td className="table-td">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((project) => {
+            const stats = unitStats[project.id];
+            const sp = project.sellingPoints || [];
+            return (
+              <div
+                key={project.id}
+                className="card-base !p-0 overflow-hidden flex flex-col"
+                role="button"
+                tabIndex={0}
+                onClick={() => setDetailsTarget(project)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setDetailsTarget(project);
+                  }
+                }}
+              >
+                <div className="relative h-36 flex-shrink-0">
+                  <ProjectCover project={project} iconSize={30} />
+                  <span
+                    className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${project.status === 'Active' ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}
+                  >
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${project.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${project.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-400'}`}
-                      />
-                      {project.status}
-                    </span>
-                  </td>
-                  <td className="table-td text-sm text-muted-foreground">
-                    {project.createdAt
-                      ? new Date(project.createdAt).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : '—'}
-                  </td>
-                  <td className="table-td">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setUnitsTarget({ id: project.id, name: project.name })}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-primary hover:text-primary hover:bg-primary/10 transition-colors"
-                        title="Units & media — add photos, videos, PDFs"
-                      >
-                        <Layers size={13} />
-                      </button>
-                      <button
-                        onClick={() => setVisitTarget(project)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible"
-                        title="Site visit — GPS check-in"
-                      >
-                        <MapPin size={13} />
-                      </button>
-                      <button
-                        onClick={() => setEditTarget(project)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible"
-                        title="Edit project"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(project)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible"
-                        title="Delete project"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      className={`w-1.5 h-1.5 rounded-full ${project.status === 'Active' ? 'bg-emerald-200' : 'bg-slate-200'}`}
+                    />
+                    {project.status}
+                  </span>
+                </div>
+
+                <div className="p-4 flex flex-col gap-2.5 flex-1">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground line-clamp-1">
+                      {project.name}
+                    </h3>
+                    <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap mt-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Building2 size={12} className="text-primary" />
+                        {project.developerName}
+                      </span>
+                      {project.location && (
+                        <span className="flex items-center gap-1 min-w-0">
+                          <MapPin size={12} className="text-primary flex-shrink-0" />
+                          <span className="truncate">{project.location}</span>
+                        </span>
+                      )}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="px-4 py-3 border-t border-border bg-muted/20">
-            <p className="text-xs text-muted-foreground">
-              Showing {filtered.length} of {projects.length} project
-              {projects.length !== 1 ? 's' : ''}
-            </p>
-          </div>
+                  </div>
+
+                  {project.pitchSummary && (
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {project.pitchSummary}
+                    </p>
+                  )}
+
+                  {project.paymentPlanSummary && (
+                    <p className="text-[11px] text-muted-foreground/90 line-clamp-2">
+                      {project.paymentPlanSummary}
+                    </p>
+                  )}
+
+                  <div className="flex items-end justify-between gap-2 border-t border-border pt-2.5 mt-auto">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Starting from
+                      </p>
+                      <p className="text-sm font-bold text-foreground tabular-nums">
+                        {formatEGP(stats?.minPrice ?? null)}
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {stats ? (
+                        <>
+                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
+                            {stats.available} Avail
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-semibold">
+                            {stats.reserved} Rsrv
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold">
+                            {stats.sold} Sold
+                          </span>
+                        </>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground text-[11px] font-semibold">
+                          No units
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {sp.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {sp.slice(0, 3).map((point, i) => (
+                        <span
+                          key={i}
+                          className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground truncate max-w-full"
+                        >
+                          {point}
+                        </span>
+                      ))}
+                      {sp.length > 3 && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground">
+                          +{sp.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 px-4 py-3 border-t border-border bg-muted/20">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDetailsTarget(project);
+                    }}
+                    className="btn-primary flex items-center justify-center gap-1.5 text-xs !px-3 !py-2 flex-1"
+                  >
+                    <Eye size={13} /> View Details
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUnitsTarget({ id: project.id, name: project.name });
+                    }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors"
+                    title="Units & media — add photos, videos, PDFs"
+                  >
+                    <Layers size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setVisitTarget(project);
+                    }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors"
+                    title="Site visit — GPS check-in"
+                  >
+                    <MapPin size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditTarget(project);
+                    }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    title="Edit project"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(project);
+                    }}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Delete project"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -626,12 +1140,40 @@ export default function ProjectsScreen() {
                 pitchSummary: editTarget.pitchSummary || '',
                 whyBuy: editTarget.whyBuy || '',
                 sellingPoints: (editTarget.sellingPoints || []).join('\n'),
+                location: editTarget.location || '',
+                fullDescription: editTarget.fullDescription || '',
+                developerDescription: editTarget.developerDescription || '',
+                paymentPlanSummary: editTarget.paymentPlanSummary || '',
+                latitude: editTarget.latitude != null ? String(editTarget.latitude) : undefined,
+                longitude: editTarget.longitude != null ? String(editTarget.longitude) : undefined,
+                radiusM: editTarget.radiusM != null ? String(editTarget.radiusM) : undefined,
+                imagePath: editTarget.imagePath || '',
               }
             : undefined
         }
         title="Edit Project"
         developers={developers}
       />
+
+      {detailsTarget && (
+        <ProjectDetailsModal
+          project={detailsTarget}
+          stats={unitStats[detailsTarget.id]}
+          onClose={() => setDetailsTarget(null)}
+          onEdit={() => {
+            setEditTarget(detailsTarget);
+            setDetailsTarget(null);
+          }}
+          onUnits={() => {
+            setUnitsTarget({ id: detailsTarget.id, name: detailsTarget.name });
+            setDetailsTarget(null);
+          }}
+          onVisit={() => {
+            setVisitTarget(detailsTarget);
+            setDetailsTarget(null);
+          }}
+        />
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

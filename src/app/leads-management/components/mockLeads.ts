@@ -16,7 +16,8 @@ export type LeadStatus =
   | 'No Answer'
   | 'No Answer At All'
   | 'Low Budget'
-  | 'Reschedule Meeting';
+  | 'Reschedule Meeting'
+  | 'Reservation';
 
 export type LeadSource =
   | 'MagicBricks'
@@ -84,6 +85,31 @@ export interface Lead {
   location?: string;
   developer?: string;
   project?: string;
+  unit?: string;
+  interestLevel?: string;
+  leadNumber?: string;
+  leadRating?: string;
+  priority?: string;
+  team?: string;
+  csAgent?: string;
+  unitId?: string | null;
+  unitArea?: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  downPayment?: number;
+  downPaymentPct?: number;
+  installmentAmount?: number;
+  installmentCount?: number;
+  installmentFrequency?: number;
+  paymentStartDate?: string;
+  reservationAmount?: number;
+  maintenanceFees?: number;
+  remainingAmount?: number;
+  paymentStatus?: string;
+  reservationDate?: string;
+  closingDate?: string;
+  finalPrice?: number;
+  commission?: number;
 }
 
 export const mockLeads: Lead[] = [];
@@ -106,6 +132,7 @@ export const ALL_STATUSES: LeadStatus[] = [
   'No Answer At All',
   'Low Budget',
   'Reschedule Meeting',
+  'Reservation',
 ];
 
 export const ALL_SOURCES: LeadSource[] = [
@@ -150,6 +177,7 @@ export const STATUS_COLORS: Record<LeadStatus, string> = {
   'No Answer At All': 'bg-amber-100 text-amber-800',
   'Low Budget': 'bg-pink-100 text-pink-700',
   'Reschedule Meeting': 'bg-violet-100 text-violet-700',
+  Reservation: 'bg-amber-100 text-amber-700',
   'All Leads': 'bg-muted text-muted-foreground',
 };
 const ALL_AGENTS: any = null;

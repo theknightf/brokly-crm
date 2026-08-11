@@ -92,6 +92,12 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
         href: '/projects',
       },
       {
+        id: 'nav-units',
+        labelKey: 'common.units',
+        icon: <Building2 size={18} />,
+        href: '/units',
+      },
+      {
         id: 'nav-teams',
         labelKey: 'common.teams',
         icon: <UsersRound size={18} />,

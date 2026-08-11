@@ -17,6 +17,8 @@ import {
   Clock,
   ArrowDownLeft,
   ArrowUpRight,
+  BadgeCheck,
+  Handshake,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -25,6 +27,7 @@ import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
 import LeadsFilters from './LeadsFilters';
 import AddLeadForm from './AddLeadForm';
+import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
 import ImportLeadsModal from './ImportLeadsModal';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -32,6 +35,8 @@ import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction, ALL_STATUSES } 
 import { leadsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import LeadCommentsSection from './LeadCommentsSection';
+import RecommendedUnitsSection from './RecommendedUnitsSection';
+import LeadTimeline from './LeadTimeline';
 
 export interface FilterState {
   search: string;
@@ -330,6 +335,20 @@ export default function LeadsManagementScreen() {
     }
   };
 
+  const handleBulkAssignTeam = async (teamName: string) => {
+    const ids = Array.from(selectedIds);
+    try {
+      await leadsService.bulkSetTeam(ids, teamName);
+      setLeads((prev) =>
+        prev.map((l) => (selectedIds.has(l.id) ? { ...l, team: teamName } : l))
+      );
+      toast.success(`${ids.length} leads assigned to team "${teamName}"`);
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to assign leads to team');
+    }
+  };
+
   const handleAddLead = async (lead: Lead) => {
     try {
       const created = await leadsService.create(lead, user?.id || '');
@@ -353,8 +372,45 @@ export default function LeadsManagementScreen() {
     }
   };
 
+  /** Dedicated edit flow: mark Reservation / Done Deal + payment snapshot. */
+  const handleQuickDealStatus = async (lead: Lead, status: LeadStatus) => {
+    const now = new Date().toISOString().split('T')[0];
+    const next: Lead = {
+      ...lead,
+      status,
+      ...(status === 'Reservation'
+        ? { reservationDate: lead.reservationDate || now, paymentStatus: 'In Progress' }
+        : status === 'Done Deal'
+          ? {
+              closingDate: lead.closingDate || now,
+              finalPrice: lead.finalPrice || lead.totalPrice || lead.unitPrice || 0,
+            }
+          : {}),
+    };
+    try {
+      const saved = await leadsService.update(next.id, next);
+      setLeads((prev) => prev.map((l) => (l.id === next.id ? (saved as Lead) : l)));
+      setViewLead(saved as Lead);
+      toast.success(`Lead marked as ${status}`);
+      try {
+        const supabase = createClient();
+        await supabase.from('activity_log').insert({
+          action_type: status === 'Reservation' ? 'Lead Reserved' : 'Done Deal',
+          entity_type: 'lead',
+          entity_id: next.id,
+          detail: `${next.name || 'Lead'} marked as ${status}`,
+        });
+      } catch {
+        // non-fatal
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update lead status');
+    }
+  };
+
   const handleExport = async () => {
     const headers = [
+      'Lead ID',
       'Name',
       'Phone',
       'Email',
@@ -365,8 +421,15 @@ export default function LeadsManagementScreen() {
       'Source',
       'Agent',
       'Status',
+      'Priority',
+      'Rating',
+      'Team',
       'Developer',
       'Project',
+      'Unit',
+      'Total Price',
+      'Down Payment',
+      'Commission',
       'Follow-up Due',
       'Created At',
     ];
@@ -381,7 +444,8 @@ export default function LeadsManagementScreen() {
         propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
       });
-      const rows = (res.data || []).map((l) => [
+      const rows = (res.data || []).map((l: any) => [
+        l.leadNumber || `LEAD-${String(l.id).slice(0, 8)}`,
         l.name,
         l.phone,
         l.email,
@@ -392,8 +456,15 @@ export default function LeadsManagementScreen() {
         l.source,
         l.agent,
         l.status,
+        l.priority,
+        l.leadRating,
+        l.team,
         l.developer ?? '',
         l.project ?? '',
+        l.unit ?? '',
+        l.totalPrice || '',
+        l.downPayment || '',
+        l.commission || '',
         l.followUpDue,
         l.createdAt,
       ]);
@@ -620,6 +691,7 @@ export default function LeadsManagementScreen() {
         selectedLeads={leads.filter((l) => selectedIds.has(l.id))}
         onDelete={handleBulkDelete}
         onAssign={handleBulkAssign}
+        onAssignTeam={handleBulkAssignTeam}
         onClear={() => setSelectedIds(new Set())}
       />
 
@@ -662,9 +734,16 @@ export default function LeadsManagementScreen() {
                     .slice(0, 2) || '—'}
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-foreground">
-                    {viewLead.name || `Lead ${viewLead.id}`}
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {viewLead.name || `Lead ${viewLead.id}`}
+                    </h2>
+                    {viewLead.leadNumber && (
+                      <span className="text-[10px] font-semibold font-mono text-primary bg-primary/10 rounded-md px-1.5 py-0.5">
+                        {viewLead.leadNumber}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{viewLead.location || '—'}</p>
                 </div>
               </div>
@@ -724,6 +803,91 @@ export default function LeadsManagementScreen() {
                 </div>
               </div>
 
+              {/* Reservation / Done Deal quick actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleQuickDealStatus(viewLead, 'Reservation')}
+                  disabled={viewLead.status === 'Reservation'}
+                  className="h-10 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <BadgeCheck size={14} />
+                  Reservation
+                </button>
+                <button
+                  onClick={() => handleQuickDealStatus(viewLead, 'Done Deal')}
+                  disabled={viewLead.status === 'Done Deal'}
+                  className="h-10 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <Handshake size={14} />
+                  Done Deal
+                </button>
+              </div>
+
+              {/* Payment plan summary */}
+              {Number(viewLead.totalPrice) > 0 && (
+                <div className="bg-muted/40 rounded-xl px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  <p className="text-xs text-muted-foreground">Total price</p>
+                  <p className="text-sm font-semibold text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.totalPrice).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Down payment</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.downPayment || 0).toLocaleString()}
+                    {Number(viewLead.downPaymentPct) > 0 && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({Number(viewLead.downPaymentPct)}%)
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Reservation</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.reservationAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.remainingAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Installment</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.installmentAmount || 0).toLocaleString()}
+                    {Number(viewLead.installmentCount) > 0 &&
+                      ` × ${viewLead.installmentCount}`}
+                  </p>
+                  {viewLead.reservationDate && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Reservation date</p>
+                      <p className="text-sm font-medium text-foreground text-right">
+                        {viewLead.reservationDate}
+                      </p>
+                    </>
+                  )}
+                  {viewLead.closingDate && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Closing date</p>
+                      <p className="text-sm font-medium text-foreground text-right">
+                        {viewLead.closingDate}
+                      </p>
+                    </>
+                  )}
+                  {Number(viewLead.commission) > 0 && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Commission</p>
+                      <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                        EGP {Number(viewLead.commission).toLocaleString()}
+                      </p>
+                    </>
+                  )}
+                  {viewLead.paymentStatus && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Payment status</p>
+                      <p className="text-sm font-medium text-foreground text-right">
+                        {viewLead.paymentStatus}
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Phone', value: viewLead.phone },
@@ -735,6 +899,10 @@ export default function LeadsManagementScreen() {
                   { label: 'Status', value: viewLead.status },
                   { label: 'Assigned To', value: viewLead.assignedToName || 'Unassigned' },
                   { label: 'Follow-up Due', value: viewLead.followUpDue },
+                  { label: 'Priority', value: viewLead.priority || '—' },
+                  { label: 'Rating', value: viewLead.leadRating || '—' },
+                  { label: 'Team', value: viewLead.team || '—' },
+                  { label: 'CS Agent', value: viewLead.csAgent || '—' },
                   ...(viewLead.developer
                     ? [{ label: 'Developer', value: viewLead.developer }]
                     : []),
@@ -805,6 +973,8 @@ export default function LeadsManagementScreen() {
               )}
 
               <LeadCallHistory leadId={viewLead.id} />
+              <RecommendedUnitsSection leadId={viewLead.id} />
+              <LeadTimeline leadId={viewLead.id} />
               <LeadCommentsSection leadId={viewLead.id} />
             </div>
             <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-2">
@@ -835,18 +1005,18 @@ export default function LeadsManagementScreen() {
         </div>
       )}
 
-      {/* Edit Lead Modal */}
+      {/* Edit Lead Modal — dedicated edit interface (not AddLeadForm) */}
       {editLead && (
         <Modal
           open={!!editLead}
           onClose={() => setEditLead(null)}
           title="Edit Lead"
-          subtitle={`Editing details for ${editLead.name}`}
+          subtitle={editLead.leadNumber ? `Editing ${editLead.leadNumber}` : `Editing details for ${editLead.name}`}
           size="xl"
         >
-          <AddLeadForm
-            initialData={editLead}
-            onSubmit={(updated) => handleEditSave({ ...editLead, ...updated })}
+          <EditLeadForm
+            lead={editLead}
+            onSubmit={(updated) => handleEditSave(updated)}
             onCancel={() => setEditLead(null)}
           />
         </Modal>

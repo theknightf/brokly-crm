@@ -111,6 +111,9 @@ export async function POST(request: Request) {
     outcome,
     next_action,
     scheduled_at,
+    visit_type,
+    meeting_link,
+    platform,
   } = body as {
     project_id?: string | null;
     project_name?: string;
@@ -123,7 +126,12 @@ export async function POST(request: Request) {
     outcome?: string;
     next_action?: string;
     scheduled_at?: string | null;
+    visit_type?: string | null;
+    meeting_link?: string | null;
+    platform?: string | null;
   };
+
+  const visitType = visit_type || 'In-person';
 
   const now = new Date().toISOString();
   const latitude = typeof lat === 'number' && !Number.isNaN(lat) ? lat : null;
@@ -143,6 +151,9 @@ export async function POST(request: Request) {
           lead_phone: lead_phone || '',
           status: 'scheduled',
           scheduled_at: scheduled_at || null,
+          visit_type: visitType,
+          meeting_link: meeting_link || '',
+          platform: platform || '',
           note: note || '',
         })
         .select()
@@ -286,6 +297,9 @@ export async function POST(request: Request) {
         distance_m: distance,
         verified: within,
         within_radius: within,
+        visit_type: visitType,
+        meeting_link: meeting_link || '',
+        platform: platform || '',
         note: note ?? '',
       })
       .select()
