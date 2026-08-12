@@ -144,6 +144,7 @@ export const dictionaries: Dict = {
   'workspace.statusNotCompleted': { en: 'Not completed', ar: 'غير مكتملة' },
   'workspace.statusCompleted': { en: 'Completed', ar: 'مكتملة' },
   'workspace.priorityAny': { en: 'Any', ar: 'أي' },
+  'workspace.agentFilter': { en: 'Sales agent', ar: 'مندوب المبيعات' },
 
   'followups.title': { en: 'Follow-ups', ar: 'المتابعات' },
 };

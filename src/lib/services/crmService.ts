@@ -406,7 +406,11 @@ export const leadsService = {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) {
+      throw new Error(
+        describeLeadWriteError(error, 'status update')
+      );
+    }
     invalidateCache();
     await followUpsService.syncFromLead(data);
     return rowToLead(data);
@@ -631,6 +635,7 @@ export const leadsService = {
     status?: string;
     source?: string;
     agent?: string;
+    project?: string;
     propertyType?: string;
     action?: string;
     sortKey?: string;
@@ -644,6 +649,7 @@ export const leadsService = {
       status = '',
       source = '',
       agent = '',
+      project = '',
       propertyType = '',
       action = '',
       sortKey = 'createdAt',
@@ -722,6 +728,7 @@ export const leadsService = {
       if (status) query = query.eq('crm_status', status);
       if (source) query = query.eq('source', source);
       if (agent) query = query.eq('agent', agent);
+      if (project) query = query.eq('project', project);
       if (propertyType) query = query.eq('property_type', propertyType);
 
       const from = Math.max(0, (page - 1) * pageSize);
@@ -876,6 +883,29 @@ function leadToRow(lead: any, userId?: string) {
   if (lead.leadNumber) row.lead_number = lead.leadNumber;
   if (userId) row.created_by = userId;
   return row;
+}
+
+/**
+ * Turn raw Postgres/PostgREST errors into a clear, actionable message for the
+ * lead stage/status flow. The DB triggers that write the activity log must
+ * never be able to silently break a status change — if a write fails we tell
+ * the user exactly why instead of a bare "Failed to update status".
+ */
+function describeLeadWriteError(error: any, action: string): string {
+  const msg = typeof error?.message === 'string' ? error.message : String(error || '');
+  if (/permission denied|row-level security|violates row-level security/i.test(msg)) {
+    return `You don't have permission to ${action} this lead. Ask an admin to check your role.`;
+  }
+  if (/relation ["']?[a-z_]+["']? does not exist/i.test(msg)) {
+    return `A required database table is missing (${msg}). Ask an admin to run the latest migrations.`;
+  }
+  if (/column .* does not exist/i.test(msg)) {
+    return `A required database column is missing (${msg}). Ask an admin to run the latest migrations.`;
+  }
+  if (/new row violates/i.test(msg)) {
+    return `This ${action} was rejected by the database: ${msg}`;
+  }
+  return `${action[0].toUpperCase()}${action.slice(1)} failed: ${msg}`;
 }
 
 function mapCrmStatusToLegacy(crmStatus: string): string {
@@ -2476,9 +2506,20 @@ export const usersService = {
     if (!data?.user || typeof data.user !== 'object') {
       // The user was created server-side but we could not read its profile
       // back (e.g. optional admin_id/agent_code columns not migrated yet).
-      const err: any = new Error('User created but profile could not be read back');
-      err.status = 200;
-      throw err;
+      // This is not a failure — surface a minimal profile so the admin list
+      // still refreshes instead of showing a confusing error.
+      return {
+        id: data?.user?.id ?? '',
+        email: payload.email,
+        fullName: payload.fullName,
+        phone: '',
+        role: payload.role || 'agent',
+        brokerageName: '',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        agentCode: payload.code || '',
+        adminId: payload.adminId || null,
+      } as any;
     }
     return rowToUserProfile(data.user);
   },

@@ -12,6 +12,7 @@ type StatusFilter = 'any' | 'notCompleted' | 'completed';
 type PriorityFilter = 'any' | 'High' | 'Medium' | 'Low';
 
 interface Filters {
+  agent: string;
   status: StatusFilter;
   priority: PriorityFilter;
   date: DateFilter;
@@ -31,29 +32,29 @@ interface FollowUp {
   dueTime?: string;
 }
 
-const DEFAULT_FILTERS: Filters = { status: 'any', priority: 'any', date: 'any', from: '', to: '' };
+const DEFAULT_FILTERS: Filters = { agent: '', status: 'any', priority: 'any', date: 'any', from: '', to: '' };
 
 const TABS: { key: string; labelKey: string; preset: Filters }[] = [
   { key: 'all', labelKey: 'workspace.all', preset: { ...DEFAULT_FILTERS } },
   {
     key: 'today',
     labelKey: 'workspace.today',
-    preset: { status: 'notCompleted', priority: 'any', date: 'today', from: '', to: '' },
+    preset: { agent: '', status: 'notCompleted', priority: 'any', date: 'today', from: '', to: '' },
   },
   {
     key: 'late',
     labelKey: 'workspace.late',
-    preset: { status: 'notCompleted', priority: 'any', date: 'late', from: '', to: '' },
+    preset: { agent: '', status: 'notCompleted', priority: 'any', date: 'late', from: '', to: '' },
   },
   {
     key: 'tomorrow',
     labelKey: 'workspace.tomorrow',
-    preset: { status: 'notCompleted', priority: 'any', date: 'tomorrow', from: '', to: '' },
+    preset: { agent: '', status: 'notCompleted', priority: 'any', date: 'tomorrow', from: '', to: '' },
   },
   {
     key: 'uncompleted',
     labelKey: 'workspace.uncompleted',
-    preset: { status: 'notCompleted', priority: 'any', date: 'any', from: '', to: '' },
+    preset: { agent: '', status: 'notCompleted', priority: 'any', date: 'any', from: '', to: '' },
   },
 ];
 
@@ -81,6 +82,7 @@ export default function WorkspaceScreen() {
   const [tab, setTab] = useState(defaultTab);
   const [panelOpen, setPanelOpen] = useState(false);
   const [items, setItems] = useState<FollowUp[]>([]);
+  const [agents, setAgents] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
 
@@ -98,6 +100,8 @@ export default function WorkspaceScreen() {
 
       if (f.priority !== 'any') list = list.filter((x) => x.priority === f.priority);
 
+      if (f.agent) list = list.filter((x) => (x.agent || '') === f.agent);
+
       if (f.date === 'late') list = list.filter((x) => x.dueDate < today);
       else if (f.date === 'today') list = list.filter((x) => x.dueDate === today);
       else if (f.date === 'tomorrow') list = list.filter((x) => x.dueDate === tomorrow);
@@ -105,6 +109,12 @@ export default function WorkspaceScreen() {
         if (f.from) list = list.filter((x) => x.dueDate >= f.from);
         if (f.to) list = list.filter((x) => x.dueDate <= f.to);
       }
+
+      setAgents(
+        Array.from(
+          new Set(all.map((x) => (x.agent || '').trim()).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b))
+      );
 
       list = [...list].sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1));
       setItems(
@@ -420,6 +430,23 @@ export default function WorkspaceScreen() {
                   </label>
                 </div>
               )}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
+                  {t('workspace.agentFilter')}
+                </p>
+                <select
+                  value={draft.agent}
+                  onChange={(e) => setDraft((d) => ({ ...d, agent: e.target.value }))}
+                  className="input-base w-full appearance-none pr-8"
+                >
+                  <option value="">{t('workspace.dueAny')}</option>
+                  {agents.map((a) => (
+                    <option key={`ws-agent-${a}`} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <FilterGroup
                 label={t('workspace.statusFilter')}
                 options={[

@@ -20,6 +20,8 @@ import {
   BadgeCheck,
   Handshake,
   Pencil,
+  Building2,
+  Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -47,6 +49,7 @@ export interface FilterState {
   status: LeadStatus | '';
   source: LeadSource | '';
   agent: string;
+  project: string;
   propertyType: PropertyType | '';
   action: LeadAction | '';
 }
@@ -187,6 +190,7 @@ export default function LeadsManagementScreen({
     status: initialStatus || '',
     source: '',
     agent: '',
+    project: '',
     propertyType: '',
     action: '',
   });
@@ -271,6 +275,7 @@ export default function LeadsManagementScreen({
         status: filters.status || undefined,
         source: filters.source || undefined,
         agent: filters.agent || undefined,
+        project: filters.project || undefined,
         propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
         sortKey,
@@ -592,6 +597,7 @@ export default function LeadsManagementScreen({
       status: initialStatus || '',
       source: '',
       agent: '',
+      project: '',
       propertyType: '',
       action: '',
     });
@@ -854,7 +860,7 @@ export default function LeadsManagementScreen({
                     .slice(0, 2) || '—'}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-base font-semibold text-foreground">
                       {viewLead.name || `Lead ${viewLead.id}`}
                     </h2>
@@ -864,7 +870,26 @@ export default function LeadsManagementScreen({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">{viewLead.location || '—'}</p>
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    {viewLead.source && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-foreground bg-muted rounded-full px-2 py-0.5">
+                        <Tag size={11} className="text-primary" />
+                        {viewLead.source}
+                      </span>
+                    )}
+                    {viewLead.project && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-foreground bg-muted rounded-full px-2 py-0.5">
+                        <Building2 size={11} className="text-primary" />
+                        {viewLead.project}
+                      </span>
+                    )}
+                    {viewLead.developer && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {viewLead.developer}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">{viewLead.location || ''}</span>
+                  </div>
                 </div>
               </div>
               <button onClick={() => setViewLead(null)} className="btn-ghost p-1.5 rounded-lg">
@@ -872,13 +897,38 @@ export default function LeadsManagementScreen({
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
-              {/* Status quick actions — vertical one-per-row layout */}
+              {/* Key info — most important fields, visible without scrolling */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'Phone', value: viewLead.phone || '—', href: viewLead.phone ? `tel:${viewLead.phone.replace(/[^\d+]/g, '')}` : undefined },
+                  { label: 'Email', value: viewLead.email || '—' },
+                  { label: 'Source', value: viewLead.source || '—' },
+                  { label: 'Project', value: viewLead.project || viewLead.developer || '—' },
+                  { label: 'Property', value: viewLead.propertyType || '—' },
+                  { label: 'Budget', value: formatDisplayBudget(viewLead) },
+                  { label: 'Agent', value: viewLead.agent || 'Unassigned' },
+                  { label: 'Assigned To', value: viewLead.assignedToName || 'Unassigned' },
+                ].map(({ label, value, href }) => (
+                  <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
+                    <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>
+                    {href ? (
+                      <a href={href} className="text-sm font-semibold text-primary truncate block">
+                        {value}
+                      </a>
+                    ) : (
+                      <p className="text-sm font-medium text-foreground truncate">{value}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Status quick actions — horizontal scroll pills */}
               <div className="bg-muted/40 rounded-xl px-3 py-2.5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-muted-foreground font-medium">Lead status</p>
                   <StatusBadge status={viewLead.status || 'Fresh Leads'} showDot />
                 </div>
-                <div className="flex flex-col gap-1 max-h-52 overflow-y-auto -mx-1 px-1">
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
                   {ALL_STATUSES.map((s) => {
                     const isActive = s === (viewLead.status || 'Fresh Leads');
                     return (
@@ -890,17 +940,13 @@ export default function LeadsManagementScreen({
                           setViewLead({ ...viewLead, status: next });
                           handleStatusChange(viewLead.id, next);
                         }}
-                        className={`w-full px-3 h-10 rounded-lg text-left text-sm flex items-center gap-2.5 transition-all active:scale-[0.98] ${
+                        className={`whitespace-nowrap px-3 h-9 rounded-full text-xs flex items-center gap-1.5 transition-all active:scale-[0.98] border ${
                           isActive
-                            ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
-                            : 'text-foreground hover:bg-background/60 font-normal'
+                            ? 'bg-primary text-primary-foreground border-primary font-semibold'
+                            : 'text-foreground bg-card border-border hover:bg-muted font-medium'
                         }`}
                       >
-                        {isActive ? (
-                          <Check size={13} className="flex-shrink-0 text-primary" />
-                        ) : (
-                          <span className="w-[13px] flex-shrink-0" />
-                        )}
+                        {isActive && <Check size={12} className="flex-shrink-0" />}
                         {s}
                       </button>
                     );
@@ -1036,19 +1082,12 @@ export default function LeadsManagementScreen({
 
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Phone', value: viewLead.phone },
-                  { label: 'Email', value: viewLead.email || '—' },
-                  { label: 'Property Type', value: viewLead.propertyType },
-                  { label: 'Budget', value: formatDisplayBudget(viewLead) },
-                  { label: 'Source', value: viewLead.source },
-                  { label: 'Agent', value: viewLead.agent },
-                  { label: 'Status', value: viewLead.status },
-                  { label: 'Assigned To', value: viewLead.assignedToName || 'Unassigned' },
-                  { label: 'Follow-up Due', value: viewLead.followUpDue },
+                  { label: 'Follow-up Due', value: viewLead.followUpDue || '—' },
                   { label: 'Priority', value: viewLead.priority || '—' },
                   { label: 'Rating', value: viewLead.leadRating || '—' },
                   { label: 'Team', value: viewLead.team || '—' },
                   { label: 'CS Agent', value: viewLead.csAgent || '—' },
+                  { label: 'Lead Number', value: viewLead.leadNumber || '—' },
                   ...(viewLead.developer
                     ? [{ label: 'Developer', value: viewLead.developer }]
                     : []),

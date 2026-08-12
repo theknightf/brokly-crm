@@ -1,7 +1,8 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { FilterState } from './LeadsManagementScreen';
+import { teamsService, projectsService } from '@/lib/services/crmService';
 import {
   ALL_STATUSES,
   ALL_SOURCES,
@@ -21,6 +22,36 @@ interface LeadsFiltersProps {
 export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
   const update = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
     onChange({ ...filters, [key]: value });
+
+  const [agentOptions, setAgentOptions] = useState<string[]>([]);
+  const [projectOptions, setProjectOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    teamsService
+      .getAssignableUsers()
+      .then((data: any) => {
+        if (!alive) return;
+        const names = (Array.isArray(data) ? data : [])
+          .map((u: any) => (u?.name as string) || '')
+          .filter(Boolean);
+        setAgentOptions(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => {});
+    projectsService
+      .getAll()
+      .then((data: any) => {
+        if (!alive) return;
+        const names = (Array.isArray(data) ? data : [])
+          .map((p: any) => (p?.name as string) || '')
+          .filter(Boolean);
+        setProjectOptions(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <div className="flex flex-wrap gap-2 mt-3">
@@ -70,6 +101,46 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
           {ALL_SOURCES.map((s) => (
             <option key={`filter-source-${s}`} value={s}>
               {s}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={13}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+        />
+      </div>
+
+      {/* Agent */}
+      <div className="relative">
+        <select
+          value={filters.agent}
+          onChange={(e) => update('agent', e.target.value)}
+          className="input-base h-9 text-sm appearance-none pr-8 min-w-[140px]"
+        >
+          <option value="">All Agents</option>
+          {agentOptions.map((a) => (
+            <option key={`filter-agent-${a}`} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={13}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+        />
+      </div>
+
+      {/* Project */}
+      <div className="relative">
+        <select
+          value={filters.project}
+          onChange={(e) => update('project', e.target.value)}
+          className="input-base h-9 text-sm appearance-none pr-8 min-w-[150px]"
+        >
+          <option value="">All Projects</option>
+          {projectOptions.map((p) => (
+            <option key={`filter-project-${p}`} value={p}>
+              {p}
             </option>
           ))}
         </select>

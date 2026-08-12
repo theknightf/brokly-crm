@@ -168,7 +168,13 @@ interface CallOutcomeSheetProps {
   onClose: () => void;
   /** Called after the log is saved so parents can refresh their lists. */
   onSaved?: (item: CallItem) => Promise<void> | void;
+  /** Timestamp (ms) when the agent tapped the dialer (tel:) link. Used to
+   *  estimate real call length via the visibilitychange gap, so managers can
+   *  spot suspiciously short "completed" calls. */
+  initiatedAt?: number;
 }
+
+const SHORT_CALL_SECONDS = 8;
 
 export function CallOutcomeSheet({
   item,
@@ -176,6 +182,7 @@ export function CallOutcomeSheet({
   direction: initialDirection,
   onClose,
   onSaved,
+  initiatedAt,
 }: CallOutcomeSheetProps) {
   const [outcome, setOutcome] = useState<CallOutcome | null>(null);
   const [direction, setDirection] = useState<'outgoing' | 'incoming'>('outgoing');
@@ -184,6 +191,8 @@ export function CallOutcomeSheet({
   const [saving, setSaving] = useState(false);
   const [pitch, setPitch] = useState<ProjectPitch | null>(null);
   const [pitchLoading, setPitchLoading] = useState(false);
+  const [shortCall, setShortCall] = useState(false);
+  const [duplicateToday, setDuplicateToday] = useState(false);
   const startedAtRef = useRef<number>(0);
 
   useEffect(() => {
@@ -194,7 +203,42 @@ export function CallOutcomeSheet({
     setSaving(false);
     setPitch(null);
     setPitchLoading(false);
+    setShortCall(false);
+    setDuplicateToday(false);
     startedAtRef.current = Date.now();
+
+    // PWA call-arrival verification: if we know when the dialer was opened and
+    // the gap back to this sheet is under the threshold, flag it softly —
+    // the agent may have a legitimate reason (no answer, wrong number) and can
+    // note it, but the manager sees an estimated_duration_seconds to spot-check.
+    if (initiatedAt) {
+      const gapSeconds = Math.round((Date.now() - initiatedAt) / 1000);
+      if (gapSeconds < SHORT_CALL_SECONDS) setShortCall(true);
+    }
+
+    // Soft duplicate-call warning: already logged a call for this lead today?
+    if (item.entityType === 'lead' || !item.entityType) {
+      (async () => {
+        try {
+          const res = await fetch(
+            `/api/call-log?entity_type=lead&entity_id=${encodeURIComponent(item.id)}`,
+            { cache: 'no-store' }
+          );
+          const body = await res.json().catch(() => null);
+          const calls: any[] = body?.calls || body?.call_logs || [];
+          const today = new Date().toDateString();
+          if (
+            calls.some(
+              (c) => c?.created_at && new Date(c.created_at).toDateString() === today
+            )
+          ) {
+            setDuplicateToday(true);
+          }
+        } catch {
+          // best-effort
+        }
+      })();
+    }
 
     // Load the project pitch so the agent can read it while on the call.
     let cancelled = false;
@@ -232,6 +276,10 @@ export function CallOutcomeSheet({
     setSaving(true);
     try {
       const durationSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+      // Real-world estimate from the dialer tap to now (via visibilitychange).
+      const estimatedDurationSeconds = initiatedAt
+        ? Math.max(0, Math.round((Date.now() - initiatedAt) / 1000))
+        : durationSeconds;
       const clientRef =
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
           ? crypto.randomUUID()
@@ -250,6 +298,7 @@ export function CallOutcomeSheet({
           outcome,
           notes: note.trim() || '',
           duration_seconds: durationSeconds,
+          estimated_duration_seconds: estimatedDurationSeconds,
           client_ref: clientRef,
         }),
       });
