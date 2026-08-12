@@ -39,6 +39,8 @@ import LeadCommentsSection from './LeadCommentsSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
 import LeadTimeline from './LeadTimeline';
 import DealStatusModal from './DealStatusModal';
+import QuickPaymentPlanModal from './QuickPaymentPlanModal';
+import LogCallModal from './LogCallModal';
 
 export interface FilterState {
   search: string;
@@ -83,7 +85,7 @@ function fmtCallDuration(seconds?: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-function LeadCallHistory({ leadId }: { leadId: string }) {
+function LeadCallHistory({ leadId, refreshKey = 0 }: { leadId: string; refreshKey?: number }) {
   const [rows, setRows] = useState<CallHistoryRow[] | null>(null);
 
   useEffect(() => {
@@ -105,7 +107,7 @@ function LeadCallHistory({ leadId }: { leadId: string }) {
     return () => {
       alive = false;
     };
-  }, [leadId]);
+  }, [leadId, refreshKey]);
 
   return (
     <div className="bg-muted/40 rounded-xl px-3 py-2.5">
@@ -214,6 +216,9 @@ export default function LeadsManagementScreen({
     lead: Lead;
     status: 'Reservation' | 'Done Deal';
   } | null>(null);
+  const [payPlanLead, setPayPlanLead] = useState<Lead | null>(null);
+  const [logCallLead, setLogCallLead] = useState<Lead | null>(null);
+  const [callHistoryKey, setCallHistoryKey] = useState(0);
 
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
@@ -902,6 +907,15 @@ export default function LeadsManagementScreen({
                 </button>
               </div>
 
+              {/* Log call quick action */}
+              <button
+                onClick={() => setLogCallLead(viewLead)}
+                className="w-full h-10 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <PhoneCall size={14} />
+                Log Call
+              </button>
+
               {/* Payment plan summary */}
               {Number(viewLead.totalPrice) > 0 ? (
                 <div className="bg-muted/40 rounded-xl px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
@@ -965,10 +979,7 @@ export default function LeadsManagementScreen({
                   )}
                   <div className="col-span-2 pt-1 border-t border-border">
                     <button
-                      onClick={() => {
-                        setEditLead(viewLead);
-                        setViewLead(null);
-                      }}
+                      onClick={() => setPayPlanLead(viewLead)}
                       className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
                     >
                       <Pencil size={10} /> Edit payment plan
@@ -979,10 +990,7 @@ export default function LeadsManagementScreen({
                 <div className="bg-muted/40 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">No payment plan added</p>
                   <button
-                    onClick={() => {
-                      setEditLead(viewLead);
-                      setViewLead(null);
-                    }}
+                    onClick={() => setPayPlanLead(viewLead)}
                     className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
                   >
                     <Plus size={11} /> Add payment plan
@@ -1072,7 +1080,7 @@ export default function LeadsManagementScreen({
                 </div>
               )}
 
-              <LeadCallHistory leadId={viewLead.id} />
+              <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
               <RecommendedUnitsSection leadId={viewLead.id} />
               <LeadTimeline leadId={viewLead.id} />
               <LeadCommentsSection leadId={viewLead.id} />
@@ -1148,6 +1156,31 @@ export default function LeadsManagementScreen({
           onConfirm={(fields) => {
             handleQuickDealStatus(dealModal.lead, dealModal.status, fields);
             setDealModal(null);
+          }}
+        />
+      )}
+
+      {/* Quick payment plan modal */}
+      {payPlanLead && (
+        <QuickPaymentPlanModal
+          lead={payPlanLead}
+          onClose={() => setPayPlanLead(null)}
+          onSaved={(updated) => {
+            setViewLead((v) => (v?.id === updated.id ? updated : v));
+            setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+            setPayPlanLead(null);
+          }}
+        />
+      )}
+
+      {/* Quick log call modal */}
+      {logCallLead && (
+        <LogCallModal
+          lead={logCallLead}
+          onClose={() => setLogCallLead(null)}
+          onDone={() => {
+            setLogCallLead(null);
+            setCallHistoryKey((k) => k + 1);
           }}
         />
       )}

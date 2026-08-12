@@ -517,16 +517,24 @@ export default function UnitsScreen() {
                 {[
                   ['Type', preview.unitType || '—'],
                   ['Area', preview.area ? `${preview.area} m²` : '—'],
+                  ['Bedrooms', Number(preview.bedrooms) > 0 ? `${preview.bedrooms}` : null],
+                  ['Bathrooms', Number(preview.bathrooms) > 0 ? `${preview.bathrooms}` : null],
                   ['Floor', preview.floor ? `${preview.floor}` : '—'],
-                  ['Code', preview.name || '—'],
-                ].map(([k, v]) => (
-                  <div key={k} className="bg-muted/50 rounded-xl p-2.5">
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{k}</p>
-                    <p className="text-sm font-semibold text-foreground tabular-nums truncate">
-                      {v}
-                    </p>
-                  </div>
-                ))}
+                  ['Building / Block', preview.building || '—'],
+                  ['Code', preview.unitCode || preview.name || '—'],
+                  ['Status', preview.status || '—'],
+                ]
+                  .filter(([, v]) => v != null)
+                  .map(([k, v]) => (
+                    <div key={String(k)} className="bg-muted/50 rounded-xl p-2.5">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                        {k}
+                      </p>
+                      <p className="text-sm font-semibold text-foreground tabular-nums truncate">
+                        {v}
+                      </p>
+                    </div>
+                  ))}
               </div>
 
               {(Number(preview.downPaymentPct) > 0 ||

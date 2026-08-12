@@ -13,7 +13,9 @@ import {
   Mail,
   CheckCircle2,
   AlertCircle,
+  UserRound,
 } from 'lucide-react';
+import Link from 'next/link';
 import { followUpsService } from '@/lib/services/crmService';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -264,6 +266,14 @@ export default function CalendarScreen() {
                     {f.dueTime && <span className="tabular-nums">{f.dueTime}</span>}
                     {f.agent && <span className="truncate">· {f.agent}</span>}
                   </div>
+                  {f.leadId && (
+                    <Link
+                      href={`/leads-management?lead=${encodeURIComponent(f.leadId)}`}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                    >
+                      <UserRound size={11} /> Open lead
+                    </Link>
+                  )}
                   {f.status === 'Completed' && (
                     <p className="flex items-center gap-1 text-[11px] text-emerald-600">
                       <CheckCircle2 size={12} /> Completed

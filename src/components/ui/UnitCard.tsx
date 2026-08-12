@@ -1,6 +1,17 @@
 'use client';
 import React from 'react';
-import { Building2, MapPin, Ruler, Layers, Eye, Pencil, BadgeCheck } from 'lucide-react';
+import {
+  Building2,
+  MapPin,
+  Ruler,
+  Layers,
+  Eye,
+  Pencil,
+  BadgeCheck,
+  BedDouble,
+  Bath,
+  Hash,
+} from 'lucide-react';
 
 const fmt = (n: number) => (n ? n.toLocaleString() : '0');
 
@@ -78,6 +89,11 @@ export default function UnitCard({
               </p>
             )}
           </div>
+          {unit.unitCode && (
+            <span className="text-[10px] font-semibold font-mono text-muted-foreground bg-muted rounded-md px-1.5 py-0.5 flex items-center gap-1 shrink-0">
+              <Hash size={9} /> {unit.unitCode}
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
@@ -93,10 +109,28 @@ export default function UnitCard({
               {unit.area} m²
             </span>
           )}
+          {Number(unit.bedrooms) > 0 && (
+            <span className="inline-flex items-center gap-1 tabular-nums">
+              <BedDouble size={11} />
+              {unit.bedrooms}
+            </span>
+          )}
+          {Number(unit.bathrooms) > 0 && (
+            <span className="inline-flex items-center gap-1 tabular-nums">
+              <Bath size={11} />
+              {unit.bathrooms}
+            </span>
+          )}
           {Number(unit.floor) > 0 && (
             <span className="inline-flex items-center gap-1">
               <MapPin size={11} />
               Floor {unit.floor}
+            </span>
+          )}
+          {unit.building && (
+            <span className="inline-flex items-center gap-1">
+              <Building2 size={11} />
+              {unit.building}
             </span>
           )}
         </div>
@@ -111,6 +145,12 @@ export default function UnitCard({
             </span>
           )}
         </div>
+
+        {unit.sellingPoint && (
+          <p className="text-[11px] font-medium text-emerald-700 bg-emerald-50 rounded-lg px-2 py-1">
+            {unit.sellingPoint}
+          </p>
+        )}
 
         {unit.notes && (
           <p className="text-[11px] text-muted-foreground line-clamp-2">{unit.notes}</p>
