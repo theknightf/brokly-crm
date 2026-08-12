@@ -14,8 +14,11 @@ import {
   Smartphone,
   CheckCircle2,
   XCircle,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Modal from '@/components/ui/Modal';
 import { teamsService, messageLogsService } from '@/lib/services/crmService';
 
 interface AssignableUser {
@@ -35,11 +38,27 @@ export interface BulkLead {
   email?: string;
 }
 
+export interface LeadForAssignment {
+  id: string;
+  name?: string;
+}
+
+/**
+ * Splits `count` items across `userCount` users as evenly as possible
+ * (e.g. 10 leads / 3 users -> [4, 3, 3]).
+ */
+export function distributeRoundRobin(count: number, userCount: number): number[] {
+  if (count <= 0 || userCount <= 0) return [];
+  const base = Math.floor(count / userCount);
+  const extra = count % userCount;
+  return Array.from({ length: userCount }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
 interface BulkActionBarProps {
   selectedCount: number;
   selectedLeads: BulkLead[];
   onDelete: () => void;
-  onAssign: (userId: string, userName: string) => void;
+  onAssignMany: (users: AssignableUser[]) => Promise<void>;
   onAssignTeam: (teamName: string) => void;
   onClear: () => void;
 }
@@ -60,7 +79,7 @@ export default function BulkActionBar({
   selectedCount,
   selectedLeads,
   onDelete,
-  onAssign,
+  onAssignMany,
   onAssignTeam,
   onClear,
 }: BulkActionBarProps) {
@@ -76,10 +95,22 @@ export default function BulkActionBar({
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<{ sent: number; failed: number } | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [confirmAssignOpen, setConfirmAssignOpen] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const withPhone = selectedLeads.filter((l) => l.phone);
   const withEmail = selectedLeads.filter((l) => l.email);
   const withSms = selectedLeads.filter((l) => l.phone);
+
+  useEffect(() => {
+    if (open === 'assign') setSelectedUserIds(new Set());
+  }, [open]);
+
+  const selectedUsers = users.filter((u) => selectedUserIds.has(u.id));
+  const distribution = distributeRoundRobin(selectedLeads.length, selectedUsers.length);
+  const distByUserId = new Map<string, number>();
+  selectedUsers.forEach((u, i) => distByUserId.set(u.id, distribution[i] ?? 0));
 
   useEffect(() => {
     if (open !== 'assign' || users.length > 0) return;
@@ -149,7 +180,8 @@ export default function BulkActionBar({
         sent += 1;
       } catch (err: any) {
         failed += 1;
-        if (failures.length < 3) failures.push(`${lead.name || lead.phone}: ${err?.message || 'failed'}`);
+        if (failures.length < 3)
+          failures.push(`${lead.name || lead.phone}: ${err?.message || 'failed'}`);
       }
       await new Promise((r) => setTimeout(r, 120));
     }
@@ -260,7 +292,15 @@ export default function BulkActionBar({
             {open === 'assign' && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setOpen('none')} />
-                <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-2xl min-w-[200px] max-h-56 overflow-y-auto py-1 z-50 fade-in">
+                <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-2xl min-w-[280px] max-h-[70vh] overflow-y-auto py-1 z-50 fade-in">
+                  <div className="px-3 pt-3 pb-2 border-b border-border">
+                    <p className="text-xs font-semibold text-foreground">
+                      {selectedLeads.length} selected lead{selectedLeads.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Pick users — leads are split evenly (round-robin).
+                    </p>
+                  </div>
                   {loadingUsers ? (
                     <div className="flex items-center justify-center py-4">
                       <Loader2 size={16} className="animate-spin text-primary" />
@@ -268,18 +308,54 @@ export default function BulkActionBar({
                   ) : users.length === 0 ? (
                     <p className="px-3 py-2 text-sm text-muted-foreground">No assignable users</p>
                   ) : (
-                    users.map((u) => (
+                    users.map((u) => {
+                      const checked = selectedUserIds.has(u.id);
+                      return (
+                        <button
+                          key={`bulk-user-${u.id}`}
+                          onClick={() =>
+                            setSelectedUserIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(u.id)) next.delete(u.id);
+                              else next.add(u.id);
+                              return next;
+                            })
+                          }
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors ${
+                            checked ? 'bg-muted/60' : ''
+                          }`}
+                        >
+                          <span
+                            className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                              checked ? 'bg-primary border-primary text-white' : 'border-input'
+                            }`}
+                          >
+                            {checked && <Check size={12} />}
+                          </span>
+                          <span className="truncate">{u.name}</span>
+                          {checked && (
+                            <span className="ml-auto text-xs text-primary font-semibold">
+                              {distByUserId.get(u.id) ?? 0}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                  {selectedUsers.length > 0 && !loadingUsers && (
+                    <div className="px-3 py-2 border-t border-border">
                       <button
-                        key={`bulk-user-${u.id}`}
                         onClick={() => {
-                          onAssign(u.id, u.name);
+                          setConfirmAssignOpen(true);
                           setOpen('none');
                         }}
-                        className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                        className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
                       >
-                        {u.name}
+                        <UserCheck size={13} />
+                        Assign {selectedLeads.length} leads to {selectedUsers.length} user
+                        {selectedUsers.length !== 1 ? 's' : ''} (round-robin)
                       </button>
-                    ))
+                    </div>
                   )}
                 </div>
               </>
@@ -336,7 +412,11 @@ export default function BulkActionBar({
               }}
               disabled={withEmail.length === 0}
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors disabled:opacity-40"
-              title={withEmail.length === 0 ? 'No selected lead has an email' : `Email ${withEmail.length} leads`}
+              title={
+                withEmail.length === 0
+                  ? 'No selected lead has an email'
+                  : `Email ${withEmail.length} leads`
+              }
             >
               <Mail size={15} />
               <span className="hidden md:inline">Email</span>
@@ -348,7 +428,11 @@ export default function BulkActionBar({
               }}
               disabled={withSms.length === 0}
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors disabled:opacity-40"
-              title={withSms.length === 0 ? 'No selected lead has a phone' : `SMS ${withSms.length} leads`}
+              title={
+                withSms.length === 0
+                  ? 'No selected lead has a phone'
+                  : `SMS ${withSms.length} leads`
+              }
             >
               <Smartphone size={15} />
               <span className="hidden md:inline">SMS</span>
@@ -403,7 +487,10 @@ export default function BulkActionBar({
       {/* Bulk email/SMS composer */}
       {composer !== 'none' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={() => setComposer('none')} />
+          <div
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
+            onClick={() => setComposer('none')}
+          />
           <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-lg fade-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <div className="flex items-center gap-3">
@@ -451,8 +538,10 @@ export default function BulkActionBar({
                   }
                 />
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  Available tokens: <code className="bg-muted px-1 py-0.5 rounded">{'{customer_name}'}</code>{' '}
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{phone}'}</code> — replaced per lead.
+                  Available tokens:{' '}
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{customer_name}'}</code>{' '}
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{phone}'}</code> — replaced per
+                  lead.
                 </p>
               </div>
 
@@ -464,11 +553,7 @@ export default function BulkActionBar({
                       : 'bg-amber-50 text-amber-700'
                   }`}
                 >
-                  {results.failed === 0 ? (
-                    <CheckCircle2 size={15} />
-                  ) : (
-                    <XCircle size={15} />
-                  )}
+                  {results.failed === 0 ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
                   {results.sent} sent, {results.failed} failed
                 </div>
               )}
@@ -491,6 +576,72 @@ export default function BulkActionBar({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Round-robin assign confirmation */}
+      {confirmAssignOpen && (
+        <Modal
+          open
+          onClose={() => setConfirmAssignOpen(false)}
+          title="Assign leads (round-robin)"
+          subtitle={`${selectedLeads.length} lead${selectedLeads.length !== 1 ? 's' : ''} across ${
+            selectedUsers.length
+          } user${selectedUsers.length !== 1 ? 's' : ''}`}
+          size="sm"
+        >
+          <div className="p-6 space-y-4">
+            <div className="space-y-1.5">
+              {selectedUsers.map((u) => (
+                <div
+                  key={`dist-${u.id}`}
+                  className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-sm"
+                >
+                  <span className="text-foreground font-medium truncate">{u.name}</span>
+                  <span className="font-semibold text-primary flex-shrink-0">
+                    {distByUserId.get(u.id) ?? 0} lead
+                    {(distByUserId.get(u.id) ?? 0) !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-start gap-2 rounded-xl bg-amber-50 text-amber-700 px-3 py-2 text-xs">
+              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+              <span>
+                Leads are distributed one by one. If any assignment fails mid-way, everything is
+                rolled back and no lead is left partially assigned.
+              </span>
+            </div>
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmAssignOpen(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setAssigning(true);
+                  try {
+                    await onAssignMany(selectedUsers);
+                    setConfirmAssignOpen(false);
+                  } catch {
+                    // parent surfaces the rollback toast
+                  } finally {
+                    setAssigning(false);
+                    setSelectedUserIds(new Set());
+                  }
+                }}
+                disabled={assigning}
+                className="btn-primary flex items-center gap-2"
+              >
+                {assigning && <Loader2 size={14} className="animate-spin" />}
+                Confirm & Assign
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </>
   );

@@ -1,13 +1,23 @@
 'use client';
-import React, { useState } from 'react';
-import { Loader2, Handshake, BadgeCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Loader2,
+  Handshake,
+  BadgeCheck,
+  Link2,
+  Search,
+  UserCircle2,
+  RefreshCw,
+} from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { Lead } from './mockLeads';
+import { leadsService } from '@/lib/services/crmService';
 
 interface DealStatusModalProps {
   lead: Lead;
   status: 'Reservation' | 'Done Deal';
   onClose: () => void;
+  onChangeLead?: (leadId: string) => Promise<Lead | null>;
   onConfirm: (fields: {
     status: 'Reservation' | 'Done Deal';
     date: string;
@@ -22,10 +32,21 @@ const money = (v: any) => {
   return isNaN(n) ? 0 : n;
 };
 
+interface LeadResult {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  propertyType: string;
+  project: string;
+  unit: string;
+}
+
 export default function DealStatusModal({
   lead,
   status,
   onClose,
+  onChangeLead,
   onConfirm,
 }: DealStatusModalProps) {
   const today = new Date().toISOString().split('T')[0];
@@ -42,8 +63,68 @@ export default function DealStatusModal({
   );
   const [commission, setCommission] = useState(String(lead.commission || 0));
   const [saving, setSaving] = useState(false);
+  const [leadSearchOpen, setLeadSearchOpen] = useState(false);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [leadResults, setLeadResults] = useState<LeadResult[]>([]);
+  const [leadSearching, setLeadSearching] = useState(false);
+  const [switchingLead, setSwitchingLead] = useState(false);
+
+  useEffect(() => {
+    const t = new Date().toISOString().split('T')[0];
+    setDate(status === 'Reservation' ? lead.reservationDate || t : lead.closingDate || t);
+    setAmount(
+      status === 'Reservation'
+        ? String(lead.reservationAmount || 0)
+        : String(lead.finalPrice || lead.totalPrice || lead.unitPrice || 0)
+    );
+    setFinalPrice(String(lead.finalPrice || lead.totalPrice || lead.unitPrice || 0));
+    setCommission(String(lead.commission || 0));
+    setLeadSearch('');
+    setLeadResults([]);
+    setLeadSearchOpen(false);
+  }, [lead, status]);
+
+  useEffect(() => {
+    const q = leadSearch.trim();
+    if (q.length < 2) {
+      setLeadResults([]);
+      return;
+    }
+    let cancelled = false;
+    setLeadSearching(true);
+    const t = setTimeout(() => {
+      leadsService
+        .search(q)
+        .then((results) => {
+          if (!cancelled) setLeadResults(results as LeadResult[]);
+        })
+        .catch(() => {
+          if (!cancelled) setLeadResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setLeadSearching(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [leadSearch]);
 
   const isReservation = status === 'Reservation';
+
+  const pickLead = async (r: LeadResult) => {
+    if (!onChangeLead) return;
+    setSwitchingLead(true);
+    try {
+      await onChangeLead(r.id);
+      setLeadSearchOpen(false);
+    } catch {
+      // keep the current lead
+    } finally {
+      setSwitchingLead(false);
+    }
+  };
 
   const submit = () => {
     setSaving(true);
@@ -78,6 +159,88 @@ export default function DealStatusModal({
           {isReservation
             ? 'This will mark the lead as Reserved and start the payment plan.'
             : 'This will mark the lead as a closed deal.'}
+        </div>
+
+        {/* Carry Lead / Select Existing Lead */}
+        <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Link2 size={14} className="text-primary" />
+            <span className="text-sm font-medium text-foreground">Carry this lead</span>
+            <button
+              type="button"
+              onClick={() => setLeadSearchOpen((o) => !o)}
+              className="ml-auto text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+              title="Link the reservation to a different existing lead"
+            >
+              {switchingLead ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <RefreshCw size={12} />
+              )}
+              Select existing lead…
+            </button>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg bg-card border border-border px-3 py-2 text-sm">
+            <UserCircle2 size={15} className="text-muted-foreground flex-shrink-0" />
+            <span className="font-medium text-foreground truncate">
+              {lead.name || 'Unnamed lead'}
+            </span>
+            <span className="text-xs text-muted-foreground flex-shrink-0">
+              {lead.leadNumber || lead.phone || ''}
+            </span>
+          </div>
+          {leadSearchOpen && (
+            <div className="relative">
+              <input
+                className="input-base pl-9"
+                placeholder="Search leads by name, phone, email, project or unit…"
+                value={leadSearch}
+                onChange={(e) => setLeadSearch(e.target.value)}
+                autoFocus
+              />
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              {leadSearching && (
+                <Loader2
+                  size={14}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary"
+                />
+              )}
+              {leadSearch.trim().length >= 2 && (
+                <div className="absolute z-20 mt-1 w-full bg-card border border-border rounded-xl shadow-modal overflow-y-auto max-h-48 fade-in">
+                  {leadResults.length === 0 && !leadSearching ? (
+                    <p className="px-3 py-2 text-sm text-muted-foreground">No leads found</p>
+                  ) : (
+                    leadResults.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => pickLead(r)}
+                        disabled={switchingLead}
+                        className="w-full text-left px-3 py-2 hover:bg-muted transition-colors"
+                      >
+                        <span className="block text-sm font-medium text-foreground">{r.name}</span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {[r.project, r.unit, r.propertyType].filter(Boolean).join(' · ') ||
+                            [r.phone, r.email].filter(Boolean).join(' · ')}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground/80">
+                          {r.phone} · {r.email}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {!leadSearchOpen && (
+            <p className="text-[11px] text-muted-foreground">
+              No new lead is created — the reservation is attached to the lead shown above.
+            </p>
+          )}
         </div>
 
         <label className="flex flex-col gap-1">

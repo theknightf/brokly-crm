@@ -11,11 +11,23 @@ import {
   ALL_PRIORITIES,
 } from './mockFollowUps';
 import { getActiveAgentNames } from '@/app/teams/components/mockTeamMembers';
+import { leadsService } from '@/lib/services/crmService';
+import { Link2, Search, Loader2, UserCircle2 } from 'lucide-react';
 
 interface FollowUpFormProps {
   initial?: Partial<FollowUp>;
   onSubmit: (data: FollowUp) => void;
   onCancel: () => void;
+}
+
+interface LeadResult {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  propertyType: string;
+  project: string;
+  unit: string;
 }
 
 export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFormProps) {
@@ -42,8 +54,51 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
     notes: initial?.notes ?? '',
     propertyInterest: initial?.propertyInterest ?? '',
     relationshipStatus: (initial?.relationshipStatus ?? '') as RelationshipStatus | '',
+    leadId: initial?.leadId ?? '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [linkedLeadName, setLinkedLeadName] = useState('');
+  const [leadSearch, setLeadSearch] = useState('');
+  const [leadResults, setLeadResults] = useState<LeadResult[]>([]);
+  const [leadSearching, setLeadSearching] = useState(false);
+  const [leadSearchOpen, setLeadSearchOpen] = useState(false);
+
+  useEffect(() => {
+    if (!form.leadId) return;
+    leadsService
+      .getById(form.leadId)
+      .then((lead: any) => {
+        if (lead) setLinkedLeadName(lead.name || '');
+      })
+      .catch(() => {});
+  }, [form.leadId]);
+
+  useEffect(() => {
+    const q = leadSearch.trim();
+    if (q.length < 2) {
+      setLeadResults([]);
+      return;
+    }
+    let cancelled = false;
+    setLeadSearching(true);
+    const t = setTimeout(() => {
+      leadsService
+        .search(q)
+        .then((results) => {
+          if (!cancelled) setLeadResults(results as LeadResult[]);
+        })
+        .catch(() => {
+          if (!cancelled) setLeadResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setLeadSearching(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [leadSearch]);
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -52,6 +107,29 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
       delete n[k];
       return n;
     });
+  };
+
+  const linkLead = (r: LeadResult) => {
+    setForm((p) => {
+      const next = { ...p, leadId: r.id };
+      if (!next.contactName.trim()) next.contactName = r.name;
+      if (!next.contactPhone.trim()) next.contactPhone = r.phone;
+      if (!next.contactEmail.trim()) next.contactEmail = r.email;
+      if (!next.propertyInterest.trim()) {
+        const interest = [r.project, r.unit, r.propertyType].filter(Boolean).join(' – ');
+        next.propertyInterest = interest || r.propertyType;
+      }
+      return next;
+    });
+    setLinkedLeadName(r.name);
+    setLeadSearch('');
+    setLeadResults([]);
+    setLeadSearchOpen(false);
+  };
+
+  const clearLeadLink = () => {
+    setForm((p) => ({ ...p, leadId: '' }));
+    setLinkedLeadName('');
   };
 
   const validate = () => {
@@ -74,6 +152,7 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
     onSubmit({
       id: initial?.id ?? `fu-${Date.now()}`,
       ...form,
+      leadId: form.leadId || undefined,
       agentInitials: form.agent
         .split(' ')
         .map((p) => p[0])
@@ -129,7 +208,11 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
           <select
             className="input-base"
             value={form.contactType}
-            onChange={(e) => set('contactType', e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              set('contactType', v);
+              if (v === 'Customer') clearLeadLink();
+            }}
           >
             <option value="Lead">Lead</option>
             <option value="Customer">Customer</option>
@@ -154,6 +237,100 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
             onChange={(e) => set('contactEmail', e.target.value)}
           />
         </Field>
+
+        {form.contactType === 'Lead' && (
+          <div className="sm:col-span-2 rounded-xl border border-border bg-muted/40 p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <Link2 size={14} className="text-primary" />
+              <span className="text-sm font-medium text-foreground">Link to existing lead</span>
+            </div>
+
+            {form.leadId ? (
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-50 text-emerald-700 px-3 py-2 text-sm">
+                <UserCircle2 size={15} className="flex-shrink-0" />
+                <span className="truncate font-medium">
+                  Carry lead: {linkedLeadName || 'Linked'}
+                </span>
+                <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLeadSearch('');
+                      setLeadSearchOpen(true);
+                    }}
+                    className="text-xs font-semibold hover:underline"
+                  >
+                    Select another
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearLeadLink}
+                    className="text-xs font-semibold text-emerald-700/70 hover:text-emerald-700 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Choose an existing lead so this follow-up stays linked — no duplicate lead is
+                created.
+              </p>
+            )}
+
+            {(!form.leadId || leadSearchOpen) && (
+              <div className="relative">
+                <input
+                  className="input-base pl-9"
+                  placeholder="Search leads by name, phone, email, project or unit…"
+                  value={leadSearch}
+                  onChange={(e) => {
+                    setLeadSearch(e.target.value);
+                    setLeadSearchOpen(true);
+                  }}
+                  onFocus={() => setLeadSearchOpen(true)}
+                />
+                <Search
+                  size={15}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                {leadSearching && (
+                  <Loader2
+                    size={14}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary"
+                  />
+                )}
+                {leadSearchOpen && leadSearch.trim().length >= 2 && (
+                  <div className="absolute z-20 mt-1 w-full bg-card border border-border rounded-xl shadow-modal overflow-y-auto max-h-56 fade-in">
+                    {leadResults.length === 0 && !leadSearching ? (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">No leads found</p>
+                    ) : (
+                      leadResults.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => linkLead(r)}
+                          className="w-full text-left px-3 py-2 hover:bg-muted transition-colors"
+                        >
+                          <span className="block text-sm font-medium text-foreground">
+                            {r.name}
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            {[r.project, r.unit, r.propertyType].filter(Boolean).join(' · ') ||
+                              [r.phone, r.email].filter(Boolean).join(' · ')}
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground/80">
+                            {r.phone} · {r.email}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <Field label="Property Interest">
           <input

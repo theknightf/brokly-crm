@@ -220,6 +220,17 @@ export default function LeadsManagementScreen({
   const [logCallLead, setLogCallLead] = useState<Lead | null>(null);
   const [callHistoryKey, setCallHistoryKey] = useState(0);
 
+  /** Swap the lead inside the reservation / done-deal modal (Select Existing Lead). */
+  const handleDealLeadChange = async (leadId: string): Promise<Lead | null> => {
+    const found = (await leadsService.getById(leadId)) as Lead | null;
+    if (found) {
+      setDealModal((m) => (m ? { ...m, lead: found } : m));
+    } else {
+      toast.error('Lead not found');
+    }
+    return found;
+  };
+
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
 
@@ -360,25 +371,50 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleBulkAssign = async (userId: string, userName: string) => {
+  const handleBulkAssignMany = async (users: { id: string; name: string }[]) => {
     const ids = Array.from(selectedIds);
+    if (!ids.length || !users.length) return;
+    const done: { id: string; userId: string; name: string }[] = [];
     try {
-      await leadsService.bulkAssignUsers(ids, userId, userName);
-      const agentInitials = userName
-        .split(' ')
-        .map((p) => p[0])
-        .join('');
+      for (let i = 0; i < ids.length; i++) {
+        const u = users[i % users.length];
+        await leadsService.bulkAssignUsers([ids[i]], u.id, u.name);
+        done.push({ id: ids[i], userId: u.id, name: u.name });
+      }
       setLeads((prev) =>
-        prev.map((l) =>
-          selectedIds.has(l.id)
-            ? { ...l, agent: userName, agentInitials, assignedTo: userId, assignedToName: userName }
-            : l
-        )
+        prev.map((l) => {
+          const a = done.find((x) => x.id === l.id);
+          if (!a) return l;
+          return {
+            ...l,
+            agent: a.name,
+            agentInitials: a.name
+              .split(' ')
+              .map((p) => p[0])
+              .join(''),
+            assignedTo: a.userId,
+            assignedToName: a.name,
+          };
+        })
       );
-      toast.success(`${ids.length} leads assigned to ${userName}`);
+      const counts = users.map((u) => ({
+        name: u.name,
+        count: done.filter((a) => a.userId === u.id).length,
+      }));
+      toast.success(
+        `Assigned ${ids.length} leads: ${counts.map((c) => `${c.name} × ${c.count}`).join(', ')}`
+      );
       setSelectedIds(new Set());
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to assign leads');
+      try {
+        await leadsService.bulkAssignUsers(
+          done.map((d) => d.id),
+          null
+        );
+      } catch {
+        // best-effort rollback
+      }
+      toast.error(err?.message || 'Assignment failed mid-way — all changes were rolled back');
     }
   };
 
@@ -774,7 +810,7 @@ export default function LeadsManagementScreen({
         selectedCount={selectedIds.size}
         selectedLeads={leads.filter((l) => selectedIds.has(l.id))}
         onDelete={handleBulkDelete}
-        onAssign={handleBulkAssign}
+        onAssignMany={handleBulkAssignMany}
         onAssignTeam={handleBulkAssignTeam}
         onClear={() => setSelectedIds(new Set())}
       />
@@ -1153,6 +1189,7 @@ export default function LeadsManagementScreen({
           lead={dealModal.lead}
           status={dealModal.status}
           onClose={() => setDealModal(null)}
+          onChangeLead={handleDealLeadChange}
           onConfirm={(fields) => {
             handleQuickDealStatus(dealModal.lead, dealModal.status, fields);
             setDealModal(null);

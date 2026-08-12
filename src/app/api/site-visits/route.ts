@@ -381,21 +381,23 @@ export async function GET(request: Request) {
   const leadSearch = url.searchParams.get('lead_search') === '1';
   const leadQuery = url.searchParams.get('lead_query') || '';
 
-  // Lead lookup for the visit sheet's lead selector (name OR phone partial match).
+  // Lead lookup for the visit sheet's lead selector (name/phone/email/project/unit match).
   if (leadSearch) {
     const q = leadQuery.trim();
     const words = q.replace(/\D/g, '');
     let leadsQuery = supabase
       .from('leads')
-      .select('id, name, phone')
+      .select('id, name, phone, email, project, unit, property_type')
       .order('created_at', { ascending: false })
       .limit(20);
     if (q.length >= 2) {
       leadsQuery = q.includes('@')
         ? (leadsQuery as any).ilike('email', `%${q}%`)
         : words.length >= 2
-          ? (leadsQuery as any).or(`name.ilike.%${q}%,phone.ilike.%${words}%`)
-          : (leadsQuery as any).ilike('name', `%${q}%`);
+          ? (leadsQuery as any).or(
+              `name.ilike.%${q}%,phone.ilike.%${words}%,email.ilike.%${q}%,project.ilike.%${q}%,unit.ilike.%${q}%`
+            )
+          : (leadsQuery as any).or(`name.ilike.%${q}%,project.ilike.%${q}%,unit.ilike.%${q}%`);
       const { data: found } = await leadsQuery;
       if (found) return NextResponse.json({ leads: found });
       return NextResponse.json({ leads: [] });

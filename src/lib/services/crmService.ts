@@ -241,6 +241,37 @@ export const leadsService = {
     }
   },
 
+  /** Lightweight lead search by name/phone/email/project/unit (follow-up + reservation lead linking). */
+  async search(q: string, limit = 8) {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('id, name, phone, email, property_type, project, unit')
+        .or(
+          `name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,project.ilike.%${q}%,unit.ilike.%${q}%`
+        )
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) {
+        if (isSchemaError(error)) throw error;
+        return [];
+      }
+      return (data || []).map((r: any) => ({
+        id: r.id,
+        name: r.name || '',
+        phone: r.phone || '',
+        email: r.email || '',
+        propertyType: r.property_type || '',
+        project: r.project || '',
+        unit: r.unit || '',
+      }));
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return [];
+    }
+  },
+
   async create(lead: any, userId: string) {
     const supabase = createClient();
     // Auto-assignment when the admin rotation toggle is on.
