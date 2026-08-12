@@ -19,10 +19,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Project, ProjectStatus } from './mockProjects';
-import { projectsService, developersService, unitsService } from '@/lib/services/crmService';
+import {
+  projectsService,
+  developersService,
+  unitsService,
+  UnitFile,
+} from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import UnitsPanel from './UnitsPanel';
+import UnitCard from '@/components/ui/UnitCard';
 
 interface Developer {
   id: string;
@@ -40,6 +46,7 @@ interface Unit {
   price: number;
   paymentPlan: string;
   status: string;
+  imagePath?: string | null;
 }
 
 interface UnitStats {
@@ -67,12 +74,6 @@ interface ProjectFormData {
   imageFile: File | null;
   imagePath?: string;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  Available: 'bg-emerald-50 text-emerald-700',
-  Reserved: 'bg-amber-50 text-amber-700',
-  Sold: 'bg-blue-50 text-blue-700',
-};
 
 function parseLat(v?: string): number | null {
   const n = v == null ? NaN : parseFloat(v);
@@ -505,6 +506,7 @@ function ProjectDetailsModal({
   onEdit,
   onUnits,
   onVisit,
+  onReserveUnit,
 }: {
   project: Project;
   stats?: UnitStats;
@@ -512,6 +514,7 @@ function ProjectDetailsModal({
   onEdit: () => void;
   onUnits: () => void;
   onVisit: () => void;
+  onReserveUnit: (unit: any) => Promise<void>;
 }) {
   const hasGps = project.latitude != null && project.longitude != null;
   const mapsUrl = hasGps
@@ -519,6 +522,33 @@ function ProjectDetailsModal({
     : '';
   const sellingPoints = project.sellingPoints || [];
   const units = stats?.units || [];
+  const [unitImages, setUnitImages] = useState<Record<string, string>>({});
+
+  // Resolve signed URLs for unit cover images (private bucket).
+  React.useEffect(() => {
+    let mounted = true;
+    const withImage = units.filter((u) => u.imagePath);
+    if (withImage.length === 0) return;
+    Promise.all(
+      withImage.map(async (u) => ({
+        id: u.id,
+        url: await unitsService.getFileUrl({ filePath: u.imagePath } as UnitFile),
+      }))
+    )
+      .then((results) => {
+        if (!mounted) return;
+        setUnitImages((prev) => {
+          const next = { ...prev };
+          for (const r of results) if (r.url) next[r.id] = r.url;
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id]);
 
   const section = (title: string, body?: string) =>
     body && body.trim() ? (
@@ -533,7 +563,7 @@ function ProjectDetailsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-2xl fade-in max-h-[92vh] flex flex-col">
+      <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-3xl fade-in max-h-[92vh] flex flex-col">
         <div className="relative h-44 sm:h-52 flex-shrink-0">
           <ProjectCover project={project} iconSize={44} className="rounded-t-2xl" />
           <div className="absolute top-3 right-3">
@@ -641,38 +671,16 @@ function ProjectDetailsModal({
               ))}
             </div>
             {units.length > 0 ? (
-              <div className="border border-border rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-border">
-                    {units.slice(0, 6).map((u) => (
-                      <tr key={u.id}>
-                        <td className="px-3 py-2.5">
-                          <p className="font-medium text-foreground">{u.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {u.unitType || 'Unit'}
-                            {u.area > 0 ? ` · ${u.area} m²` : ''}
-                            {u.floor > 0 ? ` · Floor ${u.floor}` : ''}
-                          </p>
-                        </td>
-                        <td className="px-3 py-2.5 text-right whitespace-nowrap font-medium text-foreground">
-                          {formatEGP(u.price)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          <span
-                            className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_COLORS[u.status] || 'bg-slate-100 text-slate-600'}`}
-                          >
-                            {u.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {units.length > 6 && (
-                  <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground border-t border-border">
-                    +{units.length - 6} more units
-                  </div>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {units.slice(0, 8).map((u) => (
+                  <UnitCard
+                    key={u.id}
+                    unit={u}
+                    imageUrl={unitImages[u.id]}
+                    showProject={false}
+                    onReserve={(unit) => onReserveUnit(unit)}
+                  />
+                ))}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -718,6 +726,25 @@ export default function ProjectsScreen() {
     loadData();
   }, []);
 
+  const buildStats = (unitsData: Unit[]) => {
+    const stats: Record<string, UnitStats> = {};
+    for (const u of unitsData) {
+      const s = (stats[u.projectId] ||= {
+        minPrice: null,
+        available: 0,
+        reserved: 0,
+        sold: 0,
+        units: [],
+      });
+      s.units.push(u);
+      if (u.price > 0 && (s.minPrice == null || u.price < s.minPrice)) s.minPrice = u.price;
+      if (u.status === 'Available') s.available += 1;
+      else if (u.status === 'Reserved') s.reserved += 1;
+      else if (u.status === 'Sold') s.sold += 1;
+    }
+    return stats;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -728,26 +755,24 @@ export default function ProjectsScreen() {
       ]);
       setProjects(projectsData as Project[]);
       setDevelopers(devsData as Developer[]);
-      const stats: Record<string, UnitStats> = {};
-      for (const u of unitsData as Unit[]) {
-        const s = (stats[u.projectId] ||= {
-          minPrice: null,
-          available: 0,
-          reserved: 0,
-          sold: 0,
-          units: [],
-        });
-        s.units.push(u);
-        if (u.price > 0 && (s.minPrice == null || u.price < s.minPrice)) s.minPrice = u.price;
-        if (u.status === 'Available') s.available += 1;
-        else if (u.status === 'Reserved') s.reserved += 1;
-        else if (u.status === 'Sold') s.sold += 1;
-      }
-      setUnitStats(stats);
+      setUnitStats(buildStats(unitsData as Unit[]));
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load projects');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** One-tap reserve from the project details modal (unit card action). */
+  const handleReserveUnit = async (unit: any) => {
+    if (unit.status !== 'Available') return;
+    try {
+      await unitsService.update(unit.id, { ...unit, status: 'Reserved' });
+      const unitsData = await unitsService.getAll();
+      setUnitStats(buildStats(unitsData as Unit[]));
+      toast.success(`"${unit.name}" reserved`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to reserve unit');
     }
   };
 
@@ -1172,6 +1197,7 @@ export default function ProjectsScreen() {
             setVisitTarget(detailsTarget);
             setDetailsTarget(null);
           }}
+          onReserveUnit={handleReserveUnit}
         />
       )}
 

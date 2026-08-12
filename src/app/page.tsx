@@ -5,6 +5,7 @@ import AppLayout from '@/components/AppLayout';
 
 const DashboardHeader = dynamic(() => import('./components/DashboardHeader'));
 const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
+const DashboardKpis = dynamic(() => import('./components/DashboardKpis'));
 const DashboardCharts = dynamic(() => import('./components/DashboardCharts'));
 const OverdueFollowUps = dynamic(() => import('./components/OverdueFollowUps'));
 const RecentActivity = dynamic(() => import('./components/RecentActivity'));
@@ -18,12 +19,15 @@ export default function DashboardPage() {
           <DashboardHeader />
         </div>
         <div className="order-4 lg:order-2">
-          <KPIBentoGrid />
+          <DashboardKpis />
         </div>
         <div className="order-5 lg:order-3">
+          <KPIBentoGrid />
+        </div>
+        <div className="order-6 lg:order-4">
           <DashboardCharts />
         </div>
-        <div className="order-1 lg:order-4 grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="order-1 lg:order-5 grid grid-cols-1 xl:grid-cols-2 gap-6">
           <MobileTodayFollowUps />
           <div className="hidden lg:block">
             <OverdueFollowUps />

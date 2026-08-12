@@ -22,7 +22,10 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-function rowsToDurationMillis(checkInAt?: string | null, checkOutAt?: string | null): number | null {
+function rowsToDurationMillis(
+  checkInAt?: string | null,
+  checkOutAt?: string | null
+): number | null {
   if (!checkInAt || !checkOutAt) return null;
   const a = new Date(checkInAt).getTime();
   const b = new Date(checkOutAt).getTime();
@@ -167,8 +170,21 @@ export async function POST(request: Request) {
         }
         throw error;
       }
-      await appendEvent(supabase, data.id, user.id, 'Scheduled', `Visit scheduled for ${lead_name || 'lead'}`);
-      await audit(supabase, user.id, 'site_visit', data.id, 'created', `Site visit scheduled for ${lead_name || 'lead'}${project_name ? ` at ${project_name}` : ''}`);
+      await appendEvent(
+        supabase,
+        data.id,
+        user.id,
+        'Scheduled',
+        `Visit scheduled for ${lead_name || 'lead'}`
+      );
+      await audit(
+        supabase,
+        user.id,
+        'site_visit',
+        data.id,
+        'created',
+        `Site visit scheduled for ${lead_name || 'lead'}${project_name ? ` at ${project_name}` : ''}`
+      );
       return NextResponse.json({ visit: data });
     }
 
@@ -184,7 +200,13 @@ export async function POST(request: Request) {
         .select()
         .single();
       if (error) throw error;
-      await appendEvent(supabase, visitId, user.id, action === 'cancel' ? 'Cancelled' : 'No Show', note || '');
+      await appendEvent(
+        supabase,
+        visitId,
+        user.id,
+        action === 'cancel' ? 'Cancelled' : 'No Show',
+        note || ''
+      );
       return NextResponse.json({ visit: data });
     }
 
@@ -239,7 +261,9 @@ export async function POST(request: Request) {
           .eq('id', data.lead_id);
       }
       if (data.lead_id) {
-        await supabase.from('call_logs').insert({
+        // Best-effort call log — the visit itself is already saved, so a
+        // failure here must never fail the checkout, but it is logged.
+        const { error: callLogErr } = await supabase.from('call_logs').insert({
           user_id: user.id,
           entity_type: 'lead',
           entity_id: data.lead_id,
@@ -251,6 +275,9 @@ export async function POST(request: Request) {
           outcome: outcome || 'Completed',
           notes: (note || '') + (outcome ? ` Outcome: ${outcome}.` : ''),
         });
+        if (callLogErr) {
+          console.error('[site-visits] call_logs insert failed:', callLogErr.message);
+        }
       }
 
       return NextResponse.json({ visit: data, duration_seconds: secs });
@@ -358,7 +385,11 @@ export async function GET(request: Request) {
   if (leadSearch) {
     const q = leadQuery.trim();
     const words = q.replace(/\D/g, '');
-    let leadsQuery = supabase.from('leads').select('id, name, phone').order('created_at', { ascending: false }).limit(20);
+    let leadsQuery = supabase
+      .from('leads')
+      .select('id, name, phone')
+      .order('created_at', { ascending: false })
+      .limit(20);
     if (q.length >= 2) {
       leadsQuery = q.includes('@')
         ? (leadsQuery as any).ilike('email', `%${q}%`)

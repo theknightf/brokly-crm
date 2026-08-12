@@ -6,7 +6,13 @@ export const dynamic = 'force-dynamic';
 // Best-effort audit trail insert — never fatal (table may not exist yet).
 async function audit(
   supabase: Awaited<ReturnType<typeof createServerClient>>,
-  row: { user_id: string; entity_type: string; entity_id: string; action: string; description: string }
+  row: {
+    user_id: string;
+    entity_type: string;
+    entity_id: string;
+    action: string;
+    description: string;
+  }
 ) {
   try {
     const { data: profile } = await supabase
@@ -68,7 +74,8 @@ export async function POST(request: Request) {
   // Idempotency key: the same client_ref (regenerated per user interaction)
   // can never create a second row, even if the client retries or double-taps.
   const ref =
-    client_ref || `${user.id}-${entity_id || 'none'}-${ch}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    client_ref ||
+    `${user.id}-${entity_id || 'none'}-${ch}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   // Resolve the project linked to the entity so every call log carries
   // project/lead context for the reports.
@@ -149,6 +156,8 @@ export async function POST(request: Request) {
   };
 
   try {
+    let saved: any;
+
     // Idempotent save: upsert on client_ref so retries/double-taps return the
     // existing record instead of creating a duplicate call log.
     const { data, error } = await supabase
@@ -157,10 +166,76 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    let saved: any;
     if (error) {
       const msg = (error.message || '').toLowerCase();
-      if (msg.includes('client_ref') || msg.includes('project_name')) {
+      const code = error.code || '';
+      const missingTable =
+        msg.includes('does not exist') ||
+        msg.includes('could not find') ||
+        msg.includes('schema cache');
+      const missingColumns = msg.includes('client_ref') || msg.includes('project_name');
+      // Postgres cannot infer a conflict target from a PARTIAL unique index
+      // (the pre-20260813000000 layout), so ON CONFLICT fails with 42P10.
+      const conflictTargetMissing =
+        code === '42P10' ||
+        msg.includes('on conflict') ||
+        msg.includes('unique or exclusion constraint');
+
+      if (conflictTargetMissing) {
+        // Old DB layout: a plain insert keeps the call saved. Reuse an
+        // existing row with the same client_ref to preserve idempotency.
+        const { data: existing } = await supabase
+          .from('call_logs')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('client_ref', ref)
+          .maybeSingle();
+        if (existing) {
+          saved = existing;
+        } else {
+          const { data: ins, error: insErr } = await supabase
+            .from('call_logs')
+            .insert(row)
+            .select()
+            .single();
+          if (insErr) {
+            if (insErr.code === '23505') {
+              saved = { id: 'dup-' + ref, ...row };
+            } else if (missingTable) {
+              const rec = { ...row, created_at: new Date().toISOString() };
+              const { error: qe } = await supabase.from('admin_settings').insert({
+                category: 'call_log_fallback',
+                name: user.id,
+                color: JSON.stringify(rec),
+                sort_order: Math.floor(Date.now() / 1000),
+                is_active: true,
+              });
+              if (qe) return NextResponse.json({ error: qe.message }, { status: 500 });
+              saved = { id: 'tmp-' + Date.now(), ...rec };
+            } else if (missingColumns) {
+              const { client_ref: _cr, project_name: _pn, ...plainRow } = row;
+              const { data: plainData, error: plainErr } = await supabase
+                .from('call_logs')
+                .insert(plainRow)
+                .select()
+                .single();
+              if (plainErr) {
+                if (plainErr.code === '23505') {
+                  saved = { id: 'dup-' + ref, ...plainRow };
+                } else {
+                  throw plainErr;
+                }
+              } else {
+                saved = plainData;
+              }
+            } else {
+              throw insErr;
+            }
+          } else {
+            saved = ins;
+          }
+        }
+      } else if (missingColumns) {
         // New columns not provisioned yet — retry without them (no dedup).
         const { client_ref: _cr, project_name: _pn, ...plainRow } = row;
         const { data: plainData, error: plainErr } = await supabase
@@ -169,12 +244,9 @@ export async function POST(request: Request) {
           .select()
           .single();
         if (plainErr) {
-          const pm = (plainErr.message || '').toLowerCase();
-          if (
-            pm.includes('does not exist') ||
-            pm.includes('could not find') ||
-            pm.includes('schema cache')
-          ) {
+          if (plainErr.code === '23505') {
+            saved = { id: 'dup-' + ref, ...plainRow };
+          } else if (missingTable) {
             const rec = { ...plainRow, created_at: new Date().toISOString() };
             const { error: qe } = await supabase.from('admin_settings').insert({
               category: 'call_log_fallback',
@@ -191,11 +263,7 @@ export async function POST(request: Request) {
         } else {
           saved = plainData;
         }
-      } else if (
-        msg.includes('does not exist') ||
-        msg.includes('could not find') ||
-        msg.includes('schema cache')
-      ) {
+      } else if (missingTable) {
         // Real call_logs table not provisioned yet — fall back to
         // admin_settings (writable by any authenticated user) so the log
         // genuinely SAVES now.
@@ -245,7 +313,8 @@ export async function POST(request: Request) {
       entity_type: entity_type || 'lead',
       entity_id: entity_id || '',
       action: 'touchpoint_logged',
-      description: `${ch}${outcome ? ` · ${outcome}` : ''} — ${contact_name || contact_phone || ''}`.trim(),
+      description:
+        `${ch}${outcome ? ` · ${outcome}` : ''} — ${contact_name || contact_phone || ''}`.trim(),
     });
 
     return NextResponse.json({ call: saved });

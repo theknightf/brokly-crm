@@ -65,50 +65,57 @@ const money = (v: any) => {
 };
 
 export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormProps) {
-  const [projects, setProjects] = useState<{ id: string; name: string; developerId: string | null }[]>([]);
+  const [projects, setProjects] = useState<
+    { id: string; name: string; developerId: string | null; developerName: string }[]
+  >([]);
   const [projectUnits, setProjectUnits] = useState<any[]>([]);
   const [agents, setAgents] = useState<string[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  const { register, handleSubmit, watch, setValue, formState: { isSubmitting } } =
-    useForm<EditLeadFormData>({
-      defaultValues: {
-        name: lead.name || '',
-        phone: lead.phone || '',
-        email: lead.email || '',
-        location: lead.location || '',
-        propertyType: (lead.propertyType as PropertyType) || '2BHK Apartment',
-        budgetMin: lead.budgetMin ?? undefined,
-        budgetMax: lead.budgetMax ?? undefined,
-        source: (lead.source as LeadSource) || 'Facebook Ads',
-        agent: lead.agent || '',
-        assignedTo: lead.assignedTo || '',
-        status: (lead.status as LeadStatus) || 'Fresh Leads',
-        followUpDue: lead.followUpDue || '',
-        notes: lead.notes || '',
-        leadRating: lead.leadRating || '',
-        priority: lead.priority || 'Normal',
-        team: lead.team || '',
-        csAgent: lead.csAgent || '',
-        project: lead.project || '',
-        developer: lead.developer || '',
-        unitId: lead.unitId || '',
-        totalPrice: lead.totalPrice || lead.unitPrice || 0,
-        downPayment: lead.downPayment || 0,
-        reservationAmount: lead.reservationAmount || 0,
-        maintenanceFees: lead.maintenanceFees || 0,
-        installmentCount: lead.installmentCount || 0,
-        installmentFrequency: lead.installmentFrequency || 12,
-        paymentStartDate: lead.paymentStartDate || '',
-        paymentStatus: lead.paymentStatus || 'Not Started',
-        reservationDate: lead.reservationDate || '',
-        closingDate: lead.closingDate || '',
-        finalPrice: lead.finalPrice || 0,
-        commission: lead.commission || 0,
-      },
-    });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { isSubmitting },
+  } = useForm<EditLeadFormData>({
+    defaultValues: {
+      name: lead.name || '',
+      phone: lead.phone || '',
+      email: lead.email || '',
+      location: lead.location || '',
+      propertyType: (lead.propertyType as PropertyType) || '2BHK Apartment',
+      budgetMin: lead.budgetMin ?? undefined,
+      budgetMax: lead.budgetMax ?? undefined,
+      source: (lead.source as LeadSource) || 'Facebook Ads',
+      agent: lead.agent || '',
+      assignedTo: lead.assignedTo || '',
+      status: (lead.status as LeadStatus) || 'Fresh Leads',
+      followUpDue: lead.followUpDue || '',
+      notes: lead.notes || '',
+      leadRating: lead.leadRating || '',
+      priority: lead.priority || 'Normal',
+      team: lead.team || '',
+      csAgent: lead.csAgent || '',
+      project: lead.project || '',
+      developer: lead.developer || '',
+      unitId: lead.unitId || '',
+      totalPrice: lead.totalPrice || lead.unitPrice || 0,
+      downPayment: lead.downPayment || 0,
+      reservationAmount: lead.reservationAmount || 0,
+      maintenanceFees: lead.maintenanceFees || 0,
+      installmentCount: lead.installmentCount || 0,
+      installmentFrequency: lead.installmentFrequency || 12,
+      paymentStartDate: lead.paymentStartDate || '',
+      paymentStatus: lead.paymentStatus || 'Not Started',
+      reservationDate: lead.reservationDate || '',
+      closingDate: lead.closingDate || '',
+      finalPrice: lead.finalPrice || 0,
+      commission: lead.commission || 0,
+    },
+  });
 
   useEffect(() => {
     Promise.all([
@@ -122,13 +129,10 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
           id: p.id,
           name: p.name,
           developerId: p.developerId || null,
+          developerName: p.developerName || '',
         }))
       );
-      setAgents(
-        (teamData as any[])
-          .filter((m) => m.status === 'Active')
-          .map((m) => m.name)
-      );
+      setAgents((teamData as any[]).filter((m) => m.status === 'Active').map((m) => m.name));
       setUsers((assignableUsers as any[]).map((u) => ({ id: u.id, name: u.name })));
       setTeams((teamsData as any[]).map((t) => ({ id: t.id, name: t.name })));
     });
@@ -173,7 +177,10 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
     setValue('totalPrice', money(unit.price));
     setValue('installmentFrequency', Number(unit.installmentFrequency || 12));
     if (unit.installmentYears) {
-      setValue('installmentCount', Number(unit.installmentYears) * (12 / Number(unit.installmentFrequency || 12)));
+      setValue(
+        'installmentCount',
+        Number(unit.installmentYears) * (12 / Number(unit.installmentFrequency || 12))
+      );
     }
   };
 
@@ -216,8 +223,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
             .toUpperCase()
         : lead.agentInitials || '',
       status: data.status,
-      assignedTo: data.assignedTo || null,
-      assignedToName: assignedUser?.name || (data.assignedTo ? lead.assignedToName : null),
+      assignedTo: data.assignedTo || undefined,
+      assignedToName: assignedUser?.name || (data.assignedTo ? lead.assignedToName : undefined),
       followUpDue: data.followUpDue || undefined,
       notes: data.notes || '',
       developer: data.developer || undefined,
@@ -264,41 +271,77 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         {/* Section 1: Contact Information */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+              1
+            </div>
             <h3 className="text-sm font-semibold text-foreground">Contact Information</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="label-base">Full name</label>
-              <input type="text" className="input-base" placeholder="Ahmed Hassan" {...register('name')} />
+              <input
+                type="text"
+                className="input-base"
+                placeholder="Ahmed Hassan"
+                {...register('name')}
+              />
             </div>
             <div>
               <label className="label-base">Phone number</label>
-              <input type="tel" className="input-base" placeholder="+20 10 0000 0000" {...register('phone')} />
+              <input
+                type="tel"
+                className="input-base"
+                placeholder="+20 10 0000 0000"
+                {...register('phone')}
+              />
             </div>
             <div>
               <label className="label-base">Email address</label>
-              <input type="email" className="input-base" placeholder="ahmed@email.com" {...register('email')} />
+              <input
+                type="email"
+                className="input-base"
+                placeholder="ahmed@email.com"
+                {...register('email')}
+              />
             </div>
             <div>
               <label className="label-base">City / Region</label>
-              <input type="text" className="input-base" placeholder="Cairo" {...register('location')} />
+              <input
+                type="text"
+                className="input-base"
+                placeholder="Cairo"
+                {...register('location')}
+              />
             </div>
             <div>
               <label className="label-base">Property type</label>
               <select className={selectClass} {...register('propertyType')}>
                 {ALL_PROPERTY_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="label-base">Budget min (EGP)</label>
-              <input type="number" min="0" className="input-base" placeholder="500000" {...register('budgetMin')} />
+              <input
+                type="number"
+                min="0"
+                className="input-base"
+                placeholder="500000"
+                {...register('budgetMin')}
+              />
             </div>
             <div>
               <label className="label-base">Budget max (EGP)</label>
-              <input type="number" min="0" className="input-base" placeholder="1200000" {...register('budgetMax')} />
+              <input
+                type="number"
+                min="0"
+                className="input-base"
+                placeholder="1200000"
+                {...register('budgetMax')}
+              />
             </div>
           </div>
         </div>
@@ -308,15 +351,21 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         {/* Section 2: Classification & Assignment */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
-            <h3 className="text-sm font-semibold text-foreground">Classification &amp; Assignment</h3>
+            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+              2
+            </div>
+            <h3 className="text-sm font-semibold text-foreground">
+              Classification &amp; Assignment
+            </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label-base">Lead status</label>
               <select className={selectClass} {...register('status')}>
                 {ALL_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
@@ -324,7 +373,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <label className="label-base">Source</label>
               <select className={selectClass} {...register('source')}>
                 {ALL_SOURCES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
@@ -332,7 +383,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <label className="label-base">Priority</label>
               <select className={selectClass} {...register('priority')}>
                 {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
                 ))}
               </select>
             </div>
@@ -340,22 +393,36 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <label className="label-base">Lead rating</label>
               <select className={selectClass} {...register('leadRating')}>
                 {RATINGS.map((r) => (
-                  <option key={r} value={r}>{r || 'No rating'}</option>
+                  <option key={r} value={r}>
+                    {r || 'No rating'}
+                  </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="label-base">Follow-up due</label>
+              <input type="date" className="input-base" {...register('followUpDue')} />
             </div>
             <div>
               <label className="label-base">Assign to user</label>
               <select className={selectClass} {...register('assignedTo')}>
                 <option value="">Unassigned</option>
                 {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="label-base">Agent</label>
-              <input type="text" list="edit-agents" className="input-base" placeholder="Agent name" {...register('agent')} />
+              <input
+                type="text"
+                list="edit-agents"
+                className="input-base"
+                placeholder="Agent name"
+                {...register('agent')}
+              />
               <datalist id="edit-agents">
                 {agents.map((a) => (
                   <option key={a} value={a} />
@@ -367,13 +434,20 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <select className={selectClass} {...register('team')}>
                 <option value="">No team</option>
                 {teams.map((t) => (
-                  <option key={t.id} value={t.name}>{t.name}</option>
+                  <option key={t.id} value={t.name}>
+                    {t.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="label-base">CS agent</label>
-              <input type="text" className="input-base" placeholder="CS agent name" {...register('csAgent')} />
+              <input
+                type="text"
+                className="input-base"
+                placeholder="CS agent name"
+                {...register('csAgent')}
+              />
             </div>
           </div>
         </div>
@@ -383,7 +457,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         {/* Section 3: Unit & Payment Plan */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+              3
+            </div>
             <h3 className="text-sm font-semibold text-foreground">Unit &amp; Payment Plan</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -396,19 +472,23 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                   setValue('project', e.target.value);
                   setValue('unitId', '');
                   const proj = projects.find((p) => p.name === e.target.value);
-                  if (proj) setValue('developer', proj.developerId || lead.developer || '');
+                  if (proj) setValue('developer', proj.developerName || lead.developer || '');
                 }}
               >
                 <option value="">No project</option>
                 {projects.map((p) => (
-                  <option key={p.id} value={p.name}>{p.name}</option>
+                  <option key={p.id} value={p.name}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="label-base flex items-center gap-1.5">
                 Unit
-                {loadingUnits && <Loader2 size={12} className="animate-spin text-muted-foreground" />}
+                {loadingUnits && (
+                  <Loader2 size={12} className="animate-spin text-muted-foreground" />
+                )}
               </label>
               <select
                 className={selectClass}
@@ -417,7 +497,11 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                 disabled={!selectedProject || projectUnits.length === 0}
               >
                 <option value="">
-                  {!selectedProject ? 'Select a project first' : projectUnits.length === 0 ? 'No units in this project' : 'Select a unit'}
+                  {!selectedProject
+                    ? 'Select a project first'
+                    : projectUnits.length === 0
+                      ? 'No units in this project'
+                      : 'Select a unit'}
                 </option>
                 {projectUnits.map((u) => (
                   <option key={u.id} value={u.id}>
@@ -451,7 +535,12 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
             </div>
             <div>
               <label className="label-base">Installment count</label>
-              <input type="number" min="0" className="input-base" {...register('installmentCount')} />
+              <input
+                type="number"
+                min="0"
+                className="input-base"
+                {...register('installmentCount')}
+              />
             </div>
             <div>
               <label className="label-base">Installment frequency</label>
@@ -464,11 +553,21 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
             </div>
             <div>
               <label className="label-base">Reservation amount (EGP)</label>
-              <input type="number" min="0" className="input-base" {...register('reservationAmount')} />
+              <input
+                type="number"
+                min="0"
+                className="input-base"
+                {...register('reservationAmount')}
+              />
             </div>
             <div>
               <label className="label-base">Maintenance fees (EGP)</label>
-              <input type="number" min="0" className="input-base" {...register('maintenanceFees')} />
+              <input
+                type="number"
+                min="0"
+                className="input-base"
+                {...register('maintenanceFees')}
+              />
             </div>
             <div>
               <label className="label-base">Payment start date</label>
@@ -478,7 +577,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <label className="label-base">Payment status</label>
               <select className={selectClass} {...register('paymentStatus')}>
                 {PAYMENT_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
@@ -488,7 +589,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-muted/50 rounded-xl p-3">
               <p className="text-[11px] text-muted-foreground">Remaining</p>
-              <p className="text-sm font-semibold tabular-nums">EGP {formatNumber(Math.round(plan.remaining))}</p>
+              <p className="text-sm font-semibold tabular-nums">
+                EGP {formatNumber(Math.round(plan.remaining))}
+              </p>
             </div>
             <div className="bg-muted/50 rounded-xl p-3">
               <p className="text-[11px] text-muted-foreground">Installment</p>
@@ -516,7 +619,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         {/* Section 4: Reservation / Deal */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">4</div>
+            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+              4
+            </div>
             <h3 className="text-sm font-semibold text-foreground">Reservation / Done Deal</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -544,10 +649,17 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         {/* Section 5: Notes */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">5</div>
+            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+              5
+            </div>
             <h3 className="text-sm font-semibold text-foreground">Notes</h3>
           </div>
-          <textarea rows={3} className="input-base w-full" placeholder="Notes about this lead…" {...register('notes')} />
+          <textarea
+            rows={3}
+            className="input-base w-full"
+            placeholder="Notes about this lead…"
+            {...register('notes')}
+          />
         </div>
       </div>
 
@@ -555,7 +667,11 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         <button type="button" onClick={onCancel} className="btn-secondary">
           Cancel
         </button>
-        <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="btn-primary flex items-center gap-2"
+        >
           {isSubmitting && <Loader2 size={14} className="animate-spin" />}
           Save changes
         </button>

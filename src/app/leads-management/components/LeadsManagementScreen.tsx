@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
   BadgeCheck,
   Handshake,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -37,6 +38,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import LeadCommentsSection from './LeadCommentsSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
 import LeadTimeline from './LeadTimeline';
+import DealStatusModal from './DealStatusModal';
 
 export interface FilterState {
   search: string;
@@ -163,14 +165,24 @@ function LeadCallHistory({ leadId }: { leadId: string }) {
   );
 }
 
-export default function LeadsManagementScreen() {
+interface LeadsManagementScreenProps {
+  initialStatus?: LeadStatus | '';
+  title?: string;
+  subtitle?: string;
+}
+
+export default function LeadsManagementScreen({
+  initialStatus = '',
+  title,
+  subtitle,
+}: LeadsManagementScreenProps = {}) {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
     search: '',
-    status: '',
+    status: initialStatus || '',
     source: '',
     agent: '',
     propertyType: '',
@@ -198,9 +210,39 @@ export default function LeadsManagementScreen() {
     phone: string;
     project?: string | null;
   } | null>(null);
+  const [dealModal, setDealModal] = useState<{
+    lead: Lead;
+    status: 'Reservation' | 'Done Deal';
+  } | null>(null);
 
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
+
+  // Open a lead's preview when arriving from another page (e.g. a follow-up
+  // linked to a lead: /leads-management?lead=<id>) or open the add modal
+  // directly (?new=1, used by the topbar quick action).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get('lead');
+    const openNew = params.get('new') === '1';
+    if (openNew) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('new');
+      window.history.replaceState({}, '', url.toString());
+      setAddModalOpen(true);
+    }
+    if (!leadId) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('lead');
+    window.history.replaceState({}, '', url.toString());
+    leadsService
+      .getById(leadId)
+      .then((lead) => {
+        if (lead) setViewLead(lead as Lead);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchLeads = async () => {
     const requestId = ++fetchRef.current;
@@ -339,9 +381,7 @@ export default function LeadsManagementScreen() {
     const ids = Array.from(selectedIds);
     try {
       await leadsService.bulkSetTeam(ids, teamName);
-      setLeads((prev) =>
-        prev.map((l) => (selectedIds.has(l.id) ? { ...l, team: teamName } : l))
-      );
+      setLeads((prev) => prev.map((l) => (selectedIds.has(l.id) ? { ...l, team: teamName } : l)));
       toast.success(`${ids.length} leads assigned to team "${teamName}"`);
       setSelectedIds(new Set());
     } catch (err: any) {
@@ -373,19 +413,28 @@ export default function LeadsManagementScreen() {
   };
 
   /** Dedicated edit flow: mark Reservation / Done Deal + payment snapshot. */
-  const handleQuickDealStatus = async (lead: Lead, status: LeadStatus) => {
+  const handleQuickDealStatus = async (
+    lead: Lead,
+    status: 'Reservation' | 'Done Deal',
+    fields?: { date: string; amount: number; finalPrice: number; commission: number }
+  ) => {
     const now = new Date().toISOString().split('T')[0];
     const next: Lead = {
       ...lead,
       status,
-      ...(status === 'Reservation'
-        ? { reservationDate: lead.reservationDate || now, paymentStatus: 'In Progress' }
-        : status === 'Done Deal'
-          ? {
-              closingDate: lead.closingDate || now,
-              finalPrice: lead.finalPrice || lead.totalPrice || lead.unitPrice || 0,
-            }
-          : {}),
+      reservationAmount:
+        status === 'Reservation' && fields ? fields.amount : lead.reservationAmount,
+      reservationDate:
+        status === 'Reservation'
+          ? fields?.date || lead.reservationDate || now
+          : lead.reservationDate,
+      closingDate:
+        status === 'Done Deal' ? fields?.date || lead.closingDate || now : lead.closingDate,
+      finalPrice: fields
+        ? fields.finalPrice
+        : lead.finalPrice || lead.totalPrice || lead.unitPrice || 0,
+      commission: fields ? fields.commission : lead.commission,
+      paymentStatus: status === 'Reservation' ? 'In Progress' : lead.paymentStatus,
     };
     try {
       const saved = await leadsService.update(next.id, next);
@@ -497,7 +546,14 @@ export default function LeadsManagementScreen() {
   };
 
   const clearFilters = () => {
-    setFilters({ search: '', status: '', source: '', agent: '', propertyType: '', action: '' });
+    setFilters({
+      search: '',
+      status: initialStatus || '',
+      source: '',
+      agent: '',
+      propertyType: '',
+      action: '',
+    });
     setCurrentPage(1);
   };
 
@@ -540,7 +596,12 @@ export default function LeadsManagementScreen() {
     const projectName = lead.project || lead.location || '';
     if (!projectName) {
       setSiteVisitProject(null);
-      setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: null });
+      setSiteVisitLead({
+        id: lead.id,
+        name: lead.name || '',
+        phone: lead.phone || '',
+        project: null,
+      });
       return;
     }
     (async () => {
@@ -560,14 +621,29 @@ export default function LeadsManagementScreen() {
             longitude: (proj as any)?.longitude ?? null,
             radiusM: (proj as any)?.radius_m ?? null,
           });
-          setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: projectName });
+          setSiteVisitLead({
+            id: lead.id,
+            name: lead.name || '',
+            phone: lead.phone || '',
+            project: projectName,
+          });
         } else {
           setSiteVisitProject(null);
-          setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: projectName });
+          setSiteVisitLead({
+            id: lead.id,
+            name: lead.name || '',
+            phone: lead.phone || '',
+            project: projectName,
+          });
         }
       } catch {
         setSiteVisitProject(null);
-        setSiteVisitLead({ id: lead.id, name: lead.name || "", phone: lead.phone || "", project: projectName });
+        setSiteVisitLead({
+          id: lead.id,
+          name: lead.name || '',
+          phone: lead.phone || '',
+          project: projectName,
+        });
       }
     })();
   };
@@ -600,9 +676,12 @@ export default function LeadsManagementScreen() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="page-title">Leads</h1>
+          <h1 className="page-title">{title || 'Leads'}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {total} lead{total !== 1 ? 's' : ''} in your pipeline
+            {subtitle ||
+              `${total} lead${total !== 1 ? 's' : ''} in your pipeline${
+                initialStatus ? ` · status: ${initialStatus}` : ''
+              }`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -806,7 +885,7 @@ export default function LeadsManagementScreen() {
               {/* Reservation / Done Deal quick actions */}
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleQuickDealStatus(viewLead, 'Reservation')}
+                  onClick={() => setDealModal({ lead: viewLead, status: 'Reservation' })}
                   disabled={viewLead.status === 'Reservation'}
                   className="h-10 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                 >
@@ -814,7 +893,7 @@ export default function LeadsManagementScreen() {
                   Reservation
                 </button>
                 <button
-                  onClick={() => handleQuickDealStatus(viewLead, 'Done Deal')}
+                  onClick={() => setDealModal({ lead: viewLead, status: 'Done Deal' })}
                   disabled={viewLead.status === 'Done Deal'}
                   className="h-10 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                 >
@@ -824,7 +903,7 @@ export default function LeadsManagementScreen() {
               </div>
 
               {/* Payment plan summary */}
-              {Number(viewLead.totalPrice) > 0 && (
+              {Number(viewLead.totalPrice) > 0 ? (
                 <div className="bg-muted/40 rounded-xl px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
                   <p className="text-xs text-muted-foreground">Total price</p>
                   <p className="text-sm font-semibold text-foreground text-right tabular-nums">
@@ -850,8 +929,7 @@ export default function LeadsManagementScreen() {
                   <p className="text-xs text-muted-foreground">Installment</p>
                   <p className="text-sm font-medium text-foreground text-right tabular-nums">
                     EGP {Number(viewLead.installmentAmount || 0).toLocaleString()}
-                    {Number(viewLead.installmentCount) > 0 &&
-                      ` × ${viewLead.installmentCount}`}
+                    {Number(viewLead.installmentCount) > 0 && ` × ${viewLead.installmentCount}`}
                   </p>
                   {viewLead.reservationDate && (
                     <>
@@ -885,6 +963,30 @@ export default function LeadsManagementScreen() {
                       </p>
                     </>
                   )}
+                  <div className="col-span-2 pt-1 border-t border-border">
+                    <button
+                      onClick={() => {
+                        setEditLead(viewLead);
+                        setViewLead(null);
+                      }}
+                      className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <Pencil size={10} /> Edit payment plan
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-muted/40 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">No payment plan added</p>
+                  <button
+                    onClick={() => {
+                      setEditLead(viewLead);
+                      setViewLead(null);
+                    }}
+                    className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <Plus size={11} /> Add payment plan
+                  </button>
                 </div>
               )}
 
@@ -950,9 +1052,7 @@ export default function LeadsManagementScreen() {
                       },
                       {
                         label: 'WA Follow-up',
-                        icon: (
-                          <CalendarClock size={13} />
-                        ),
+                        icon: <CalendarClock size={13} />,
                         cls: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
                         outcome: 'WhatsApp Follow-up',
                       },
@@ -1011,7 +1111,11 @@ export default function LeadsManagementScreen() {
           open={!!editLead}
           onClose={() => setEditLead(null)}
           title="Edit Lead"
-          subtitle={editLead.leadNumber ? `Editing ${editLead.leadNumber}` : `Editing details for ${editLead.name}`}
+          subtitle={
+            editLead.leadNumber
+              ? `Editing ${editLead.leadNumber}`
+              : `Editing details for ${editLead.name}`
+          }
           size="xl"
         >
           <EditLeadForm
@@ -1032,6 +1136,19 @@ export default function LeadsManagementScreen() {
             setSiteVisitLead(null);
           }}
           onChanged={fetchLeads}
+        />
+      )}
+
+      {/* Reservation / Done Deal modal */}
+      {dealModal && (
+        <DealStatusModal
+          lead={dealModal.lead}
+          status={dealModal.status}
+          onClose={() => setDealModal(null)}
+          onConfirm={(fields) => {
+            handleQuickDealStatus(dealModal.lead, dealModal.status, fields);
+            setDealModal(null);
+          }}
         />
       )}
 

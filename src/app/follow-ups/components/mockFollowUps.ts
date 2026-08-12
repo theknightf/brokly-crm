@@ -24,6 +24,8 @@ export interface FollowUp {
   createdAt: string;
   completedAt?: string;
   relationshipStatus?: RelationshipStatus;
+  /** Linked lead id when this follow-up was scheduled from a lead. */
+  leadId?: string;
 }
 
 export interface CustomerProfile {

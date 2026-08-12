@@ -8,6 +8,7 @@ import {
   Users,
   UserCheck,
   CalendarClock,
+  CalendarDays,
   UsersRound,
   BarChart3,
   Settings,
@@ -20,6 +21,9 @@ import {
   Calculator,
   Receipt,
   MapPin,
+  KeyRound,
+  Handshake,
+  Phone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -67,6 +71,30 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
         icon: <CalendarClock size={18} />,
         href: '/follow-ups',
         badge: 5,
+      },
+      {
+        id: 'nav-reservations',
+        labelKey: 'common.reservations',
+        icon: <KeyRound size={18} />,
+        href: '/reservations',
+      },
+      {
+        id: 'nav-deals',
+        labelKey: 'common.deals',
+        icon: <Handshake size={18} />,
+        href: '/deals',
+      },
+      {
+        id: 'nav-call-logs',
+        labelKey: 'common.callLogs',
+        icon: <Phone size={18} />,
+        href: '/call-logs',
+      },
+      {
+        id: 'nav-calendar',
+        labelKey: 'common.calendar',
+        icon: <CalendarDays size={18} />,
+        href: '/calendar',
       },
       {
         id: 'nav-workspace',
@@ -155,14 +183,18 @@ const ROLE_ITEM_PRIORITY: Record<string, Record<string, number>> = {
     'nav-leads': 3,
     'nav-customers': 4,
     'nav-followups': 5,
-    'nav-calculator': 6,
-    'nav-locations': 7,
-    'nav-projects': 8,
-    'nav-reports': 9,
-    'nav-teams': 10,
-    'nav-expenses': 11,
-    'nav-settings': 12,
-    'nav-admin': 13,
+    'nav-reservations': 6,
+    'nav-deals': 7,
+    'nav-call-logs': 8,
+    'nav-calendar': 9,
+    'nav-calculator': 10,
+    'nav-locations': 11,
+    'nav-projects': 12,
+    'nav-reports': 13,
+    'nav-teams': 14,
+    'nav-expenses': 15,
+    'nav-settings': 16,
+    'nav-admin': 17,
   },
   management: {
     'nav-dashboard': 1,
@@ -174,10 +206,14 @@ const ROLE_ITEM_PRIORITY: Record<string, Record<string, number>> = {
     'nav-leads': 7,
     'nav-customers': 8,
     'nav-followups': 9,
-    'nav-workspace': 10,
-    'nav-expenses': 11,
-    'nav-settings': 12,
-    'nav-admin': 13,
+    'nav-reservations': 10,
+    'nav-deals': 11,
+    'nav-call-logs': 12,
+    'nav-calendar': 13,
+    'nav-workspace': 14,
+    'nav-expenses': 15,
+    'nav-settings': 16,
+    'nav-admin': 17,
   },
 };
 
@@ -265,11 +301,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
 function SidebarContent({
   collapsed,
   isActive,
-  nav = navGroups,
+  nav,
 }: {
   collapsed: boolean;
   isActive: (href: string) => boolean;
-  nav?: { titleKey: string; items: NavItem[] }[];
+  nav: { titleKey: string; items: NavItem[] }[];
 }) {
   const { user, profile, signOut } = useAuth();
   const { t } = useLanguage();
@@ -308,7 +344,7 @@ function SidebarContent({
 
       {/* Nav groups */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-        {navGroups
+        {nav
           .map((group) => ({
             ...group,
             items: group.items.filter(

@@ -36,6 +36,7 @@ import {
 } from './mockFollowUps';
 import { followUpsService, teamService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 
 const typeIcon: Record<FollowUpType, React.ReactNode> = {
   Call: <Phone size={13} />,
@@ -104,6 +105,7 @@ function isOverdue(dueDate: string, status: FollowUpStatus) {
 
 export default function FollowUpsManagementScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
@@ -699,7 +701,21 @@ export default function FollowUpsManagementScreen() {
                                 <span className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[9px] font-bold flex-shrink-0">
                                   {fu.agentInitials}
                                 </span>
-                                {fu.contactName}
+                                {fu.leadId ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      router.push(`/leads-management?lead=${fu.leadId}`)
+                                    }
+                                    className="font-medium text-primary hover:underline inline-flex items-center gap-1"
+                                    title="Open linked lead"
+                                  >
+                                    {fu.contactName}
+                                    <UserCircle2 size={11} />
+                                  </button>
+                                ) : (
+                                  <span>{fu.contactName}</span>
+                                )}
                               </span>
                               {fu.propertyInterest && (
                                 <span className="truncate max-w-[200px]">

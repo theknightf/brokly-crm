@@ -115,7 +115,10 @@ async function rotationOrder(): Promise<{ id: string; name: string }[]> {
     const { data } = await supabase
       .from('leads')
       .select('assigned_to, updated_at')
-      .in('assigned_to', agents.map((a) => a.id))
+      .in(
+        'assigned_to',
+        agents.map((a) => a.id)
+      )
       .order('updated_at', { ascending: false })
       .limit(agents.length * 3);
     const latest = new Map<string, number>();
@@ -134,7 +137,9 @@ async function rotationOrder(): Promise<{ id: string; name: string }[]> {
  * Returns a Map<rowIndex, agent> for rows that should be auto-assigned by
  * rotation (only rows without an explicit assignee). At most one DB round-trip.
  */
-async function computeRotationAssignments(rows: any[]): Promise<Map<number, { id: string; name: string }>> {
+async function computeRotationAssignments(
+  rows: any[]
+): Promise<Map<number, { id: string; name: string }>> {
   const out = new Map<number, { id: string; name: string }>();
   const order = await rotationOrder();
   if (!order.length) return out;
@@ -216,6 +221,26 @@ export const leadsService = {
     }
   },
 
+  /** Single lead by id (used to open a lead's preview from other pages). */
+  async getById(id: string) {
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
+        .eq('id', id)
+        .single();
+      if (error) {
+        if (isSchemaError(error)) throw error;
+        return null;
+      }
+      return rowToLead(data);
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      return null;
+    }
+  },
+
   async create(lead: any, userId: string) {
     const supabase = createClient();
     // Auto-assignment when the admin rotation toggle is on.
@@ -252,7 +277,7 @@ export const leadsService = {
     if (!clean.length) return new Set<string>();
     const supabase = createClient();
     try {
-      let query: any = supabase
+      const query: any = supabase
         .from('leads')
         .select('phone')
         .or(clean.map((p) => `phone.ilike.%${p}%`).join(','));
@@ -478,6 +503,90 @@ export const leadsService = {
       });
       return counts;
     });
+  },
+
+  /**
+   * Lightweight dashboard KPIs. Every query is best-effort: a missing column
+   * or table must never break the dashboard — we fall back to zeros.
+   */
+  async getDashboardStats() {
+    const supabase = createClient();
+    const empty = {
+      total: 0,
+      new30d: 0,
+      unassigned: 0,
+      hot: 0,
+      reservations: 0,
+      doneDeals: 0,
+      conversionPct: 0,
+      revenue: 0,
+    };
+    try {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+      const countExact = async (query: any) => {
+        try {
+          const r = await query;
+          return r?.error ? 0 : Number(r?.count || 0);
+        } catch {
+          return 0;
+        }
+      };
+      const dealRows = await (async () => {
+        try {
+          const r = await supabase
+            .from('leads')
+            .select('final_price, total_price')
+            .in('crm_status', ['Done Deal', 'Won']);
+          return r?.error ? [] : r.data || [];
+        } catch {
+          return [];
+        }
+      })();
+      const [statusCounts, newCount, unassignedCount, hotCount] = await Promise.all([
+        this.getStatusCounts().catch(() => ({})),
+        countExact(
+          supabase
+            .from('leads')
+            .select('id', { count: 'exact', head: true })
+            .gte('created_at', thirtyDaysAgo)
+        ),
+        countExact(
+          supabase
+            .from('leads')
+            .select('id', { count: 'exact', head: true })
+            .is('assigned_to', null)
+        ),
+        countExact(
+          supabase
+            .from('leads')
+            .select('id', { count: 'exact', head: true })
+            .eq('lead_rating', 'Hot')
+        ),
+      ]);
+      const doneDeals =
+        Number((statusCounts as Record<string, number>)['Done Deal'] || 0) +
+        Number((statusCounts as Record<string, number>)['Won'] || 0);
+      const total = Object.values(statusCounts as Record<string, number>).reduce(
+        (sum: number, v: any) => sum + Number(v || 0),
+        0
+      );
+      const revenue = (dealRows || []).reduce(
+        (sum: number, r: any) => sum + Number(r.final_price || r.total_price || 0),
+        0
+      );
+      return {
+        total,
+        new30d: Number(newCount || 0),
+        unassigned: Number(unassignedCount || 0),
+        hot: Number(hotCount || 0),
+        reservations: Number((statusCounts as Record<string, number>)['Reservation'] || 0),
+        doneDeals,
+        conversionPct: total > 0 ? Math.round((doneDeals / total) * 1000) / 10 : 0,
+        revenue,
+      };
+    } catch {
+      return empty;
+    }
   },
 
   /**
@@ -829,6 +938,31 @@ export const followUpsService = {
     }
   },
 
+  /** Overdue + due-today counts for the dashboard KPI row (best-effort). */
+  async getDashboardCounts() {
+    const supabase = createClient();
+    const today = new Date().toISOString().split('T')[0];
+    const count = async (lt: boolean) => {
+      try {
+        let q: any = supabase
+          .from('follow_ups')
+          .select('id', { count: 'exact', head: true })
+          .not('follow_up_status', 'in', '("Completed","Cancelled")');
+        q = lt ? q.lt('due_date', today) : q.eq('due_date', today);
+        const r = await q;
+        if (r.error) {
+          if (isSchemaError(r.error)) throw r.error;
+          return 0;
+        }
+        return r.count || 0;
+      } catch {
+        return 0;
+      }
+    };
+    const [overdue, dueToday] = await Promise.all([count(true), count(false)]);
+    return { overdue, dueToday };
+  },
+
   async create(fu: any, userId: string) {
     const supabase = createClient();
     const { data, error } = await supabase
@@ -955,6 +1089,7 @@ function rowToFollowUp(row: any) {
     relationshipStatus: row.relationship_status,
     completedAt: row.completed_at,
     createdAt: row.created_at?.split('T')[0] || row.created_at,
+    leadId: row.lead_id || '',
   };
 }
 
@@ -978,6 +1113,7 @@ function followUpToRow(fu: any, userId?: string) {
     completed_at: fu.completedAt || null,
   };
   if (userId) row.created_by = userId;
+  if (fu.leadId) row.lead_id = fu.leadId;
   return row;
 }
 
@@ -1469,7 +1605,7 @@ export const projectsService = {
         why_buy: project.whyBuy ?? '',
         selling_points: Array.isArray(project.sellingPoints)
           ? project.sellingPoints.filter(Boolean).join('\n')
-          : project.sellingPoints ?? '',
+          : (project.sellingPoints ?? ''),
         image_path: project.imagePath || '',
         location: project.location || '',
         full_description: project.fullDescription || '',
@@ -1497,7 +1633,7 @@ export const projectsService = {
         why_buy: project.whyBuy ?? '',
         selling_points: Array.isArray(project.sellingPoints)
           ? project.sellingPoints.filter(Boolean).join('\n')
-          : project.sellingPoints ?? '',
+          : (project.sellingPoints ?? ''),
         image_path: project.imagePath || '',
         location: project.location || '',
         full_description: project.fullDescription || '',
@@ -1667,6 +1803,16 @@ function unitRowToUnit(row: any) {
   };
 }
 
+/** Unit + project details used by the lead's recommended-units cards. */
+function enrichRecommendedUnit(row: any) {
+  return {
+    ...unitRowToUnit(row),
+    projectImagePath: row.projects?.image_path || '',
+    projectSellingPoints: splitSellingPoints(row.projects?.selling_points),
+    projectPaymentPlanSummary: row.projects?.payment_plan_summary || '',
+  };
+}
+
 function unitToRow(unit: any) {
   return {
     project_id: unit.projectId,
@@ -1824,9 +1970,7 @@ export const unitsService = {
     const lower = (file.name || '').toLowerCase();
     const isPdf = file.type === 'application/pdf' || lower.endsWith('.pdf');
     const isVideo =
-      !isPdf &&
-      (/^video\//.test(file.type || '') ||
-        /\.(mp4|mov|m4v|webm|avi|mkv)$/.test(lower));
+      !isPdf && (/^video\//.test(file.type || '') || /\.(mp4|mov|m4v|webm|avi|mkv)$/.test(lower));
     const kind = isPdf ? 'pdf' : isVideo ? 'video' : 'image';
     const { data, error } = await supabase
       .from('unit_files')
@@ -1880,10 +2024,10 @@ export const unitsService = {
 export const recommendedUnitsService = {
   async listByLead(leadId: string) {
     const supabase = createClient();
-    try {
+    const fetchWith = async (select: string) => {
       const { data, error } = await supabase
         .from('lead_recommended_units')
-        .select('*, unit:units(*, projects(name))')
+        .select(select)
         .eq('lead_id', leadId)
         .order('created_at', { ascending: false });
       if (error) {
@@ -1895,11 +2039,23 @@ export const recommendedUnitsService = {
         leadId: row.lead_id,
         unitId: row.unit_id,
         createdAt: row.created_at,
-        unit: row.unit ? unitRowToUnit(row.unit) : null,
+        unit: row.unit ? enrichRecommendedUnit(row.unit) : null,
       }));
+    };
+    try {
+      // Selling points / payment plan summary were added later — fall back to
+      // the plain join on databases that have not run the migration yet.
+      return await fetchWith(
+        '*, unit:units(*, projects(name, image_path, selling_points, payment_plan_summary))'
+      );
     } catch (err: any) {
       if (isSchemaError(err)) throw err;
-      return [];
+      try {
+        return await fetchWith('*, unit:units(*, projects(name))');
+      } catch (err2: any) {
+        if (isSchemaError(err2)) throw err2;
+        return [];
+      }
     }
   },
 
@@ -1928,6 +2084,32 @@ export const recommendedUnitsService = {
   },
 };
 
+// ─── SITE VISITS (DASHBOARD COUNTS) ────────────────────────────────────────
+
+export const siteVisitsService = {
+  /** Scheduled (incl. in-progress) and completed visit counts — best-effort. */
+  async getCounts() {
+    const supabase = createClient();
+    try {
+      const [scheduled, completed] = await Promise.all([
+        supabase
+          .from('site_visits')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ['scheduled', 'in_progress'])
+          .then((r) => (r.error ? 0 : r.count || 0)),
+        supabase
+          .from('site_visits')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'completed')
+          .then((r) => (r.error ? 0 : r.count || 0)),
+      ]);
+      return { scheduled: Number(scheduled || 0), completed: Number(completed || 0) };
+    } catch {
+      return { scheduled: 0, completed: 0 };
+    }
+  },
+};
+
 // ─── MESSAGE LOGS (BULK EMAIL / SMS) ────────────────────────────────────────
 
 export const messageLogsService = {
@@ -1943,7 +2125,11 @@ export const messageLogsService = {
     const res = await fetch('/api/messages/email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, entity_type: payload.entityType, entity_id: payload.entityId }),
+      body: JSON.stringify({
+        ...payload,
+        entity_type: payload.entityType,
+        entity_id: payload.entityId,
+      }),
     });
     const body = await res.json().catch(() => null);
     if (!res.ok) throw new Error(body?.error || 'Failed to send email');
@@ -1962,7 +2148,11 @@ export const messageLogsService = {
     const res = await fetch('/api/messages/sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, entity_type: payload.entityType, entity_id: payload.entityId }),
+      body: JSON.stringify({
+        ...payload,
+        entity_type: payload.entityType,
+        entity_id: payload.entityId,
+      }),
     });
     const body = await res.json().catch(() => null);
     if (!res.ok) throw new Error(body?.error || 'Failed to send SMS');

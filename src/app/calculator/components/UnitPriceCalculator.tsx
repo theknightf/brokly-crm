@@ -11,9 +11,18 @@ import {
   ListChecks,
   BadgePercent,
   Loader2,
+  UserPlus,
+  Search,
+  Check,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { unitsService } from '@/lib/services/crmService';
+import {
+  leadsService,
+  recommendedUnitsService,
+  unitsService,
+  type UnitFile,
+} from '@/lib/services/crmService';
 
 const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -122,6 +131,12 @@ export default function UnitPriceCalculator() {
   const [freq, setFreq] = useState(12);
   const [units, setUnits] = useState<any[]>([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [pickerUnitId, setPickerUnitId] = useState<string | null>(null);
+  const [leadQuery, setLeadQuery] = useState('');
+  const [savingLeadId, setSavingLeadId] = useState<string | null>(null);
+  const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set());
+  const [unitImages, setUnitImages] = useState<Record<string, string>>({});
 
   React.useEffect(() => {
     let mounted = true;
@@ -141,6 +156,53 @@ export default function UnitPriceCalculator() {
       mounted = false;
     };
   }, []);
+
+  React.useEffect(() => {
+    let mounted = true;
+    leadsService
+      .getAll()
+      .then((data: any) => {
+        if (mounted) setLeads(data || []);
+      })
+      .catch(() => {
+        if (mounted) setLeads([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const filteredLeads = useMemo(() => {
+    const q = leadQuery.trim().toLowerCase();
+    if (!q) return leads;
+    return leads.filter(
+      (l: any) =>
+        String(l?.name || '')
+          .toLowerCase()
+          .includes(q) ||
+        String(l?.phone || '')
+          .toLowerCase()
+          .includes(q)
+    );
+  }, [leads, leadQuery]);
+
+  const isAdded = (unitId: string, leadId: string) => addedKeys.has(`${leadId}:${unitId}`);
+
+  const handleAddToLead = async (unit: any, lead: any) => {
+    if (savingLeadId) return;
+    setSavingLeadId(lead.id);
+    try {
+      await recommendedUnitsService.add(lead.id, unit.id);
+      setAddedKeys((prev) => new Set(prev).add(`${lead.id}:${unit.id}`));
+      setPickerUnitId(null);
+      setLeadQuery('');
+      toast.success(t('calculator.leadAddedToast'));
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not add the unit to the lead');
+    } finally {
+      setSavingLeadId(null);
+    }
+  };
 
   const result = useMemo(() => {
     const price = parseFloat(meterPrice);
@@ -242,14 +304,40 @@ export default function UnitPriceCalculator() {
       const up = Number(u.price || 0);
       const ua = Number(u.area || 0);
       if (up <= 0) continue;
-      let priceDelta = Math.abs(up - result.total) / result.total;
-      let areaDelta = 0;
-      if (meters > 0 && ua > 0) areaDelta = Math.abs(ua - meters) / meters;
+      const priceDelta = Math.abs(up - result.total) / result.total;
+      const areaDelta = meters > 0 && ua > 0 ? Math.abs(ua - meters) / meters : 0;
       const score = priceDelta * 0.6 + areaDelta * 0.4;
       bank.push({ unit: u, score });
     }
     return bank.sort((a, b) => a.score - b.score).slice(0, 4);
   }, [units, result, totalMeters]);
+
+  // Resolve short-lived signed URLs for unit thumbnails (private bucket).
+  React.useEffect(() => {
+    let mounted = true;
+    const withImage = recommendations
+      .map(({ unit }) => (unit?.imagePath ? { id: unit.id, path: unit.imagePath } : null))
+      .filter((x): x is { id: string; path: string } => !!x);
+    if (withImage.length === 0) return;
+    Promise.all(
+      withImage.map(async ({ id, path }) => ({
+        id,
+        url: await unitsService.getFileUrl({ filePath: path } as UnitFile),
+      }))
+    )
+      .then((results) => {
+        if (!mounted) return;
+        setUnitImages((prev) => {
+          const next = { ...prev };
+          for (const r of results) if (r.url) next[r.id] = r.url;
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [recommendations]);
 
   const gridCard = (color: string, label: string, value: string, sub?: string) => (
     <div className="bg-muted/50 rounded-xl p-3">
@@ -538,27 +626,126 @@ export default function UnitPriceCalculator() {
         ) : (
           <ul className="divide-y divide-border">
             {recommendations.map(({ unit }) => (
-              <li key={unit.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{unit.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {[unit.unitType, unit.area ? `${unit.area} m²` : '', unit.floor ? `Floor ${unit.floor}` : '']
-                      .filter(Boolean)
-                      .join(' · ') || '—'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="font-semibold tabular-nums text-foreground">
-                    EGP {fmt(Number(unit.price) || 0)}
-                  </span>
-                  {(unit.downPaymentPct > 0 || unit.installmentYears > 0) && (
-                    <span className="text-[11px] text-muted-foreground hidden sm:inline">
-                      {unit.downPaymentPct > 0 ? `${unit.downPaymentPct}% down` : ''}
-                      {unit.downPaymentPct > 0 && unit.installmentYears > 0 ? ' · ' : ''}
-                      {unit.installmentYears > 0 ? `${unit.installmentYears} yrs` : ''}
+              <li key={unit.id} className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                    {unitImages[unit.id] ? (
+                      <img
+                        src={unitImages[unit.id]}
+                        alt={unit.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Building2 size={18} className="text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">{unit.name}</p>
+                    {unit.projectName && (
+                      <p className="text-[11px] font-semibold text-primary truncate">
+                        {unit.projectName}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground truncate">
+                      {[
+                        unit.unitType,
+                        unit.area ? `${unit.area} m²` : '',
+                        unit.floor ? `Floor ${unit.floor}` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '—'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm shrink-0">
+                    <span className="font-semibold tabular-nums text-foreground">
+                      EGP {fmt(Number(unit.price) || 0)}
                     </span>
-                  )}
+                    {(unit.downPaymentPct > 0 || unit.installmentYears > 0) && (
+                      <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                        {unit.downPaymentPct > 0 ? `${unit.downPaymentPct}% down` : ''}
+                        {unit.downPaymentPct > 0 && unit.installmentYears > 0 ? ' · ' : ''}
+                        {unit.installmentYears > 0 ? `${unit.installmentYears} yrs` : ''}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickerUnitId(pickerUnitId === unit.id ? null : unit.id);
+                        setLeadQuery('');
+                      }}
+                      className="btn-secondary !h-8 !px-2.5 !text-xs"
+                    >
+                      <UserPlus size={13} />
+                      {t('calculator.addToLead')}
+                    </button>
+                  </div>
                 </div>
+
+                {pickerUnitId === unit.id && (
+                  <div className="mt-3 rounded-xl border border-border bg-muted/40 p-2 space-y-2">
+                    <div className="relative">
+                      <Search
+                        size={13}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <input
+                        type="text"
+                        placeholder={t('calculator.searchLeads')}
+                        value={leadQuery}
+                        onChange={(e) => setLeadQuery(e.target.value)}
+                        className="input-base !h-8 !pl-8 !text-xs"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-44 overflow-y-auto space-y-1">
+                      {filteredLeads.length === 0 ? (
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                          {t('calculator.noLeadsFound')}
+                        </p>
+                      ) : (
+                        filteredLeads.map((lead: any) => {
+                          const added = isAdded(unit.id, lead.id);
+                          const saving = savingLeadId === lead.id;
+                          return (
+                            <button
+                              key={lead.id}
+                              type="button"
+                              disabled={added || !!savingLeadId}
+                              onClick={() => handleAddToLead(unit, lead)}
+                              className="w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-card transition-colors disabled:opacity-60 disabled:cursor-default"
+                            >
+                              <span className="min-w-0">
+                                <span className="block text-xs font-medium text-foreground truncate">
+                                  {lead.name || '—'}
+                                </span>
+                                {lead.phone && (
+                                  <span className="block text-[11px] text-muted-foreground truncate">
+                                    {lead.phone}
+                                  </span>
+                                )}
+                              </span>
+                              {added ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 shrink-0">
+                                  <Check size={12} />
+                                  {t('calculator.leadAlreadyAdded')}
+                                </span>
+                              ) : saving ? (
+                                <Loader2
+                                  size={13}
+                                  className="animate-spin text-muted-foreground shrink-0"
+                                />
+                              ) : (
+                                <span className="text-[11px] font-semibold text-primary shrink-0">
+                                  {t('calculator.addToLead')}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

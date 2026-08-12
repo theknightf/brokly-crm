@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, X, Search, Loader2 } from 'lucide-react';
+import { Building2, Plus, X, Search, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { recommendedUnitsService, unitsService } from '@/lib/services/crmService';
+import { projectsService, recommendedUnitsService, unitsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface RecommendedUnitsSectionProps {
@@ -10,7 +10,40 @@ interface RecommendedUnitsSectionProps {
   onChanged?: () => void;
 }
 
-export default function RecommendedUnitsSection({ leadId, onChanged }: RecommendedUnitsSectionProps) {
+/** Small cover thumbnail: unit image if set, otherwise the project cover. */
+function UnitThumb({ unit }: { unit: any }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    const path = unit?.imagePath || unit?.projectImagePath;
+    if (!path) {
+      setUrl('');
+      return;
+    }
+    let mounted = true;
+    projectsService.getImageUrl(path).then((u) => {
+      if (mounted) setUrl(u || '');
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [unit?.imagePath, unit?.projectImagePath]);
+  if (!url) {
+    return (
+      <span className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+        <Building2 size={16} />
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+  );
+}
+
+export default function RecommendedUnitsSection({
+  leadId,
+  onChanged,
+}: RecommendedUnitsSectionProps) {
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,9 +114,15 @@ export default function RecommendedUnitsSection({ leadId, onChanged }: Recommend
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
-      String(u.name || '').toLowerCase().includes(q) ||
-      String(u.projectName || '').toLowerCase().includes(q) ||
-      String(u.unitType || '').toLowerCase().includes(q)
+      String(u.name || '')
+        .toLowerCase()
+        .includes(q) ||
+      String(u.projectName || '')
+        .toLowerCase()
+        .includes(q) ||
+      String(u.unitType || '')
+        .toLowerCase()
+        .includes(q)
     );
   });
 
@@ -113,18 +152,45 @@ export default function RecommendedUnitsSection({ leadId, onChanged }: Recommend
         <ul className="space-y-1.5">
           {items.map((item) => {
             const unit = item.unit || {};
+            const sellingPoints = unit.projectSellingPoints || [];
             return (
               <li
                 key={item.id}
-                className="flex items-center gap-2 bg-background/70 rounded-lg px-2.5 py-2"
+                className="flex items-start gap-2 bg-background/70 rounded-lg px-2.5 py-2"
               >
+                <UnitThumb unit={unit} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">{unit.name || 'Unit'}</p>
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {unit.name || 'Unit'}
+                  </p>
                   <p className="text-[11px] text-muted-foreground truncate">
                     {[unit.projectName, unit.unitType, unit.area ? `${unit.area} m²` : '']
                       .filter(Boolean)
                       .join(' · ') || '—'}
                   </p>
+                  {unit.projectPaymentPlanSummary && (
+                    <p className="text-[11px] font-medium text-primary truncate mt-0.5">
+                      {unit.projectPaymentPlanSummary}
+                    </p>
+                  )}
+                  {sellingPoints.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {sellingPoints.slice(0, 3).map((sp: string, i: number) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5"
+                        >
+                          <CheckCircle2 size={9} className="text-emerald-500" />
+                          {sp}
+                        </span>
+                      ))}
+                      {sellingPoints.length > 3 && (
+                        <span className="text-[10px] text-muted-foreground self-center">
+                          +{sellingPoints.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <span className="text-xs font-semibold tabular-nums text-foreground flex-shrink-0">
                   EGP {Number(unit.price || 0).toLocaleString()}
@@ -158,7 +224,10 @@ export default function RecommendedUnitsSection({ leadId, onChanged }: Recommend
             </div>
             <div className="px-4 py-2.5 border-b border-border">
               <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Search
+                  size={13}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
