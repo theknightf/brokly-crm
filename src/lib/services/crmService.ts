@@ -500,6 +500,45 @@ export const leadsService = {
     invalidateCache();
   },
 
+  /**
+   * Transaction-safe round-robin bulk assignment. Delegates to the
+   * `bulk_assign_round_robin` RPC which updates every lead atomically and rolls
+   * the whole batch back if any single lead fails (permission, missing user) —
+   * a lead is never left partially assigned.
+   */
+  async bulkAssignRoundRobin(ids: string[], users: { id: string; name: string }[]) {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('bulk_assign_round_robin', {
+      p_lead_ids: ids,
+      p_user_ids: users.map((u) => u.id),
+    });
+    if (error) throw error;
+
+    // Follow-up sync + notifications remain best-effort after commit, so a
+    // failure there can't leave assignment state inconsistent.
+    try {
+      const done = (data || []) as { lead_id: string; user_id: string; user_name: string }[];
+      const byUser = new Map<string, string[]>();
+      done.forEach((d) => {
+        const list = byUser.get(d.user_id) || [];
+        list.push(d.lead_id);
+        byUser.set(d.user_id, list);
+      });
+      for (const u of users) {
+        const userLeads = byUser.get(u.id);
+        if (userLeads?.length) {
+          await pushAssignmentNotifications(supabase, userLeads, u.id, u.name);
+        }
+      }
+      const { data: synced } = await supabase.from('leads').select('*').in('id', ids);
+      await followUpsService.syncFromLead(synced || []);
+    } catch {
+      // ignore — notifications/follow-up sync are best-effort
+    }
+    invalidateCache();
+    return (data || []) as { lead_id: string; user_id: string; user_name: string }[];
+  },
+
   /** Bulk-assign a team label (leads.team) to the selected leads. */
   async bulkSetTeam(ids: string[], teamName: string) {
     const supabase = createClient();
@@ -739,8 +778,11 @@ export const leadsService = {
         .range(from, to);
 
       if (error) {
-        if (isSchemaError(error)) throw error;
-        return { data: [], total: 0, page, pageSize };
+        // Schema errors throw with technical detail for the (un-migrated) case;
+        // every other failure (network, timeout, auth, integrity) must also
+        // propagate so the UI can show an actionable error state instead of a
+        // misleading empty table.
+        throw new Error(error.message || 'Failed to load leads');
       }
       return {
         data: (data || []).map(rowToLead),
@@ -749,8 +791,11 @@ export const leadsService = {
         pageSize,
       };
     } catch (err: any) {
+      // Always rely on isSchemaError to decide a degraded path; for leads we
+      // want real errors surfaced, so re-throw unless it already describes a
+      // missing-schema situation that the older caller handles.
       if (isSchemaError(err)) throw err;
-      return { data: [], total: 0, page, pageSize };
+      throw err;
     }
   },
 
@@ -2572,6 +2617,25 @@ export const usersService = {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/sign-up-login`,
     });
     if (error) throw error;
+  },
+
+  /** Admin sets a new password for a user (secure, server-side, never logged). */
+  async changePassword(id: string, password: string, confirmPassword: string) {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}/password`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, confirmPassword }),
+    });
+    if (!res.ok) {
+      let message = `Failed to change password (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch {
+        /* ignore parse errors */
+      }
+      throw new Error(message);
+    }
   },
 
   async inviteUser(email: string, fullName: string, role: string) {

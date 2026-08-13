@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
+import { createClient as createServerClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth';
 
 function getSupabaseService() {
   return createClient(
@@ -22,10 +17,14 @@ function isSchemaError(e: unknown): boolean {
   );
 }
 
-// GET /api/admin/activity — admin dashboard data
+// GET /api/admin/activity — admin dashboard data (admin-only)
 // Query params: from, to (dates), user_id (optional filter), period (day|week|month)
 export async function GET(request: Request) {
   try {
+    const serverClient = await createServerClient();
+    const auth = await requireAdmin(serverClient);
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const from =
       searchParams.get('from') ||
@@ -34,7 +33,6 @@ export async function GET(request: Request) {
     const userId = searchParams.get('user_id');
     const period = searchParams.get('period') || 'day'; // day | week | month
 
-    const supabase = getSupabase();
     const supabaseAdmin = getSupabaseService();
     const db = supabaseAdmin as any;
 

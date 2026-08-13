@@ -66,6 +66,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, metadata: Record<string, any> = {}) => {
+    // Self-signup can never claim a privileged role (backed by the
+    // handle_new_user trigger which also downgrades unknown/privileged roles).
+    const requestedRole = String(metadata?.role || 'agent');
+    const safeRole = ['agent', 'broker', 'branch_manager', 'senior_agent', 'telecaller'].includes(
+      requestedRole
+    )
+      ? requestedRole
+      : 'agent';
     const { data, error } = await getSupabase().auth.signUp({
       email,
       password,
@@ -73,7 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         data: {
           full_name: metadata?.fullName || '',
           avatar_url: metadata?.avatarUrl || '',
-          role: metadata?.role || 'agent',
+          role: safeRole,
           brokerage_name: metadata?.brokerageName || '',
           phone: metadata?.phone || '',
         },

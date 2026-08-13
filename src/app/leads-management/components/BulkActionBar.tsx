@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Trash2,
   UserCheck,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
+import ViewportPopover from '@/components/ui/ViewportPopover';
 import { teamsService, messageLogsService } from '@/lib/services/crmService';
 
 interface AssignableUser {
@@ -86,6 +87,9 @@ export default function BulkActionBar({
   const [open, setOpen] = useState<'none' | 'whatsapp' | 'assign' | 'team'>('none');
   const [composer, setComposer] = useState<'none' | 'email' | 'sms'>('none');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const whatsappBtnRef = useRef<HTMLButtonElement>(null);
+  const assignBtnRef = useRef<HTMLButtonElement>(null);
+  const teamBtnRef = useRef<HTMLButtonElement>(null);
   const [users, setUsers] = useState<AssignableUser[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -212,6 +216,7 @@ export default function BulkActionBar({
           {/* WhatsApp bulk */}
           <div className="relative flex-shrink-0">
             <button
+              ref={whatsappBtnRef}
               onClick={() => setOpen((o) => (o === 'whatsapp' ? 'none' : 'whatsapp'))}
               disabled={withPhone.length === 0}
               className="flex items-center gap-1.5 text-sm font-medium text-emerald-300 hover:text-emerald-200 transition-colors disabled:opacity-40"
@@ -225,56 +230,62 @@ export default function BulkActionBar({
               WhatsApp
               {withPhone.length > 0 && <ChevronDown size={13} />}
             </button>
-            {open === 'whatsapp' && withPhone.length > 0 && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setOpen('none')} />
-                <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-modal min-w-[340px] max-h-[80vh] overflow-y-auto py-1 z-50 fade-in">
-                  <div className="px-3 pt-3 pb-2 border-b border-border">
-                    <p className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
-                      <Send size={11} />
-                      Forward message to all {withPhone.length} leads
-                    </p>
-                    <textarea
-                      value={waMessage}
-                      onChange={(e) => setWaMessage(e.target.value)}
-                      placeholder="Type a message to forward… (optional — leave blank to open blank chats)"
-                      rows={3}
-                      className="w-full border border-input bg-background text-foreground text-xs rounded-lg px-3 py-2 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                    />
-                  </div>
-                  <div className="px-3 py-2 border-b border-border sticky top-0 bg-card">
-                    <button
-                      onClick={openAllWhatsApp}
-                      className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors"
-                    >
-                      <ExternalLink size={13} />
-                      {waMessage.trim()
-                        ? `Send message to all (${withPhone.length}) — one tab per lead`
-                        : `Open all (${withPhone.length}) — one tab per lead`}
-                    </button>
-                    <p className="text-[11px] text-muted-foreground mt-1.5 text-center">
-                      Your browser may ask to allow multiple tabs.
-                    </p>
-                  </div>
-                  {withPhone.map((l) => (
-                    <a
-                      key={l.id}
-                      href={waLink(l.phone, waMessage.trim())}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                    >
-                      <MessageCircle size={13} className="text-emerald-600 flex-shrink-0" />
-                      <span className="truncate min-w-0">{l.name}</span>
-                      <span className="ml-auto text-xs text-muted-foreground font-mono whitespace-nowrap">
-                        {l.phone}
-                      </span>
-                      <ExternalLink size={11} className="text-muted-foreground/50 flex-shrink-0" />
-                    </a>
-                  ))}
-                </div>
-              </>
-            )}
+            <ViewportPopover
+              open={open === 'whatsapp'}
+              onClose={() => setOpen('none')}
+              anchorRef={whatsappBtnRef}
+              minWidth={340}
+              preferredMaxHeight={520}
+              recomputeKey={withPhone.length}
+              zIndex={60}
+              className="py-1"
+            >
+              <div className="px-3 pt-3 pb-2 border-b border-border">
+                <p className="text-xs font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                  <Send size={11} />
+                  Forward message to all {withPhone.length} leads
+                </p>
+                <textarea
+                  value={waMessage}
+                  onChange={(e) => setWaMessage(e.target.value)}
+                  placeholder="Type a message to forward… (optional — leave blank to open blank chats)"
+                  rows={3}
+                  className="w-full border border-input bg-background text-foreground text-xs rounded-lg px-3 py-2 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                />
+              </div>
+              <div className="px-3 py-2 border-b border-border sticky top-0 bg-card">
+                <button
+                  onClick={openAllWhatsApp}
+                  className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-500 transition-colors"
+                >
+                  <ExternalLink size={13} />
+                  {waMessage.trim()
+                    ? `Send message to all (${withPhone.length}) — one tab per lead`
+                    : `Open all (${withPhone.length}) — one tab per lead`}
+                </button>
+                <p className="text-[11px] text-muted-foreground mt-1.5 text-center">
+                  Your browser may ask to allow multiple tabs.
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                {withPhone.map((l) => (
+                  <a
+                    key={l.id}
+                    href={waLink(l.phone, waMessage.trim())}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                  >
+                    <MessageCircle size={13} className="text-emerald-600 flex-shrink-0" />
+                    <span className="truncate min-w-0">{l.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground font-mono whitespace-nowrap">
+                      {l.phone}
+                    </span>
+                    <ExternalLink size={11} className="text-muted-foreground/50 flex-shrink-0" />
+                  </a>
+                ))}
+              </div>
+            </ViewportPopover>
           </div>
 
           <div className="h-4 w-px bg-background/20 flex-shrink-0" />
@@ -282,6 +293,7 @@ export default function BulkActionBar({
           {/* Assign user */}
           <div className="relative flex-shrink-0">
             <button
+              ref={assignBtnRef}
               onClick={() => setOpen((o) => (o === 'assign' ? 'none' : 'assign'))}
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors"
             >
@@ -289,82 +301,87 @@ export default function BulkActionBar({
               Assign
               <ChevronDown size={13} />
             </button>
-            {open === 'assign' && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setOpen('none')} />
-                <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-2xl min-w-[280px] max-h-[70vh] overflow-y-auto py-1 z-50 fade-in">
-                  <div className="px-3 pt-3 pb-2 border-b border-border">
-                    <p className="text-xs font-semibold text-foreground">
-                      {selectedLeads.length} selected lead{selectedLeads.length !== 1 ? 's' : ''}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Pick users — leads are split evenly (round-robin).
-                    </p>
-                  </div>
-                  {loadingUsers ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 size={16} className="animate-spin text-primary" />
-                    </div>
-                  ) : users.length === 0 ? (
-                    <p className="px-3 py-2 text-sm text-muted-foreground">No assignable users</p>
-                  ) : (
-                    users.map((u) => {
-                      const checked = selectedUserIds.has(u.id);
-                      return (
-                        <button
-                          key={`bulk-user-${u.id}`}
-                          onClick={() =>
-                            setSelectedUserIds((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(u.id)) next.delete(u.id);
-                              else next.add(u.id);
-                              return next;
-                            })
-                          }
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors ${
-                            checked ? 'bg-muted/60' : ''
-                          }`}
-                        >
-                          <span
-                            className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                              checked ? 'bg-primary border-primary text-white' : 'border-input'
-                            }`}
-                          >
-                            {checked && <Check size={12} />}
-                          </span>
-                          <span className="truncate">{u.name}</span>
-                          {checked && (
-                            <span className="ml-auto text-xs text-primary font-semibold">
-                              {distByUserId.get(u.id) ?? 0}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                  {selectedUsers.length > 0 && !loadingUsers && (
-                    <div className="px-3 py-2 border-t border-border">
-                      <button
-                        onClick={() => {
-                          setConfirmAssignOpen(true);
-                          setOpen('none');
-                        }}
-                        className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
-                      >
-                        <UserCheck size={13} />
-                        Assign {selectedLeads.length} leads to {selectedUsers.length} user
-                        {selectedUsers.length !== 1 ? 's' : ''} (round-robin)
-                      </button>
-                    </div>
-                  )}
+            <ViewportPopover
+              open={open === 'assign'}
+              onClose={() => setOpen('none')}
+              anchorRef={assignBtnRef}
+              minWidth={284}
+              preferredMaxHeight={460}
+              recomputeKey={selectedLeads.length}
+              zIndex={60}
+              className="py-1"
+            >
+              <div className="px-3 pt-3 pb-2 border-b border-border">
+                <p className="text-xs font-semibold text-foreground">
+                  {selectedLeads.length} selected lead{selectedLeads.length !== 1 ? 's' : ''}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Pick users — leads are split evenly (round-robin).
+                </p>
+              </div>
+              {loadingUsers ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 size={16} className="animate-spin text-primary" />
                 </div>
-              </>
-            )}
+              ) : users.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-muted-foreground">No assignable users</p>
+              ) : (
+                users.map((u) => {
+                  const checked = selectedUserIds.has(u.id);
+                  return (
+                    <button
+                      key={`bulk-user-${u.id}`}
+                      onClick={() =>
+                        setSelectedUserIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(u.id)) next.delete(u.id);
+                          else next.add(u.id);
+                          return next;
+                        })
+                      }
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors ${
+                        checked ? 'bg-muted/60' : ''
+                      }`}
+                    >
+                      <span
+                        className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                          checked ? 'bg-primary border-primary text-white' : 'border-input'
+                        }`}
+                      >
+                        {checked && <Check size={12} />}
+                      </span>
+                      <span className="truncate">{u.name}</span>
+                      {checked && (
+                        <span className="ml-auto text-xs text-primary font-semibold">
+                          {distByUserId.get(u.id) ?? 0}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+              {selectedUsers.length > 0 && !loadingUsers && (
+                <div className="px-3 py-2 border-t border-border">
+                  <button
+                    onClick={() => {
+                      setConfirmAssignOpen(true);
+                      setOpen('none');
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    <UserCheck size={13} />
+                    Assign {selectedLeads.length} leads to {selectedUsers.length} user
+                    {selectedUsers.length !== 1 ? 's' : ''} (round-robin)
+                  </button>
+                </div>
+              )}
+            </ViewportPopover>
           </div>
 
           {/* Assign team */}
           <div className="relative flex-shrink-0">
             <button
+              ref={teamBtnRef}
               onClick={() => setOpen((o) => (o === 'team' ? 'none' : 'team'))}
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors"
             >
@@ -372,33 +389,37 @@ export default function BulkActionBar({
               Team
               <ChevronDown size={13} />
             </button>
-            {open === 'team' && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setOpen('none')} />
-                <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-xl shadow-2xl min-w-[200px] max-h-56 overflow-y-auto py-1 z-50 fade-in">
-                  {loadingTeams ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 size={16} className="animate-spin text-primary" />
-                    </div>
-                  ) : teams.length === 0 ? (
-                    <p className="px-3 py-2 text-sm text-muted-foreground">No teams yet</p>
-                  ) : (
-                    teams.map((t) => (
-                      <button
-                        key={`bulk-team-${t.id}`}
-                        onClick={() => {
-                          onAssignTeam(t.name);
-                          setOpen('none');
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                      >
-                        {t.name}
-                      </button>
-                    ))
-                  )}
+            <ViewportPopover
+              open={open === 'team'}
+              onClose={() => setOpen('none')}
+              anchorRef={teamBtnRef}
+              minWidth={200}
+              preferredMaxHeight={360}
+              recomputeKey={teams.length}
+              zIndex={60}
+              className="py-1"
+            >
+              {loadingTeams ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 size={16} className="animate-spin text-primary" />
                 </div>
-              </>
-            )}
+              ) : teams.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-muted-foreground">No teams yet</p>
+              ) : (
+                teams.map((t) => (
+                  <button
+                    key={`bulk-team-${t.id}`}
+                    onClick={() => {
+                      onAssignTeam(t.name);
+                      setOpen('none');
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                  >
+                    {t.name}
+                  </button>
+                ))
+              )}
+            </ViewportPopover>
           </div>
 
           <div className="h-4 w-px bg-background/20 flex-shrink-0" />

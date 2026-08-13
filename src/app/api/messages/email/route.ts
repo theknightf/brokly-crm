@@ -36,6 +36,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'subject and html are required' }, { status: 400 });
   }
 
+  // Anti-abuse: the recipient must be a lead the caller is allowed to see.
+  // RLS scopes the lookup, so an arbitrary address cannot be targeted.
+  const targetEmail = to.trim().toLowerCase();
+  const { data: accessibleLead } = await supabase
+    .from('leads')
+    .select('id, name, email')
+    .ilike('email', targetEmail)
+    .limit(1)
+    .maybeSingle();
+  if (!accessibleLead) {
+    return NextResponse.json(
+      { error: 'Recipient email is not associated with a lead you can access' },
+      { status: 403 }
+    );
+  }
+
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
   const smtpUser = process.env.SMTP_USER;

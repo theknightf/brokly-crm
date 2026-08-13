@@ -121,11 +121,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only the session owner (or an admin via RLS) may close it.
+    // Only the session owner may close it (admin access is NOT granted here —
+    // admin cleanup goes through the admin surfaces instead).
     const query = supabase
       .from('user_sessions')
       .select('id, login_at')
       .eq('id', session_id)
+      .eq('user_id', user.id)
       .eq('is_active', true);
 
     const { data: activeSessions, error: findErr } = await query;

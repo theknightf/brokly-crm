@@ -22,6 +22,8 @@ import {
   Pencil,
   Building2,
   Tag,
+  TriangleAlert,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -185,6 +187,7 @@ export default function LeadsManagementScreen({
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     status: initialStatus || '',
@@ -223,6 +226,7 @@ export default function LeadsManagementScreen({
   const [payPlanLead, setPayPlanLead] = useState<Lead | null>(null);
   const [logCallLead, setLogCallLead] = useState<Lead | null>(null);
   const [callHistoryKey, setCallHistoryKey] = useState(0);
+  const statusPendingRef = useRef<Set<string>>(new Set());
 
   /** Swap the lead inside the reservation / done-deal modal (Select Existing Lead). */
   const handleDealLeadChange = async (leadId: string): Promise<Lead | null> => {
@@ -291,9 +295,11 @@ export default function LeadsManagementScreen({
       if (requestId !== fetchRef.current) return;
       setLeads((res.data || []) as Lead[]);
       setTotal(res.total);
+      setLoadError(null);
     } catch (err: any) {
       if (requestId !== fetchRef.current) return;
-      toast.error(err?.message || 'Failed to load leads');
+      setLoadError(err?.message || 'Failed to load leads');
+      setLeads([]);
     } finally {
       if (requestId === fetchRef.current) {
         setLoading(false);
@@ -327,13 +333,32 @@ export default function LeadsManagementScreen({
   };
 
   const handleStatusChange = async (id: string, newStatus: LeadStatus) => {
+    if (statusPendingRef.current.has(id)) return;
+    statusPendingRef.current.add(id);
+    // Snapshot the previous status so we can roll the UI back if the server
+    // rejects the change (prevents the preview from lying about the stage).
+    const prevLeads = leads;
+    const prevView = viewLead;
     try {
-      await leadsService.updateStatus(id, newStatus);
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l)));
       setViewLead((prev) => (prev?.id === id ? { ...prev, status: newStatus } : prev));
+      await leadsService.updateStatus(id, newStatus);
       toast.success(`Lead status updated to ${newStatus}`);
     } catch (err: any) {
+      setLeads((prev) =>
+        prev.map((l) => {
+          const orig = prevLeads.find((x) => x.id === id);
+          return l.id === id && orig ? { ...l, status: orig.status } : l;
+        })
+      );
+      setViewLead((prev) => {
+        if (prev?.id !== id) return prev;
+        const orig = prevView && prevView.id === id ? prevView : prevLeads.find((x) => x.id === id);
+        return orig ? { ...prev, status: orig.status } : prev;
+      });
       toast.error(err?.message || 'Failed to update status');
+    } finally {
+      statusPendingRef.current.delete(id);
     }
   };
 
@@ -386,13 +411,15 @@ export default function LeadsManagementScreen({
   const handleBulkAssignMany = async (users: { id: string; name: string }[]) => {
     const ids = Array.from(selectedIds);
     if (!ids.length || !users.length) return;
-    const done: { id: string; userId: string; name: string }[] = [];
     try {
-      for (let i = 0; i < ids.length; i++) {
-        const u = users[i % users.length];
-        await leadsService.bulkAssignUsers([ids[i]], u.id, u.name);
-        done.push({ id: ids[i], userId: u.id, name: u.name });
-      }
+      // Single RPC call: deterministic round-robin, fully atomic on the server.
+      // If any lead can't be reassigned the whole batch rolls back.
+      const result = await leadsService.bulkAssignRoundRobin(ids, users);
+      const done: { id: string; userId: string; name: string }[] = (result || []).map((r) => ({
+        id: r.lead_id,
+        userId: r.user_id,
+        name: r.user_name,
+      }));
       setLeads((prev) =>
         prev.map((l) => {
           const a = done.find((x) => x.id === l.id);
@@ -418,15 +445,9 @@ export default function LeadsManagementScreen({
       );
       setSelectedIds(new Set());
     } catch (err: any) {
-      try {
-        await leadsService.bulkAssignUsers(
-          done.map((d) => d.id),
-          null
-        );
-      } catch {
-        // best-effort rollback
-      }
-      toast.error(err?.message || 'Assignment failed mid-way — all changes were rolled back');
+      // The RPC is atomic — nothing was persisted, so there is nothing to
+      // un-assign. State already reflects the failure (toast only).
+      toast.error(err?.message || 'Assignment failed — no leads were changed');
     }
   };
 
@@ -792,6 +813,24 @@ export default function LeadsManagementScreen({
       </div>
 
       {/* Table */}
+      {loadError && (
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <TriangleAlert size={18} className="flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Failed to load leads</p>
+              <p className="text-xs opacity-80">{loadError}</p>
+            </div>
+          </div>
+          <button
+            onClick={fetchLeads}
+            className="btn-secondary shrink-0"
+          >
+            <RefreshCw size={14} />
+            Retry
+          </button>
+        </div>
+      )}
       <div className="card-base !p-0 overflow-hidden">
         <LeadsTable
           leads={leads}
@@ -922,7 +961,6 @@ export default function LeadsManagementScreen({
                         onClick={() => {
                           if (isActive) return;
                           const next = s as LeadStatus;
-                          setViewLead({ ...viewLead, status: next });
                           handleStatusChange(viewLead.id, next);
                         }}
                         className={`whitespace-nowrap px-3 h-9 rounded-full text-xs flex items-center gap-1.5 transition-all active:scale-[0.98] border ${

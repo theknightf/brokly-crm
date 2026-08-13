@@ -33,6 +33,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'message is required' }, { status: 400 });
   }
 
+  // Anti-abuse: the recipient must be a lead the caller is allowed to see.
+  // RLS scopes the lead lookup, so an arbitrary phone cannot be targeted.
+  const targetPhone = to.replace(/[^0-9]/g, '');
+  const { data: accessibleLead } = await supabase
+    .from('leads')
+    .select('id, name, phone')
+    .ilike('phone', `%${targetPhone.slice(-9)}`)
+    .limit(1)
+    .maybeSingle();
+  if (!accessibleLead) {
+    return NextResponse.json(
+      { error: 'Recipient phone is not associated with a lead you can access' },
+      { status: 403 }
+    );
+  }
+
   const gatewayUrl = process.env.SMS_GATEWAY_URL;
   const apiKey = process.env.SMS_GATEWAY_API_KEY || '';
   const from = process.env.SMS_GATEWAY_FROM || 'BROKLY';

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { validateCreateUser } from '@/lib/userValidation';
-import { canManageUsers } from '@/lib/roles';
+import { requireUserManager } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,24 +18,8 @@ const ALLOWED_ROLES = [
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { data: actor } = await supabase
-    .from('user_profiles')
-    .select('id, role')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  const isAdmin = canManageUsers(actor?.role);
-  if (!isAdmin || !actor) {
-    return NextResponse.json({ error: 'Only admins can create users' }, { status: 403 });
-  }
+  const guard = await requireUserManager(supabase);
+  if (!guard.ok) return guard.response;
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== 'object') {
@@ -52,7 +36,21 @@ export async function POST(request: Request) {
   const code = ((body.code as string) || '').trim();
   const role = ALLOWED_ROLES.includes(body.role as string) ? (body.role as string) : 'agent';
 
-  // Unique email check against existing profiles
+  // Only the business owner may create further owners/admins' peers: a
+  // non-owner admin cannot grant the owner role.
+  if (role === 'owner' && guard.actor.role !== 'owner') {
+    return NextResponse.json(
+      { error: 'Only the business owner can create another owner' },
+      { status: 403 }
+    );
+  }
+  if (role === 'admin' && guard.actor.role !== 'owner' && guard.actor.role !== 'admin') {
+    return NextResponse.json(
+      { error: 'Only an owner or admin can create an admin' },
+      { status: 403 }
+    );
+  }
+
   const { data: existing } = await supabase
     .from('user_profiles')
     .select('id')
@@ -63,7 +61,7 @@ export async function POST(request: Request) {
   }
 
   // Assigned admin — defaults to the acting admin when not provided
-  const adminId = ((body.adminId as string) || actor.id) as string;
+  const adminId = ((body.adminId as string) || guard.actor.id) as string;
   const { data: targetAdmin } = await supabase
     .from('user_profiles')
     .select('id, role')

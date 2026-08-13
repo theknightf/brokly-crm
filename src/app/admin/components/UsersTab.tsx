@@ -237,15 +237,40 @@ function DeleteConfirm({
   );
 }
 
-function PasswordResetConfirm({
-  email,
+function ChangePasswordModal({
+  user,
   onConfirm,
   onClose,
 }: {
-  email: string;
-  onConfirm: () => void;
+  user: UserProfile;
+  onConfirm: (password: string) => Promise<void>;
   onClose: () => void;
 }) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleSubmit = async () => {
+    const e: Record<string, string> = {};
+    if (password.length < 8) e.password = 'Password must be at least 8 characters';
+    else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password))
+      e.password = 'Password must include uppercase, lowercase, and a number';
+    if (password !== confirm) e.confirm = 'Passwords do not match';
+    if (Object.keys(e).length > 0) {
+      setErrors(e);
+      return;
+    }
+    setSaving(true);
+    setErrors({});
+    try {
+      await onConfirm(password);
+    } catch (err: any) {
+      setErrors({ form: err?.message || 'Failed to change password' });
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -255,22 +280,67 @@ function PasswordResetConfirm({
             <KeyRound size={18} className="text-primary" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-foreground">Reset Password</h3>
-            <p className="text-sm text-muted-foreground">Send a password reset email</p>
+            <h3 className="text-base font-semibold text-foreground">Change Password</h3>
+            <p className="text-sm text-muted-foreground truncate">
+              {user.fullName || user.email}
+            </p>
           </div>
         </div>
-        <p className="text-sm text-foreground mb-5">
-          A password reset link will be sent to <span className="font-semibold">{email}</span>.
+        <p className="text-xs text-muted-foreground mb-4">
+          Set a new password for this user. They will be logged out of existing sessions and must
+          sign in again with the new password.
         </p>
-        <div className="flex gap-3">
+        {errors.form && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg px-3 py-2 mb-4">
+            {errors.form}
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              New Password *
+            </label>
+            <input
+              type="password"
+              value={password}
+              autoFocus
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setErrors((p) => ({ ...p, password: '' }));
+              }}
+              placeholder="Min 8 chars, upper, lower, number"
+              className="input-base w-full"
+            />
+            {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              Confirm New Password *
+            </label>
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => {
+                setConfirm(e.target.value);
+                setErrors((p) => ({ ...p, confirm: '' }));
+              }}
+              placeholder="Repeat the new password"
+              className="input-base w-full"
+            />
+            {errors.confirm && <p className="text-xs text-destructive mt-1">{errors.confirm}</p>}
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="btn-secondary flex-1">
             Cancel
           </button>
           <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            onClick={handleSubmit}
+            disabled={saving}
+            className="btn-primary flex-1 flex items-center justify-center gap-2"
           >
-            Send Reset Link
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            Save Password
           </button>
         </div>
       </div>
@@ -529,6 +599,11 @@ export default function UsersTab() {
     email: '',
     name: '',
   });
+  const [passwordState, setPasswordState] = useState<{
+    open: boolean;
+    user: UserProfile | null;
+  }>({ open: false, user: null });
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   useEffect(() => {
     loadData();
@@ -554,16 +629,20 @@ export default function UsersTab() {
     const matchSearch =
       !search ||
       u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase());
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.agentCode || '').toLowerCase().includes(search.toLowerCase());
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
-    return matchSearch && matchRole;
+    const matchStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' ? u.isActive : !u.isActive);
+    return matchSearch && matchRole && matchStatus;
   });
 
   const handleEdit = (user: UserProfile) => setModalState({ open: true, user });
   const handleDeletePrompt = (user: UserProfile) =>
     setDeleteState({ open: true, id: user.id, name: user.fullName || user.email });
-  const handleResetPrompt = (user: UserProfile) =>
-    setResetState({ open: true, email: user.email, name: user.fullName || user.email });
+  const handlePasswordPrompt = (user: UserProfile) =>
+    setPasswordState({ open: true, user });
 
   const handleToggleActive = async (user: UserProfile) => {
     const newActive = !user.isActive;
@@ -610,14 +689,10 @@ export default function UsersTab() {
     setDeleteState({ open: false, id: '', name: '' });
   };
 
-  const handlePasswordReset = async () => {
-    try {
-      await usersService.sendPasswordReset(resetState.email);
-      toast.success(`Password reset email sent to ${resetState.email}`);
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to send reset email');
-    }
-    setResetState({ open: false, email: '', name: '' });
+  const handleChangePassword = async (newPassword: string) => {
+    if (!passwordState.user?.id) return;
+    await usersService.changePassword(passwordState.user.id, newPassword, newPassword);
+    toast.success(`Password updated for ${passwordState.user.fullName || passwordState.user.email}`);
   };
 
   const handleCreateUser = async (data: {
@@ -697,6 +772,21 @@ export default function UsersTab() {
                 {r.label}
               </option>
             ))}
+          </select>
+          <ChevronDown
+            size={14}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          />
+        </div>
+        <div className="relative">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="input-base appearance-none pr-8 text-sm"
+          >
+            <option value="all">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
           <ChevronDown
             size={14}
@@ -815,9 +905,9 @@ export default function UsersTab() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => handleResetPrompt(user)}
+                          onClick={() => handlePasswordPrompt(user)}
                           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
-                          title="Reset Password"
+                          title="Change Password"
                         >
                           <KeyRound size={14} />
                         </button>
@@ -859,11 +949,14 @@ export default function UsersTab() {
           onClose={() => setDeleteState({ open: false, id: '', name: '' })}
         />
       )}
-      {resetState.open && (
-        <PasswordResetConfirm
-          email={resetState.email}
-          onConfirm={handlePasswordReset}
-          onClose={() => setResetState({ open: false, email: '', name: '' })}
+      {passwordState.open && passwordState.user && (
+        <ChangePasswordModal
+          user={passwordState.user}
+          onClose={() => setPasswordState({ open: false, user: null })}
+          onConfirm={async (pwd) => {
+            await handleChangePassword(pwd);
+            setPasswordState({ open: false, user: null });
+          }}
         />
       )}
       {createState && (
