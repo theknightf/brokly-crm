@@ -32,6 +32,8 @@ interface CallLog {
   created_at?: string;
 }
 
+import { outcomeClass } from '@/lib/ui';
+
 const CHANNEL_ICON: Record<string, React.ReactNode> = {
   Call: <Phone size={13} />,
   'Video Call': <Video size={13} />,
@@ -39,16 +41,6 @@ const CHANNEL_ICON: Record<string, React.ReactNode> = {
   Email: <Mail size={13} />,
   'Site Visit': <MapPin size={13} />,
   Meeting: <CalendarClock size={13} />,
-};
-
-const OUTCOME_CLS: Record<string, string> = {
-  Interested: 'bg-emerald-50 text-emerald-700',
-  'Call back later': 'bg-blue-50 text-blue-700',
-  Busy: 'bg-amber-50 text-amber-700',
-  'No Answer': 'bg-slate-100 text-slate-600',
-  'Not Interested': 'bg-red-50 text-red-600',
-  'Won Deal': 'bg-emerald-50 text-emerald-700',
-  'Wrong Number': 'bg-slate-100 text-slate-600',
 };
 
 const fmtDur = (s?: number) => {
@@ -140,9 +132,9 @@ export default function CallLogsScreen() {
           .map(([outcome, n]) => (
             <span
               key={outcome}
-              className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 ${
-                OUTCOME_CLS[outcome] || 'bg-muted text-muted-foreground'
-              }`}
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-3 py-1.5 ${outcomeClass(
+                outcome
+              )}`}
             >
               {outcome}: {n}
             </span>
@@ -232,9 +224,7 @@ export default function CallLogsScreen() {
               <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
                 {c.outcome && (
                   <span
-                    className={`font-semibold px-2 py-0.5 rounded-full ${
-                      OUTCOME_CLS[c.outcome] || 'bg-muted text-muted-foreground'
-                    }`}
+                    className={`font-semibold px-2 py-0.5 rounded-full ${outcomeClass(c.outcome)}`}
                   >
                     {c.outcome}
                   </span>

@@ -99,7 +99,7 @@ function StatusDropdown({
               <button
                 key={`status-opt-${leadId}-${s}`}
                 onClick={() => {
-                  onStatusChange(leadId, s);
+                  onStatusChange(leadId, s as LeadStatus);
                   setOpen(false);
                 }}
                 className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}

@@ -45,7 +45,7 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
         id: 'nav-dashboard',
         labelKey: 'common.dashboard',
         icon: <LayoutDashboard size={18} />,
-        href: '/dashboard',
+        href: '/',
       },
     ],
   },
@@ -57,7 +57,6 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
         labelKey: 'common.leads',
         icon: <Users size={18} />,
         href: '/leads-management',
-        badge: 14,
       },
       {
         id: 'nav-customers',
@@ -70,7 +69,6 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
         labelKey: 'common.followups',
         icon: <CalendarClock size={18} />,
         href: '/follow-ups',
-        badge: 5,
       },
       {
         id: 'nav-reservations',
@@ -260,7 +258,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
   const { profile } = useAuth();
 
   const isActive = (href: string) => {
-    if (href === '/dashboard' && pathname === '/') return true;
+    if (href === '/') return pathname === '/';
     return pathname === href || pathname.startsWith(href + '/');
   };
 
@@ -365,7 +363,7 @@ function SidebarContent({
                 {group.items.map((item) => (
                   <li key={item.id}>
                     <Link
-                      href={item.href === '/dashboard' ? '/' : item.href}
+                      href={item.href}
                       className={`nav-item relative group ${
                         isActive(item.href) ? 'nav-item-active' : ''
                       } ${collapsed ? 'justify-center px-2' : ''}`}

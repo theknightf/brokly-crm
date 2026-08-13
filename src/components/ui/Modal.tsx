@@ -12,10 +12,10 @@ interface ModalProps {
 }
 
 const sizeClasses = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-2xl',
+  xl: 'sm:max-w-4xl',
 };
 
 export default function Modal({
@@ -44,26 +44,26 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
       <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-card rounded-2xl shadow-modal fade-in max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${sizeClasses[size]} bg-card sm:rounded-2xl rounded-t-2xl shadow-modal fade-in sm:max-h-[90vh] max-h-[92dvh] flex flex-col slide-up-enter`}
       >
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-border flex-shrink-0">
-          <div>
-            <h2 id="modal-title" className="text-lg font-semibold text-foreground">
+        <div className="flex items-start justify-between p-5 sm:p-6 border-b border-border flex-shrink-0">
+          <div className="min-w-0">
+            <h2 id="modal-title" className="text-base sm:text-lg font-semibold text-foreground">
               {title}
             </h2>
             {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
           </div>
           <button
             onClick={onClose}
-            className="btn-ghost p-1.5 rounded-lg ml-4 flex-shrink-0"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0 ml-3"
             aria-label="Close modal"
           >
             <X size={18} />

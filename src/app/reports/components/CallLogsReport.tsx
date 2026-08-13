@@ -17,20 +17,9 @@ interface CallLog {
   created_at?: string;
 }
 
-type Period = 'day' | 'week' | 'month' | 'range';
+import { outcomeClass } from '@/lib/ui';
 
-const OUTCOME_CLS: Record<string, string> = {
-  Reached: 'bg-emerald-100 text-emerald-700',
-  Interested: 'bg-sky-100 text-sky-700',
-  'Site Visit': 'bg-violet-100 text-violet-700',
-  'Won Deal': 'bg-yellow-100 text-yellow-700',
-  'Not Interested': 'bg-red-100 text-red-700',
-  'Call back later': 'bg-amber-100 text-amber-700',
-  'No Answer': 'bg-muted text-muted-foreground',
-  'Wrong Number': 'bg-rose-100 text-rose-700',
-  Busy: 'bg-muted text-muted-foreground',
-  Other: 'bg-muted text-muted-foreground',
-};
+type Period = 'day' | 'week' | 'month' | 'range';
 
 const fmtDate = (iso?: string) => {
   if (!iso) return '—';
@@ -375,7 +364,7 @@ export default function CallLogsReport() {
               {outcomes.map(([o, c]) => (
                 <span
                   key={o}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${OUTCOME_CLS[o] || 'bg-muted text-muted-foreground'}`}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${outcomeClass(o)}`}
                 >
                   {o} · {c}
                 </span>
@@ -430,7 +419,7 @@ export default function CallLogsReport() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${OUTCOME_CLS[l.outcome || ''] || 'bg-muted text-muted-foreground'}`}
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${outcomeClass(l.outcome || '')}`}
                         >
                           {l.outcome || '—'}
                         </span>

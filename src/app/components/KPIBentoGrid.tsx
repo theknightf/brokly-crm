@@ -1,47 +1,27 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, GripVertical } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowDown, ArrowUp, Check, GripVertical, ArrowUpRight } from 'lucide-react';
 import { leadsService } from '@/lib/services/crmService';
-import { ALL_STATUSES, STATUS_COLORS } from '@/app/leads-management/components/mockLeads';
+import { ALL_STATUSES, colorClassOf, STATUS_ICONS } from '@/lib/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
-
-const STATUS_ICONS: Record<string, string> = {
-  'Fresh Leads': '🌱',
-  'Cold Calls': '📞',
-  'Pending Leads': '⏳',
-  'Following Up': '🔄',
-  Meeting: '🤝',
-  Interested: '⭐',
-  'Not Interested': '❌',
-  Cancellation: '🚫',
-  'Done Deal': '✅',
-  'Duplicate Leads': '📋',
-  'Wrong Number': '📵',
-  'Data Rotation': '🔃',
-  'Closed Number': '🔒',
-  'No Answer': '📴',
-  'No Answer At All': '🔕',
-  'Low Budget': '💰',
-  'Reschedule Meeting': '📅',
-};
 
 interface StatusCardProps {
   status: string;
   count: number;
   total: number;
   colorClass: string;
+  interactive: boolean;
 }
 
-function StatusCard({ status, count, total, colorClass }: StatusCardProps) {
+function StatusCard({ status, count, total, colorClass, interactive }: StatusCardProps) {
   const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
   const [bg, text] = colorClass.split(' ');
   const icon = STATUS_ICONS[status] || '📊';
 
-  return (
-    <div
-      className={`rounded-2xl border border-border bg-card p-4 flex flex-col gap-2 hover:shadow-md transition-shadow`}
-    >
+  const inner = (
+    <>
       <div className="flex items-start justify-between">
         <div
           className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${bg} bg-opacity-60`}
@@ -52,11 +32,36 @@ function StatusCard({ status, count, total, colorClass }: StatusCardProps) {
           {pct}%
         </span>
       </div>
-      <div>
-        <p className="text-2xl font-bold text-foreground tabular-nums">{count.toLocaleString()}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{status}</p>
+      <div className="flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-2xl font-bold text-foreground tabular-nums leading-none">
+            {count.toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 leading-tight">{status}</p>
+        </div>
+        <ArrowUpRight
+          size={14}
+          className="text-muted-foreground/30 group-hover:text-primary transition-colors flex-shrink-0"
+        />
       </div>
-    </div>
+    </>
+  );
+
+  if (!interactive) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-4 flex flex-col gap-2">
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/leads-management?status=${encodeURIComponent(status)}`}
+      className={`rounded-2xl border border-border bg-card p-4 flex flex-col gap-2 block transition-all hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 active:scale-[0.98]`}
+    >
+      {inner}
+    </Link>
   );
 }
 
@@ -181,7 +186,10 @@ export default function KPIBentoGrid() {
       </div>
 
       {/* Total leads hero card */}
-      <div className="rounded-2xl border border-border bg-card px-6 py-4 flex items-center justify-between">
+      <Link
+        href="/leads-management"
+        className="rounded-2xl border border-border bg-card px-6 py-4 flex items-center justify-between transition-all hover:shadow-md hover:border-primary/30 active:scale-[0.99]"
+      >
         <div>
           <p className="text-sm text-muted-foreground font-medium">Total Leads</p>
           <p className="text-4xl font-bold text-foreground tabular-nums mt-0.5">
@@ -194,13 +202,12 @@ export default function KPIBentoGrid() {
             {ALL_STATUSES.length} categories tracked
           </p>
         </div>
-      </div>
+      </Link>
 
       {/* Status cards grid (admin-reorderable) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
         {order.map((status) => {
-          const colorClass =
-            (STATUS_COLORS as Record<string, string>)[status] || 'bg-muted text-muted-foreground';
+          const colorClass = colorClassOf(status);
           const pos = order.indexOf(status);
           return (
             <div
@@ -256,6 +263,7 @@ export default function KPIBentoGrid() {
                   count={counts[status] || 0}
                   total={total}
                   colorClass={colorClass}
+                  interactive={!edit}
                 />
               </div>
             </div>

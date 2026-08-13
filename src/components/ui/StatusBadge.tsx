@@ -1,5 +1,5 @@
 import React from 'react';
-import { STATUS_COLORS } from '@/app/leads-management/components/mockLeads';
+import { colorClassOf } from '@/lib/ui';
 
 export type LeadStatus = string;
 
@@ -10,8 +10,7 @@ interface StatusBadgeProps {
 }
 
 export default function StatusBadge({ status, onClick, showDot = true }: StatusBadgeProps) {
-  const colorClass =
-    (STATUS_COLORS as Record<string, string>)[status] || 'bg-muted text-muted-foreground';
+  const colorClass = colorClassOf(status);
   const [bg, text] = colorClass.split(' ');
   const dotColor = text?.replace('text-', 'bg-') || 'bg-muted-foreground';
 

@@ -245,6 +245,13 @@ export default function LeadsManagementScreen({
     const params = new URLSearchParams(window.location.search);
     const leadId = params.get('lead');
     const openNew = params.get('new') === '1';
+    const statusParam = params.get('status');
+    if (statusParam && ALL_STATUSES.includes(statusParam as LeadStatus)) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('status');
+      window.history.replaceState({}, '', url.toString());
+      setFilters((f) => ({ ...f, status: statusParam as LeadStatus }));
+    }
     if (openNew) {
       const url = new URL(window.location.href);
       url.searchParams.delete('new');
@@ -844,13 +851,13 @@ export default function LeadsManagementScreen({
 
       {/* View Lead Modal */}
       {viewLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div
             className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
             onClick={() => setViewLead(null)}
           />
-          <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-lg fade-in max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
+          <div className="relative flex flex-col bg-card border border-border sm:rounded-2xl rounded-t-2xl shadow-modal w-full sm:max-w-lg fade-in sm:max-h-[90vh] max-h-[92dvh] slide-up-enter overflow-hidden">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border flex-shrink-0 bg-card z-10">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
                   {viewLead.name
@@ -892,40 +899,18 @@ export default function LeadsManagementScreen({
                   </div>
                 </div>
               </div>
-              <button onClick={() => setViewLead(null)} className="btn-ghost p-1.5 rounded-lg">
+              <button
+                onClick={() => setViewLead(null)}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0"
+              >
                 ✕
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
-              {/* Key info — most important fields, visible without scrolling */}
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: 'Phone', value: viewLead.phone || '—', href: viewLead.phone ? `tel:${viewLead.phone.replace(/[^\d+]/g, '')}` : undefined },
-                  { label: 'Email', value: viewLead.email || '—' },
-                  { label: 'Source', value: viewLead.source || '—' },
-                  { label: 'Project', value: viewLead.project || viewLead.developer || '—' },
-                  { label: 'Property', value: viewLead.propertyType || '—' },
-                  { label: 'Budget', value: formatDisplayBudget(viewLead) },
-                  { label: 'Agent', value: viewLead.agent || 'Unassigned' },
-                  { label: 'Assigned To', value: viewLead.assignedToName || 'Unassigned' },
-                ].map(({ label, value, href }) => (
-                  <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
-                    <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>
-                    {href ? (
-                      <a href={href} className="text-sm font-semibold text-primary truncate block">
-                        {value}
-                      </a>
-                    ) : (
-                      <p className="text-sm font-medium text-foreground truncate">{value}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Status quick actions — horizontal scroll pills */}
+            <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-4">
+              {/* Stage (pipeline status) — first thing a Sales user changes */}
               <div className="bg-muted/40 rounded-xl px-3 py-2.5">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-muted-foreground font-medium">Lead status</p>
+                  <p className="text-xs text-muted-foreground font-medium">Stage</p>
                   <StatusBadge status={viewLead.status || 'Fresh Leads'} showDot />
                 </div>
                 <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
@@ -952,6 +937,78 @@ export default function LeadsManagementScreen({
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Primary actions — one-tap reach at the top */}
+              <div className="grid grid-cols-2 gap-2">
+                {viewLead.phone && (
+                  <>
+                    <a
+                      href={`tel:${viewLead.phone.replace(/[^0-9+,]/g, '')}`}
+                      className="h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <PhoneCall size={15} />
+                      Call
+                    </a>
+                    <a
+                      href={`https://wa.me/${viewLead.phone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <MessageCircle size={16} />
+                      WhatsApp
+                    </a>
+                  </>
+                )}
+                <button
+                  onClick={() => setLogCallLead(viewLead)}
+                  className="h-11 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                >
+                  <PhoneCall size={15} />
+                  Log Call
+                </button>
+                <button
+                  onClick={() => {
+                    setEditLead(viewLead);
+                    setViewLead(null);
+                  }}
+                  className="h-11 rounded-xl bg-secondary text-secondary-foreground flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                >
+                  <Pencil size={15} />
+                  Edit
+                </button>
+              </div>
+
+              {/* Key info — most important fields, visible without scrolling */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  {
+                    label: 'Phone',
+                    value: viewLead.phone || '—',
+                    href: viewLead.phone
+                      ? `tel:${viewLead.phone.replace(/[^\d+]/g, '')}`
+                      : undefined,
+                  },
+                  { label: 'Email', value: viewLead.email || '—' },
+                  { label: 'Source', value: viewLead.source || '—' },
+                  { label: 'Project', value: viewLead.project || viewLead.developer || '—' },
+                  { label: 'Property', value: viewLead.propertyType || '—' },
+                  { label: 'Budget', value: formatDisplayBudget(viewLead) },
+                  { label: 'Agent', value: viewLead.agent || 'Unassigned' },
+                  { label: 'Assigned To', value: viewLead.assignedToName || 'Unassigned' },
+                ].map(({ label, value, href }) => (
+                  <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
+                    <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>
+                    {href ? (
+                      <a href={href} className="text-sm font-semibold text-primary truncate block">
+                        {value}
+                      </a>
+                    ) : (
+                      <p className="text-sm font-medium text-foreground truncate">{value}</p>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {/* Schedule follow-up */}
@@ -1160,7 +1217,7 @@ export default function LeadsManagementScreen({
               <LeadTimeline leadId={viewLead.id} />
               <LeadCommentsSection leadId={viewLead.id} />
             </div>
-            <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-2">
+            <div className="px-5 sm:px-6 py-4 border-t border-border flex items-center justify-between gap-2 flex-shrink-0">
               <button
                 onClick={() => fetchAndOpenSiteVisit(viewLead)}
                 className="btn-secondary flex items-center gap-1.5 text-sm"

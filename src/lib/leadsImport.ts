@@ -185,7 +185,7 @@ export function normalizeStatus(raw: string): LeadStatus | '' {
   const s = String(raw ?? '').trim();
   if (!s) return '';
   const exact = ALL_STATUSES.find((v) => v.toLowerCase() === s.toLowerCase());
-  if (exact) return exact;
+  if (exact) return exact as LeadStatus;
   const legacy: Record<string, LeadStatus> = {
     new: 'Fresh Leads',
     contacted: 'Cold Calls',

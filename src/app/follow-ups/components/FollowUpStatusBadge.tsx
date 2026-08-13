@@ -1,13 +1,6 @@
 import React from 'react';
 import { FollowUpStatus, FollowUpPriority } from './mockFollowUps';
-
-const statusConfig: Record<FollowUpStatus, { bg: string; text: string; dot: string }> = {
-  Pending: { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-500' },
-  'In Progress': { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-500' },
-  Completed: { bg: 'bg-emerald-50', text: 'text-emerald-600', dot: 'bg-emerald-500' },
-  Overdue: { bg: 'bg-red-50', text: 'text-red-600', dot: 'bg-red-500' },
-  Cancelled: { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400' },
-};
+import { followUpStatusClass } from '@/lib/ui';
 
 const priorityConfig: Record<FollowUpPriority, { bg: string; text: string }> = {
   High: { bg: 'bg-red-50', text: 'text-red-600' },
@@ -20,12 +13,13 @@ interface FollowUpStatusBadgeProps {
 }
 
 export function FollowUpStatusBadge({ status }: FollowUpStatusBadgeProps) {
-  const cfg = statusConfig[status];
+  const [bg, text] = followUpStatusClass(status).split(' ');
+  const dot = text.replace('text-', 'bg-') || 'bg-muted-foreground';
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.text}`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${bg} ${text}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} flex-shrink-0`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${dot} flex-shrink-0`} />
       {status}
     </span>
   );

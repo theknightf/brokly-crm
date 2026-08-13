@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import EmptyState from '@/components/ui/EmptyState';
 import { exportCSV } from '@/lib/exportReport';
+import { roleLabelOf } from '@/lib/ui';
 
 interface Employee {
   id: string;
@@ -112,16 +113,6 @@ function fmtTime(iso?: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: 'Admin',
-  owner: 'Owner',
-  branch_manager: 'Branch Manager',
-  senior_agent: 'Senior Agent',
-  agent: 'Agent',
-  broker: 'Broker',
-  telecaller: 'Telecaller',
-};
 
 function StatCard({
   icon,
@@ -242,7 +233,7 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {data
-                ? `${ROLE_LABEL[data.employee.role] || data.employee.role} · ${from} → ${to}`
+                ? `${roleLabelOf(data.employee.role)} · ${from} → ${to}`
                 : 'Loading…'}
             </p>
           </div>

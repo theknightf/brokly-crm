@@ -126,7 +126,19 @@ export default function FollowUpsManagementScreen() {
   const [scheduleFromProfile, setScheduleFromProfile] = useState<CustomerProfile | null>(null);
 
   useEffect(() => {
+    try {
+      const tab = new URLSearchParams(window.location.search).get('tab');
+      if (tab && ['all', 'overdue', 'today', 'upcoming', 'completed', 'profiles'].includes(tab)) {
+        setActiveTab(tab as typeof activeTab);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('tab');
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch {
+      // ignore
+    }
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadData = async () => {

@@ -15,20 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminSettingsService } from '@/lib/services/crmService';
-
-const ROLE_BADGES: Record<string, { label: string; color: string }> = {
-  owner: { label: 'Owner', color: 'bg-purple-100 text-purple-700' },
-  admin: { label: 'Admin', color: 'bg-blue-100 text-blue-700' },
-  broker: { label: 'Broker', color: 'bg-indigo-100 text-indigo-700' },
-  branch_manager: { label: 'Branch Manager', color: 'bg-cyan-100 text-cyan-700' },
-  senior_agent: { label: 'Senior Agent', color: 'bg-emerald-100 text-emerald-700' },
-  agent: { label: 'Sales', color: 'bg-amber-100 text-amber-700' },
-  telecaller: { label: 'Telecaller', color: 'bg-rose-100 text-rose-700' },
-};
-
-function roleBadge(role: string) {
-  return ROLE_BADGES[role] ?? { label: role, color: 'bg-muted text-muted-foreground' };
-}
+import { roleBadgeOf } from '@/lib/ui';
 
 interface AttendanceUser {
   id: string;
@@ -410,7 +397,7 @@ export default function AttendanceTab() {
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map((user) => {
-                const badge = roleBadge(user.role);
+                const badge = roleBadgeOf(user.role);
                 const rec = records[user.id];
                 const checkIn = formatTime(rec?.check_in_time ?? null);
                 const checkOut = formatTime(rec?.check_out_time ?? null);

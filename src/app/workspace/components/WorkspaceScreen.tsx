@@ -6,6 +6,7 @@ import { followUpsService } from '@/lib/services/crmService';
 import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { followUpStatusClass } from '@/lib/ui';
 
 type DateFilter = 'any' | 'late' | 'today' | 'tomorrow' | 'custom';
 type StatusFilter = 'any' | 'notCompleted' | 'completed';
@@ -235,13 +236,7 @@ export default function WorkspaceScreen() {
     );
   };
 
-  const statusColor = (status: string) => {
-    if (status === 'Completed') return 'bg-emerald-100 text-emerald-700';
-    if (status === 'Overdue') return 'bg-red-100 text-red-600';
-    if (status === 'In Progress') return 'bg-blue-100 text-blue-700';
-    if (status === 'Cancelled') return 'bg-muted text-muted-foreground';
-    return 'bg-amber-100 text-amber-700';
-  };
+  const statusColor = (status: string) => followUpStatusClass(status);
 
   return (
     <div className="flex flex-col gap-4">
