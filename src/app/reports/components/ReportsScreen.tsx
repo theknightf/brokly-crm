@@ -23,14 +23,14 @@ import {
 } from 'recharts';
 
 const COLORS = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#06b6d4',
-  '#f97316',
   '#84cc16',
+  '#65a30d',
+  '#a3e635',
+  '#22c55e',
+  '#4d7c0f',
+  '#365314',
+  '#16a34a',
+  '#d9f99d',
 ];
 
 function formatCurrency(value: number) {
@@ -506,7 +506,7 @@ export default function ReportsScreen() {
                   <Line
                     type="monotone"
                     dataKey="won"
-                    stroke="#10b981"
+                    stroke="#4d7c0f"
                     strokeWidth={2}
                     dot={{ r: 4 }}
                     name="Won"

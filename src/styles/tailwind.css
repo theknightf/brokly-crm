@@ -3,47 +3,48 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --primary: #1d4ed8;
+  --background: #ffffff;
+  --foreground: #18181b;
+  --primary: #65a30d;
   --primary-foreground: #ffffff;
-  --secondary: #eff6ff;
-  --secondary-foreground: #1e40af;
-  --accent: #f59e0b;
-  --accent-foreground: #ffffff;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --secondary: #f2f7e8;
+  --secondary-foreground: #3f6212;
+  --accent: #a3e635;
+  --accent-foreground: #1a2e05;
+  --muted: #f4f6f3;
+  --muted-foreground: #6b7280;
   --card: #ffffff;
-  --card-foreground: #0f172a;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #1d4ed8;
-  --radius: 10px;
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --card-foreground: #18181b;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #84cc16;
+  --radius: 12px;
+  --font-sans: var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif;
+  --font-display: var(--font-fraunces), Fraunces, serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
 
-  --status-new: #3b82f6;
-  --status-new-bg: #eff6ff;
-  --status-contacted: #8b5cf6;
-  --status-contacted-bg: #f5f3ff;
-  --status-qualified: #06b6d4;
-  --status-qualified-bg: #ecfeff;
-  --status-visit-scheduled: #f59e0b;
-  --status-visit-scheduled-bg: #fffbeb;
-  --status-visited: #f97316;
-  --status-visited-bg: #fff7ed;
-  --status-negotiation: #ec4899;
-  --status-negotiation-bg: #fdf2f8;
-  --status-won: #10b981;
-  --status-won-bg: #ecfdf5;
-  --status-lost: #ef4444;
-  --status-lost-bg: #fef2f2;
+  --status-new: #84cc16;
+  --status-new-bg: #f0fcd8;
+  --status-contacted: #65a30d;
+  --status-contacted-bg: #ecf5df;
+  --status-qualified: #22c55e;
+  --status-qualified-bg: #e8f9ee;
+  --status-visit-scheduled: #84cc16;
+  --status-visit-scheduled-bg: #f0fcd8;
+  --status-visited: #4d7c0f;
+  --status-visited-bg: #ecf5df;
+  --status-negotiation: #65a30d;
+  --status-negotiation-bg: #f0fcd8;
+  --status-won: #4d7c0f;
+  --status-won-bg: #d9f99d;
+  --status-lost: #52525b;
+  --status-lost-bg: #f4f4f5;
 
-  --source-portal: #6366f1;
-  --source-referral: #10b981;
-  --source-walkin: #f59e0b;
-  --source-social: #ec4899;
-  --source-cold: #64748b;
+  --source-portal: #65a30d;
+  --source-referral: #22c55e;
+  --source-walkin: #84cc16;
+  --source-social: #a3e635;
+  --source-cold: #6b7280;
 }
 
 @layer base {
@@ -80,8 +81,9 @@
     font-variant-numeric: tabular-nums;
   }
   .text-hero-metric {
+    font-family: var(--font-display);
     font-size: clamp(1.75rem, 2.5vw, 2.25rem);
-    font-weight: 700;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
   }
@@ -96,7 +98,7 @@
       max-height 300ms ease;
   }
   .blob-primary {
-    background: radial-gradient(ellipse at center, #1d4ed8 0%, #1e40af 100%);
+    background: radial-gradient(ellipse at center, #65a30d 0%, #3f6212 100%);
     filter: blur(60px);
   }
   .card-hover {
@@ -148,7 +150,7 @@
     }
   }
   .shimmer {
-    background: linear-gradient(90deg, var(--muted) 25%, #e8edf2 50%, var(--muted) 75%);
+    background: linear-gradient(90deg, var(--muted) 25%, #e7e7e2 50%, var(--muted) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
   }
@@ -164,16 +166,16 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-secondary {
-    @apply bg-secondary text-secondary-foreground border border-border px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+    @apply bg-card text-foreground border border-border px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
   }
   .btn-ghost {
     @apply bg-transparent text-muted-foreground px-3 py-2 rounded-lg text-sm btn-press hover:bg-muted hover:text-foreground focus:outline-none;
   }
   .btn-danger {
-    @apply bg-red-500 text-white px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2;
+    @apply bg-clay text-white px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-clay-dark focus:outline-none focus:ring-2 focus:ring-clay focus:ring-offset-2;
   }
   .input-base {
     @apply w-full border border-input bg-card text-foreground rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition-colors;
@@ -188,10 +190,10 @@
     @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold badge-transition cursor-pointer select-none;
   }
   .section-header {
-    @apply text-lg font-semibold text-foreground;
+    @apply text-lg font-semibold text-foreground font-display;
   }
   .page-title {
-    @apply text-2xl font-semibold text-foreground;
+    @apply text-2xl font-semibold text-foreground font-display;
   }
   .metric-label {
     @apply text-xs font-medium text-muted-foreground tracking-wide uppercase;
@@ -200,7 +202,7 @@
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground;
   }
   .nav-item-active {
-    @apply bg-secondary text-primary font-semibold;
+    @apply bg-foreground text-background font-semibold shadow-sm;
   }
   .table-th {
     @apply px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap;

@@ -14,16 +14,16 @@ interface LeadTimelineProps {
 }
 
 const ACTION_COLORS: Record<string, string> = {
-  'Lead Added': 'bg-emerald-100 text-emerald-700',
-  'Lead Updated': 'bg-sky-100 text-sky-700',
-  'Lead Assigned': 'bg-violet-100 text-violet-700',
-  'Lead Reserved': 'bg-amber-100 text-amber-700',
-  'Done Deal': 'bg-emerald-100 text-emerald-700',
-  'Lead Deleted': 'bg-red-100 text-red-700',
+  'Lead Added': 'bg-sage-soft text-sage',
+  'Lead Updated': 'bg-dusk-soft text-dusk',
+  'Lead Assigned': 'bg-teal-soft text-teal',
+  'Lead Reserved': 'bg-gold-soft text-gold',
+  'Done Deal': 'bg-sage-soft text-sage',
+  'Lead Deleted': 'bg-clay-soft text-clay',
   'Recommended Unit Added': 'bg-primary/10 text-primary',
   'Recommended Unit Removed': 'bg-muted text-muted-foreground',
-  'Site Visit Scheduled': 'bg-blue-100 text-blue-700',
-  'Site Visit Completed': 'bg-teal-100 text-teal-700',
+  'Site Visit Scheduled': 'bg-dusk-soft text-dusk',
+  'Site Visit Completed': 'bg-teal-soft text-teal',
 };
 
 function colorFor(action: string): string {

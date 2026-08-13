@@ -26,24 +26,24 @@ export const ALL_STATUSES: string[] = [
 
 /** Pipeline status brand colors. Keys match lead.status values in DB. */
 export const STATUS_COLORS: Record<string, string> = {
-  'Fresh Leads': 'bg-blue-100 text-blue-700',
-  'Cold Calls': 'bg-cyan-100 text-cyan-700',
-  'Pending Leads': 'bg-yellow-100 text-yellow-700',
-  'Following Up': 'bg-indigo-100 text-indigo-700',
-  Meeting: 'bg-purple-100 text-purple-700',
-  Interested: 'bg-emerald-100 text-emerald-700',
-  'Not Interested': 'bg-red-100 text-red-700',
-  Cancellation: 'bg-orange-100 text-orange-700',
-  'Done Deal': 'bg-green-100 text-green-700',
-  'Duplicate Leads': 'bg-gray-100 text-gray-600',
-  'Wrong Number': 'bg-rose-100 text-rose-700',
-  'Data Rotation': 'bg-teal-100 text-teal-700',
-  'Closed Number': 'bg-slate-100 text-slate-600',
-  'No Answer': 'bg-amber-100 text-amber-700',
-  'No Answer At All': 'bg-amber-100 text-amber-800',
-  'Low Budget': 'bg-pink-100 text-pink-700',
-  'Reschedule Meeting': 'bg-violet-100 text-violet-700',
-  Reservation: 'bg-amber-100 text-amber-700',
+  'Fresh Leads': 'bg-gold-soft text-gold',
+  'Cold Calls': 'bg-dusk-soft text-dusk',
+  'Pending Leads': 'bg-muted text-muted-foreground',
+  'Following Up': 'bg-teal-soft text-teal',
+  Meeting: 'bg-dusk-soft text-dusk',
+  Interested: 'bg-teal-soft text-teal',
+  'Not Interested': 'bg-clay-soft text-clay',
+  Cancellation: 'bg-clay-soft text-clay',
+  'Done Deal': 'bg-sage-soft text-sage',
+  'Duplicate Leads': 'bg-muted text-muted-foreground',
+  'Wrong Number': 'bg-clay-soft text-clay',
+  'Data Rotation': 'bg-dusk-soft text-dusk',
+  'Closed Number': 'bg-muted text-muted-foreground',
+  'No Answer': 'bg-gold-soft text-gold',
+  'No Answer At All': 'bg-gold-soft text-gold-dark',
+  'Low Budget': 'bg-muted text-muted-foreground',
+  'Reschedule Meeting': 'bg-gold-soft text-gold',
+  Reservation: 'bg-gold-soft text-gold-dark',
   'All Leads': 'bg-muted text-muted-foreground',
 };
 
@@ -70,20 +70,20 @@ export const STATUS_ICONS: Record<string, string> = {
 
 /** Call/WhatsApp outcome badge colors shared by call logs, reports & the admin tab. */
 export const OUTCOME_CLS: Record<string, string> = {
-  Reached: 'bg-emerald-100 text-emerald-700',
-  Interested: 'bg-sky-100 text-sky-700',
-  'Site Visit': 'bg-violet-100 text-violet-700',
-  'Won Deal': 'bg-yellow-100 text-yellow-700',
-  'Not Interested': 'bg-red-100 text-red-700',
-  'Call back later': 'bg-amber-100 text-amber-700',
+  Reached: 'bg-teal-soft text-teal',
+  Interested: 'bg-teal-soft text-teal',
+  'Site Visit': 'bg-dusk-soft text-dusk',
+  'Won Deal': 'bg-sage-soft text-sage',
+  'Not Interested': 'bg-clay-soft text-clay',
+  'Call back later': 'bg-gold-soft text-gold',
   'No Answer': 'bg-muted text-muted-foreground',
-  'Wrong Number': 'bg-rose-100 text-rose-700',
-  Busy: 'bg-amber-100 text-amber-700',
+  'Wrong Number': 'bg-clay-soft text-clay',
+  Busy: 'bg-gold-soft text-gold',
   Other: 'bg-muted text-muted-foreground',
-  'WhatsApp Sent': 'bg-emerald-100 text-emerald-700',
-  'Customer Replied': 'bg-sky-100 text-sky-700',
+  'WhatsApp Sent': 'bg-teal-soft text-teal',
+  'Customer Replied': 'bg-teal-soft text-teal',
   'No Reply': 'bg-muted text-muted-foreground',
-  'WhatsApp Follow-up': 'bg-amber-100 text-amber-700',
+  'WhatsApp Follow-up': 'bg-gold-soft text-gold',
 };
 
 export function outcomeClass(outcome: string): string {
@@ -96,14 +96,14 @@ export function colorClassOf(status: string): string {
 
 /** Role → human label + badge color used across attendance/users tables. */
 export const ROLE_BADGES: Record<string, { label: string; color: string }> = {
-  owner: { label: 'Owner', color: 'bg-purple-100 text-purple-700' },
-  admin: { label: 'Admin', color: 'bg-blue-100 text-blue-700' },
-  broker: { label: 'Broker', color: 'bg-indigo-100 text-indigo-700' },
-  branch_manager: { label: 'Branch Manager', color: 'bg-cyan-100 text-cyan-700' },
-  senior_agent: { label: 'Senior Agent', color: 'bg-emerald-100 text-emerald-700' },
-  agent: { label: 'Sales', color: 'bg-amber-100 text-amber-700' },
-  telecaller: { label: 'Telecaller', color: 'bg-rose-100 text-rose-700' },
-  'Team Lead': { label: 'Team Lead', color: 'bg-teal-100 text-teal-700' },
+  owner: { label: 'Owner', color: 'bg-dusk-soft text-dusk' },
+  admin: { label: 'Admin', color: 'bg-teal-soft text-teal' },
+  broker: { label: 'Broker', color: 'bg-sage-soft text-sage' },
+  branch_manager: { label: 'Branch Manager', color: 'bg-dusk-soft text-dusk' },
+  senior_agent: { label: 'Senior Agent', color: 'bg-sage-soft text-sage' },
+  agent: { label: 'Sales', color: 'bg-gold-soft text-gold' },
+  telecaller: { label: 'Telecaller', color: 'bg-clay-soft text-clay' },
+  'Team Lead': { label: 'Team Lead', color: 'bg-teal-soft text-teal' },
 };
 
 export function roleBadgeOf(role?: string | null): { label: string; color: string } {
@@ -117,10 +117,10 @@ export function roleLabelOf(role?: string | null): string {
 
 /** Follow-up lifecycle status colors (Follow-ups + Workspace tab badges). */
 export const FOLLOW_UP_STATUS_CLS: Record<string, string> = {
-  Completed: 'bg-emerald-100 text-emerald-700',
-  Pending: 'bg-amber-100 text-amber-700',
-  Overdue: 'bg-red-100 text-red-600',
-  'In Progress': 'bg-blue-100 text-blue-700',
+  Completed: 'bg-sage-soft text-sage',
+  Pending: 'bg-gold-soft text-gold',
+  Overdue: 'bg-clay-soft text-clay',
+  'In Progress': 'bg-dusk-soft text-dusk',
   Cancelled: 'bg-muted text-muted-foreground',
 };
 

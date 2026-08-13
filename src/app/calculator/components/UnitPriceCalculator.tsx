@@ -760,7 +760,7 @@ export default function UnitPriceCalculator() {
             downMode === 'percent' && result.valid ? `· ${downValue || 0}%` : undefined
           )}
           {gridCard(
-            'bg-teal-500',
+            'bg-teal',
             t('calculator.handover'),
             result.valid ? fmt(result.handover) : '—',
             handoverMode === 'percent' && result.valid ? `· ${handoverValue || 0}%` : undefined

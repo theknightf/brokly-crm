@@ -13,14 +13,14 @@ import {
 import { reportsService } from '@/lib/services/crmService';
 
 const stageColors: Record<string, string> = {
-  New: '#6366f1',
-  Contacted: '#8b5cf6',
-  Qualified: '#3b82f6',
-  'Site Visit Scheduled': '#06b6d4',
-  'Site Visited': '#f59e0b',
-  Negotiation: '#f97316',
-  Won: '#10b981',
-  Lost: '#ef4444',
+  New: '#84cc16',
+  Contacted: '#65a30d',
+  Qualified: '#a3e635',
+  'Site Visit Scheduled': '#4d7c0f',
+  'Site Visited': '#22c55e',
+  Negotiation: '#365314',
+  Won: '#4d7c0f',
+  Lost: '#9ca3af',
 };
 
 interface TooltipPayloadItem {

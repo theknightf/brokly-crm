@@ -16,6 +16,13 @@ module.exports = {
         border: { DEFAULT: 'var(--border)' },
         input: { DEFAULT: 'var(--input)' },
         ring: { DEFAULT: 'var(--ring)' },
+        // Lime & white brand palette
+        teal: { soft: '#ecf5df', DEFAULT: '#65a30d', ink: '#3f6212' },
+        gold: { soft: '#f0fcd8', DEFAULT: '#84cc16', dark: '#4d7c0f' },
+        sage: { soft: '#d9f99d', DEFAULT: '#4d7c0f', dark: '#365314' },
+        clay: { soft: '#f4f4f5', DEFAULT: '#52525b', dark: '#27272a' },
+        dusk: { soft: '#e8f9ee', DEFAULT: '#22c55e', dark: '#15803d' },
+        stone: { soft: '#f6f6f7', DEFAULT: '#e5e7eb' },
       },
       borderRadius: {
         DEFAULT: 'var(--radius)',
@@ -27,6 +34,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'sans-serif'],
+        display: ['var(--font-display)', 'Fraunces', 'serif'],
         mono: ['var(--font-mono)', 'monospace'],
       },
       boxShadow: {

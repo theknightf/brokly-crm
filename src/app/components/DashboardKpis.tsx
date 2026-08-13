@@ -117,82 +117,82 @@ export default function DashboardKpis() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
       <KpiCard
-        icon={<Users size={16} className="text-blue-600" />}
-        iconBg="bg-blue-50"
+        icon={<Users size={16} className="text-teal" />}
+        iconBg="bg-teal-soft"
         label="Total leads"
         value={stats.total.toLocaleString()}
         href="/leads-management"
       />
       <KpiCard
-        icon={<Flame size={16} className="text-orange-600" />}
-        iconBg="bg-orange-50"
+        icon={<Flame size={16} className="text-clay" />}
+        iconBg="bg-clay-soft"
         label="Hot leads"
         value={stats.hot.toLocaleString()}
         sub="rating = Hot"
         href="/leads-management"
       />
       <KpiCard
-        icon={<UserPlus size={16} className="text-violet-600" />}
-        iconBg="bg-violet-50"
+        icon={<UserPlus size={16} className="text-gold-dark" />}
+        iconBg="bg-gold-soft"
         label="New leads (30d)"
         value={stats.new30d.toLocaleString()}
         href="/leads-management"
       />
       <KpiCard
-        icon={<AlertCircle size={16} className="text-sky-600" />}
-        iconBg="bg-sky-50"
+        icon={<AlertCircle size={16} className="text-dusk" />}
+        iconBg="bg-dusk-soft"
         label="Unassigned"
         value={stats.unassigned.toLocaleString()}
         sub={`of ${stats.total.toLocaleString()} total`}
         href="/leads-management"
       />
       <KpiCard
-        icon={<BadgeCheck size={16} className="text-amber-600" />}
-        iconBg="bg-amber-50"
+        icon={<BadgeCheck size={16} className="text-gold-dark" />}
+        iconBg="bg-gold-soft"
         label="Reservations"
         value={stats.reservations.toLocaleString()}
         href="/leads-management?status=Reservation"
       />
       <KpiCard
-        icon={<Handshake size={16} className="text-emerald-600" />}
-        iconBg="bg-emerald-50"
+        icon={<Handshake size={16} className="text-sage" />}
+        iconBg="bg-sage-soft"
         label="Done deals"
         value={stats.doneDeals.toLocaleString()}
         sub={`${stats.conversionPct}% conversion`}
         href="/deals"
       />
       <KpiCard
-        icon={<Wallet size={16} className="text-teal-600" />}
-        iconBg="bg-teal-50"
+        icon={<Wallet size={16} className="text-teal-ink" />}
+        iconBg="bg-teal-soft"
         label="Revenue"
         value={`EGP ${stats.revenue.toLocaleString()}`}
         href="/reports"
       />
       <KpiCard
-        icon={<Clock size={16} className="text-red-500" />}
-        iconBg="bg-red-50"
+        icon={<Clock size={16} className="text-clay" />}
+        iconBg="bg-clay-soft"
         label="Overdue follow-ups"
         value={fuCounts.overdue.toLocaleString()}
         href="/follow-ups?tab=overdue"
       />
       <KpiCard
-        icon={<AlertCircle size={16} className="text-orange-600" />}
-        iconBg="bg-orange-50"
+        icon={<AlertCircle size={16} className="text-gold-dark" />}
+        iconBg="bg-gold-soft"
         label="Follow-ups due today"
         value={fuCounts.dueToday.toLocaleString()}
         href="/follow-ups?tab=today"
       />
       <KpiCard
-        icon={<MapPin size={16} className="text-sky-600" />}
-        iconBg="bg-sky-50"
+        icon={<MapPin size={16} className="text-dusk" />}
+        iconBg="bg-dusk-soft"
         label="Site visits"
         value={visits.scheduled.toLocaleString()}
         sub={`${visits.completed.toLocaleString()} completed`}
         href="/locations"
       />
       <KpiCard
-        icon={<TrendingUp size={16} className="text-indigo-600" />}
-        iconBg="bg-indigo-50"
+        icon={<TrendingUp size={16} className="text-sage" />}
+        iconBg="bg-sage-soft"
         label="Conversion rate"
         value={`${stats.conversionPct}%`}
         sub="Deals ÷ total leads"
