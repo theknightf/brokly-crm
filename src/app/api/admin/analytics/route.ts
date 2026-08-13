@@ -11,10 +11,10 @@ async function requireAdmin(db: Awaited<ReturnType<typeof createClient>>) {
   if (!user) return null;
   const { data: actor } = await db
     .from('user_profiles')
-    .select('id, role')
+    .select('id, role, is_active')
     .eq('id', user.id)
     .maybeSingle();
-  if (!actor || !isAdminRole(actor.role)) return null;
+  if (!actor || actor.is_active === false || !isAdminRole(actor.role)) return null;
   return actor;
 }
 

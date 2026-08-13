@@ -82,8 +82,9 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS trg_prevent_privilege_escalation ON public.user_profiles;
+DROP TRIGGER IF EXISTS prevent_privilege_escalation ON public.user_profiles;
 CREATE TRIGGER trg_prevent_privilege_escalation
-  BEFORE UPDATE OF role ON public.user_profiles
+  BEFORE UPDATE OF role, admin_id, is_active ON public.user_profiles
   FOR EACH ROW EXECUTE FUNCTION public.prevent_privilege_escalation();
 
 -- ─── 3. admin_settings — reads for everyone, writes admin-only ─────────────

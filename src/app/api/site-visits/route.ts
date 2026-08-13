@@ -407,10 +407,10 @@ export async function GET(request: Request) {
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .single();
-  const isAdmin = ['admin', 'owner'].includes(profile?.role || '');
+  const isAdmin = profile?.is_active !== false && ['admin', 'owner'].includes(profile?.role || '');
 
   let scopedUserId = user.id;
   if (isAdmin && userId) scopedUserId = userId;

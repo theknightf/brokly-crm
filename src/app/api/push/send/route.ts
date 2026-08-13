@@ -45,11 +45,11 @@ export async function POST(request: Request) {
   if (target !== caller.id) {
     const { data: callerProfile } = await supabase
       .from('user_profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', caller.id)
       .single();
     const role = callerProfile?.role || '';
-    if (!['admin', 'owner'].includes(role)) {
+    if (callerProfile?.is_active === false || !['admin', 'owner'].includes(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   }

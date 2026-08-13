@@ -37,10 +37,10 @@ export async function GET(request: Request) {
   try {
     const { data: actor } = await supabase
       .from('user_profiles')
-      .select('id, role')
+      .select('id, role, is_active')
       .eq('id', user.id)
       .maybeSingle();
-    if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!actor || actor.is_active === false) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const isAdmin = isAdminRole(actor.role);
 
@@ -257,10 +257,10 @@ export async function POST(request: Request) {
 
   const { data: actor } = await supabase
     .from('user_profiles')
-    .select('id, role')
+    .select('id, role, is_active')
     .eq('id', user.id)
     .maybeSingle();
-  if (!actor || !isAdminRole(actor.role)) {
+  if (!actor || actor.is_active === false || !isAdminRole(actor.role)) {
     return NextResponse.json({ error: 'Forbidden — only Owner/Admin can rate team leaders' }, { status: 403 });
   }
 

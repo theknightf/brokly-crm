@@ -19,6 +19,14 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { data: actor } = await supabase
+    .from('user_profiles')
+    .select('is_active')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (!actor || actor.is_active === false) {
+    return NextResponse.json({ error: 'Account disabled' }, { status: 403 });
+  }
 
   let body: any;
   try {

@@ -36,6 +36,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     profileRequestRef.current = userId;
     try {
       const { data } = await getSupabase().from('user_profiles').select('*').eq('id', userId).single();
+      // Deactivated accounts are signed out immediately so deactivation takes
+      // effect on the very next profile fetch (mount, login, or session change).
+      if (data && data.is_active === false) {
+        setProfile(null);
+        const { error } = await getSupabase().auth.signOut();
+        if (error) console.error('[AuthContext] signOut (disabled account) failed', error);
+        router.push('/sign-up-login');
+        router.refresh();
+        return;
+      }
       setProfile(data);
     } catch {
       setProfile(null);

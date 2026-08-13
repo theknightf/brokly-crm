@@ -64,10 +64,10 @@ export async function GET(request: Request) {
 
   const { data: actor } = await supabase
     .from('user_profiles')
-    .select('id, role, full_name')
+    .select('id, role, full_name, is_active')
     .eq('id', user.id)
     .maybeSingle();
-  if (!actor || !isAdminRole(actor.role)) {
+  if (!actor || actor.is_active === false || !isAdminRole(actor.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

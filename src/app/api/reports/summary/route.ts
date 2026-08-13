@@ -16,10 +16,10 @@ export async function GET() {
 
   const { data: actor } = await supabase
     .from('user_profiles')
-    .select('id, role')
+    .select('id, role, is_active')
     .eq('id', user.id)
     .maybeSingle();
-  const isAdmin = isAdminRole(actor?.role);
+  const isAdmin = actor?.is_active !== false && isAdminRole(actor?.role);
 
   const [leadsRes, followUpsRes, customersRes, teamRes, callsRes, membershipsRes, teamsRes, expensesRes, ratingsRes] =
     await Promise.all([

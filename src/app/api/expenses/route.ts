@@ -11,10 +11,12 @@ async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) 
   if (!user) return null;
   const { data: actor } = await supabase
     .from('user_profiles')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .maybeSingle();
-  return actor && isAdminRole(actor.role) ? { role: actor.role, id: user.id } : null;
+  return actor && actor.is_active !== false && isAdminRole(actor.role)
+    ? { role: actor.role, id: user.id }
+    : null;
 }
 
 function normalizeAmount(value: unknown): number {
