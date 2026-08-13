@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   const [usersRes, attendanceRes] = await Promise.all([
     supabase
       .from('user_profiles')
-      .select('id, full_name, email, role, is_active')
+      .select('id, full_name, email, role, is_active, team_id')
       .order('full_name'),
     supabase
       .from('attendance')

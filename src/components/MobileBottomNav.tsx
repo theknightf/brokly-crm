@@ -2,7 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, MapPin, CalendarClock, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, MapPin, CalendarClock, CalendarCheck2, Menu } from 'lucide-react';
 import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -11,11 +11,12 @@ interface MobileBottomNavProps {
   onOpenMenu: () => void;
 }
 
-// Mobile navigation is uniform for every role: Home | Leads | Location | Follow-ups.
+// Mobile navigation is uniform for every role: Home | Leads | Attendance | Locations | Follow-ups.
 // Customers stays available through the sidebar and the nav menu.
 const items = [
   { labelKey: 'common.home', href: '/', icon: LayoutDashboard },
   { labelKey: 'common.leads', href: '/leads-management', icon: Users },
+  { labelKey: 'common.attendance', href: '/attendance', icon: CalendarCheck2 },
   { labelKey: 'common.locations', href: '/locations', icon: MapPin },
   { labelKey: 'common.followups', href: '/follow-ups', icon: CalendarClock },
 ];

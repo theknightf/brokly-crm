@@ -11,12 +11,26 @@ function isSchemaError(msg?: string): boolean {
   );
 }
 
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
 function localToday(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** A valid ISO timestamp that the database can store, or null when invalid. */
+function toISODate(value: unknown): string | null {
+  if (typeof value !== 'string' || !value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+/** Validate a YYYY-MM-DD date. */
+function isDate(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -79,6 +93,21 @@ export async function GET(request: Request) {
   });
 }
 
+/**
+ * POST /api/attendance — ADMIN ONLY.
+ *
+ * Endpoint shape:
+ *   { action: 'checkin'|'checkout'|'edit', userId, date, checkInTime?, checkOutTime?, reason? }
+ *
+ * - `checkInTime` / `checkOutTime` are the EXACT timestamps the admin selected.
+ *   They are validated and stored verbatim — the server NEVER substitutes the
+ *   current time for an explicitly provided time.
+ * - The current server time is used ONLY when the field is omitted (normal
+ *   admin-assisted check-in/out for "now").
+ * - `action: 'edit'` replaces both times together.
+ * - Every manual mutation writes a row to `audit_log` and `activity_log` for
+ *   accountability.
+ */
 export async function POST(request: Request) {
   const supabase = await createClient();
   const actor = await requireAdmin(supabase);
@@ -87,49 +116,136 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (!body || typeof body !== 'object' || !body.userId) {
+  if (!body || typeof body !== 'object' || typeof body.userId !== 'string' || !body.userId) {
     return NextResponse.json({ error: 'userId is required' }, { status: 400 });
   }
 
-  const action = body.action === 'checkout' ? 'checkout' : 'checkin';
-  const attendanceDate = typeof body.date === 'string' && body.date ? body.date : localToday();
-  const now = body.time ? new Date(body.time).toISOString() : new Date().toISOString();
+  const action = body.action === 'checkout' || body.action === 'edit' ? body.action : 'checkin';
+  const attendanceDate = isDate(body.date) ? body.date : localToday();
 
-  if (action === 'checkout') {
-    const { error } = await supabase
-      .from('attendance')
-      .update({ check_out_time: now, updated_at: now })
-      .eq('user_id', body.userId)
-      .eq('attendance_date', attendanceDate);
-    if (error) {
-      if (isSchemaError(error?.message)) {
-        return NextResponse.json(
-          { error: 'Attendance is not set up yet — apply the database migrations first' },
-          { status: 500 }
-        );
-      }
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-    return NextResponse.json({ ok: true, action });
+  // Validate that the target user exists (prevents creating rows for arbitrary ids).
+  const { data: targetUser } = await supabase
+    .from('user_profiles')
+    .select('id, full_name')
+    .eq('id', body.userId)
+    .maybeSingle();
+  if (!targetUser) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  const { error } = await supabase.from('attendance').upsert(
-    {
+  // Parse explicit admin-selected timestamps. Reject malformed values instead of
+  // silently substituting `new Date()` — the admin-selected time must win.
+  const checkInTime = toISODate(body.checkInTime);
+  if (body.checkInTime != null && body.checkInTime !== '' && !checkInTime) {
+    return NextResponse.json({ error: 'Invalid check-in time format' }, { status: 400 });
+  }
+  const checkOutTime = toISODate(body.checkOutTime);
+  if (body.checkOutTime != null && body.checkOutTime !== '' && !checkOutTime) {
+    return NextResponse.json({ error: 'Invalid check-out time format' }, { status: 400 });
+  }
+
+  // Reject nonsensical edits (e.g. a check-out time before check-in).
+  if (
+    checkInTime &&
+    checkOutTime &&
+    new Date(checkOutTime).getTime() < new Date(checkInTime).getTime()
+  ) {
+    return NextResponse.json({ error: 'Check-out cannot be before check-in' }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+  const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : '';
+
+  // Fetch the existing record first (for audit old values + merging edits).
+  const { data: existing } = await supabase
+    .from('attendance')
+    .select('id, check_in_time, check_out_time')
+    .eq('user_id', body.userId)
+    .eq('attendance_date', attendanceDate)
+    .maybeSingle();
+
+  const effectiveCheckIn = checkInTime ?? existing?.check_in_time ?? (action === 'checkout' ? existing?.check_in_time : now);
+  const effectiveCheckOut = action === 'checkout' ? (checkOutTime ?? now) : action === 'edit' ? (checkOutTime ?? existing?.check_out_time ?? null) : checkOutTime ?? existing?.check_out_time ?? null;
+
+  if (action === 'checkout' && !existing?.check_in_time) {
+    return NextResponse.json(
+      { error: 'Cannot check out — no check-in record exists for this employee on this date' },
+      { status: 400 }
+    );
+  }
+
+  let result: { error: any } | null = null;
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('attendance')
+      .update({
+        check_in_time: effectiveCheckIn,
+        check_out_time: effectiveCheckOut,
+        marked_by: actor.id,
+        updated_at: now,
+      })
+      .eq('id', existing.id);
+    result = { error };
+  } else {
+    const { error } = await supabase.from('attendance').insert({
       user_id: body.userId,
       attendance_date: attendanceDate,
-      check_in_time: now,
+      check_in_time: effectiveCheckIn,
+      check_out_time: effectiveCheckOut,
       marked_by: actor.id,
-    },
-    { onConflict: 'user_id,attendance_date' }
-  );
-  if (error) {
-    if (isSchemaError(error?.message)) {
+    });
+    result = { error };
+  }
+
+  if (result?.error) {
+    if (isSchemaError(result.error?.message)) {
       return NextResponse.json(
         { error: 'Attendance is not set up yet — apply the database migrations first' },
         { status: 500 }
       );
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: result.error.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, action });
+
+  // ── Accountability: record the manual action ─────────────────────────
+  const oldCheckIn = existing?.check_in_time || null;
+  const oldCheckOut = existing?.check_out_time || null;
+  const auditAction = action === 'edit' ? 'edited' : action === 'checkout' ? 'checked_out' : 'checked_in';
+  const description = reason
+    ? `Manual attendance ${auditAction} for ${targetUser.full_name} on ${attendanceDate} — ${reason}`
+    : `Manual attendance ${auditAction} for ${targetUser.full_name} on ${attendanceDate}`;
+
+  const auditPayload = {
+    user_id: targetUser.id,
+    user_name: targetUser.full_name || '',
+    entity_type: 'attendance',
+    entity_id: attendanceDate,
+    action: auditAction,
+    prev_value: { check_in_time: oldCheckIn, check_out_time: oldCheckOut },
+    new_value: { check_in_time: effectiveCheckIn, check_out_time: effectiveCheckOut },
+    description,
+  };
+
+  const [auditRes, activityRes] = await Promise.all([
+    supabase.from('audit_log').insert(auditPayload),
+    supabase.from('activity_log').insert({
+      user_id: targetUser.id,
+      action_type: `Attendance ${auditAction === 'edited' ? 'Edited' : auditAction === 'checked_out' ? 'Check-out' : 'Check-in'}`,
+      entity_type: 'attendance',
+      entity_id: attendanceDate,
+      detail: `${targetUser.full_name || ''} — ${description}`,
+      meta: 'manual-by-admin',
+    }),
+  ]);
+
+  // Log failures but never fail the mutation for them (best-effort auditing).
+  if (auditRes.error) {
+    console.error('[attendance] audit_log write failed', auditRes.error.message);
+  }
+  if (activityRes.error) {
+    console.error('[attendance] activity_log write failed', activityRes.error.message);
+  }
+
+  return NextResponse.json({ ok: true, action, attendance_date: attendanceDate });
 }

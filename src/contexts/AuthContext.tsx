@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
+import { normalizeAuthError } from '@/lib/authErrors';
 
 const AuthContext = createContext<any>({});
 
@@ -79,17 +80,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
       },
     });
-    if (error) throw error;
+    if (error) throw new Error(normalizeAuthError(error));
     return data;
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    // Activity session is started automatically by useActivityTracker when
-    // `user` is set by onAuthStateChange. No manual POST needed here.
-    router.refresh();
-    return data;
+    try {
+      const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
+      if (error) {
+        // Preserve the full technical detail for debugging (browser console /
+        // network tab), but only surface a safe message to the user.
+        console.error('[AuthContext] signInWithPassword failed', {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+        });
+        throw new Error(normalizeAuthError(error));
+      }
+      // Activity session is started automatically by useActivityTracker when
+      // `user` is set by onAuthStateChange. No manual POST needed here.
+      router.refresh();
+      return data;
+    } catch (err: any) {
+      // Already normalized above — propagate the user-safe message as-is.
+      if (err instanceof Error && /^(Invalid email|Unable to connect|Please confirm|Too many|Password does not|Sign in failed|Authentication is not configured)/.test(err.message)) {
+        throw err;
+      }
+      throw new Error(normalizeAuthError(err));
+    }
   };
 
   const signOut = async () => {
@@ -114,7 +132,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback?next=/reset-password`,
     });
-    if (error) throw error;
+    if (error) throw new Error(normalizeAuthError(error));
   };
 
   const getCurrentUser = async () => {

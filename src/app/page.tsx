@@ -2,6 +2,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import AppLayout from '@/components/AppLayout';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DashboardHeader = dynamic(() => import('./components/DashboardHeader'));
 const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
@@ -10,8 +11,31 @@ const DashboardCharts = dynamic(() => import('./components/DashboardCharts'));
 const OverdueFollowUps = dynamic(() => import('./components/OverdueFollowUps'));
 const RecentActivity = dynamic(() => import('./components/RecentActivity'));
 const MobileTodayFollowUps = dynamic(() => import('./components/MobileTodayFollowUps'));
+const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
 
 export default function DashboardPage() {
+  const { profile, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col gap-6">
+          <div className="h-12 bg-muted/60 rounded-2xl animate-pulse" />
+          <div className="h-24 bg-muted/60 rounded-2xl animate-pulse" />
+          <div className="h-24 bg-muted/60 rounded-2xl animate-pulse" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (profile?.role === 'owner') {
+    return (
+      <AppLayout>
+        <OwnerDashboard />
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="flex flex-col gap-6">

@@ -104,7 +104,9 @@ async function enforceRadius(
 }
 
 // POST /api/attendance/self — employees check in/out themselves with GPS.
-// Body: { action: "checkin"|"checkout", lat?, lng?, date? }
+// Body: { action: "checkin"|"checkout", lat?, lng? }
+// The server ALWAYS decides the timestamp and the attendance date. Employees
+// cannot pick a time or backdate — `new Date()` is the single source of truth.
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -118,7 +120,7 @@ export async function POST(request: Request) {
   }
 
   const action = body.action === 'checkout' ? 'checkout' : 'checkin';
-  const attendanceDate = typeof body.date === 'string' && body.date ? body.date : localToday();
+  const attendanceDate = localToday();
   const now = new Date().toISOString();
   const lat = typeof body.lat === 'number' && !Number.isNaN(body.lat) ? body.lat : null;
   const lng = typeof body.lng === 'number' && !Number.isNaN(body.lng) ? body.lng : null;
@@ -133,6 +135,28 @@ export async function POST(request: Request) {
     }
 
     if (action === 'checkout') {
+      // First read the existing record to guard against double check-outs and
+      // missing check-ins.
+      const { data: existing } = await supabase
+        .from('attendance')
+        .select('id, check_in_time, check_out_time')
+        .eq('user_id', user.id)
+        .eq('attendance_date', attendanceDate)
+        .maybeSingle();
+
+      if (!existing?.check_in_time) {
+        return NextResponse.json(
+          { error: 'You have not checked in for today yet.' },
+          { status: 400 }
+        );
+      }
+      if (existing.check_out_time) {
+        return NextResponse.json(
+          { error: 'You have already checked out for today.' },
+          { status: 400 }
+        );
+      }
+
       const { data, error } = await supabase
         .from('attendance')
         .update({

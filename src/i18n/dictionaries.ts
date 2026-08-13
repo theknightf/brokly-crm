@@ -47,6 +47,12 @@ export const dictionaries: Dict = {
   'common.fixed': { en: 'Fixed (EGP)', ar: 'مبلغ ثابت (ج.م)' },
   'common.optional': { en: 'optional', ar: 'اختياري' },
   'common.nothingHere': { en: 'Nothing here', ar: 'لا يوجد شيء هنا' },
+  'common.attendance': { en: 'Attendance', ar: 'الحضور' },
+  'common.checkIn': { en: 'Check In', ar: 'تسجيل الحضور' },
+  'common.checkOut': { en: 'Check Out', ar: 'تسجيل الانصراف' },
+  'common.checkedIn': { en: 'Checked in', ar: 'تم تسجيل الحضور' },
+  'common.checkedOut': { en: 'Checked out', ar: 'تم تسجيل الانصراف' },
+  'common.notCheckedIn': { en: 'Not checked in', ar: 'لم يسجل الحضور' },
 
   'nav.overview': { en: 'Overview', ar: 'نظرة عامة' },
   'nav.pipeline': { en: 'Pipeline', ar: 'خط الأنابيب' },

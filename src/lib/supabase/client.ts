@@ -38,7 +38,10 @@ const fromStorage = () => {
 };
 
 const setCookie = (name: string, value: string, options?: any) => {
-  let s = `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}; SameSite=None; Secure; Partitioned`;
+  // Only force Secure on HTTPS. Plain HTTP (localhost / LAN WebView) drops
+  // Secure cookies silently, breaking session persistence.
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  let s = `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}; SameSite=Lax${secure ? '; Secure' : ''}${secure ? '; Partitioned' : ''}`;
   if (options?.maxAge) s += `; Max-Age=${options.maxAge}`;
   if (options?.domain) s += `; Domain=${options.domain}`;
   if (options?.expires) s += `; Expires=${new Date(options.expires).toUTCString()}`;
