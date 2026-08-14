@@ -13,14 +13,14 @@ import {
 import { reportsService } from '@/lib/services/crmService';
 
 const stageColors: Record<string, string> = {
-  New: '#84cc16',
-  Contacted: '#65a30d',
-  Qualified: '#a3e635',
-  'Site Visit Scheduled': '#4d7c0f',
-  'Site Visited': '#22c55e',
-  Negotiation: '#365314',
-  Won: '#4d7c0f',
-  Lost: '#9ca3af',
+  New: '#d4e157',
+  Contacted: '#a3e635',
+  Qualified: '#86efac',
+  'Site Visit Scheduled': '#fbbf24',
+  'Site Visited': '#7dd3fc',
+  Negotiation: '#f59e0b',
+  Won: '#4ade80',
+  Lost: '#f0a898',
 };
 
 interface TooltipPayloadItem {
@@ -41,7 +41,7 @@ function CustomTooltip({
   const d = payload[0].payload;
   const pct = total > 0 ? ((d.count / total) * 100).toFixed(1) : '0';
   return (
-    <div className="bg-white border border-border rounded-lg shadow-lg px-3 py-2 text-sm">
+    <div className="bg-card border border-border rounded-xl shadow-card px-4 py-3 text-sm">
       <p className="font-semibold text-foreground">{d.stage}</p>
       <p className="text-muted-foreground">
         {d.count} leads <span className="font-medium text-foreground">({pct}%)</span>
@@ -62,7 +62,7 @@ export default function CustomerLifecycleChart() {
         const chartData = Object.entries(byStatus).map(([stage, count]) => ({
           stage,
           count: count as number,
-          color: stageColors[stage] ?? '#94a3b8',
+          color: stageColors[stage] ?? '#c4c6cb',
         }));
         setData(chartData);
       })
@@ -102,15 +102,15 @@ export default function CustomerLifecycleChart() {
               barCategoryGap="30%"
               margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis
                 dataKey="stage"
-                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                 axisLine={false}
                 tickLine={false}
               />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CustomTooltip total={total} />} cursor={{ fill: '#f8fafc' }} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip total={total} />} cursor={{ fill: 'var(--muted)', opacity: 0.5 }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />

@@ -393,7 +393,7 @@ function SidebarContent({
                         <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
                       )}
                       {collapsed && (
-                        <span className="absolute left-full ml-2 px-2 py-1 bg-foreground text-background text-xs rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                        <span className="absolute left-full ml-2 px-2 py-1 bg-surface-3 text-foreground text-xs rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 border border-border">
                           {t(item.labelKey)}
                           {item.badge !== undefined && ` (${item.badge})`}
                         </span>

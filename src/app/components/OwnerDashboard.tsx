@@ -104,9 +104,9 @@ function StatCard({
 }) {
   const tones: Record<string, string> = {
     default: 'text-foreground',
-    green: 'text-teal',
+    green: 'text-sage',
     red: 'text-clay',
-    amber: 'text-gold-dark',
+    amber: 'text-gold',
     primary: 'text-primary',
   };
   return (
@@ -183,7 +183,7 @@ export default function OwnerDashboard() {
   const s = data.summary;
   const expChange = s.expensesChangePct;
   const attentionTypes: Record<string, string> = {
-    today: 'bg-gold-soft text-gold-dark',
+    today: 'bg-gold-soft text-gold',
     'low-hours': 'bg-teal-soft text-teal',
   };
 
@@ -278,9 +278,9 @@ export default function OwnerDashboard() {
           </div>
           <div className="grid grid-cols-4 gap-3 text-center">
             {[
-              { label: 'Present', value: data.attendanceOverview.present, color: 'text-teal' },
+              { label: 'Present', value: data.attendanceOverview.present, color: 'text-sage' },
               { label: 'Absent', value: data.attendanceOverview.absent, color: 'text-clay' },
-              { label: 'Late', value: data.attendanceOverview.late, color: 'text-gold-dark' },
+              { label: 'Late', value: data.attendanceOverview.late, color: 'text-gold' },
               { label: 'Leave', value: data.attendanceOverview.leave, color: 'text-dusk' },
             ].map((x) => (
               <div key={x.label} className="bg-muted/50 rounded-xl py-4">
@@ -297,7 +297,7 @@ export default function OwnerDashboard() {
 
         <div className="bg-card border border-border rounded-2xl p-5">
           <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
-            <AlertCircle size={16} className="text-gold-dark" /> Attention Needed
+            <AlertCircle size={16} className="text-gold" /> Attention Needed
           </h2>
           {data.attentionNeeded.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">All clear — nothing needs attention today.</p>

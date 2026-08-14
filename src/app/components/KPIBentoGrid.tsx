@@ -24,7 +24,7 @@ function StatusCard({ status, count, total, colorClass, interactive }: StatusCar
     <>
       <div className="flex items-start justify-between">
         <div
-          className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${bg} bg-opacity-60`}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 border border-border ${bg} bg-opacity-100`}
         >
           {icon}
         </div>
@@ -41,7 +41,7 @@ function StatusCard({ status, count, total, colorClass, interactive }: StatusCar
         </div>
         <ArrowUpRight
           size={14}
-          className="text-muted-foreground/30 group-hover:text-primary transition-colors flex-shrink-0"
+          className="text-primary/40 group-hover:text-primary transition-colors flex-shrink-0"
         />
       </div>
     </>
@@ -49,7 +49,7 @@ function StatusCard({ status, count, total, colorClass, interactive }: StatusCar
 
   if (!interactive) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-4 flex flex-col gap-2">
+      <div className="rounded-2xl border border-border bg-card p-4 flex flex-col gap-2.5 shadow-card">
         {inner}
       </div>
     );
@@ -58,7 +58,7 @@ function StatusCard({ status, count, total, colorClass, interactive }: StatusCar
   return (
     <Link
       href={`/leads-management?status=${encodeURIComponent(status)}`}
-      className={`rounded-2xl border border-border bg-card p-4 flex flex-col gap-2 block transition-all hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 active:scale-[0.98]`}
+      className={`group rounded-2xl border border-border bg-card p-4 flex flex-col gap-2.5 block transition-all shadow-card hover:shadow-card-hover hover:border-primary/40 hover:-translate-y-0.5 active:scale-[0.98]`}
     >
       {inner}
     </Link>
@@ -188,15 +188,16 @@ export default function KPIBentoGrid() {
       {/* Total leads hero card */}
       <Link
         href="/leads-management"
-        className="rounded-2xl border border-border bg-card px-6 py-4 flex items-center justify-between transition-all hover:shadow-md hover:border-primary/30 active:scale-[0.99]"
+        className="group relative rounded-2xl border border-border bg-card px-6 py-5 flex items-center justify-between overflow-hidden transition-all shadow-card hover:shadow-card-hover hover:border-primary/40 active:scale-[0.99]"
       >
-        <div>
-          <p className="text-sm text-muted-foreground font-medium">Total Leads</p>
-          <p className="text-4xl font-bold text-foreground tabular-nums mt-0.5">
+        <div className="absolute inset-0 pointer-events-none bg-brand-glow opacity-60 group-hover:opacity-100 transition-opacity" />
+        <div className="relative">
+          <p className="metric-label mb-1">Total Leads</p>
+          <p className="text-4xl font-bold text-foreground tabular-nums mt-1">
             {total.toLocaleString()}
           </p>
         </div>
-        <div className="text-right">
+        <div className="relative text-right">
           <p className="text-xs text-muted-foreground">All statuses combined</p>
           <p className="text-sm font-semibold text-primary mt-1">
             {ALL_STATUSES.length} categories tracked

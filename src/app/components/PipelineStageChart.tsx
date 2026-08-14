@@ -13,16 +13,16 @@ import {
 import { reportsService } from '@/lib/services/crmService';
 
 const stageColors = [
-  '#3B82F6',
-  '#8B5CF6',
-  '#06B6D4',
-  '#F59E0B',
-  '#F97316',
-  '#EC4899',
-  '#10B981',
-  '#64748B',
-  '#EF4444',
-  '#84CC16',
+  '#d4e157',
+  '#a3e635',
+  '#86efac',
+  '#4ade80',
+  '#7dd3fc',
+  '#38bdf8',
+  '#fbbf24',
+  '#f59e0b',
+  '#f0a898',
+  '#c4c6cb',
 ];
 
 interface TooltipPayload {
