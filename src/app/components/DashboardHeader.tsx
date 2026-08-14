@@ -17,8 +17,8 @@ export default function DashboardHeader() {
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <div className="glass flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-muted-foreground">
-          <CalendarDays size={14} className="text-primary" />
+        <div className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-3 py-1.5 text-sm text-muted-foreground">
+          <CalendarDays size={14} />
           <span>{t('dashboard.last30')}</span>
         </div>
         <button className="btn-ghost flex items-center gap-1.5 text-sm border border-border rounded-lg px-3 py-1.5">

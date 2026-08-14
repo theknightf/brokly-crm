@@ -36,20 +36,20 @@ export default function RecentActivity() {
       .then((leads: any[]) => {
         const recent = (leads || []).map((lead: any) => {
           let icon = <UserPlus size={14} />;
-          let iconBg = 'bg-dusk-soft text-dusk';
+          let iconBg = 'bg-blue-50 text-primary';
           let text = `New lead: ${lead.name}`;
 
           if (lead.status === 'Won') {
             icon = <CheckCircle2 size={14} />;
-            iconBg = 'bg-sage-soft text-sage';
+            iconBg = 'bg-emerald-50 text-emerald-600';
             text = `Deal closed: ${lead.name} — ${lead.propertyType || ''}`;
           } else if (lead.status === 'Lost') {
             icon = <XCircle size={14} />;
-            iconBg = 'bg-clay-soft text-clay';
+            iconBg = 'bg-red-50 text-red-500';
             text = `Lead lost: ${lead.name}`;
           } else if (lead.status === 'Negotiation') {
             icon = <ArrowRight size={14} />;
-            iconBg = 'bg-gold-soft text-gold';
+            iconBg = 'bg-amber-50 text-amber-600';
             text = `${lead.name} in negotiation — ${lead.propertyType || ''}`;
           }
 
@@ -76,8 +76,8 @@ export default function RecentActivity() {
           <h2 className="section-header">Recent Activity</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Latest leads in your pipeline</p>
         </div>
-        <span className="flex items-center gap-1.5 text-xs text-sage bg-sage-soft px-2 py-1 rounded-lg font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-sage animate-pulse" />
+        <span className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Live
         </span>
       </div>

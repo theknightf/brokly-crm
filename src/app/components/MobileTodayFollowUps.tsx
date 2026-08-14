@@ -25,9 +25,9 @@ const todayStr = () => new Date().toISOString().split('T')[0];
 
 function dueLabel(due: string): { text: string; cls: string; overdue: boolean } {
   const today = todayStr();
-  if (due < today)
-    return { text: 'Overdue', cls: 'bg-destructive/15 text-destructive', overdue: true };
-  if (due === today) return { text: 'Due today', cls: 'bg-gold-soft text-gold', overdue: false };
+  if (due < today) return { text: 'Overdue', cls: 'bg-red-100 text-red-600', overdue: true };
+  if (due === today)
+    return { text: 'Due today', cls: 'bg-amber-100 text-amber-700', overdue: false };
   return { text: due, cls: 'bg-muted text-muted-foreground', overdue: false };
 }
 
@@ -86,7 +86,7 @@ export default function MobileTodayFollowUps() {
     <div className="lg:hidden">
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-surface-3 border border-border text-primary flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-secondary text-primary flex items-center justify-center">
             <CalendarClock size={16} />
           </div>
           <div>
@@ -108,8 +108,8 @@ export default function MobileTodayFollowUps() {
         </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-32 text-center rounded-2xl border border-border bg-card">
-          <div className="w-10 h-10 rounded-full bg-sage-soft flex items-center justify-center mb-2">
-            <AlertTriangle size={18} className="text-sage" />
+          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mb-2">
+            <AlertTriangle size={18} className="text-emerald-500" />
           </div>
           <p className="text-sm font-semibold text-foreground">All caught up!</p>
           <p className="text-xs text-muted-foreground mt-0.5">No follow-ups due today</p>
@@ -121,11 +121,11 @@ export default function MobileTodayFollowUps() {
             return (
               <div
                 key={item.id}
-                className={`rounded-2xl border bg-card p-3.5 shadow-card ${
+                className={`rounded-2xl border bg-card p-3.5 ${
                   d.overdue
-                    ? 'border-destructive/30'
+                    ? 'border-red-200'
                     : d.text === 'Due today'
-                      ? 'border-gold/30'
+                      ? 'border-amber-200'
                       : 'border-border'
                 }`}
               >
@@ -159,7 +159,7 @@ export default function MobileTodayFollowUps() {
                         target="_blank"
                         rel="noreferrer"
                         onClick={() => armCall(item, 'WhatsApp')}
-                        className="w-11 h-11 rounded-xl bg-teal-soft text-teal flex items-center justify-center active:scale-90 transition-transform"
+                        className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center active:scale-90 transition-transform"
                         aria-label="WhatsApp"
                       >
                         <MessageCircle size={19} />

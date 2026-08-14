@@ -13,14 +13,14 @@ import {
 import { reportsService } from '@/lib/services/crmService';
 
 const sourceColors = [
-  '#d4e157',
-  '#86efac',
-  '#7dd3fc',
-  '#fbbf24',
-  '#f0a898',
-  '#c4c6cb',
-  '#38bdf8',
-  '#4ade80',
+  '#6366F1',
+  '#10B981',
+  '#3B82F6',
+  '#F59E0B',
+  '#EC4899',
+  '#64748B',
+  '#F97316',
+  '#06B6D4',
 ];
 
 interface TooltipPayload {

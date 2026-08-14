@@ -3,64 +3,48 @@
 @tailwind utilities;
 
 :root {
-  /* ── Citron Noir — surface scale ───────────────────────────────
-     Deep charcoal-navy ecosystem with a sharp lemon-lime accent.
-     Layered tones (background → surface-1 → surface-2) create the
-     "tactile layering" depth the design calls for. */
-  --background: #051424;
-  --surface-1: #0d1c2d;
-  --surface-2: #1c2b3c;
-  --surface-3: #273647;
-  --foreground: #d4e4fa;
-  --primary: #d4e157;
-  --primary-foreground: #1c1d00;
-  --secondary: #1c2b3c;
-  --secondary-foreground: #d4e4fa;
-  --accent: #d4e157;
-  --accent-foreground: #1c1d00;
-  --muted: #122131;
-  --muted-foreground: #c8c8b1;
-  --card: #0d1c2d;
-  --card-foreground: #d4e4fa;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: #273647;
-  --ring: #d4e157;
+  --background: #ffffff;
+  --foreground: #18181b;
+  --primary: #65a30d;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f7e8;
+  --secondary-foreground: #3f6212;
+  --accent: #a3e635;
+  --accent-foreground: #1a2e05;
+  --muted: #f4f6f3;
+  --muted-foreground: #6b7280;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #84cc16;
   --radius: 12px;
-  --font-sans: var(--font-geist-sans), 'Geist', sans-serif;
-  --font-display: var(--font-geist-sans), 'Geist', sans-serif;
-  --font-mono: var(--font-geist-mono), 'Geist Mono', monospace;
+  --font-sans: var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif;
+  --font-display: var(--font-fraunces), Fraunces, serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
 
-  /* Brand accent family (lemon-lime) */
-  --brand-glow: rgba(212, 225, 87, 0.12);
-  --brand-glow-strong: rgba(212, 225, 87, 0.22);
+  --status-new: #84cc16;
+  --status-new-bg: #f0fcd8;
+  --status-contacted: #65a30d;
+  --status-contacted-bg: #ecf5df;
+  --status-qualified: #22c55e;
+  --status-qualified-bg: #e8f9ee;
+  --status-visit-scheduled: #84cc16;
+  --status-visit-scheduled-bg: #f0fcd8;
+  --status-visited: #4d7c0f;
+  --status-visited-bg: #ecf5df;
+  --status-negotiation: #65a30d;
+  --status-negotiation-bg: #f0fcd8;
+  --status-won: #4d7c0f;
+  --status-won-bg: #d9f99d;
+  --status-lost: #52525b;
+  --status-lost-bg: #f4f4f5;
 
-  /* Status colors — success uses the primary lime; warning a muted
-     amber; critical a desaturated coral (per the design language). */
-  --status-new: #d4e157;
-  --status-new-bg: rgba(212, 225, 87, 0.14);
-  --status-contacted: #a3e635;
-  --status-contacted-bg: rgba(163, 230, 53, 0.14);
-  --status-qualified: #86efac;
-  --status-qualified-bg: rgba(134, 239, 172, 0.12);
-  --status-visit-scheduled: #d4e157;
-  --status-visit-scheduled-bg: rgba(212, 225, 87, 0.14);
-  --status-visited: #7dd3fc;
-  --status-visited-bg: rgba(125, 211, 252, 0.12);
-  --status-negotiation: #fbbf24;
-  --status-negotiation-bg: rgba(251, 191, 36, 0.14);
-  --status-won: #86efac;
-  --status-won-bg: rgba(134, 239, 172, 0.12);
-  --status-lost: #f0a898;
-  --status-lost-bg: rgba(240, 168, 152, 0.12);
-
-  --source-portal: #d4e157;
-  --source-referral: #86efac;
-  --source-walkin: #a3e635;
-  --source-social: #fbbf24;
-  --source-cold: #c8c8b1;
-
-  --destructive: #f0a898;
-  --destructive-foreground: #1c1d00;
+  --source-portal: #65a30d;
+  --source-referral: #22c55e;
+  --source-walkin: #84cc16;
+  --source-social: #a3e635;
+  --source-cold: #6b7280;
 }
 
 @layer base {
@@ -73,8 +57,6 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
   }
   html {
     scroll-behavior: smooth;
@@ -87,10 +69,6 @@
   h6,
   p {
     margin: 0;
-  }
-  ::selection {
-    background: rgba(212, 225, 87, 0.28);
-    color: var(--foreground);
   }
 }
 
@@ -120,7 +98,7 @@
       max-height 300ms ease;
   }
   .blob-primary {
-    background: radial-gradient(ellipse at center, rgba(212, 225, 87, 0.35) 0%, rgba(212, 225, 87, 0) 70%);
+    background: radial-gradient(ellipse at center, #65a30d 0%, #3f6212 100%);
     filter: blur(60px);
   }
   .card-hover {
@@ -172,7 +150,7 @@
     }
   }
   .shimmer {
-    background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+    background: linear-gradient(90deg, var(--muted) 25%, #e7e7e2 50%, var(--muted) 75%);
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
   }
@@ -188,25 +166,19 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold text-sm btn-press focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 6px 20px rgba(212, 225, 87, 0.18);
-  }
-  .btn-primary:hover {
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 8px 28px rgba(212, 225, 87, 0.32);
-    filter: brightness(1.06);
+    @apply bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-secondary {
-    @apply bg-surface-2 text-foreground border border-border px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+    @apply bg-card text-foreground border border-border px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
   }
   .btn-ghost {
-    @apply bg-transparent text-muted-foreground px-3 py-2 rounded-lg text-sm btn-press hover:bg-surface-2 hover:text-foreground focus:outline-none;
+    @apply bg-transparent text-muted-foreground px-3 py-2 rounded-lg text-sm btn-press hover:bg-muted hover:text-foreground focus:outline-none;
   }
   .btn-danger {
-    @apply bg-destructive text-background px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-destructive focus:outline-none focus:ring-2 focus:ring-destructive focus:ring-offset-2 focus:ring-offset-background;
+    @apply bg-clay text-white px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-clay-dark focus:outline-none focus:ring-2 focus:ring-clay focus:ring-offset-2;
   }
   .input-base {
-    @apply w-full border border-transparent bg-surface-2 text-foreground rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+    @apply w-full border border-input bg-card text-foreground rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition-colors;
   }
   .label-base {
     @apply block text-sm font-medium text-foreground mb-1;
@@ -214,29 +186,23 @@
   .card-base {
     @apply bg-card border border-border rounded-xl p-5 card-hover;
   }
-  .glass {
-    background: rgba(13, 28, 45, 0.72);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
   .status-badge {
     @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold badge-transition cursor-pointer select-none;
   }
   .section-header {
-    @apply text-lg font-semibold text-foreground;
+    @apply text-lg font-semibold text-foreground font-display;
   }
   .page-title {
-    @apply text-2xl font-semibold text-foreground;
+    @apply text-2xl font-semibold text-foreground font-display;
   }
   .metric-label {
-    @apply text-xs font-medium text-muted-foreground tracking-[0.08em] uppercase;
+    @apply text-xs font-medium text-muted-foreground tracking-wide uppercase;
   }
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground;
   }
   .nav-item-active {
-    @apply bg-brand-glow text-primary font-semibold;
+    @apply bg-foreground text-background font-semibold shadow-sm;
   }
   .table-th {
     @apply px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap;
@@ -295,7 +261,7 @@
     border-radius: 12px;
     margin-bottom: 10px;
     overflow: hidden;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   }
   table.table-mobile > tbody > tr > td {
     display: flex;

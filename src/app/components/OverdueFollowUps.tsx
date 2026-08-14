@@ -30,17 +30,17 @@ export default function OverdueFollowUps() {
   }, []);
 
   const getUrgencyClass = (priority: string) => {
-    if (priority === 'High') return 'border-destructive/30 bg-destructive/10';
-    if (priority === 'Medium') return 'border-gold/30 bg-gold-soft/50';
-    return 'border-border bg-muted/30';
+    if (priority === 'High') return 'border-red-100 bg-red-50/40';
+    if (priority === 'Medium') return 'border-amber-100 bg-amber-50/30';
+    return 'border-border bg-muted/20';
   };
 
   return (
     <div className="card-base border-amber-200">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-clay-soft border border-border flex items-center justify-center">
-            <AlertTriangle size={14} className="text-clay" />
+          <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+            <AlertTriangle size={14} className="text-amber-600" />
           </div>
           <div>
             <h2 className="section-header">Overdue Follow-ups</h2>
@@ -87,7 +87,7 @@ export default function OverdueFollowUps() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-0.5">
-                  <span className="flex items-center gap-1 text-xs text-destructive font-medium">
+                  <span className="flex items-center gap-1 text-xs text-red-500 font-medium">
                     <Clock size={10} />
                     Due {item.dueDate}
                   </span>

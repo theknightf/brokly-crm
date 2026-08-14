@@ -28,14 +28,11 @@ export default function DynamicGreeting() {
   }, [firstName]);
 
   return (
-    <div>
-      <p className="metric-label mb-1">Dashboard</p>
-      <h1 className="page-title text-3xl sm:text-4xl font-semibold tracking-[-0.01em]">
-        {line}
-      </h1>
-      <p className="block text-sm font-medium text-muted-foreground mt-1.5">
+    <h1 className="page-title">
+      {line}
+      <span className="block text-sm font-medium text-muted-foreground mt-1">
         Here's what needs your attention today.
-      </p>
-    </div>
+      </span>
+    </h1>
   );
 }

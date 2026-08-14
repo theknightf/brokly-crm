@@ -39,7 +39,7 @@ export default function Topbar({
     .slice(0, 2);
 
   return (
-    <header className="h-14 bg-card/80 backdrop-blur-md border-b border-border flex items-center px-4 gap-3 flex-shrink-0 z-20 sticky top-0">
+    <header className="h-14 bg-card border-b border-border flex items-center px-4 gap-3 flex-shrink-0 z-20 sticky top-0">
       {/* Desktop toggle */}
       <button
         onClick={onToggleSidebar}
