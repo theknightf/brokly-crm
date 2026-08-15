@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Hash, Building2, RefreshCw } from 'lucide-react';
+import { Loader2, Hash, Building2, RefreshCw, ChevronDown } from 'lucide-react';
 import {
   Lead,
   LeadStatus,
@@ -73,6 +73,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
+  const [showPlan, setShowPlan] = useState(false);
 
   const {
     register,
@@ -281,6 +282,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <label className="label-base">Full name</label>
               <input
                 type="text"
+                autoFocus
                 className="input-base"
                 placeholder="Ahmed Hassan"
                 {...register('name')}
@@ -454,6 +456,23 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
 
         <div className="border-t border-border" />
 
+        <button
+          type="button"
+          onClick={() => setShowPlan((v) => !v)}
+          className="btn-press w-full flex items-center justify-between text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-xl px-4 py-3 transition-colors active:scale-[0.99]"
+        >
+          <span>Unit &amp; Payment Plan</span>
+          <span className="flex items-center gap-1 text-muted-foreground">
+            {showPlan ? 'Hide' : 'Show'}
+            <ChevronDown
+              size={15}
+              className={`transition-transform duration-300 ${showPlan ? 'rotate-180' : ''}`}
+            />
+          </span>
+        </button>
+
+        {showPlan && (
+        <>
         {/* Section 3: Unit & Payment Plan */}
         <div>
           <div className="flex items-center gap-2 mb-4">
@@ -613,6 +632,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
             </div>
           </div>
         </div>
+
+        </>
+        )}
 
         <div className="border-t border-border" />
 

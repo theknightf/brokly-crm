@@ -57,8 +57,8 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
     type: (initial?.type ?? 'Call') as FollowUpType,
     status: (initial?.status ?? 'Pending') as FollowUpStatus,
     priority: (initial?.priority ?? 'Medium') as FollowUpPriority,
-    dueDate: initial?.dueDate ?? '',
-    dueTime: initial?.dueTime ?? '',
+    dueDate: initial?.dueDate ?? new Date().toISOString().split('T')[0],
+    dueTime: initial?.dueTime ?? new Date().toTimeString().slice(0, 5),
     agent: initial?.agent ?? '',
     notes: initial?.notes ?? '',
     propertyInterest: initial?.propertyInterest ?? '',
@@ -196,12 +196,33 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
         <div className="sm:col-span-2">
           <Field label="Follow-up Title *" error={errors.title}>
             <input
+              autoFocus
               className="input-base"
               placeholder="e.g. Follow up on site visit feedback"
               value={form.title}
               onChange={(e) => set('title', e.target.value)}
             />
           </Field>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="label-base">Quick type</label>
+          <div className="flex flex-wrap gap-2">
+            {(['Call', 'WhatsApp', 'Site Visit', 'Meeting'] as FollowUpType[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => set('type', t)}
+                className={`btn-press px-3 py-1.5 rounded-full text-sm font-medium border transition-colors active:scale-[0.97] ${
+                  form.type === t
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border text-foreground hover:bg-muted'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
         <Field label="Contact Name *" error={errors.contactName}>
