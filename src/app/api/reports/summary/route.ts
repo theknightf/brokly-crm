@@ -4,7 +4,7 @@ import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
 
   const {
@@ -21,6 +21,27 @@ export async function GET() {
     .maybeSingle();
   const isAdmin = actor?.is_active !== false && isAdminRole(actor?.role);
 
+  // Optional from/to date range (YYYY-MM-DD). When absent, behaviour is
+  // unchanged: all-time data exactly as before (backwards compatible).
+  const url = new URL(request.url);
+  const fromParam = url.searchParams.get('from');
+  const toParam = url.searchParams.get('to');
+  const hasRange = !!fromParam && !!toParam;
+  const rangeStart = hasRange
+    ? new Date(`${fromParam}T00:00:00`).getTime()
+    : Number.NEGATIVE_INFINITY;
+  const rangeEnd = hasRange
+    ? new Date(`${toParam}T23:59:59.999`).getTime()
+    : Number.POSITIVE_INFINITY;
+  const inRange = (iso: string | null | undefined): boolean => {
+    if (!iso) return !hasRange;
+    const ts = new Date(iso).getTime();
+    if (Number.isNaN(ts)) return !hasRange;
+    return ts >= rangeStart && ts <= rangeEnd;
+  };
+  const inDateRange = (date: string | null | undefined): boolean =>
+    !hasRange || (!!date && date >= fromParam && date <= toParam);
+
   const [leadsRes, followUpsRes, customersRes, teamRes, callsRes, membershipsRes, teamsRes, expensesRes, ratingsRes] =
     await Promise.all([
       supabase
@@ -28,7 +49,9 @@ export async function GET() {
         .select(
           'lead_status, source, property_type, budget_max, created_at, agent, assigned_to, created_by'
         ),
-      supabase.from('follow_ups').select('follow_up_status, follow_up_type, priority, due_date'),
+      supabase
+        .from('follow_ups')
+        .select('follow_up_status, follow_up_type, priority, due_date, created_at'),
       supabase.from('leads').select('budget_max, created_at').eq('lead_status', 'Won'),
       supabase
         .from('team_members')
@@ -59,14 +82,25 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to load report data' }, { status: 500 });
   }
 
-  const leads = leadsRes.data || [];
-  const followUps = followUpsRes.data || [];
-  const customers = customersRes.data || [];
+  const allLeads = leadsRes.data || [];
+  const leads = hasRange ? allLeads.filter((l: any) => inRange(l.created_at)) : allLeads;
+  const allFollowUps = followUpsRes.data || [];
+  const followUps = hasRange
+    ? allFollowUps.filter((f: any) => inRange(f.created_at))
+    : allFollowUps;
+  const allCustomers = customersRes.data || [];
+  const customers = hasRange
+    ? allCustomers.filter((c: any) => inRange(c.created_at))
+    : allCustomers;
+  const allCalls = callsRes.data || [];
+  const calls = hasRange ? allCalls.filter((c: any) => inRange(c.created_at)) : allCalls;
+  const allExpenses = expensesRes.data || [];
+  const expenses = hasRange
+    ? allExpenses.filter((e: any) => inDateRange(e.expense_date))
+    : allExpenses;
   const team = teamRes.data || [];
-  const calls = callsRes.data || [];
   const memberships = membershipsRes.data || [];
   const allTeams = teamsRes.data || [];
-  const expenses = expensesRes.data || [];
   const ratings = ratingsRes.data || [];
 
   // Lead status breakdown
@@ -94,14 +128,15 @@ export async function GET() {
     followUpsByStatus[f.follow_up_status] = (followUpsByStatus[f.follow_up_status] || 0) + 1;
   });
 
-  // Monthly leads (last 6 months)
+  // Monthly leads (last 6 months). Computed from all leads (unfiltered) so the
+  // fixed 6-month trend window is not distorted by the selected date range.
   const now = new Date();
   const monthlyLeads: { month: string; leads: number; won: number }[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const monthStr = d.toISOString().slice(0, 7);
     const label = d.toLocaleString('default', { month: 'short', year: '2-digit' });
-    const monthLeads = leads.filter((l: any) => l.created_at?.startsWith(monthStr));
+    const monthLeads = allLeads.filter((l: any) => l.created_at?.startsWith(monthStr));
     monthlyLeads.push({
       month: label,
       leads: monthLeads.length,

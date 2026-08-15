@@ -2826,8 +2826,11 @@ function rowToCustomer(row: any) {
 // ─── REPORTS ─────────────────────────────────────────────────────────────────
 
 export const reportsService = {
-  getSummary() {
-    return cachedRead('reportsSummary', fetchReportsSummary);
+  getSummary(from?: string, to?: string) {
+    // When a date range is requested, cache under a range-scoped key so the
+    // all-time callers (dashboard charts) never share stale scoped data.
+    const key = from && to ? `reportsSummary:${from}:${to}` : 'reportsSummary';
+    return cachedRead(key, () => fetchReportsSummary(from, to));
   },
 
   async getActivity(from: string, to: string) {
@@ -2849,8 +2852,12 @@ export const reportsService = {
   },
 };
 
-async function fetchReportsSummary() {
-  const res = await fetch('/api/reports/summary', { cache: 'no-store' });
+async function fetchReportsSummary(from?: string, to?: string) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  const res = await fetch(`/api/reports/summary${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to load report data (${res.status})`);
   return res.json();
 }

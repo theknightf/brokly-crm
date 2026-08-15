@@ -56,6 +56,39 @@ function daysAgoIso(n: number): string {
   return isoDay(d);
 }
 
+function monthStartIso(): string {
+  const d = new Date();
+  return isoDay(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+
+// Used for the "All time" preset: a floor early enough to capture every record
+// while still letting the unified filter pass a concrete from/to everywhere.
+const ALL_TIME_START = '2000-01-01';
+
+type RangePreset = 'today' | '7d' | 'month' | 'all' | 'custom';
+
+const RANGE_PRESETS: { key: RangePreset; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: '7d', label: 'Last 7 days' },
+  { key: 'month', label: 'This month' },
+  { key: 'all', label: 'All time' },
+];
+
+function presetRange(key: RangePreset): { from: string; to: string } {
+  const today = todayIso();
+  switch (key) {
+    case 'today':
+      return { from: today, to: today };
+    case 'month':
+      return { from: monthStartIso(), to: today };
+    case 'all':
+      return { from: ALL_TIME_START, to: today };
+    case '7d':
+    default:
+      return { from: daysAgoIso(6), to: today };
+  }
+}
+
 function countDays(from: string, to: string): number {
   const start = new Date(`${from}T00:00:00`).getTime();
   const end = new Date(`${to}T00:00:00`).getTime();
@@ -256,7 +289,8 @@ const TABS: { key: TabKey; label: string }[] = [
 export default function ReportsScreen() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [from, setFrom] = useState(daysAgoIso(7));
+  const [rangePreset, setRangePreset] = useState<RangePreset>('7d');
+  const [from, setFrom] = useState(daysAgoIso(6));
   const [to, setTo] = useState(todayIso());
   const [activity, setActivity] = useState<any>(null);
   const [attendance, setAttendance] = useState<any>(null);
@@ -266,15 +300,15 @@ export default function ReportsScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   useEffect(() => {
-    loadReports();
-    loadExtras();
+    loadReports(from, to);
+    loadExtras(from, to);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadReports = async () => {
+  const loadReports = async (f: string, t: string) => {
     setLoading(true);
     try {
-      const result = await reportsService.getSummary();
+      const result = await reportsService.getSummary(f || undefined, t || undefined);
       setData(result as ReportData);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load reports');
@@ -283,12 +317,12 @@ export default function ReportsScreen() {
     }
   };
 
-  const loadExtras = async () => {
+  const loadExtras = async (f: string, t: string) => {
     setExtrasLoading(true);
     try {
       const [act, att] = await Promise.all([
-        reportsService.getActivity(from, to),
-        reportsService.getAttendanceReport(from, to),
+        reportsService.getActivity(f, t),
+        reportsService.getAttendanceReport(f, t),
       ]);
       setActivity(act);
       setAttendance(att);
@@ -298,6 +332,14 @@ export default function ReportsScreen() {
     } finally {
       setExtrasLoading(false);
     }
+  };
+
+  const applyRange = (f: string, t: string, preset: RangePreset) => {
+    setFrom(f);
+    setTo(t);
+    setRangePreset(preset);
+    loadReports(f, t);
+    loadExtras(f, t);
   };
 
   const leadsByStatusData = data
@@ -442,8 +484,8 @@ export default function ReportsScreen() {
           </button>
           <button
             onClick={() => {
-              loadReports();
-              loadExtras();
+              loadReports(from, to);
+              loadExtras(from, to);
             }}
             disabled={loading || extrasLoading}
             className="btn-ghost p-2 rounded-lg"
@@ -451,6 +493,51 @@ export default function ReportsScreen() {
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
+        </div>
+      </div>
+
+      {/* Unified date range filter */}
+      <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3 border-b border-border bg-card flex-shrink-0">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {RANGE_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => {
+                const r = presetRange(p.key);
+                applyRange(r.from, r.to, p.key);
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+                rangePreset === p.key
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <input
+            type="date"
+            value={from}
+            max={to}
+            onChange={(e) => {
+              if (e.target.value) applyRange(e.target.value, to, 'custom');
+            }}
+            className="input-base text-sm"
+            title="From"
+          />
+          <span className="text-xs text-muted-foreground">to</span>
+          <input
+            type="date"
+            value={to}
+            max={todayIso()}
+            onChange={(e) => {
+              if (e.target.value) applyRange(from, e.target.value, 'custom');
+            }}
+            className="input-base text-sm"
+            title="To"
+          />
         </div>
       </div>
 
@@ -510,11 +597,6 @@ export default function ReportsScreen() {
               actionTypes={actionTypes}
               hourFilter={hourFilter}
               setHourFilter={setHourFilter}
-              from={from}
-              to={to}
-              setFrom={setFrom}
-              setTo={setTo}
-              loadExtras={loadExtras}
               extrasLoading={extrasLoading}
               extrasAdmin={extrasAdmin}
             />
@@ -806,11 +888,6 @@ function TeamTab({
   actionTypes,
   hourFilter,
   setHourFilter,
-  from,
-  to,
-  setFrom,
-  setTo,
-  loadExtras,
   extrasLoading,
   extrasAdmin,
 }: {
@@ -820,11 +897,6 @@ function TeamTab({
   actionTypes: string[];
   hourFilter: number | 'all';
   setHourFilter: (v: number | 'all') => void;
-  from: string;
-  to: string;
-  setFrom: (v: string) => void;
-  setTo: (v: string) => void;
-  loadExtras: () => void;
   extrasLoading: boolean;
   extrasAdmin: boolean;
 }) {
@@ -1004,22 +1076,6 @@ function TeamTab({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="input-base text-sm"
-                title="From"
-              />
-              <span className="text-xs text-muted-foreground">to</span>
-              <input
-                type="date"
-                value={to}
-                max={todayIso()}
-                onChange={(e) => setTo(e.target.value)}
-                className="input-base text-sm"
-                title="To"
-              />
               <select
                 value={String(hourFilter)}
                 onChange={(e) =>
@@ -1035,13 +1091,6 @@ function TeamTab({
                   </option>
                 ))}
               </select>
-              <button
-                onClick={loadExtras}
-                disabled={extrasLoading}
-                className="btn-secondary text-sm flex items-center gap-1.5"
-              >
-                <RefreshCw size={14} className={extrasLoading ? 'animate-spin' : ''} /> Apply
-              </button>
             </div>
           </div>
 
