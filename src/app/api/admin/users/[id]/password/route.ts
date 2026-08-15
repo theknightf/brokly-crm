@@ -69,9 +69,12 @@ export async function PATCH(
   }
 
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRoleKey) {
+  if (!serviceRoleKey || serviceRoleKey.startsWith('replace-with-')) {
     return NextResponse.json(
-      { error: 'SUPABASE_SERVICE_ROLE_KEY is not configured on the server' },
+      {
+        error:
+          'Server is missing a valid SUPABASE_SERVICE_ROLE_KEY. Add your real service-role key (Supabase dashboard → Settings → API) to the server environment variables and redeploy.',
+      },
       { status: 500 }
     );
   }
