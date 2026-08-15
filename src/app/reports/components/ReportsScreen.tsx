@@ -1,7 +1,27 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-import { BarChart3, Loader2, RefreshCw, Users, UserCheck, DollarSign, Target, FileDown } from 'lucide-react';
+import {
+  BarChart3,
+  Loader2,
+  RefreshCw,
+  Users,
+  UserCheck,
+  DollarSign,
+  Target,
+  FileDown,
+  Activity,
+  Clock,
+  CalendarCheck,
+  CheckSquare,
+  Phone,
+  FolderKanban,
+  Receipt,
+  Banknote,
+  Wallet,
+  ChevronRight,
+} from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
 import { toast } from 'sonner';
 import { exportPDF, exportCSV } from '@/lib/exportReport';
@@ -298,7 +318,34 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'calls', label: 'Calls' },
 ];
 
+// Landing cards — one per required report type. `target` is either an in-page
+// tab key or a route to an existing dedicated page/section.
+type ReportCardTarget = TabKey | string;
+const REPORT_CARDS: {
+  key: string;
+  title: string;
+  desc: string;
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  target: ReportCardTarget;
+  adminOnly?: boolean;
+}[] = [
+  { key: 'userPerformance', title: 'User Performance', desc: 'Leads, wins and conversion per agent', icon: Users, target: 'team' },
+  { key: 'userActivities', title: 'User Activities', desc: 'Every user action grouped by hour and type', icon: Activity, target: 'team' },
+  { key: 'leads', title: 'Leads', desc: 'Lead volume, status, sources and property types', icon: BarChart3, target: 'leads' },
+  { key: 'attendance', title: 'Attendance', desc: 'On-time, late and absent days per user', icon: Clock, target: 'attendance' },
+  { key: 'meetings', title: 'Meetings', desc: 'Scheduled site visits and meetings', icon: CalendarCheck, target: '/calendar' },
+  { key: 'followUps', title: 'Follow-ups', desc: 'Pending and completed follow-ups', icon: CheckSquare, target: '/follow-ups' },
+  { key: 'calls', title: 'Calls', desc: 'Call volume, duration and outcomes', icon: Phone, target: 'calls' },
+  { key: 'sales', title: 'Sales / Deals', desc: 'Revenue, won deals and average deal value', icon: DollarSign, target: 'sales' },
+  { key: 'projects', title: 'Projects', desc: 'Project pipeline and pitches', icon: FolderKanban, target: '/projects' },
+  { key: 'expenses', title: 'Expenses', desc: 'Spend by category and team', icon: Receipt, target: '/expenses' },
+  { key: 'payroll', title: 'Payroll', desc: 'Payroll entries, bonuses and deductions', icon: Banknote, target: '/admin?tab=payroll', adminOnly: true },
+  { key: 'accounts', title: 'Accounts', desc: 'Company accounts and balances', icon: Wallet, target: '/admin?tab=leadSources', adminOnly: true },
+  { key: 'kpis', title: 'KPIs', desc: 'Team KPI targets vs actual results', icon: Target, target: '/admin?tab=kpiTargets', adminOnly: true },
+];
+
 export default function ReportsScreen() {
+  const router = useRouter();
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [rangePreset, setRangePreset] = useState<RangePreset>('7d');
@@ -309,7 +356,8 @@ export default function ReportsScreen() {
   const [hourFilter, setHourFilter] = useState<number | 'all'>('all');
   const [extrasLoading, setExtrasLoading] = useState(false);
   const [extrasAdmin, setExtrasAdmin] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [view, setView] = useState<'landing' | TabKey>('landing');
+  const [userFilter, setUserFilter] = useState<string>('all');
 
   useEffect(() => {
     loadReports(from, to);
@@ -377,30 +425,96 @@ export default function ReportsScreen() {
     new Set(activityRows.flatMap((r) => Object.keys(r.byAction)))
   ).sort();
 
+  // ── User filter (VERY IMPORTANT per requirements) ────────────────────
+  // Builds the list of users from every available source so the dropdown
+  // works even before the extras (activity/attendance) finish loading.
+  const userOptions: { id: string; name: string }[] = [];
+  {
+    const map = new Map<string, string>();
+    const add = (id: string | undefined | null, name: string | undefined | null) => {
+      if (!id || !name) return;
+      if (!map.has(id)) map.set(id, name);
+    };
+    for (const u of activity?.users || []) add(u.id, u.full_name || u.email);
+    for (const u of attendance?.users || []) add(u.id, u.full_name || u.email);
+    for (const m of data?.teamPerformance || []) add(m.id, m.name);
+    for (const c of data?.callsByEmployee || []) add(c.userId, c.name);
+    userOptions.push(...Array.from(map.entries()).map(([id, name]) => ({ id, name })));
+    userOptions.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const selectedUserId = userFilter !== 'all' ? userFilter : null;
+  const selectedTeam = selectedUserId
+    ? (data?.teamPerformance || []).find((m) => m.id === selectedUserId)
+    : null;
+
+  // Per-user scoped copy of the report data: KPI cards and per-user tables
+  // (agent performance, team performance, calls) reflect only the selected user.
+  const filteredData: ReportData | null = data
+    ? {
+        ...data,
+        totalLeads: selectedTeam ? selectedTeam.assignedLeads : data.totalLeads,
+        totalCustomers: selectedTeam ? selectedTeam.closedDeals : data.totalCustomers,
+        totalRevenue: selectedTeam ? selectedTeam.totalRevenue : data.totalRevenue,
+        conversionRate: selectedTeam ? String(selectedTeam.conversionRate) : data.conversionRate,
+        agentPerformance: selectedUserId
+          ? data.agentPerformance.filter((a) => a.name === (selectedTeam?.name ?? ''))
+          : data.agentPerformance,
+        teamPerformance: selectedUserId
+          ? data.teamPerformance.filter((m) => m.id === selectedUserId)
+          : data.teamPerformance,
+        callsByEmployee: selectedUserId
+          ? data.callsByEmployee.filter((c) => c.userId === selectedUserId)
+          : data.callsByEmployee,
+      }
+    : null;
+
+  const filteredActivityRows = selectedUserId
+    ? activityRows.filter((r) => r.id === selectedUserId)
+    : activityRows;
+  const filteredHourRows = selectedUserId
+    ? hourRows.filter((r) => r.id === selectedUserId)
+    : hourRows;
+  const filteredAttendanceRows = selectedUserId
+    ? attendanceRows.filter((r) => r.id === selectedUserId)
+    : attendanceRows;
+
+  const selectedUserName = selectedUserId
+    ? userOptions.find((u) => u.id === selectedUserId)?.name
+    : undefined;
+
+  const openReport = (target: ReportCardTarget) => {
+    if (target === 'overview' || target === 'leads' || target === 'sales' || target === 'team' || target === 'attendance' || target === 'calls') {
+      setView(target);
+    } else {
+      router.push(target);
+    }
+  };
+
   const exportReportsPDF = () => {
-    if (!data) return;
+    if (!filteredData) return;
     const tables: { caption: string; headers: string[]; rows: string[][]; footer?: string }[] = [];
-    if (data.monthlyLeads.length) {
+    if (filteredData.monthlyLeads.length) {
       tables.push({
         caption: 'Monthly Leads vs Won (Last 6 Months)',
         headers: ['Month', 'Leads', 'Won'],
-        rows: data.monthlyLeads.map((m) => [m.month, String(m.leads), String(m.won)]),
+        rows: filteredData.monthlyLeads.map((m) => [m.month, String(m.leads), String(m.won)]),
       });
     }
-    if (data.agentPerformance.length) {
+    if (filteredData.agentPerformance.length) {
       tables.push({
         caption: 'Agent Performance',
         headers: ['Agent', 'Leads', 'Won', 'Conversion %'],
-        rows: data.agentPerformance
+        rows: filteredData.agentPerformance
           .sort((a, b) => b.leads - a.leads)
           .map((a) => [a.name, String(a.leads), String(a.won), String(a.rate)]),
       });
     }
-    if (data.teamPerformance.length) {
+    if (filteredData.teamPerformance.length) {
       tables.push({
         caption: 'Team Performance',
         headers: ['Member', 'Assigned', 'Closed', 'Revenue', 'Rate %'],
-        rows: data.teamPerformance
+        rows: filteredData.teamPerformance
           .sort((a, b) => b.closedDeals - a.closedDeals)
           .map((m) => [
             m.name,
@@ -411,34 +525,38 @@ export default function ReportsScreen() {
           ]),
       });
     }
-    if (activityRows.length) {
+    if (filteredActivityRows.length) {
       tables.push({
         caption: `Team Activity — Actions per Hour (${from} → ${to}; office hours 12:00–20:00)`,
         headers: ['User', ...OFFICE_HOURS.map((h) => `${h}:00`), 'Total'],
-        rows: activityRows.map((r) => [
+        rows: filteredActivityRows.map((r) => [
           r.name,
           ...OFFICE_HOURS.map((h) => String(r.byHour[h] || 0)),
           String(r.total),
         ]),
       });
     }
-    if (attendanceRows.length) {
+    if (filteredAttendanceRows.length) {
       tables.push({
         caption: `Attendance Report (${from} → ${to})`,
         headers: ['User', 'Days Present', 'On Time', 'Late', 'Absent'],
-        rows: attendanceRows
+        rows: filteredAttendanceRows
           .sort((a, b) => b.late - a.late)
           .map((r) => [r.name, String(r.present), String(r.onTime), String(r.late), String(r.absent)]),
       });
     }
     exportPDF(
       'Reports & Analytics',
-      `Generated for ${from} → ${to}`,
+      `Generated for ${from} → ${to}${
+        selectedUserId
+          ? ` · User: ${selectedUserName ?? selectedUserId}`
+          : ' · All users'
+      }`,
       [
-        { label: 'Total Leads', value: String(data.totalLeads) },
-        { label: 'Customers', value: String(data.totalCustomers) },
-        { label: 'Revenue', value: formatCurrency(data.totalRevenue) },
-        { label: 'Conversion', value: `${data.conversionRate}%` },
+        { label: 'Total Leads', value: String(filteredData.totalLeads) },
+        { label: 'Customers', value: String(filteredData.totalCustomers) },
+        { label: 'Revenue', value: formatCurrency(filteredData.totalRevenue) },
+        { label: 'Conversion', value: `${filteredData.conversionRate}%` },
       ],
       tables,
       `reports-${todayIso()}`
@@ -447,16 +565,16 @@ export default function ReportsScreen() {
   };
 
   const exportReportsCSV = () => {
-    if (!data) return;
+    if (!filteredData) return;
     const headers = ['Metric', 'Value'];
     const rows: string[][] = [
-      ['Total Leads', String(data.totalLeads)],
-      ['Total Customers', String(data.totalCustomers)],
-      ['Total Revenue', String(data.totalRevenue)],
-      ['Conversion Rate %', String(data.conversionRate)],
-      ...Object.entries(data.leadsByStatus).map(([k, v]) => [`Leads By Status — ${k}`, String(v)]),
-      ...Object.entries(data.leadsBySource).map(([k, v]) => [`Leads By Source — ${k}`, String(v)]),
-      ...data.agentPerformance
+      ['Total Leads', String(filteredData.totalLeads)],
+      ['Total Customers', String(filteredData.totalCustomers)],
+      ['Total Revenue', String(filteredData.totalRevenue)],
+      ['Conversion Rate %', String(filteredData.conversionRate)],
+      ...Object.entries(filteredData.leadsByStatus).map(([k, v]) => [`Leads By Status — ${k}`, String(v)]),
+      ...Object.entries(filteredData.leadsBySource).map(([k, v]) => [`Leads By Source — ${k}`, String(v)]),
+      ...filteredData.agentPerformance
         .sort((a, b) => b.leads - a.leads)
         .map((a) => [`Agent ${a.name}`, `leads ${a.leads}, won ${a.won}, ${a.rate}%`]),
     ];
@@ -529,6 +647,19 @@ export default function ReportsScreen() {
           ))}
         </div>
         <div className="flex items-center gap-2 ml-auto">
+          <select
+            value={userFilter}
+            onChange={(e) => setUserFilter(e.target.value)}
+            className="input-base text-sm"
+            title="Filter reports by user"
+          >
+            <option value="all">All users</option>
+            {userOptions.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
           <input
             type="date"
             value={from}
@@ -555,12 +686,24 @@ export default function ReportsScreen() {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 overflow-x-auto px-4 sm:px-6 py-2 border-b border-border bg-card flex-shrink-0">
+        <button
+          onClick={() => setView('landing')}
+          className={`px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+            view === 'landing'
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+          }`}
+        >
+          All Reports
+        </button>
         {TABS.map((t) => (
           <button
             key={t.key}
-            onClick={() => setActiveTab(t.key)}
+            onClick={() => {
+              setView(t.key);
+            }}
             className={`px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-              activeTab === t.key
+              view === t.key
                 ? 'bg-primary/10 text-primary'
                 : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
             }`}
@@ -580,53 +723,124 @@ export default function ReportsScreen() {
         </div>
       ) : (
         <div className="flex-1 overflow-auto px-6 py-6">
-          {/* Overview tab */}
-          <div className={activeTab === 'overview' ? 'block space-y-6' : 'hidden'}>
-            <OverviewTab data={data} showDelta={rangePreset !== 'all'} />
-          </div>
+          {view === 'landing' ? (
+            <div className="space-y-6">
+              {selectedUserId ? (
+                <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+                  <Users size={16} className="text-primary flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Showing reports for{' '}
+                    <span className="font-semibold text-foreground">
+                      {selectedUserName ?? 'this user'}
+                    </span>
+                    .{' '}
+                    <button
+                      onClick={() => setUserFilter('all')}
+                      className="text-primary font-semibold hover:underline"
+                    >
+                      View all users
+                    </button>
+                  </p>
+                </div>
+              ) : null}
 
-          {/* Leads tab */}
-          <div className={activeTab === 'leads' ? 'block space-y-6' : 'hidden'}>
-            <LeadsTab
-              leadsByStatusData={leadsByStatusData}
-              leadsBySourceData={leadsBySourceData}
-              leadsByPropertyData={leadsByPropertyData}
-              followUpStatusData={followUpStatusData}
-            />
-          </div>
+              {/* Report cards landing */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {REPORT_CARDS.filter((c) => !c.adminOnly || extrasAdmin).map((card) => (
+                  <button
+                    key={card.key}
+                    onClick={() => openReport(card.target)}
+                    className="text-left bg-card border border-border rounded-xl p-5 hover:border-primary/50 hover:shadow-sm transition-all group"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-3">
+                      <card.icon size={20} />
+                    </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-foreground">{card.title}</h3>
+                      <ChevronRight
+                        size={16}
+                        className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-0.5"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
+                    <span className="inline-block mt-3 text-xs font-semibold text-primary">
+                      {TABS.some((t) => t.key === card.target)
+                        ? 'Open report'
+                        : 'Open section'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Overview tab */}
+              <div className={view === 'overview' ? 'block space-y-6' : 'hidden'}>
+                {selectedUserId ? (
+                  <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+                    <Users size={16} className="text-primary flex-shrink-0" />
+                    <p className="text-sm text-muted-foreground">
+                      Showing reports for{' '}
+                      <span className="font-semibold text-foreground">
+                        {selectedUserName ?? 'this user'}
+                      </span>
+                      .{' '}
+                      <button
+                        onClick={() => setUserFilter('all')}
+                        className="text-primary font-semibold hover:underline"
+                      >
+                        View all users
+                      </button>
+                    </p>
+                  </div>
+                ) : null}
+                <OverviewTab data={filteredData!} showDelta={rangePreset !== 'all' && !selectedUserId} />
+              </div>
 
-          {/* Sales tab */}
-          <div className={activeTab === 'sales' ? 'block space-y-6' : 'hidden'}>
-            <SalesTab data={data} />
-          </div>
+              {/* Leads tab */}
+              <div className={view === 'leads' ? 'block space-y-6' : 'hidden'}>
+                <LeadsTab
+                  leadsByStatusData={leadsByStatusData}
+                  leadsBySourceData={leadsBySourceData}
+                  leadsByPropertyData={leadsByPropertyData}
+                  followUpStatusData={followUpStatusData}
+                />
+              </div>
 
-          {/* Team tab */}
-          <div className={activeTab === 'team' ? 'block space-y-6' : 'hidden'}>
-            <TeamTab
-              data={data}
-              activityRows={activityRows}
-              hourRows={hourRows}
-              actionTypes={actionTypes}
-              hourFilter={hourFilter}
-              setHourFilter={setHourFilter}
-              extrasLoading={extrasLoading}
-              extrasAdmin={extrasAdmin}
-            />
-          </div>
+              {/* Sales tab */}
+              <div className={view === 'sales' ? 'block space-y-6' : 'hidden'}>
+                <SalesTab data={filteredData!} />
+              </div>
 
-          {/* Attendance tab */}
-          <div className={activeTab === 'attendance' ? 'block space-y-6' : 'hidden'}>
-            <AttendanceTab
-              attendanceRows={attendanceRows}
-              extrasLoading={extrasLoading}
-              extrasAdmin={extrasAdmin}
-            />
-          </div>
+              {/* Team tab */}
+              <div className={view === 'team' ? 'block space-y-6' : 'hidden'}>
+                <TeamTab
+                  data={filteredData!}
+                  activityRows={filteredActivityRows}
+                  hourRows={filteredHourRows}
+                  actionTypes={actionTypes}
+                  hourFilter={hourFilter}
+                  setHourFilter={setHourFilter}
+                  extrasLoading={extrasLoading}
+                  extrasAdmin={extrasAdmin}
+                />
+              </div>
 
-          {/* Calls tab */}
-          <div className={activeTab === 'calls' ? 'block space-y-6' : 'hidden'}>
-            <CallsTab data={data} />
-          </div>
+              {/* Attendance tab */}
+              <div className={view === 'attendance' ? 'block space-y-6' : 'hidden'}>
+                <AttendanceTab
+                  attendanceRows={filteredAttendanceRows}
+                  extrasLoading={extrasLoading}
+                  extrasAdmin={extrasAdmin}
+                />
+              </div>
+
+              {/* Calls tab */}
+              <div className={view === 'calls' ? 'block space-y-6' : 'hidden'}>
+                <CallsTab data={filteredData!} />
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

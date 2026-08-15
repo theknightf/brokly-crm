@@ -57,6 +57,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [summary, setSummary] = useState<{
     imported: number;
     skipped: number;
+    duplicateCount: number;
     reasons: string[];
   } | null>(null);
 
@@ -208,12 +209,17 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     return r.phone && r.reasons.length === 0 && (skipDuplicates ? !dup : true);
   }).length;
 
+  const unmappedColumns = result
+    ? result.headers.filter((h, i) => !mapping[i]).filter(Boolean)
+    : [];
+
   const doImport = async () => {
     setImporting(true);
     try {
       const batch: any[] = [];
       const skippedReasons: string[] = [];
       const mergedImported: string[] = [];
+      let duplicateCount = 0;
       rows.forEach((row) => {
         const dup = !!row.phone && duplicatePhones.has(row.phone.replace(/\D/g, ''));
         if (!row.phone) {
@@ -225,6 +231,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           return;
         }
         if (skipDuplicates && dup) {
+          duplicateCount += 1;
           skippedReasons.push(`Row ${row.rowNumber}: duplicate phone ${row.phone}`);
           return;
         }
@@ -278,6 +285,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       setSummary({
         imported: batch.length,
         skipped: skippedReasons.length,
+        duplicateCount,
         reasons: [...skippedReasons.slice(0, 20), ...mergedImported.slice(0, 10)],
       });
       setStep('done');
@@ -352,6 +360,22 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
 
       {step === 'preview' && result && (
         <div className="p-6 space-y-5">
+          {/* Unmapped / skipped columns (data preservation) */}
+          {unmappedColumns.length > 0 && (
+            <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-800 text-sm flex items-start gap-2">
+              <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">
+                  {unmappedColumns.length} column{unmappedColumns.length !== 1 ? 's' : ''} will be
+                  skipped — map them below to preserve their data
+                </p>
+                <p className="text-xs mt-0.5 text-sky-700/80">
+                  {unmappedColumns.join(' · ')}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Column mapping */}
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">Map columns</h3>
@@ -501,6 +525,11 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                 <p className="text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
                   <XCircle size={14} className="text-red-500" />
                   {summary.skipped} row{summary.skipped !== 1 ? 's' : ''} skipped
+                  {summary.duplicateCount > 0 && (
+                    <span className="text-amber-600 font-semibold">
+                      · {summary.duplicateCount} duplicate{summary.duplicateCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </p>
                 <ul className="text-xs text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
                   {summary.reasons.map((r, i) => (

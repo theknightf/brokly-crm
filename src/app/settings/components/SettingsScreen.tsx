@@ -385,8 +385,39 @@ function NotificationsTab() {
 }
 
 // ─── Appearance Tab ───────────────────────────────────────────────────────────
+const THEME_KEY = 'brokly_theme';
+
+function resolveTheme(pref: 'light' | 'dark' | 'system'): boolean {
+  if (pref === 'dark') return true;
+  if (pref === 'light') return false;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+}
+
+function applyTheme(pref: 'light' | 'dark' | 'system') {
+  const dark = resolveTheme(pref);
+  document.documentElement.classList.toggle('dark', dark);
+}
+
 function AppearanceTab() {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    if (typeof window === 'undefined') return 'system';
+    return (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'system') || 'system';
+  });
+
+  useEffect(() => {
+    applyTheme(theme);
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const onChange = () => applyTheme('system');
+      mq.addEventListener('change', onChange);
+      return () => mq.removeEventListener('change', onChange);
+    }
+  }, [theme]);
+
+  const select = (value: 'light' | 'dark' | 'system') => {
+    setTheme(value);
+    localStorage.setItem(THEME_KEY, value);
+  };
 
   const themes = [
     { value: 'light' as const, label: 'Light', icon: <Sun size={18} /> },
@@ -406,7 +437,7 @@ function AppearanceTab() {
           {themes.map((t) => (
             <button
               key={t.value}
-              onClick={() => setTheme(t.value)}
+              onClick={() => select(t.value)}
               className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
                 theme === t.value
                   ? 'border-primary bg-primary/5'
@@ -426,7 +457,7 @@ function AppearanceTab() {
           ))}
         </div>
         <p className="text-xs text-muted-foreground mt-3">
-          Theme switching will be applied in a future update.
+          Your theme preference is saved on this device.
         </p>
       </div>
     </div>

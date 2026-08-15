@@ -47,6 +47,48 @@
   --source-cold: #6b7280;
 }
 
+/* Dark theme — applied via the `dark` class on <html> (tailwind darkMode: 'class'). */
+.dark {
+  --background: #0f1115;
+  --foreground: #e7e9ee;
+  --primary: #a3e635;
+  --primary-foreground: #1a2e05;
+  --secondary: #1c2416;
+  --secondary-foreground: #d9f99d;
+  --accent: #84cc16;
+  --accent-foreground: #0f1115;
+  --muted: #1a1d23;
+  --muted-foreground: #9aa1ab;
+  --card: #14171d;
+  --card-foreground: #e7e9ee;
+  --border: #262a31;
+  --input: #262a31;
+  --ring: #84cc16;
+
+  --status-new: #a3e635;
+  --status-new-bg: #1c2416;
+  --status-contacted: #84cc16;
+  --status-contacted-bg: #1a2315;
+  --status-qualified: #4ade80;
+  --status-qualified-bg: #11261a;
+  --status-visit-scheduled: #a3e635;
+  --status-visit-scheduled-bg: #1c2416;
+  --status-visited: #b3e56b;
+  --status-visited-bg: #1a2315;
+  --status-negotiation: #84cc16;
+  --status-negotiation-bg: #1c2416;
+  --status-won: #d9f99d;
+  --status-won-bg: #22300f;
+  --status-lost: #9aa1ab;
+  --status-lost-bg: #1a1d23;
+
+  --source-portal: #84cc16;
+  --source-referral: #4ade80;
+  --source-walkin: #a3e635;
+  --source-social: #bef264;
+  --source-cold: #9aa1ab;
+}
+
 @layer base {
   * {
     box-sizing: border-box;

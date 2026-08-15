@@ -47,6 +47,7 @@ export type CallOutcome =
   | 'Reached'
   | 'Interested'
   | 'Site Visit'
+  | 'Meeting'
   | 'Won Deal'
   | 'Not Interested'
   | 'Call back later'
@@ -73,6 +74,11 @@ const OUTCOMES: { value: CallOutcome; icon: React.ReactNode; cls: string }[] = [
   {
     value: 'Site Visit',
     icon: <CalendarCheck size={14} />,
+    cls: 'border-violet-200 bg-violet-50 text-violet-700',
+  },
+  {
+    value: 'Meeting',
+    icon: <CalendarClock size={14} />,
     cls: 'border-violet-200 bg-violet-50 text-violet-700',
   },
   {
@@ -193,6 +199,10 @@ export function CallOutcomeSheet({
   const [pitchLoading, setPitchLoading] = useState(false);
   const [shortCall, setShortCall] = useState(false);
   const [duplicateToday, setDuplicateToday] = useState(false);
+  const [meetingDate, setMeetingDate] = useState('');
+  const [meetingTime, setMeetingTime] = useState('12:00');
+  const [meetingLocation, setMeetingLocation] = useState('In Company');
+  const [meetingNotes, setMeetingNotes] = useState('');
   const startedAtRef = useRef<number>(0);
 
   useEffect(() => {
@@ -205,6 +215,10 @@ export function CallOutcomeSheet({
     setPitchLoading(false);
     setShortCall(false);
     setDuplicateToday(false);
+    setMeetingDate('');
+    setMeetingTime('12:00');
+    setMeetingLocation('In Company');
+    setMeetingNotes('');
     startedAtRef.current = Date.now();
 
     // PWA call-arrival verification: if we know when the dialer was opened and
@@ -383,12 +397,77 @@ export function CallOutcomeSheet({
         }
       };
 
+      const scheduleMeeting = async () => {
+        const targetDate = meetingDate || futureDate(0);
+        const locationNote = `Meeting at ${meetingLocation}${
+          item.projectName ? ` — ${item.projectName}` : ''
+        }`;
+        if (item.entityType === 'lead' || !item.entityType) {
+          try {
+            const supabase = createClient();
+            const {
+              data: { user: currentUser },
+            } = await supabase.auth.getUser();
+            const created = await followUpsService.create(
+              {
+                title: `Meeting: ${item.contactName}`,
+                contactName: item.contactName,
+                contactPhone: item.contactPhone || '',
+                contactType: 'Lead',
+                type: 'Meeting',
+                status: 'Pending',
+                priority: 'High',
+                dueDate: targetDate,
+                dueTime: meetingTime || '12:00',
+                agent: '',
+                agentInitials: '',
+                notes: [locationNote, meetingNotes.trim(), note.trim()]
+                  .filter(Boolean)
+                  .join(' — '),
+                propertyInterest: '',
+                relationshipStatus: 'New',
+              },
+              currentUser?.id || ''
+            );
+            if (created?.id) {
+              await supabase
+                .from('follow_ups')
+                .update({ lead_id: item.id })
+                .eq('id', created.id)
+                .then(({ error }) => {
+                  if (error) throw error;
+                });
+            }
+            toast.success(`Meeting scheduled for ${targetDate} at ${meetingTime}`);
+          } catch {
+            toast.success('Call logged');
+          }
+        } else if (item.rescheduleId) {
+          try {
+            await followUpsService.update(item.rescheduleId, {
+              dueDate: targetDate,
+              dueTime: meetingTime,
+              type: 'Meeting',
+              status: 'Pending',
+              notes: [locationNote, meetingNotes.trim(), note.trim()].filter(Boolean).join(' — '),
+            });
+            toast.success(`Meeting scheduled for ${targetDate} at ${meetingTime}`);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Call logged, but scheduling failed');
+          }
+        }
+      };
+
       if (outcome === 'Call back later') {
         scheduleFollowUp(futureDate(callbackDays), 'Call back');
       }
 
       if (outcome === 'WhatsApp Follow-up') {
         scheduleFollowUp(futureDate(callbackDays), 'WhatsApp follow-up');
+      }
+
+      if (outcome === 'Site Visit' || outcome === 'Meeting') {
+        await scheduleMeeting();
       }
 
       toast.success('Call logged');
@@ -531,6 +610,62 @@ export function CallOutcomeSheet({
           </div>
         )}
 
+        {(outcome === 'Site Visit' || outcome === 'Meeting') && (
+          <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2.5">
+            <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <CalendarCheck size={13} className="text-primary" />
+              Schedule meeting
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-muted-foreground">Date</label>
+                <input
+                  type="date"
+                  value={meetingDate || futureDate(0)}
+                  onChange={(e) => setMeetingDate(e.target.value)}
+                  className="border border-input bg-background text-foreground rounded-lg px-2.5 h-9 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-muted-foreground">Time</label>
+                <input
+                  type="time"
+                  value={meetingTime}
+                  onChange={(e) => setMeetingTime(e.target.value)}
+                  className="border border-input bg-background text-foreground rounded-lg px-2.5 h-9 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-semibold text-muted-foreground">Location</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {['In Company', 'Developer Branch', 'Project Site'].map((loc) => (
+                  <button
+                    key={loc}
+                    onClick={() => setMeetingLocation(loc)}
+                    className={`h-9 rounded-lg text-[11px] font-semibold transition-colors active:scale-95 ${
+                      meetingLocation === loc
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card border border-border text-muted-foreground'
+                    }`}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <input
+              value={meetingNotes}
+              onChange={(e) => setMeetingNotes(e.target.value)}
+              placeholder="Meeting notes (optional)"
+              className="w-full border border-input bg-background text-foreground rounded-lg px-2.5 h-9 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              This meeting appears on the unified Calendar automatically.
+            </p>
+          </div>
+        )}
+
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -554,7 +689,9 @@ export function CallOutcomeSheet({
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
             {outcome === 'Call back later' || outcome === 'WhatsApp Follow-up'
               ? 'Save & schedule'
-              : 'Save log'}
+              : outcome === 'Site Visit' || outcome === 'Meeting'
+                ? 'Save & schedule meeting'
+                : 'Save log'}
           </button>
         </div>
       </div>

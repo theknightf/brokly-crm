@@ -22,6 +22,10 @@ import {
   Trophy,
   PhoneCall,
   Mail,
+  Banknote,
+  Palmtree,
+  Target,
+  Repeat,
 } from 'lucide-react';
 import { adminSettingsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +37,10 @@ import ActivityDashboard from './ActivityDashboard';
 import ProductivityDashboard from './ProductivityDashboard';
 import CallLogsTab from './CallLogsTab';
 import EmailTemplatesTab from './EmailTemplatesTab';
+import PayrollTab from './PayrollTab';
+import LeaveTab from './LeaveTab';
+import KpiTargetsTab from './KpiTargetsTab';
+import RotationTab from './RotationTab';
 
 type TabKey =
   | 'leadSources'
@@ -45,7 +53,11 @@ type TabKey =
   | 'activity'
   | 'productivity'
   | 'callLogs'
-  | 'emailTemplates';
+  | 'emailTemplates'
+  | 'payroll'
+  | 'leave'
+  | 'kpiTargets'
+  | 'rotation';
 
 interface AdminItem {
   id: string;
@@ -121,6 +133,30 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
     label: 'Email Templates',
     icon: <Mail size={16} />,
     description: 'Reusable email subject & body templates for automated and manual emails',
+  },
+  {
+    key: 'payroll',
+    label: 'Payroll',
+    icon: <Banknote size={16} />,
+    description: 'Payroll periods, attendance-based generation, salaries, and bonuses',
+  },
+  {
+    key: 'leave',
+    label: 'Leave',
+    icon: <Palmtree size={16} />,
+    description: 'Approve or reject employee leave requests',
+  },
+  {
+    key: 'kpiTargets',
+    label: 'KPI Targets',
+    icon: <Target size={16} />,
+    description: 'Set daily and monthly performance targets for the team',
+  },
+  {
+    key: 'rotation',
+    label: 'Lead Rotation',
+    icon: <Repeat size={16} />,
+    description: 'Auto-reassign inactive leads to available agents',
   },
 ];
 
@@ -285,7 +321,18 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('leadSources');
   const [settings, setSettings] = useState<
     Record<
-      Exclude<TabKey, 'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'>,
+      Exclude<
+        TabKey,
+        | 'users'
+        | 'attendance'
+        | 'activity'
+        | 'productivity'
+        | 'callLogs'
+        | 'payroll'
+        | 'leave'
+        | 'kpiTargets'
+        | 'rotation'
+      >,
       AdminItem[]
     >
   >({
@@ -311,6 +358,15 @@ export default function AdminScreen() {
 
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('tab') as TabKey | null;
+      if (t && TABS.some((x) => x.key === t)) setActiveTab(t);
+    } catch {
+      /* ignore malformed query */
+    }
   }, []);
 
   const loadSettings = async () => {
@@ -344,12 +400,25 @@ export default function AdminScreen() {
     activeTab === 'attendance' ||
     activeTab === 'activity' ||
     activeTab === 'productivity' ||
-    activeTab === 'callLogs';
+    activeTab === 'callLogs' ||
+    activeTab === 'emailTemplates' ||
+    activeTab === 'payroll' ||
+    activeTab === 'leave' ||
+    activeTab === 'kpiTargets' ||
+    activeTab === 'rotation';
   const items = !isPanelTab
     ? settings[
         activeTab as Exclude<
           TabKey,
-          'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'
+          | 'users'
+          | 'attendance'
+          | 'activity'
+          | 'productivity'
+          | 'callLogs'
+          | 'payroll'
+          | 'leave'
+          | 'kpiTargets'
+          | 'rotation'
         >
       ] || []
     : [];
@@ -500,14 +569,36 @@ export default function AdminScreen() {
             const isActivity = tab.key === 'activity';
             const isProductivity = tab.key === 'productivity';
             const isCallLogs = tab.key === 'callLogs';
-            const isSpecial = isUsers || isAttendance || isActivity || isProductivity || isCallLogs;
+            const isPayroll = tab.key === 'payroll';
+            const isLeave = tab.key === 'leave';
+            const isKpi = tab.key === 'kpiTargets';
+            const isRotation = tab.key === 'rotation';
+            const isSpecial =
+              isUsers ||
+              isAttendance ||
+              isActivity ||
+              isProductivity ||
+              isCallLogs ||
+              tab.key === 'emailTemplates' ||
+              isPayroll ||
+              isLeave ||
+              isKpi ||
+              isRotation;
             const count = isSpecial
               ? 0
               : (
                   settings[
                     tab.key as Exclude<
                       TabKey,
-                      'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'
+                      | 'users'
+                      | 'attendance'
+                      | 'activity'
+                      | 'productivity'
+                      | 'callLogs'
+                      | 'payroll'
+                      | 'leave'
+                      | 'kpiTargets'
+                      | 'rotation'
                     >
                   ] || []
                 ).length;
@@ -517,7 +608,15 @@ export default function AdminScreen() {
                   settings[
                     tab.key as Exclude<
                       TabKey,
-                      'users' | 'attendance' | 'activity' | 'productivity' | 'callLogs'
+                      | 'users'
+                      | 'attendance'
+                      | 'activity'
+                      | 'productivity'
+                      | 'callLogs'
+                      | 'payroll'
+                      | 'leave'
+                      | 'kpiTargets'
+                      | 'rotation'
                     >
                   ] || []
                 ).filter((i) => i.active).length;
@@ -542,6 +641,14 @@ export default function AdminScreen() {
                     <p className="text-xs text-muted-foreground">Sessions & usage</p>
                   ) : isProductivity ? (
                     <p className="text-xs text-muted-foreground">Leaderboard & ranking</p>
+                  ) : isPayroll ? (
+                    <p className="text-xs text-muted-foreground">Salaries & periods</p>
+                  ) : isLeave ? (
+                    <p className="text-xs text-muted-foreground">Leave requests</p>
+                  ) : isKpi ? (
+                    <p className="text-xs text-muted-foreground">Daily & monthly goals</p>
+                  ) : isRotation ? (
+                    <p className="text-xs text-muted-foreground">Auto-reassign inactive leads</p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
                       {active}/{count} active
@@ -566,6 +673,14 @@ export default function AdminScreen() {
             <CallLogsTab />
           ) : activeTab === 'emailTemplates' ? (
             <EmailTemplatesTab />
+          ) : activeTab === 'payroll' ? (
+            <PayrollTab />
+          ) : activeTab === 'leave' ? (
+            <LeaveTab />
+          ) : activeTab === 'kpiTargets' ? (
+            <KpiTargetsTab />
+          ) : activeTab === 'rotation' ? (
+            <RotationTab />
           ) : loading ? (
             <div className="flex items-center justify-center h-48">
               <Loader2 size={28} className="animate-spin text-primary" />

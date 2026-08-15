@@ -38,6 +38,7 @@ import ImportLeadsModal from './ImportLeadsModal';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction, ALL_STATUSES } from './mockLeads';
 import { leadsService } from '@/lib/services/crmService';
+import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { useAuth } from '@/contexts/AuthContext';
 import LeadCommentsSection from './LeadCommentsSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
@@ -227,6 +228,11 @@ export default function LeadsManagementScreen({
   const [logCallLead, setLogCallLead] = useState<Lead | null>(null);
   const [callHistoryKey, setCallHistoryKey] = useState(0);
   const statusPendingRef = useRef<Set<string>>(new Set());
+  const [dupWarning, setDupWarning] = useState<{
+    existing: any;
+    pendingLead: Lead;
+  } | null>(null);
+  const [dupChecking, setDupChecking] = useState(false);
 
   /** Swap the lead inside the reservation / done-deal modal (Select Existing Lead). */
   const handleDealLeadChange = async (leadId: string): Promise<Lead | null> => {
@@ -250,6 +256,13 @@ export default function LeadsManagementScreen({
     const leadId = params.get('lead');
     const openNew = params.get('new') === '1';
     const statusParam = params.get('status');
+    const searchParam = params.get('search');
+    if (searchParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('search');
+      window.history.replaceState({}, '', url.toString());
+      setFilters((f) => ({ ...f, search: searchParam }));
+    }
     if (statusParam && ALL_STATUSES.includes(statusParam as LeadStatus)) {
       const url = new URL(window.location.href);
       url.searchParams.delete('status');
@@ -464,6 +477,24 @@ export default function LeadsManagementScreen({
   };
 
   const handleAddLead = async (lead: Lead) => {
+    setDupChecking(true);
+    let existing = null;
+    try {
+      existing = await duplicateLeadsService.findByPhone(lead.phone || '');
+    } catch {
+      existing = null;
+    }
+    setDupChecking(false);
+
+    // Strong duplicate detection: warn before silently creating a duplicate.
+    if (existing) {
+      setDupWarning({ existing, pendingLead: lead });
+      return;
+    }
+    await createLead(lead);
+  };
+
+  const createLead = async (lead: Lead) => {
     try {
       const created = await leadsService.create(lead, user?.id || '');
       setLeads((prev) => [created as Lead, ...prev]);
@@ -472,6 +503,25 @@ export default function LeadsManagementScreen({
       toast.success(`Lead "${lead.name}" added successfully`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to add lead');
+    }
+  };
+
+  /** "Create anyway" after a duplicate warning — records the attempt for admins. */
+  const createDuplicateAnyway = async () => {
+    if (!dupWarning) return;
+    const { existing, pendingLead } = dupWarning;
+    setDupWarning(null);
+    try {
+      await createLead(pendingLead);
+      if (existing?.id) {
+        await duplicateLeadsService.logAttempt({
+          matchedLeadId: existing.id,
+          attemptedLeadId: pendingLead.id,
+          attemptedPhone: pendingLead.phone || '',
+        });
+      }
+    } catch {
+      /* toast already shown by createLead */
     }
   };
 
@@ -876,6 +926,77 @@ export default function LeadsManagementScreen({
         size="xl"
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
+      </Modal>
+
+      {/* Duplicate Lead Warning */}
+      <Modal
+        open={!!dupWarning}
+        onClose={() => setDupWarning(null)}
+        title="Duplicate lead detected"
+        subtitle="This phone number already exists in your leads"
+        size="md"
+      >
+        {dupWarning && (
+          <div className="p-6">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 mb-4">
+              <p className="text-sm text-amber-800 font-medium mb-1">
+                A lead with phone <span className="font-mono">{dupWarning.existing.phone}</span> already
+                exists.
+              </p>
+              {dupWarning.existing.matches > 1 && (
+                <p className="text-xs text-amber-700">
+                  {dupWarning.existing.matches} matching leads found.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border overflow-hidden mb-5">
+              <div className="px-4 py-3 border-b border-border bg-muted/40">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Existing lead</p>
+              </div>
+              <div className="px-4 py-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Name</span>
+                  <span className="font-medium text-foreground">{dupWarning.existing.name}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Status</span>
+                  <span className="font-medium text-foreground">{dupWarning.existing.status}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Created by</span>
+                  <span className="font-medium text-foreground">{dupWarning.existing.createdBy}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Created on</span>
+                  <span className="font-medium text-foreground">
+                    {dupWarning.existing.createdAt
+                      ? dupWarning.existing.createdAt.split('T')[0]
+                      : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Assigned to</span>
+                  <span className="font-medium text-foreground">{dupWarning.existing.assignedTo}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs text-muted-foreground">
+                Creating it will be recorded and flagged for your admin.
+              </p>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setDupWarning(null)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button onClick={createDuplicateAnyway} className="btn-primary">
+                  Create anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Import Leads Modal */}

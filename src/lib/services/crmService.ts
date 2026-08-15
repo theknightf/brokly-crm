@@ -2598,6 +2598,20 @@ export const usersService = {
     return rowToUserProfile(data);
   },
 
+  /** Admin sets a user's base salary for payroll (user_profiles.base_salary). */
+  async updateSalary(id: string, baseSalary: number) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({ base_salary: Number(baseSalary) || 0 })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    invalidateCache();
+    return rowToUserProfile(data);
+  },
+
   async delete(id: string) {
     const supabase = createClient();
     // The anon client cannot delete from auth.users (service-role only), so
@@ -2678,6 +2692,9 @@ function rowToUserProfile(row: any) {
     agentCode: row.agent_code || '',
     adminId: row.admin_id || null,
     adminName: row.admin?.full_name || null,
+    baseSalary: Number(row.base_salary ?? 0),
+    hireDate: row.hire_date || null,
+    employmentStatus: row.employment_status || 'active',
     createdAt: row.created_at?.split('T')[0] || row.created_at,
   };
 }

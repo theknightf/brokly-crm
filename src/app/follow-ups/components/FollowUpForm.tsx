@@ -11,7 +11,7 @@ import {
   ALL_PRIORITIES,
 } from './mockFollowUps';
 import { getActiveAgentNames } from '@/app/teams/components/mockTeamMembers';
-import { leadsService } from '@/lib/services/crmService';
+import { leadsService, teamsService } from '@/lib/services/crmService';
 import { Link2, Search, Loader2, UserCircle2 } from 'lucide-react';
 
 interface FollowUpFormProps {
@@ -36,6 +36,15 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
   useEffect(() => {
     const refresh = () => setAgentList(getActiveAgentNames());
     window.addEventListener('team-members-updated', refresh);
+    // Prefer the real user list; fall back to the in-memory team members only
+    // when the API/database is unavailable.
+    teamsService
+      .getAssignableUsers()
+      .then((users: { id: string; name: string }[]) => {
+        const names = (users || []).map((u) => u.name).filter(Boolean);
+        if (names.length > 0) setAgentList(names);
+      })
+      .catch(() => {});
     return () => window.removeEventListener('team-members-updated', refresh);
   }, []);
 
@@ -50,7 +59,7 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
     priority: (initial?.priority ?? 'Medium') as FollowUpPriority,
     dueDate: initial?.dueDate ?? '',
     dueTime: initial?.dueTime ?? '',
-    agent: initial?.agent ?? getActiveAgentNames()[1] ?? 'Arjun Sharma',
+    agent: initial?.agent ?? '',
     notes: initial?.notes ?? '',
     propertyInterest: initial?.propertyInterest ?? '',
     relationshipStatus: (initial?.relationshipStatus ?? '') as RelationshipStatus | '',
