@@ -258,7 +258,7 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
             className="btn-secondary flex items-center gap-1.5 text-sm h-9"
           >
             <Download size={14} />
-            CSV
+            Export CSV
           </button>
         </div>
       </div>

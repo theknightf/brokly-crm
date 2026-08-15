@@ -88,7 +88,7 @@ export function PWAProvider() {
             className="inline-flex items-center gap-1.5 shrink-0 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold active:scale-95 transition-transform"
           >
             <Download size={14} />
-            Install
+            Install app
           </button>
         )}
         <button

@@ -74,7 +74,7 @@ export default function RecentActivity() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="section-header">Recent Activity</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Latest leads in your pipeline</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Latest leads added</p>
         </div>
         <span className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg font-medium">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

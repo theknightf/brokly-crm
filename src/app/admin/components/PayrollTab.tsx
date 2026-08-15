@@ -152,7 +152,7 @@ export default function PayrollTab() {
     setSaving(true);
     try {
       await payrollService.updateEntry(id, patch);
-      toast.success('Saved');
+      toast.success('Changes saved');
       const list = await payrollService.getEntries(selectedPeriod);
       setEntries(list);
     } catch (e: any) {
@@ -215,7 +215,7 @@ export default function PayrollTab() {
             <Settings2 size={15} className="text-primary" /> Working Hours & Payroll Rules
           </h3>
           <button onClick={saveConfig} disabled={savingConfig} className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5">
-            {savingConfig ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save
+            {savingConfig ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save settings
           </button>
         </div>
         <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -284,7 +284,7 @@ export default function PayrollTab() {
               className="input-base text-sm"
             />
           </Field>
-          <Field label="Commission rate (0..1, on Won deals)">
+          <Field label="Commission rate (0 to 1, on closed deals)">
             <input
               type="number"
               min={0}
@@ -431,10 +431,10 @@ export default function PayrollTab() {
                         <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Leave</th>
                         <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Bonus</th>
                         <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Commission</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Reimb.</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Other deduct</th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Reimbursements</th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Other deductions</th>
                         <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Gross</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Deduct</th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Deductions</th>
                         <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Net</th>
                         <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Status</th>
                       </tr>
@@ -523,7 +523,7 @@ function MoneyInput({ value, onSave }: { value: number; onSave: (v: number) => v
               setDraft(null);
             }}
             className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50"
-            title="Save"
+            title="Save amount"
           >
             {busy ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
           </button>

@@ -364,7 +364,7 @@ function ProjectFormModal({
                   placeholder="Radius (m)"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Radius for GPS verification. Default 300&nbsp;m.
+                  Radius used to confirm the site-visit location. Default 300&nbsp;m.
                 </p>
               </div>
             </div>
@@ -471,7 +471,7 @@ function ProjectFormModal({
                 placeholder="One per line — shown as bullet points in the call sheet, e.g.&#10;60% finished & handed over&#10;0% down payment"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
-                These appear in the call outcome sheet while the agent is on a call.
+                These show in the call summary while the agent is on a call.
               </p>
             </div>
           </div>
@@ -612,7 +612,7 @@ function ProjectDetailsModal({
           {hasGps && (
             <div className="flex items-center justify-between gap-3 bg-muted/50 rounded-xl px-4 py-3">
               <div className="text-xs text-muted-foreground">
-                <p className="font-medium text-foreground text-sm">GPS Site Pin</p>
+                <p className="font-medium text-foreground text-sm">Site location</p>
                 <p className="font-mono-data mt-0.5">
                   {Number(project.latitude).toFixed(5)}, {Number(project.longitude).toFixed(5)}
                   {project.radiusM ? ` · ±${project.radiusM}m` : ''}
@@ -684,7 +684,7 @@ function ProjectDetailsModal({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No units added yet — add units to track availability &amp; pricing.
+                No units added yet — add units to keep track of availability and pricing.
               </p>
             )}
           </div>
@@ -692,13 +692,13 @@ function ProjectDetailsModal({
 
         <div className="px-6 py-4 border-t border-border flex items-center gap-2 justify-end flex-wrap">
           <button onClick={onEdit} className="btn-secondary flex items-center gap-1.5 text-sm">
-            <Pencil size={14} /> Edit
-          </button>
-          <button onClick={onVisit} className="btn-secondary flex items-center gap-1.5 text-sm">
-            <MapPin size={14} /> Site Visit
-          </button>
-          <button onClick={onUnits} className="btn-primary flex items-center gap-1.5 text-sm">
-            <Layers size={14} /> Units &amp; Media
+              <Pencil size={14} /> Edit project
+            </button>
+            <button onClick={onVisit} className="btn-secondary flex items-center gap-1.5 text-sm">
+              <MapPin size={14} /> Site Visit
+            </button>
+            <button onClick={onUnits} className="btn-primary flex items-center gap-1.5 text-sm">
+              <Layers size={14} /> View units &amp; media
           </button>
         </div>
       </div>
@@ -880,7 +880,7 @@ export default function ProjectsScreen() {
           className="btn-primary flex items-center gap-1.5 text-sm self-start sm:self-auto"
         >
           <Plus size={15} />
-          Add Project
+          Add new project
         </button>
       </div>
 
@@ -963,7 +963,7 @@ export default function ProjectsScreen() {
               }}
               className="btn-secondary h-9 text-sm px-3"
             >
-              Clear
+              Clear filters
             </button>
           )}
         </div>
@@ -1052,10 +1052,10 @@ export default function ProjectsScreen() {
                       {stats ? (
                         <>
                           <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
-                            {stats.available} Avail
+                            {stats.available} Available
                           </span>
                           <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold">
-                            {stats.reserved} Rsrv
+                            {stats.reserved} Reserved
                           </span>
                           <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-semibold">
                             {stats.sold} Sold
@@ -1114,7 +1114,7 @@ export default function ProjectsScreen() {
                       setVisitTarget(project);
                     }}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors"
-                    title="Site visit — GPS check-in"
+                    title="Site visit — confirm you're on site"
                   >
                     <MapPin size={14} />
                   </button>
@@ -1149,7 +1149,7 @@ export default function ProjectsScreen() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onSave={handleAdd}
-        title="Add New Project"
+        title="Add new project"
         developers={developers}
       />
       <ProjectFormModal
@@ -1176,7 +1176,7 @@ export default function ProjectsScreen() {
               }
             : undefined
         }
-        title="Edit Project"
+        title="Edit project"
         developers={developers}
       />
 
@@ -1222,8 +1222,8 @@ export default function ProjectsScreen() {
                 onClick={handleDelete}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"
               >
-                Delete Project
-              </button>
+              Remove project
+            </button>
             </div>
           </div>
         </div>

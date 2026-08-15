@@ -128,7 +128,7 @@ export default function DashboardKpis() {
         iconBg="bg-clay-soft"
         label="Hot leads"
         value={stats.hot.toLocaleString()}
-        sub="rating = Hot"
+        sub="Marked as Hot"
         href="/leads-management"
       />
       <KpiCard
@@ -195,7 +195,7 @@ export default function DashboardKpis() {
         iconBg="bg-sage-soft"
         label="Conversion rate"
         value={`${stats.conversionPct}%`}
-        sub="Deals ÷ total leads"
+        sub="Deals ÷ leads"
         href="/reports"
       />
     </div>

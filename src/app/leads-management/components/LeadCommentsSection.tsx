@@ -149,7 +149,7 @@ export default function LeadCommentsSection({ leadId }: LeadCommentsSectionProps
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Write a comment…"
+          placeholder="Add a comment…"
           className="input-base flex-1 text-sm"
           disabled={submitting}
         />
@@ -157,7 +157,7 @@ export default function LeadCommentsSection({ leadId }: LeadCommentsSectionProps
           type="submit"
           disabled={submitting || !text.trim()}
           className="btn-primary px-3 flex items-center justify-center"
-          title="Post comment"
+          title="Add comment"
         >
           {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
         </button>

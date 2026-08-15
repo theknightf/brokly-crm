@@ -98,7 +98,7 @@ export default function MobileTodayFollowUps() {
           href="/follow-ups"
           className="text-xs font-semibold text-primary px-3 py-2 rounded-lg active:scale-95 transition-transform"
         >
-          View all
+          See all follow-ups
         </Link>
       </div>
 
@@ -150,7 +150,7 @@ export default function MobileTodayFollowUps() {
                         href={`tel:${item.contactPhone}`}
                         onClick={() => armCall(item, 'Call')}
                         className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center active:scale-90 transition-transform"
-                        aria-label="Call"
+                        aria-label="Call contact"
                       >
                         <Phone size={19} />
                       </a>
@@ -160,7 +160,7 @@ export default function MobileTodayFollowUps() {
                         rel="noreferrer"
                         onClick={() => armCall(item, 'WhatsApp')}
                         className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center active:scale-90 transition-transform"
-                        aria-label="WhatsApp"
+                        aria-label="Message on WhatsApp"
                       >
                         <MessageCircle size={19} />
                       </a>

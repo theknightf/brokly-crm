@@ -353,7 +353,7 @@ export default function FollowUpsManagementScreen() {
         <div>
           <h1 className="page-title">Follow-ups</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Schedule, track, and complete follow-up tasks for leads and customers
+            Schedule and track follow-ups with your leads and customers
           </p>
         </div>
         <button
@@ -785,7 +785,7 @@ export default function FollowUpsManagementScreen() {
                               {isDone && (
                                 <button
                                   onClick={() => handleReopen(fu.id)}
-                                  title="Reopen"
+                                  title="Reopen follow-up"
                                   className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
                                 >
                                   <RotateCcw size={14} />
@@ -793,14 +793,14 @@ export default function FollowUpsManagementScreen() {
                               )}
                               <button
                                 onClick={() => setEditTarget(fu)}
-                                title="Edit"
+                                title="Edit follow-up"
                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                               >
                                 <Pencil size={14} />
                               </button>
                               <button
                                 onClick={() => setDeleteTarget(fu)}
-                                title="Delete"
+                                title="Delete follow-up"
                                 className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
                               >
                                 <Trash2 size={14} />
@@ -830,7 +830,7 @@ export default function FollowUpsManagementScreen() {
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         title="Schedule Follow-up"
-        subtitle="Create a new follow-up task for a lead or customer"
+        subtitle="Create a follow-up for a lead or customer"
         size="lg"
       >
         <FollowUpForm onSubmit={handleAdd} onCancel={() => setAddModalOpen(false)} />
@@ -862,7 +862,7 @@ export default function FollowUpsManagementScreen() {
         open={!!editTarget}
         onClose={() => setEditTarget(null)}
         title="Edit Follow-up"
-        subtitle="Update the follow-up task details"
+        subtitle="Update this follow-up"
         size="lg"
       >
         {editTarget && (
@@ -883,16 +883,16 @@ export default function FollowUpsManagementScreen() {
       >
         <div className="p-6 space-y-4">
           <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{' '}
+            Delete the follow-up{' '}
             <span className="font-semibold text-foreground">&quot;{deleteTarget?.title}&quot;</span>
-            ? This action cannot be undone.
+            ? You can't undo this.
           </p>
           <div className="flex justify-end gap-3">
             <button onClick={() => setDeleteTarget(null)} className="btn-secondary">
               Cancel
             </button>
             <button onClick={handleDelete} className="btn-danger">
-              Delete
+              Delete follow-up
             </button>
           </div>
         </div>

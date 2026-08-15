@@ -310,10 +310,10 @@ export default function CallLogsReport() {
                       Reached
                     </th>
                     <th className="text-center px-4 py-2.5 text-xs font-semibold text-red-500 uppercase tracking-wide">
-                      Not int.
+                      Not Interested
                     </th>
                     <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      No ans.
+                      No Answer
                     </th>
                     <th className="text-center px-4 py-2.5 text-xs font-semibold text-amber-600 uppercase tracking-wide">
                       Call back

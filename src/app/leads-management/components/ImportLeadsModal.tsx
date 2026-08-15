@@ -458,7 +458,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                           </span>
                         ) : (
                           <span className="text-xs text-emerald-600 flex items-center gap-1">
-                            <CheckCircle2 size={12} /> OK
+                            <CheckCircle2 size={12} /> Valid
                           </span>
                         )}
                       </td>
@@ -588,7 +588,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                 className="btn-primary flex items-center gap-1.5 min-w-[140px] justify-center disabled:opacity-50"
               >
                 {importing ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                {importing ? 'Importing…' : `Import ${importableCount}`}
+                {importing ? 'Importing…' : `Import ${importableCount} lead${importableCount !== 1 ? 's' : ''}`}
               </button>
             )}
           </div>

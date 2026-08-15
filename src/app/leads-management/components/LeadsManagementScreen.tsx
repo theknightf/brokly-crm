@@ -804,7 +804,7 @@ export default function LeadsManagementScreen({
           <h1 className="page-title">{title || 'Leads'}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {subtitle ||
-              `${total} lead${total !== 1 ? 's' : ''} in your pipeline${
+              `${total} lead${total !== 1 ? 's' : ''} in your list${
                 initialStatus ? ` · status: ${initialStatus}` : ''
               }`}
           </p>
@@ -829,7 +829,7 @@ export default function LeadsManagementScreen({
             className="btn-primary flex items-center gap-1.5 text-sm"
           >
             <Plus size={15} />
-            Add Lead
+            Add lead
           </button>
         </div>
       </div>
@@ -922,7 +922,7 @@ export default function LeadsManagementScreen({
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         title="Add New Lead"
-        subtitle="Fill in the lead details to add them to your pipeline"
+        subtitle="Fill in the details to add this lead"
         size="xl"
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
@@ -991,7 +991,7 @@ export default function LeadsManagementScreen({
                   Cancel
                 </button>
                 <button onClick={createDuplicateAnyway} className="btn-primary">
-                  Create anyway
+                  Add anyway
                 </button>
               </div>
             </div>
@@ -1396,7 +1396,7 @@ export default function LeadsManagementScreen({
                   }}
                   className="btn-primary"
                 >
-                  Edit Lead
+                  Edit lead
                 </button>
               </div>
             </div>
@@ -1409,7 +1409,7 @@ export default function LeadsManagementScreen({
         <Modal
           open={!!editLead}
           onClose={() => setEditLead(null)}
-          title="Edit Lead"
+          title="Edit lead"
           subtitle={
             editLead.leadNumber
               ? `Editing ${editLead.leadNumber}`

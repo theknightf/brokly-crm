@@ -68,7 +68,7 @@ export default function LeadSourceChart() {
     <div className="card-base h-full">
       <div className="mb-5">
         <h2 className="section-header">Leads by Source</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Which channels drive your pipeline</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Where your leads come from</p>
       </div>
       {loading ? (
         <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">

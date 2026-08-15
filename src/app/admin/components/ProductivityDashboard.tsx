@@ -403,13 +403,13 @@ export default function ProductivityDashboard() {
             onClick={exportLeaderboardCSV}
             className="btn-secondary flex items-center gap-2 text-sm"
           >
-            <FileSpreadsheet size={14} className="text-emerald-600" /> Excel
+            <FileSpreadsheet size={14} className="text-emerald-600" /> Export Excel
           </button>
           <button
             onClick={exportLeaderboardPDF}
             className="btn-secondary flex items-center gap-2 text-sm"
           >
-            <FileText size={14} className="text-red-600" /> PDF
+            <FileText size={14} className="text-red-600" /> Export PDF
           </button>
         </div>
       </div>
@@ -625,13 +625,13 @@ export default function ProductivityDashboard() {
               onClick={exportReportCSV}
               className="btn-secondary flex items-center gap-1.5 text-xs"
             >
-              <FileSpreadsheet size={13} className="text-emerald-600" /> Excel
+              <FileSpreadsheet size={13} className="text-emerald-600" /> Export Excel
             </button>
             <button
               onClick={exportReportPDF}
               className="btn-secondary flex items-center gap-1.5 text-xs"
             >
-              <FileText size={13} className="text-red-600" /> PDF
+              <FileText size={13} className="text-red-600" /> Export PDF
             </button>
           </div>
         </div>

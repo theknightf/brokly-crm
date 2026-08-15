@@ -199,7 +199,7 @@ export default function KPIBentoGrid() {
         <div className="text-right">
           <p className="text-xs text-muted-foreground">All statuses combined</p>
           <p className="text-sm font-semibold text-primary mt-1">
-            {ALL_STATUSES.length} categories tracked
+            {ALL_STATUSES.length} stages tracked
           </p>
         </div>
       </Link>

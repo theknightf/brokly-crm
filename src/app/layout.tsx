@@ -39,9 +39,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Brokly — Real Estate CRM for Modern Brokerages',
+  title: 'Brokly — Real estate CRM for modern teams',
   description:
-    'Brokly helps real estate brokerages capture leads, track follow-ups, and close more deals from one clean dashboard.',
+    'Brokly helps real estate teams capture leads, track follow-ups, and close more deals from one simple dashboard.',
   manifest: '/manifest.webmanifest',
   applicationName: 'Brokly',
   appleWebApp: {

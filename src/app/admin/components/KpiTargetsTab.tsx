@@ -97,7 +97,7 @@ export default function KpiTargetsTab() {
           </div>
           <div className="flex items-end">
             <button onClick={save} disabled={saving} className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save target
             </button>
           </div>
         </div>

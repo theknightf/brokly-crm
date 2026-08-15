@@ -251,14 +251,14 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
           <div className="sm:col-span-2 rounded-xl border border-border bg-muted/40 p-3 space-y-3">
             <div className="flex items-center gap-2">
               <Link2 size={14} className="text-primary" />
-              <span className="text-sm font-medium text-foreground">Link to existing lead</span>
+              <span className="text-sm font-medium text-foreground">Link to a lead</span>
             </div>
 
             {form.leadId ? (
               <div className="flex items-center gap-2 rounded-lg bg-emerald-50 text-emerald-700 px-3 py-2 text-sm">
                 <UserCircle2 size={15} className="flex-shrink-0" />
                 <span className="truncate font-medium">
-                  Carry lead: {linkedLeadName || 'Linked'}
+                  Linked lead: {linkedLeadName || 'Linked'}
                 </span>
                 <div className="ml-auto flex items-center gap-2 flex-shrink-0">
                   <button
@@ -276,14 +276,13 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
                     onClick={clearLeadLink}
                     className="text-xs font-semibold text-emerald-700/70 hover:text-emerald-700 hover:underline"
                   >
-                    Remove
+                    Remove link
                   </button>
                 </div>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Choose an existing lead so this follow-up stays linked — no duplicate lead is
-                created.
+                Pick a lead to keep this follow-up linked. We won't create a duplicate lead.
               </p>
             )}
 

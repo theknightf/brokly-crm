@@ -411,7 +411,7 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                 className="w-full h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.98] transition-transform disabled:opacity-60"
               >
                 {locating ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
-                {geo ? 'Retry location' : 'Use my site'}
+                {geo ? 'Retry location' : 'Use my location'}
               </button>
               {locating && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">

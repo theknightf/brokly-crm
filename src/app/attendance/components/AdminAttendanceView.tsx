@@ -390,16 +390,16 @@ export default function AdminAttendanceView() {
           <div>
             <h1 className="text-xl font-bold text-foreground">Attendance</h1>
             <p className="text-sm text-muted-foreground">
-              Office hours 12:00 – 20:00 · Arrival after 12:30 = Late
+              Office hours 12:00–20:00. Arriving after 12:30 counts as late.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={dailyReport} className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5">
-            <Printer size={14} /> Daily
+            <Printer size={14} /> Daily report
           </button>
           <button onClick={monthlyReport} className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5">
-            <Download size={14} /> Monthly
+            <Download size={14} /> Monthly report
           </button>
           <button
             onClick={() => setManualOpen(true)}
@@ -568,7 +568,7 @@ export default function AdminAttendanceView() {
                           <button onClick={() => employeeReport(r.user)} className="btn-ghost p-1.5" title="View report">
                             <Eye size={14} className="text-muted-foreground" />
                           </button>
-                          <button onClick={() => showEditModal(r.user)} className="btn-ghost p-1.5" title="Edit">
+                          <button onClick={() => showEditModal(r.user)} className="btn-ghost p-1.5" title="Edit attendance">
                             <Pencil size={14} className="text-muted-foreground" />
                           </button>
                           {isSingleDay && todayRec && !todayRec.check_out_time && todayRec.check_in_time ? (
@@ -650,7 +650,7 @@ export default function AdminAttendanceView() {
                       <Eye size={13} /> View
                     </button>
                     <button onClick={() => showEditModal(r.user)} className="btn-secondary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5">
-                      <Pencil size={13} /> Edit
+                      <Pencil size={13} /> Edit attendance
                     </button>
                     {isSingleDay && !todayRec?.check_in_time ? (
                       <button onClick={() => handleQuickAction('checkin', r.user)} className="btn-primary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5">

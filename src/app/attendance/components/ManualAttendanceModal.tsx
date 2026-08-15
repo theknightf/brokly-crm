@@ -130,7 +130,7 @@ export default function ManualAttendanceModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card">
           <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
             <UserPlus size={16} className="text-primary" />
-            {isEdit ? 'Edit Attendance' : 'Add Manual Attendance'}
+            {isEdit ? 'Edit attendance' : 'Add attendance'}
           </h3>
           <button onClick={onClose} className="btn-ghost p-1.5" aria-label="Close">
             <X size={16} />
@@ -139,8 +139,7 @@ export default function ManualAttendanceModal({
 
         <div className="p-5 space-y-4">
           <p className="text-xs text-muted-foreground">
-            The check-in / check-out times you select are saved exactly as chosen. Normal employee
-            check-ins always use the server time.
+            The times you pick are saved exactly as shown. Regular check-ins use the server time.
           </p>
 
           <div>

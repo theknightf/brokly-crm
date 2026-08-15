@@ -173,7 +173,7 @@ export default function LeaveTab() {
             </div>
             <div className="flex items-end">
               <button onClick={request} disabled={submitting} className="btn-primary h-9 px-3 text-sm w-full flex items-center justify-center gap-1.5">
-                {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Submit
+                {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send request
               </button>
             </div>
           </div>
@@ -228,25 +228,25 @@ export default function LeaveTab() {
                             disabled={busyId === r.id}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
                           >
-                            {busyId === r.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Approve
+                            {busyId === r.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Approve request
                           </button>
                           <button
                             onClick={() => decide(r.id, 'reject')}
                             disabled={busyId === r.id}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100"
                           >
-                            <X size={12} /> Reject
+                            <X size={12} /> Reject request
                           </button>
                         </div>
                       )}
                       {r.status === 'pending' && (
-                        <button
-                          onClick={() => cancel(r.id)}
-                          disabled={busyId === r.id}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted ml-1"
-                        >
-                          Cancel
-                        </button>
+                          <button
+                            onClick={() => cancel(r.id)}
+                            disabled={busyId === r.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted ml-1"
+                          >
+                            Cancel request
+                          </button>
                       )}
                       {(r.status === 'approved' || r.status === 'rejected') && (
                         <span className="text-xs text-muted-foreground">{r.reviewedAt ? r.reviewedAt.split('T')[0] : ''}</span>

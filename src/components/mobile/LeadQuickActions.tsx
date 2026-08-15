@@ -110,7 +110,7 @@ export function LeadQuickActions({ lead }: LeadQuickActionsProps) {
               href={`tel:${lead.phone}`}
               onClick={() => armCall('Call')}
               className="h-11 rounded-xl bg-primary/10 text-primary flex items-center gap-2.5 px-3 active:scale-[0.98] transition-transform"
-              aria-label="Call"
+              aria-label="Call contact"
             >
               <Phone size={16} className="flex-shrink-0" />
               <span className="text-xs font-semibold">Call</span>
@@ -151,7 +151,7 @@ export function LeadQuickActions({ lead }: LeadQuickActionsProps) {
           <button
             disabled
             className="h-11 rounded-xl bg-muted text-muted-foreground/50 flex items-center gap-2.5 px-3"
-            aria-label="No phone"
+            aria-label="No phone number"
           >
             <Phone size={18} className="flex-shrink-0" />
             <span className="text-xs font-semibold">Call</span>

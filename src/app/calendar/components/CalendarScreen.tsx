@@ -110,7 +110,7 @@ export default function CalendarScreen() {
         <div>
           <h1 className="page-title">Calendar</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Follow-ups and meetings across your pipeline
+            Your follow-ups and meetings
           </p>
         </div>
         <div className="flex items-center gap-2">

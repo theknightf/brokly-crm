@@ -811,11 +811,11 @@ export default function UnitPriceCalculator() {
         </div>
         {!result.valid ? (
           <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-            Enter a meter price and area to see matching units from your inventory.
+            Enter a price per m² and an area to see matching units.
           </div>
         ) : recommendations.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-            No matching units found in your inventory yet — add units from the Projects screen.
+            No matching units found yet — add units from the Projects screen.
           </div>
         ) : (
           <div className="p-3 grid sm:grid-cols-2 gap-3">

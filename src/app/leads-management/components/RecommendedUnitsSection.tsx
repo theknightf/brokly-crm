@@ -146,7 +146,7 @@ export default function RecommendedUnitsSection({
         </div>
       ) : items.length === 0 ? (
         <p className="text-xs text-muted-foreground py-1">
-          No recommended units yet — suggest inventory units from the calculator or here.
+          No units suggested yet. Add one from the picker below.
         </p>
       ) : (
         <ul className="space-y-1.5">

@@ -8,7 +8,7 @@ export default function ReservationsPage() {
       <LeadsManagementScreen
         initialStatus="Reservation"
         title="Reservations"
-        subtitle="Leads with an active reservation on a unit"
+        subtitle="Leads with an active reservation"
       />
     </AppLayout>
   );

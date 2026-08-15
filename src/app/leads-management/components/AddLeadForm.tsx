@@ -541,7 +541,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       {/* Sticky footer */}
       <div className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex items-center justify-between gap-3 rounded-b-2xl">
         <p className="text-xs text-muted-foreground">
-          Only Enter a valid phone number is required — everything else is optional
+          Only a phone number is required — everything else is optional
         </p>
         <div className="flex items-center gap-2">
           <button type="button" onClick={onCancel} className="btn-secondary">
@@ -558,7 +558,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 <span>Adding lead…</span>
               </>
             ) : (
-              'Add Lead to Pipeline'
+              'Add lead'
             )}
           </button>
         </div>

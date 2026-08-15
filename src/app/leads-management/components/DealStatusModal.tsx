@@ -165,7 +165,7 @@ export default function DealStatusModal({
         <div className="rounded-xl border border-border bg-muted/40 p-3 space-y-2">
           <div className="flex items-center gap-2">
             <Link2 size={14} className="text-primary" />
-            <span className="text-sm font-medium text-foreground">Carry this lead</span>
+            <span className="text-sm font-medium text-foreground">Link to an existing lead</span>
             <button
               type="button"
               onClick={() => setLeadSearchOpen((o) => !o)}

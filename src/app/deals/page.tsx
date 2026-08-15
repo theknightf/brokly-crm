@@ -8,7 +8,7 @@ export default function DealsPage() {
       <LeadsManagementScreen
         initialStatus="Done Deal"
         title="Deals"
-        subtitle="Won deals and closed transactions"
+        subtitle="Won deals and closed sales"
       />
     </AppLayout>
   );

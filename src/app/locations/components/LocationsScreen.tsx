@@ -541,7 +541,7 @@ export default function LocationsScreen() {
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-foreground">Check in to a site visit</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Attach an optional lead + project, capture GPS, and get verified on-site.
+                Add an optional lead and project, capture the location, and confirm you're on site.
               </p>
             </div>
             <button
@@ -568,7 +568,7 @@ export default function LocationsScreen() {
         <EmptyState
           icon={<MapPin size={24} className="text-muted-foreground" />}
           title="Locations are not set up yet"
-          description="Apply the migrations in Supabase to enable site-visit GPS tracking."
+          description="Turn on site-visit GPS tracking to see locations here."
         />
       ) : (
         <>
@@ -837,7 +837,7 @@ export default function LocationsScreen() {
         open={checkInOpen}
         onClose={() => setCheckInOpen(false)}
         title="Check in"
-        subtitle="Start a site visit — GPS is captured to verify you're on site"
+        subtitle="Start a site visit — we capture the location to confirm you're on site"
         size="sm"
       >
         <div className="p-6 space-y-4">

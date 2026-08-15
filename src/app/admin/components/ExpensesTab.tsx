@@ -458,7 +458,7 @@ export default function ExpensesTab() {
             title="Export as PDF"
           >
             <FileDown size={14} />
-            PDF
+            Export PDF
           </button>
           <button
             onClick={exportCSVReport}
@@ -467,7 +467,7 @@ export default function ExpensesTab() {
             title="Export as CSV"
           >
             <FileDown size={14} />
-            CSV
+            Export CSV
           </button>
           <button
             onClick={() => setModal({ open: true, isEdit: false, expense: null })}

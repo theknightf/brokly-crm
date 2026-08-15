@@ -106,13 +106,13 @@ export default function CustomersScreen() {
             <UserCheck size={22} className="text-primary" />
             Customers
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Converted leads — closed won deals</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Customers who have won a deal</p>
         </div>
         <button
           onClick={loadCustomers}
           disabled={loading}
           className="btn-ghost p-2 rounded-lg"
-          title="Refresh"
+          title="Refresh list"
         >
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -218,7 +218,7 @@ export default function CustomersScreen() {
             </p>
             <p className="text-sm text-muted-foreground/70 mt-1">
               {customers.length === 0
-                ? 'Customers appear here when leads are marked as Won'
+                ? 'Customers appear here once a deal is won'
                 : 'Try adjusting your search or filters'}
             </p>
           </div>

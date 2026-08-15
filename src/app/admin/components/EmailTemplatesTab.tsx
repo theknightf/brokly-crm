@@ -258,14 +258,14 @@ export default function EmailTemplatesTab() {
                   <button
                     onClick={() => setEditor({ open: true, initial: t })}
                     className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    title="Edit"
+                    title="Edit template"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => remove(t)}
                     className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                    title="Delete"
+                    title="Delete template"
                   >
                     <Trash2 size={14} />
                   </button>

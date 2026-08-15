@@ -160,7 +160,7 @@ export default function UnitsScreen() {
         <div>
           <h1 className="page-title">Units</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {units.length} unit{units.length !== 1 ? 's' : ''} in your inventory
+            {units.length} unit{units.length !== 1 ? 's' : ''} in your CRM
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ export default function UnitsScreen() {
             className="btn-primary flex items-center gap-1.5 text-sm"
           >
             <Plus size={15} />
-            Add Unit
+            Add unit
           </button>
         </div>
       </div>
@@ -304,14 +304,14 @@ export default function UnitsScreen() {
                       setFormOpen(true);
                     }}
                     className="w-9 h-9 rounded-xl hover:bg-secondary text-muted-foreground flex items-center justify-center"
-                    aria-label="Edit"
+                    aria-label="Edit unit"
                   >
                     <Pencil size={15} />
                   </button>
                   <button
                     onClick={() => setDeleting(u)}
                     className="w-9 h-9 rounded-xl hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center"
-                    aria-label="Delete"
+                    aria-label="Delete unit"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -385,7 +385,7 @@ export default function UnitsScreen() {
                   <EmptyState
                     icon={<Building2 size={22} className="text-muted-foreground" />}
                     title="No units"
-                    description="Add units to your inventory to recommend them in the calculator."
+                    description="Add units to your CRM to recommend them in the calculator."
                   />
                 </td>
               </tr>
@@ -580,7 +580,7 @@ export default function UnitsScreen() {
                   className="btn-secondary flex items-center gap-1.5 text-sm"
                 >
                   <Pencil size={14} />
-                  Edit
+                  Edit unit
                 </button>
                 <button
                   onClick={() => {
@@ -602,15 +602,15 @@ export default function UnitsScreen() {
         <div className="p-6 space-y-4">
           <p className="text-sm text-foreground">
             Delete unit <span className="font-semibold">{deleting?.name}</span>? This removes it
-            from projects and recommended-unit lists.
+            from projects and the calculator suggestions.
           </p>
           <div className="flex justify-end gap-2">
             <button onClick={() => setDeleting(null)} className="btn-secondary">
               Cancel
             </button>
-            <button onClick={confirmDelete} className="btn-danger">
-              Delete
-            </button>
+              <button onClick={confirmDelete} className="btn-danger">
+                Remove unit
+              </button>
           </div>
         </div>
       </Modal>
@@ -725,8 +725,8 @@ function UnitFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={initial ? 'Edit Unit' : 'Add Unit'}
-      subtitle="Inventory unit details — shown to your sales team and the calculator"
+              title={initial ? 'Edit unit' : 'Add unit'}
+              subtitle="Unit details — shown to your sales team and the calculator"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
@@ -852,7 +852,7 @@ function UnitFormModal({
             />
           </div>
           <div>
-            <label className="label-base">Instalments / yr</label>
+            <label className="label-base">Installments per year</label>
             <select
               value={String(form.installmentFrequency || 12)}
               onChange={(e) =>
@@ -931,7 +931,7 @@ function UnitFormModal({
           </button>
           <button type="submit" disabled={saving} className="btn-primary flex items-center gap-1.5">
             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-            {initial?.id ? 'Save Changes' : 'Add Unit'}
+            {initial?.id ? 'Save changes' : 'Add unit'}
           </button>
         </div>
       </form>

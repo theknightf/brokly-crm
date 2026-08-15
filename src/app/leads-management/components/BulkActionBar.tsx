@@ -151,11 +151,11 @@ export default function BulkActionBar({
     const targets = isEmail ? withEmail : withSms;
     const template = message.trim();
     if (!template) {
-      toast.error('Message is required');
+      toast.error('Enter a message');
       return;
     }
     if (isEmail && !subject.trim()) {
-      toast.error('Subject is required for emails');
+      toast.error('Add a subject');
       return;
     }
     setSending(true);
@@ -195,7 +195,7 @@ export default function BulkActionBar({
     setSending(false);
     setResults({ sent, failed });
     if (failed === 0) {
-      toast.success(`${sent} ${isEmail ? 'email' : 'SMS'}${sent === 1 ? '' : 's'} sent`);
+      toast.success(`${sent} message${sent === 1 ? '' : 's'} sent`);
       setComposer('none');
       setSubject('');
       setMessage('');
@@ -300,7 +300,7 @@ export default function BulkActionBar({
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors"
             >
               <UserCheck size={15} />
-              Assign
+              Assign lead
             </button>
           </div>
 
@@ -312,7 +312,7 @@ export default function BulkActionBar({
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors"
             >
               <Users size={15} />
-              Team
+              Assign team
               <ChevronDown size={13} />
             </button>
             <ViewportPopover
@@ -377,12 +377,12 @@ export default function BulkActionBar({
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors disabled:opacity-40"
               title={
                 withSms.length === 0
-                  ? 'No selected lead has a phone'
-                  : `SMS ${withSms.length} leads`
+                  ? 'No selected lead has a phone number'
+                  : `Text ${withSms.length} leads`
               }
             >
               <Smartphone size={15} />
-              <span className="hidden md:inline">SMS</span>
+              <span className="hidden md:inline">Text</span>
             </button>
           </div>
 
@@ -395,20 +395,20 @@ export default function BulkActionBar({
               className="flex items-center gap-1.5 text-sm font-medium text-red-400 hover:text-red-300 transition-colors flex-shrink-0"
             >
               <Trash2 size={15} />
-              Delete
+              Remove lead
             </button>
           ) : (
             <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-xs text-red-400">Confirm delete?</span>
+              <span className="text-xs text-red-400">Remove this lead?</span>
               <button
                 onClick={() => {
                   onDelete();
                   setConfirmDelete(false);
                 }}
-                className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold hover:bg-red-400 transition-colors"
-              >
-                Yes, delete
-              </button>
+                  className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold hover:bg-red-400 transition-colors"
+                >
+                  Remove
+                </button>
               <button
                 onClick={() => setConfirmDelete(false)}
                 className="text-xs text-background/60 hover:text-background transition-colors"
@@ -446,12 +446,12 @@ export default function BulkActionBar({
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-foreground">
-                    Bulk {composer === 'email' ? 'Email' : 'SMS'}
+                    {composer === 'email' ? 'Email leads' : 'Text leads'}
                   </h3>
                   <p className="text-xs text-muted-foreground">
                     {composer === 'email'
-                      ? `${withEmail.length} recipient${withEmail.length === 1 ? '' : 's'} with an email address`
-                      : `${withSms.length} recipient${withSms.length === 1 ? '' : 's'} with a phone number`}
+                      ? `${withEmail.length} lead${withEmail.length === 1 ? '' : 's'} with an email address`
+                      : `${withSms.length} lead${withSms.length === 1 ? '' : 's'} with a phone number`}
                   </p>
                 </div>
               </div>
@@ -485,10 +485,10 @@ export default function BulkActionBar({
                   }
                 />
                 <p className="text-[11px] text-muted-foreground mt-1.5">
-                  Available tokens:{' '}
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{customer_name}'}</code>{' '}
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{phone}'}</code> — replaced per
-                  lead.
+                  You can use{' '}
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{customer_name}'}</code> or{' '}
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{phone}'}</code> — they are filled
+                  in for each lead.
                 </p>
               </div>
 
@@ -517,7 +517,7 @@ export default function BulkActionBar({
                   {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   {sending
                     ? 'Sending…'
-                    : `Send ${composer === 'email' ? withEmail.length : withSms.length} message${withSms.length === 1 ? '' : 's'}`}
+                    : `Send messages`}
                 </button>
               </div>
             </div>
@@ -532,7 +532,7 @@ export default function BulkActionBar({
           onClose={() => {
             if (!assigning) setAssignModalOpen(false);
           }}
-          title="Assign leads (round-robin)"
+          title="Assign leads to your team"
           subtitle={`${selectedLeads.length} selected lead${
             selectedLeads.length !== 1 ? 's' : ''
           }`}
@@ -540,7 +540,7 @@ export default function BulkActionBar({
         >
           <div className="p-6 space-y-4">
             <p className="text-xs text-muted-foreground">
-              Pick users — leads are split evenly (round-robin). Current split:
+              Pick agents — leads are shared evenly between them. Current split:
             </p>
 
             {loadingUsers ? (
@@ -548,7 +548,7 @@ export default function BulkActionBar({
                 <Loader2 size={18} className="animate-spin text-primary" />
               </div>
             ) : users.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2">No assignable users</p>
+              <p className="text-sm text-muted-foreground py-2">No agents available</p>
             ) : (
               <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-xl p-1.5">
                 {users.map((u) => {
@@ -578,8 +578,9 @@ export default function BulkActionBar({
                       <span className="truncate">{u.name}</span>
                       {checked && (
                         <span className="ml-auto text-xs text-primary font-semibold flex-shrink-0">
-                          {distByUserId.get(u.id) ?? 0} lead
-                        </span>
+                       {distByUserId.get(u.id) ?? 0} lead
+                         {(distByUserId.get(u.id) ?? 0) !== 1 ? 's' : ''}
+                         </span>
                       )}
                     </button>
                   );
@@ -597,7 +598,7 @@ export default function BulkActionBar({
                     <span className="text-foreground font-medium truncate">{u.name}</span>
                     <span className="font-semibold text-primary flex-shrink-0">
                       {distByUserId.get(u.id) ?? 0} lead
-                      {(distByUserId.get(u.id) ?? 0) !== 1 ? 's' : ''}
+                      {(distByUserId.get(u.id) ?? 0) !== 1 ? 's' : ''} assigned
                     </span>
                   </div>
                 ))}
@@ -607,8 +608,8 @@ export default function BulkActionBar({
             <div className="flex items-start gap-2 rounded-xl bg-amber-50 text-amber-700 px-3 py-2 text-xs">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
               <span>
-                Assignment is atomic — if any lead can&apos;t be reassigned, everything is rolled
-                back and no lead is left partially assigned.
+                If any lead can&apos;t be assigned, nothing changes — the whole update is cancelled
+                so no lead is left half-assigned.
               </span>
             </div>
 
@@ -638,7 +639,7 @@ export default function BulkActionBar({
                     setAssignModalOpen(false);
                     setSelectedUserIds(new Set());
                   } catch (err: any) {
-                    setAssignError(err?.message || 'Assignment failed — no leads were changed');
+                     setAssignError(err?.message || 'Couldn’t assign leads — nothing was changed');
                   } finally {
                     setAssigning(false);
                   }
@@ -649,9 +650,7 @@ export default function BulkActionBar({
                 {assigning && <Loader2 size={14} className="animate-spin" />}
                 {assigning
                   ? 'Assigning…'
-                  : `Confirm & Assign (${selectedUsers.length} user${
-                      selectedUsers.length !== 1 ? 's' : ''
-                    })`}
+                  : `Assign leads`}
               </button>
             </div>
           </div>

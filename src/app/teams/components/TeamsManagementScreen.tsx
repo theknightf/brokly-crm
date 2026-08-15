@@ -141,7 +141,7 @@ function TeamFormModal({
       <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-md p-6 fade-in">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-semibold text-foreground">
-            {initial ? 'Edit Team' : 'Create New Team'}
+              {initial ? 'Edit team' : 'Add new team'}
           </h3>
           <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">
             <X size={16} />
@@ -187,7 +187,7 @@ function TeamFormModal({
             className="btn-primary flex-1 flex items-center justify-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-            {initial ? 'Save Changes' : 'Create Team'}
+              {initial ? 'Save changes' : 'Add new team'}
           </button>
         </div>
       </div>
@@ -341,7 +341,7 @@ function AddMemberModal({
             className="btn-primary flex-1 flex items-center justify-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-            Add Member
+              Add member
           </button>
         </div>
       </div>
@@ -674,7 +674,7 @@ function PerformancePanel({
                       className="btn-primary mt-3 flex items-center gap-1.5 text-sm disabled:opacity-50"
                     >
                       {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                      Save Rating
+                      Save rating
                     </button>
                   </>
                 ) : data.leaderRating?.comment ? (
@@ -739,7 +739,7 @@ function TeamDetailPanel({
             className="btn-primary flex items-center gap-1.5 text-xs px-3 py-1.5"
           >
             <UserPlus size={13} />
-            Add Member
+              Add member
           </button>
         )}
       </div>
@@ -1032,7 +1032,7 @@ export default function TeamsManagementScreen() {
               className="btn-primary flex items-center gap-2"
             >
               <Plus size={16} />
-              New Team
+              Add new team
             </button>
           )}
         </div>
@@ -1070,7 +1070,7 @@ export default function TeamsManagementScreen() {
                     onClick={() => setCreateOpen(true)}
                     className="text-xs text-primary hover:underline"
                   >
-                    Create your first team
+                    Add your first team
                   </button>
                 )}
               </div>
@@ -1172,7 +1172,7 @@ export default function TeamsManagementScreen() {
                   className="btn-primary flex items-center gap-2 mt-2"
                 >
                   <Plus size={14} />
-                  Create Team
+                  Add new team
                 </button>
               )}
             </div>

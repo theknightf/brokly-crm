@@ -52,7 +52,7 @@ export default function OverdueFollowUps() {
           </div>
         </div>
         <Link href="/follow-ups" className="text-xs text-primary font-medium hover:underline">
-          View all →
+          View all follow-ups →
         </Link>
       </div>
 

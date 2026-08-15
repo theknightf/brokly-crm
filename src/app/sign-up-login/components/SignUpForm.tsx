@@ -279,7 +279,7 @@ export default function SignUpForm({ onSwitchToLogin }: SignUpFormProps) {
               <span>Creating workspace…</span>
             </>
           ) : (
-            'Create Free Account'
+            'Create account'
           )}
         </button>
       </form>
@@ -287,7 +287,7 @@ export default function SignUpForm({ onSwitchToLogin }: SignUpFormProps) {
       <p className="text-sm text-center text-muted-foreground mt-5">
         Already have an account?{' '}
         <button onClick={onSwitchToLogin} className="text-primary font-semibold hover:underline">
-          Sign in
+          Log in
         </button>
       </p>
     </div>

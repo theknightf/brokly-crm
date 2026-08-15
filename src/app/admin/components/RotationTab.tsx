@@ -105,7 +105,7 @@ export default function RotationTab() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={save} disabled={saving} className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save settings
             </button>
             <button onClick={runNow} disabled={running || !enabled} className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5 disabled:opacity-50">
               {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Run now

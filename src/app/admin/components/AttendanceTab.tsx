@@ -179,7 +179,7 @@ function WorkLocationCard() {
         className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5 disabled:opacity-50"
       >
         {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-        {saving ? 'Saving…' : 'Save'}
+        {saving ? 'Saving…' : 'Save location'}
       </button>
     </div>
   );

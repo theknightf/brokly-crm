@@ -142,7 +142,7 @@ export default function EmployeeAttendanceView() {
           {name ? `${name.split(' ')[0]}'s ` : ''}Attendance
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Check in when you arrive and check out when you leave — the time is recorded by the server.
+          Check in when you arrive and check out when you leave. Your time is saved automatically.
         </p>
       </div>
 
@@ -231,9 +231,9 @@ export default function EmployeeAttendanceView() {
                 )}
                 {checkedIn && !checkedOut ? 'Check Out' : 'Check In'}
               </button>
-              <p className="text-[11px] text-muted-foreground">
-                You cannot edit the time — attendance stamps are recorded by the server.
-              </p>
+                <p className="text-[11px] text-muted-foreground">
+                  You can't change the time — it's saved automatically.
+                </p>
             </div>
           </div>
 

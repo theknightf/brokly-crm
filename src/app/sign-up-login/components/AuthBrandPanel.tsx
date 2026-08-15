@@ -2,10 +2,10 @@ import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
 
 const features = [
-  'Capture and qualify leads from all property portals',
-  'Never miss a follow-up with smart reminders',
-  'Track your full pipeline from inquiry to closing',
-  'Real-time team performance and conversion reports',
+  'Get leads from every property site',
+  'Never miss a follow-up with reminders',
+  'Track every deal from first call to closing',
+  'Live team and sales reports',
 ];
 
 export default function AuthBrandPanel() {
@@ -31,8 +31,8 @@ export default function AuthBrandPanel() {
           stress less.
         </h1>
         <p className="text-blue-100 text-base leading-relaxed mb-10">
-          The CRM built specifically for real estate brokerages. Manage your entire pipeline from
-          first inquiry to final closing.
+          The CRM made for real estate teams. Manage your whole sales process from first contact to
+          final closing.
         </p>
 
         <ul className="space-y-4">

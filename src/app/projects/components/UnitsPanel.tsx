@@ -95,7 +95,7 @@ function UnitFormModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Unit" subtitle="New or existing unit within this project" size="md">
+      <Modal open={open} onClose={onClose} title="Unit" subtitle="Add or edit a unit in this project" size="md">
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -191,7 +191,7 @@ function UnitFormModal({
             />
           </div>
           <div>
-            <label className="label-base">Instalments / yr</label>
+            <label className="label-base">Installments per year</label>
             <select
               value={String(form.installmentFrequency || 12)}
               onChange={(e) => setForm((f) => ({ ...f, installmentFrequency: num(e.target.value, 12) }))}
@@ -220,7 +220,7 @@ function UnitFormModal({
           </button>
           <button type="submit" disabled={saving} className="btn-primary flex items-center gap-1.5">
             {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-            {initial?.id ? 'Save Changes' : 'Add Unit'}
+            {initial?.id ? 'Save changes' : 'Add unit'}
           </button>
         </div>
       </form>
@@ -472,7 +472,7 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
           <button
             onClick={() => setEditOpen(true)}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            title="Edit"
+              title="Edit unit"
           >
             <Pencil size={13} />
           </button>
@@ -480,7 +480,7 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
             onClick={remove}
             disabled={deleting}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-            title="Delete"
+              title="Delete unit"
           >
             {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={13} />}
           </button>
@@ -553,7 +553,7 @@ export default function UnitsPanel({ projectId, projectName, open, onClose }: Un
           </div>
           <button onClick={() => setAddOpen(true)} className="btn-primary text-sm flex items-center gap-1.5">
             <Plus size={14} />
-            Add Unit
+            Add unit
           </button>
         </div>
 
@@ -565,7 +565,7 @@ export default function UnitsPanel({ projectId, projectName, open, onClose }: Un
           <div className="flex flex-col items-center justify-center py-12 text-center card-base">
             <Layers size={30} className="text-muted-foreground mb-3" />
             <p className="text-sm font-medium text-foreground">No units yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Add units to this project to track inventory.</p>
+            <p className="text-xs text-muted-foreground mt-1">Add units to this project to keep track of what's available.</p>
           </div>
         ) : (
           <div className="space-y-2">

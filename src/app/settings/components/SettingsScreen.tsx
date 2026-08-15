@@ -275,9 +275,8 @@ function RotationToggle({ profile }: { profile: any }) {
       <div>
         <h3 className="text-sm font-semibold text-foreground">Lead Rotation</h3>
         <p className="text-sm text-muted-foreground mt-0.5">
-          When on, new and imported leads without an explicit assignee are
-          automatically assigned to the least-recently-assigned active
-          salesperson (round-robin).
+          Turn this on to share new leads automatically among your sales team,
+          one at a time.
         </p>
       </div>
       {loading ? (
@@ -485,7 +484,7 @@ function SecurityTab({ user }: { user: any }) {
             ) : (
               <Shield size={14} />
             )}
-            {sent ? 'Email Sent' : 'Reset Password'}
+            {sent ? 'Email sent' : 'Send reset link'}
           </button>
         </div>
       </div>

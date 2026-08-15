@@ -115,7 +115,7 @@ export default function CallLogsScreen() {
         <div>
           <h1 className="page-title">Call Logs</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {counts.total} touchpoint{counts.total !== 1 ? 's' : ''} recorded
+            {counts.total} call log{counts.total !== 1 ? 's' : ''} recorded
           </p>
         </div>
       </div>
@@ -191,7 +191,7 @@ export default function CallLogsScreen() {
         <EmptyState
           icon={<Phone size={22} className="text-muted-foreground" />}
           title="No call logs yet"
-          description="Calls, site visits and WhatsApp touches you log from a lead will appear here."
+          description="Calls, site visits and WhatsApp messages you log for a lead appear here."
         />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

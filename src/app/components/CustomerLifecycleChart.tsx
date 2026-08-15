@@ -76,9 +76,9 @@ export default function CustomerLifecycleChart() {
     <div className="card-base flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-foreground text-sm">Customer Lifecycle Breakdown</h3>
+          <h3 className="font-semibold text-foreground text-sm">Leads by Stage</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Pipeline health — New → Negotiation → Closed
+            Leads at each stage — New → Negotiation → Closed
           </p>
         </div>
         <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-1 rounded-full">

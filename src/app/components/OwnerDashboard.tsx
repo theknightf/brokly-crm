@@ -194,7 +194,7 @@ export default function OwnerDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Company Overview</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            How is the company doing today? Executive view of people, attendance, performance and expenses.
+            A quick view of your team, attendance, performance and expenses.
           </p>
         </div>
         <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
@@ -273,7 +273,7 @@ export default function OwnerDashboard() {
               <CalendarCheck2 size={16} className="text-primary" /> Attendance Overview
             </h2>
             <Link href="/attendance" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
-              Open Attendance <ArrowRight size={12} />
+              View attendance <ArrowRight size={12} />
             </Link>
           </div>
           <div className="grid grid-cols-4 gap-3 text-center">
@@ -376,7 +376,7 @@ export default function OwnerDashboard() {
               <Receipt size={16} className="text-primary" /> Operating Expenses
             </h2>
             <Link href="/expenses" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
-              All expenses <ArrowRight size={12} />
+              View all expenses <ArrowRight size={12} />
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -442,7 +442,7 @@ export default function OwnerDashboard() {
                   </p>
                 </div>
                 <Link href={`/admin/employees/${data.bestEmployee.id}`} className="text-teal font-medium text-xs hover:underline flex-shrink-0">
-                  View
+                  View profile
                 </Link>
               </div>
             )}

@@ -600,18 +600,18 @@ export default function ReportsScreen() {
             className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
             title="Export report as PDF"
           >
-            <FileDown size={15} />
-            PDF
-          </button>
+              <FileDown size={15} />
+              Export PDF
+            </button>
           <button
             onClick={exportReportsCSV}
             disabled={loading || !data}
             className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
             title="Export report as CSV"
           >
-            <FileDown size={15} />
-            CSV
-          </button>
+              <FileDown size={15} />
+              Export CSV
+            </button>
           <button
             onClick={() => {
               loadReports(from, to);

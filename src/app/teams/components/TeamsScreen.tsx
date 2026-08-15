@@ -278,7 +278,7 @@ function MemberFormModal({
             </button>
             <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
               {saving && <Loader2 size={14} className="animate-spin" />}
-              {initial ? 'Save Changes' : 'Add Member'}
+              {initial ? 'Save changes' : 'Add member'}
             </button>
           </div>
         </form>
@@ -480,7 +480,7 @@ export default function TeamsScreen() {
         {canManage && (
           <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2">
             <Plus size={16} />
-            Add Member
+            Add member
           </button>
         )}
       </div>
@@ -583,7 +583,7 @@ export default function TeamsScreen() {
                   Closed
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
-                  Conv. Rate
+                    Conversion
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden xl:table-cell">
                   Revenue
