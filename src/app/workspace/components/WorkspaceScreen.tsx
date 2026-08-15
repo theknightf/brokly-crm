@@ -297,9 +297,10 @@ export default function WorkspaceScreen() {
           <p className="text-xs text-muted-foreground mt-0.5">{t('workspace.noResults')}</p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] table-mobile">
-            <thead className="bg-muted/40 border-b border-border">
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] table-mobile">
+              <thead className="bg-muted/40 border-b border-border">
               <tr>
                 <th className="table-th">{t('workspace.name')}</th>
                 <th className="table-th">{t('workspace.dueDate')}</th>
@@ -362,6 +363,7 @@ export default function WorkspaceScreen() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

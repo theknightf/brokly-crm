@@ -454,7 +454,7 @@ function AttendanceTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<CalendarDays size={22} className="text-muted-foreground" />} title="No attendance" description="No check-ins logged for this period." />;
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border">
+    <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
           <tr>
@@ -495,7 +495,7 @@ function CallsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<PhoneCall size={22} className="text-muted-foreground" />} title="No calls" description="No calls or WhatsApp logged for this period." />;
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border">
+    <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
           <tr>
@@ -531,7 +531,7 @@ function VisitsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<MapPin size={22} className="text-muted-foreground" />} title="No site visits" description="No site visits recorded for this period." />;
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border">
+    <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
           <tr>
@@ -571,7 +571,7 @@ function LeadsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<Users size={22} className="text-muted-foreground" />} title="No leads" description="No leads associated with this employee for the period." />;
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border">
+    <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
           <tr>
@@ -600,7 +600,7 @@ function FollowupsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<Bell size={22} className="text-muted-foreground" />} title="No follow-ups" description="No follow-ups scheduled for this period." />;
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border">
+    <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
           <tr>
