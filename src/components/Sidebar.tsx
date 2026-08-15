@@ -38,9 +38,16 @@ interface NavItem {
   badge?: number;
 }
 
-const navGroups: { titleKey: string; items: NavItem[] }[] = [
+interface NavGroup {
+  titleKey: string;
+  descriptionKey?: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
   {
     titleKey: 'nav.overview',
+    descriptionKey: 'nav.overview.desc',
     items: [
       {
         id: 'nav-dashboard',
@@ -58,6 +65,7 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
   },
   {
     titleKey: 'nav.pipeline',
+    descriptionKey: 'nav.pipeline.desc',
     items: [
       {
         id: 'nav-leads',
@@ -111,6 +119,7 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
   },
   {
     titleKey: 'nav.management',
+    descriptionKey: 'nav.management.desc',
     items: [
       {
         id: 'nav-locations',
@@ -152,6 +161,7 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
   },
   {
     titleKey: 'nav.system',
+    descriptionKey: 'nav.system.desc',
     items: [
       {
         id: 'nav-expenses',
@@ -238,8 +248,8 @@ function roleClassOf(role?: string): 'sales' | 'management' | 'admin' {
 
 export function reorderNavForRole(
   role?: string,
-  base: { titleKey: string; items: NavItem[] }[] = navGroups
-): { titleKey: string; items: NavItem[] }[] {
+  base: NavGroup[] = navGroups
+): NavGroup[] {
   const cls = roleClassOf(role);
   if (cls === 'admin') return base;
   const priorities = ROLE_ITEM_PRIORITY[cls] || {};
@@ -312,7 +322,7 @@ function SidebarContent({
 }: {
   collapsed: boolean;
   isActive: (href: string) => boolean;
-  nav: { titleKey: string; items: NavItem[] }[];
+  nav: NavGroup[];
 }) {
   const { user, profile, signOut } = useAuth();
   const { t } = useLanguage();
@@ -362,12 +372,19 @@ function SidebarContent({
           }))
           .filter((group) => group.items.length > 0)
           .map((group) => (
-            <div key={`group-${group.titleKey}`}>
-              {!collapsed && (
-                <p className="px-3 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {t(group.titleKey)}
-                </p>
-              )}
+               <div key={`group-${group.titleKey}`}>
+               {!collapsed && (
+                 <>
+                   <p className="px-3 mb-0.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                     {t(group.titleKey)}
+                   </p>
+                   {group.descriptionKey && (
+                     <p className="px-3 mb-1.5 text-[11px] leading-tight text-muted-foreground/70">
+                       {t(group.descriptionKey)}
+                     </p>
+                   )}
+                 </>
+               )}
               <ul className="space-y-0.5">
                 {group.items.map((item) => (
                   <li key={item.id}>

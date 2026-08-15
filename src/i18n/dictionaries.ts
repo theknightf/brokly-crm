@@ -65,6 +65,26 @@ export const dictionaries: Dict = {
     ar: 'دي الحاجات اللي محتاجة انتباهك النهارده — {date}',
   },
   'dashboard.last30': { en: 'Last 30 days', ar: 'آخر 30 يوم' },
+  'dashboard.startHere': { en: 'Start here', ar: 'ابدأ من هنا' },
+  'dashboard.startHereDesc': {
+    en: 'Three quick steps to get going with Brokly.',
+    ar: 'تلات خطوات بسيطة تبدأ بيهم على بروكلي.',
+  },
+  'dashboard.step1': { en: 'Add your first lead', ar: 'ضيف أول عميل متوقّع' },
+  'dashboard.step2': { en: 'Schedule a follow-up', ar: 'حدّد متابعة' },
+  'dashboard.step3': { en: 'Browse projects & units', ar: 'تصفّح المشاريع والوحدات' },
+  'dashboard.dismissGuide': { en: 'Dismiss guide', ar: 'قفل الدليل' },
+
+  'nav.overview.desc': { en: 'Your home and daily check-in', ar: 'الرئيسية وتسجيل الحضور اليومي' },
+  'nav.pipeline.desc': {
+    en: 'Leads, customers, deals and follow-ups',
+    ar: 'العملاء المتوقّعون والعملاء والصفقات والمتابعات',
+  },
+  'nav.management.desc': {
+    en: 'Projects, units, teams and reports',
+    ar: 'المشاريع والوحدات والفرق والتقارير',
+  },
+  'nav.system.desc': { en: 'Settings, expenses and admin', ar: 'الإعدادات والمصروفات والإدارة' },
 
   'calculator.title': { en: 'Unit price calculator', ar: 'حاسبة سعر الوحدة' },
   'calculator.subtitle': {

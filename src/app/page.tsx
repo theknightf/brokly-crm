@@ -12,6 +12,7 @@ const OverdueFollowUps = dynamic(() => import('./components/OverdueFollowUps'));
 const RecentActivity = dynamic(() => import('./components/RecentActivity'));
 const MobileTodayFollowUps = dynamic(() => import('./components/MobileTodayFollowUps'));
 const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
+const GettingStarted = dynamic(() => import('./components/GettingStarted'));
 
 export default function DashboardPage() {
   const { profile, loading } = useAuth();
@@ -39,7 +40,10 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="flex flex-col gap-6">
-        <div className="order-3 lg:order-1">
+        <div className="order-2 lg:order-1">
+          <GettingStarted />
+        </div>
+        <div className="order-3 lg:order-2">
           <DashboardHeader />
         </div>
         <div className="order-4 lg:order-2">
