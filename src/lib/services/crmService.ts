@@ -542,7 +542,10 @@ export const leadsService = {
   /** Bulk-assign a team label (leads.team) to the selected leads. */
   async bulkSetTeam(ids: string[], teamName: string) {
     const supabase = createClient();
-    const { error } = await supabase.from('leads').update({ team: teamName }).in('id', ids);
+    const { error } = await supabase.rpc('bulk_set_team', {
+      p_lead_ids: ids,
+      p_team: teamName,
+    });
     if (error) throw error;
     invalidateCache();
   },
