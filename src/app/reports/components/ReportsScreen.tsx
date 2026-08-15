@@ -242,6 +242,17 @@ function fmtMinutes(seconds: number): string {
   return `${m}m`;
 }
 
+type TabKey = 'overview' | 'leads' | 'sales' | 'team' | 'attendance' | 'calls';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'leads', label: 'Leads' },
+  { key: 'sales', label: 'Sales' },
+  { key: 'team', label: 'Team' },
+  { key: 'attendance', label: 'Attendance' },
+  { key: 'calls', label: 'Calls' },
+];
+
 export default function ReportsScreen() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -252,6 +263,7 @@ export default function ReportsScreen() {
   const [hourFilter, setHourFilter] = useState<number | 'all'>('all');
   const [extrasLoading, setExtrasLoading] = useState(false);
   const [extrasAdmin, setExtrasAdmin] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   useEffect(() => {
     loadReports();
@@ -409,38 +421,55 @@ export default function ReportsScreen() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Live data from your CRM database</p>
         </div>
-<div className="flex items-center gap-2">
-        <button
-          onClick={exportReportsPDF}
-          disabled={loading || !data}
-          className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
-          title="Export report as PDF"
-        >
-          <FileDown size={15} />
-          PDF
-        </button>
-        <button
-          onClick={exportReportsCSV}
-          disabled={loading || !data}
-          className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
-          title="Export report as CSV"
-        >
-          <FileDown size={15} />
-          CSV
-        </button>
-        <button
-          onClick={() => {
-            loadReports();
-            loadExtras();
-          }}
-          disabled={loading || extrasLoading}
-          className="btn-ghost p-2 rounded-lg"
-          title="Refresh"
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportReportsPDF}
+            disabled={loading || !data}
+            className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+            title="Export report as PDF"
+          >
+            <FileDown size={15} />
+            PDF
+          </button>
+          <button
+            onClick={exportReportsCSV}
+            disabled={loading || !data}
+            className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
+            title="Export report as CSV"
+          >
+            <FileDown size={15} />
+            CSV
+          </button>
+          <button
+            onClick={() => {
+              loadReports();
+              loadExtras();
+            }}
+            disabled={loading || extrasLoading}
+            className="btn-ghost p-2 rounded-lg"
+            title="Refresh"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
-    </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 overflow-x-auto px-4 sm:px-6 py-2 border-b border-border bg-card flex-shrink-0">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+              activeTab === t.key
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center flex-1">
@@ -451,651 +480,585 @@ export default function ReportsScreen() {
           Failed to load report data. Please try again.
         </div>
       ) : (
-        <div className="flex-1 overflow-auto px-6 py-6 space-y-6">
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard
-              icon={<Users size={20} />}
-              iconBg="bg-blue-50 text-primary"
-              label="Total Leads"
-              value={String(data.totalLeads)}
-            />
-            <KPICard
-              icon={<UserCheck size={20} />}
-              iconBg="bg-emerald-50 text-emerald-600"
-              label="Total Customers"
-              value={String(data.totalCustomers)}
-            />
-            <KPICard
-              icon={<DollarSign size={20} />}
-              iconBg="bg-purple-50 text-purple-600"
-              label="Total Revenue"
-              value={formatCurrency(data.totalRevenue)}
-            />
-            <KPICard
-              icon={<Target size={20} />}
-              iconBg="bg-amber-50 text-amber-600"
-              label="Conversion Rate"
-              value={`${data.conversionRate}%`}
+        <div className="flex-1 overflow-auto px-6 py-6">
+          {/* Overview tab */}
+          <div className={activeTab === 'overview' ? 'block space-y-6' : 'hidden'}>
+            <OverviewTab data={data} />
+          </div>
+
+          {/* Leads tab */}
+          <div className={activeTab === 'leads' ? 'block space-y-6' : 'hidden'}>
+            <LeadsTab
+              leadsByStatusData={leadsByStatusData}
+              leadsBySourceData={leadsBySourceData}
+              leadsByPropertyData={leadsByPropertyData}
+              followUpStatusData={followUpStatusData}
             />
           </div>
 
-          {/* Monthly Trend */}
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-4">
-              Monthly Leads vs Won (Last 6 Months)
-            </h2>
-            {data.monthlyLeads.length === 0 ? (
+          {/* Sales tab */}
+          <div className={activeTab === 'sales' ? 'block space-y-6' : 'hidden'}>
+            <SalesTab data={data} />
+          </div>
+
+          {/* Team tab */}
+          <div className={activeTab === 'team' ? 'block space-y-6' : 'hidden'}>
+            <TeamTab
+              data={data}
+              activityRows={activityRows}
+              hourRows={hourRows}
+              actionTypes={actionTypes}
+              hourFilter={hourFilter}
+              setHourFilter={setHourFilter}
+              from={from}
+              to={to}
+              setFrom={setFrom}
+              setTo={setTo}
+              loadExtras={loadExtras}
+              extrasLoading={extrasLoading}
+              extrasAdmin={extrasAdmin}
+            />
+          </div>
+
+          {/* Attendance tab */}
+          <div className={activeTab === 'attendance' ? 'block space-y-6' : 'hidden'}>
+            <AttendanceTab
+              attendanceRows={attendanceRows}
+              extrasLoading={extrasLoading}
+              extrasAdmin={extrasAdmin}
+            />
+          </div>
+
+          {/* Calls tab */}
+          <div className={activeTab === 'calls' ? 'block space-y-6' : 'hidden'}>
+            <CallsTab data={data} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Tab panels ──────────────────────────────────────────────────────────── */
+
+function OverviewTab({ data }: { data: ReportData }) {
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          icon={<Users size={20} />}
+          iconBg="bg-blue-50 text-primary"
+          label="Total Leads"
+          value={String(data.totalLeads)}
+        />
+        <KPICard
+          icon={<UserCheck size={20} />}
+          iconBg="bg-emerald-50 text-emerald-600"
+          label="Total Customers"
+          value={String(data.totalCustomers)}
+        />
+        <KPICard
+          icon={<DollarSign size={20} />}
+          iconBg="bg-purple-50 text-purple-600"
+          label="Total Revenue"
+          value={formatCurrency(data.totalRevenue)}
+        />
+        <KPICard
+          icon={<Target size={20} />}
+          iconBg="bg-amber-50 text-amber-600"
+          label="Conversion Rate"
+          value={`${data.conversionRate}%`}
+        />
+      </div>
+
+      {/* Monthly Trend */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-foreground mb-4">
+          Monthly Leads vs Won (Last 6 Months)
+        </h2>
+        {data.monthlyLeads.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={data.monthlyLeads}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="leads"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                name="Leads"
+              />
+              <Line
+                type="monotone"
+                dataKey="won"
+                stroke="#4d7c0f"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                name="Won"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LeadsTab({
+  leadsByStatusData,
+  leadsBySourceData,
+  leadsByPropertyData,
+  followUpStatusData,
+}: {
+  leadsByStatusData: { name: string; value: number }[];
+  leadsBySourceData: { name: string; value: number }[];
+  leadsByPropertyData: { name: string; value: number }[];
+  followUpStatusData: { name: string; value: number }[];
+}) {
+  return (
+    <div className="space-y-6">
+      {/* Lead Status + Source */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Status</h2>
+          {leadsByStatusData.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={leadsByStatusData} layout="vertical">
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--border)"
+                  horizontal={false}
+                />
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
+                <Tooltip />
+                <Bar dataKey="value" name="Leads" radius={[0, 4, 4, 0]}>
+                  {leadsByStatusData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Source</h2>
+          {leadsBySourceData.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={leadsBySourceData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  dataKey="value"
+                  nameKey="name"
+                  label={({ name, percent }: { name?: string | number; percent?: number }) =>
+                    `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                  }
+                  labelLine={false}
+                >
+                  {leadsBySourceData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Property Type + Follow-up Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Property Type</h2>
+          {leadsByPropertyData.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={leadsByPropertyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Bar dataKey="value" name="Leads" radius={[4, 4, 0, 0]}>
+                  {leadsByPropertyData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Follow-ups by Status</h2>
+          {followUpStatusData.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={followUpStatusData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={75}
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {followUpStatusData.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SalesTab({ data }: { data: ReportData }) {
+  const avgDealValue =
+    data.totalCustomers > 0 ? data.totalRevenue / data.totalCustomers : 0;
+
+  const revenueByTeam = data.teamPerformance
+    .slice()
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .map((t) => ({ name: t.name, revenue: t.totalRevenue, deals: t.closedDeals }));
+
+  return (
+    <div className="space-y-6">
+      {/* Sales KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <KPICard
+          icon={<DollarSign size={20} />}
+          iconBg="bg-purple-50 text-purple-600"
+          label="Total Revenue"
+          value={formatCurrency(data.totalRevenue)}
+        />
+        <KPICard
+          icon={<UserCheck size={20} />}
+          iconBg="bg-emerald-50 text-emerald-600"
+          label="Won Deals"
+          value={String(data.totalCustomers)}
+        />
+        <KPICard
+          icon={<Target size={20} />}
+          iconBg="bg-blue-50 text-primary"
+          label="Avg Deal Value"
+          value={data.totalCustomers > 0 ? formatCurrency(avgDealValue) : '—'}
+        />
+      </div>
+
+      {/* Revenue by Team */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Revenue by Team</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Total revenue and closed deals per team
+            </p>
+          </div>
+        </div>
+        {revenueByTeam.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={revenueByTeam} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v: number) => formatCurrency(Number(v))} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
+              <Tooltip formatter={(v: number) => formatCurrency(Number(v))} />
+              <Bar dataKey="revenue" name="Revenue" radius={[0, 4, 4, 0]}>
+                {revenueByTeam.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TeamTab({
+  data,
+  activityRows,
+  hourRows,
+  actionTypes,
+  hourFilter,
+  setHourFilter,
+  from,
+  to,
+  setFrom,
+  setTo,
+  loadExtras,
+  extrasLoading,
+  extrasAdmin,
+}: {
+  data: ReportData;
+  activityRows: ActivityRow[];
+  hourRows: HourRow[];
+  actionTypes: string[];
+  hourFilter: number | 'all';
+  setHourFilter: (v: number | 'all') => void;
+  from: string;
+  to: string;
+  setFrom: (v: string) => void;
+  setTo: (v: string) => void;
+  loadExtras: () => void;
+  extrasLoading: boolean;
+  extrasAdmin: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      {/* Agent Performance Table */}
+      {data.agentPerformance.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Agent Performance</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-mobile">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Agent
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Leads
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Won
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Conversion
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.agentPerformance
+                  .sort((a, b) => b.leads - a.leads)
+                  .map((agent, i) => (
+                    <tr
+                      key={i}
+                      className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 font-medium text-foreground">{agent.name}</td>
+                      <td className="py-2.5 px-3 text-right text-muted-foreground">
+                        {agent.leads}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
+                        {agent.won}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="text-xs bg-blue-50 text-primary px-2 py-0.5 rounded-full font-medium">
+                          {agent.rate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Team Performance Table */}
+      {data.teamPerformance.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                Team Performance & Profitability
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Per-team calls, deals, revenue, expenses and leader rating — scoped to your
+                role
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-mobile">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Team
+                  </th>
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Leader
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Leads
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Closed
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Calls
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Revenue
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Expenses
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-emerald-600">
+                    Profit
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Margin
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-amber-600">
+                    Rating
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.teamPerformance
+                  .slice()
+                  .sort((a, b) => b.profit - a.profit)
+                  .map((member, i) => (
+                    <tr
+                      key={member.id || i}
+                      className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 font-medium text-foreground">
+                        {member.name}
+                      </td>
+                      <td className="py-2.5 px-3 text-muted-foreground">
+                        {member.leaderName || '—'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-muted-foreground">
+                        {member.assignedLeads}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
+                        {member.closedDeals}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-muted-foreground">
+                        {member.calls}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-foreground">
+                        {formatCurrency(member.totalRevenue)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-muted-foreground">
+                        {formatCurrency(member.expenses)}
+                      </td>
+                      <td
+                        className={`py-2.5 px-3 text-right font-bold ${member.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}
+                      >
+                        {formatCurrency(member.profit)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="text-xs bg-blue-50 text-primary px-2 py-0.5 rounded-full font-medium">
+                          {member.profitMargin}%
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        {member.leaderRating ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-semibold"
+                            title={member.leaderRatingComment || 'Leader rating'}
+                          >
+                            ★ {member.leaderRating}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Team Activity (Actions per Hour) ─────────────────────────── */}
+      {extrasAdmin && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                Team Activity — Actions per Hour
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Every user action (lead / follow-up / comment) grouped by hour · Office hours
+                12:00 – 20:00
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="input-base text-sm"
+                title="From"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={to}
+                max={todayIso()}
+                onChange={(e) => setTo(e.target.value)}
+                className="input-base text-sm"
+                title="To"
+              />
+              <select
+                value={String(hourFilter)}
+                onChange={(e) =>
+                  setHourFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))
+                }
+                className="input-base text-sm"
+                title="Filter by hour"
+              >
+                <option value="all">All hours</option>
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {hourLabel(h)}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={loadExtras}
+                disabled={extrasLoading}
+                className="btn-secondary text-sm flex items-center gap-1.5"
+              >
+                <RefreshCw size={14} className={extrasLoading ? 'animate-spin' : ''} /> Apply
+              </button>
+            </div>
+          </div>
+
+          {extrasLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 size={24} className="animate-spin text-primary" />
+            </div>
+          ) : hourFilter !== 'all' ? (
+            hourRows.length === 0 ? (
               <EmptyChart />
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={data.monthlyLeads}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="leads"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    name="Leads"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="won"
-                    stroke="#4d7c0f"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    name="Won"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          {/* Lead Status + Source */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-card border border-border rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Status</h2>
-              {leadsByStatusData.length === 0 ? (
-                <EmptyChart />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={leadsByStatusData} layout="vertical">
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--border)"
-                      horizontal={false}
-                    />
-                    <XAxis type="number" tick={{ fontSize: 12 }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
-                    <Tooltip />
-                    <Bar dataKey="value" name="Leads" radius={[0, 4, 4, 0]}>
-                      {leadsByStatusData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Source</h2>
-              {leadsBySourceData.length === 0 ? (
-                <EmptyChart />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={leadsBySourceData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }: { name?: string | number; percent?: number }) =>
-                        `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-                      }
-                      labelLine={false}
-                    >
-                      {leadsBySourceData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          {/* Property Type + Follow-up Status */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-card border border-border rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Property Type</h2>
-              {leadsByPropertyData.length === 0 ? (
-                <EmptyChart />
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={leadsByPropertyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" name="Leads" radius={[4, 4, 0, 0]}>
-                      {leadsByPropertyData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            <div className="bg-card border border-border rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Follow-ups by Status</h2>
-              {followUpStatusData.length === 0 ? (
-                <EmptyChart />
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={followUpStatusData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={75}
-                      dataKey="value"
-                      nameKey="name"
-                    >
-                      {followUpStatusData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          {/* Agent Performance Table */}
-          {data.agentPerformance.length > 0 && (
-            <div className="bg-card border border-border rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Agent Performance</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm table-mobile">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Agent
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Leads
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Won
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Conversion
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.agentPerformance
-                      .sort((a, b) => b.leads - a.leads)
-                      .map((agent, i) => (
-                        <tr
-                          key={i}
-                          className="border-b border-border/50 hover:bg-muted/30 transition-colors"
-                        >
-                          <td className="py-2.5 px-3 font-medium text-foreground">{agent.name}</td>
-                          <td className="py-2.5 px-3 text-right text-muted-foreground">
-                            {agent.leads}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
-                            {agent.won}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <span className="text-xs bg-blue-50 text-primary px-2 py-0.5 rounded-full font-medium">
-                              {agent.rate}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Team Performance Table */}
-          {data.teamPerformance.length > 0 && (
-            <div className="bg-card border border-border rounded-xl p-5">
-              <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">
-                    Team Performance & Profitability
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Per-team calls, deals, revenue, expenses and leader rating — scoped to your
-                    role
-                  </p>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm table-mobile">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Team
-                      </th>
-                      <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Leader
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Leads
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Closed
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Calls
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Revenue
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Expenses
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-emerald-600">
-                        Profit
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Margin
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-amber-600">
-                        Rating
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.teamPerformance
-                      .slice()
-                      .sort((a, b) => b.profit - a.profit)
-                      .map((member, i) => (
-                        <tr
-                          key={member.id || i}
-                          className="border-b border-border/50 hover:bg-muted/30 transition-colors"
-                        >
-                          <td className="py-2.5 px-3 font-medium text-foreground">
-                            {member.name}
-                          </td>
-                          <td className="py-2.5 px-3 text-muted-foreground">
-                            {member.leaderName || '—'}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-muted-foreground">
-                            {member.assignedLeads}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
-                            {member.closedDeals}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-muted-foreground">
-                            {member.calls}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-foreground">
-                            {formatCurrency(member.totalRevenue)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-muted-foreground">
-                            {formatCurrency(member.expenses)}
-                          </td>
-                          <td
-                            className={`py-2.5 px-3 text-right font-bold ${member.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}
-                          >
-                            {formatCurrency(member.profit)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <span className="text-xs bg-blue-50 text-primary px-2 py-0.5 rounded-full font-medium">
-                              {member.profitMargin}%
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            {member.leaderRating ? (
-                              <span
-                                className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-semibold"
-                                title={member.leaderRatingComment || 'Leader rating'}
-                              >
-                                ★ {member.leaderRating}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Calls by Employee */}
-          {data.callsByEmployee.length > 0 && (
-            <div className="bg-card border border-border rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-foreground mb-4">
-                Calls by Employee
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm table-mobile">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Employee
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Calls
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-emerald-600">
-                        Connected
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        No answer
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-sky-600">
-                        Incoming
-                      </th>
-                      <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                        Duration
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.callsByEmployee
-                      .slice()
-                      .sort((a, b) => b.calls - a.calls)
-                      .map((emp, i) => (
-                        <tr
-                          key={emp.userId || i}
-                          className="border-b border-border/50 hover:bg-muted/30 transition-colors"
-                        >
-                          <td className="py-2.5 px-3 font-medium text-foreground">{emp.name}</td>
-                          <td className="py-2.5 px-3 text-right font-bold text-foreground">
-                            {emp.calls}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
-                            {emp.connected}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-muted-foreground">
-                            {emp.noAnswer}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-sky-600 font-medium">
-                            {emp.incoming}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-muted-foreground">
-                            {fmtMinutes(emp.totalDurationSeconds)}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ── Team Activity (Actions per Hour) ─────────────────────────── */}
-          {extrasAdmin && (
-            <div className="bg-card border border-border rounded-xl p-5">
-              <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
-                <div>
-                  <h2 className="text-sm font-semibold text-foreground">
-                    Team Activity — Actions per Hour
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Every user action (lead / follow-up / comment) grouped by hour · Office hours
-                    12:00 – 20:00
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="date"
-                    value={from}
-                    onChange={(e) => setFrom(e.target.value)}
-                    className="input-base text-sm"
-                    title="From"
-                  />
-                  <span className="text-xs text-muted-foreground">to</span>
-                  <input
-                    type="date"
-                    value={to}
-                    max={todayIso()}
-                    onChange={(e) => setTo(e.target.value)}
-                    className="input-base text-sm"
-                    title="To"
-                  />
-                  <select
-                    value={String(hourFilter)}
-                    onChange={(e) =>
-                      setHourFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))
-                    }
-                    className="input-base text-sm"
-                    title="Filter by hour"
-                  >
-                    <option value="all">All hours</option>
-                    {Array.from({ length: 24 }, (_, h) => (
-                      <option key={h} value={h}>
-                        {hourLabel(h)}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={loadExtras}
-                    disabled={extrasLoading}
-                    className="btn-secondary text-sm flex items-center gap-1.5"
-                  >
-                    <RefreshCw size={14} className={extrasLoading ? 'animate-spin' : ''} /> Apply
-                  </button>
-                </div>
-              </div>
-
-              {extrasLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <Loader2 size={24} className="animate-spin text-primary" />
-                </div>
-              ) : hourFilter !== 'all' ? (
-                hourRows.length === 0 ? (
-                  <EmptyChart />
-                ) : (
-                  <>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Showing activity at{' '}
-                      <span className="font-semibold text-foreground">{hourLabel(hourFilter)}</span>{' '}
-                      · Calls = phone / video-call follow-ups
-                    </p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm whitespace-nowrap">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                              User
-                            </th>
-                            <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                              Actions
-                            </th>
-                            <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                              Calls
-                            </th>
-                            {actionTypes.map((t) => (
-                              <th
-                                key={t}
-                                className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground"
-                              >
-                                {t}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {hourRows.map((r) => (
-                            <tr
-                              key={r.id}
-                              className="border-b border-border/50 hover:bg-muted/30 transition-colors"
-                            >
-                              <td className="py-2.5 px-3">
-                                <p className="font-medium text-foreground truncate max-w-[160px]">
-                                  {r.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate max-w-[160px]">
-                                  {r.role}
-                                </p>
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-bold text-foreground">
-                                {r.actions}
-                              </td>
-                              <td className="py-2.5 px-3 text-right">
-                                {r.calls > 0 ? (
-                                  <span className="inline-flex items-center text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                                    {r.calls} calls
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">0</span>
-                                )}
-                              </td>
-                              {actionTypes.map((t) => (
-                                <td
-                                  key={t}
-                                  className="py-2.5 px-3 text-right text-muted-foreground"
-                                >
-                                  {r.byAction[t] || 0}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                )
-              ) : activityRows.length === 0 ? (
-                <EmptyChart />
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm whitespace-nowrap">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground sticky left-0 bg-card">
-                            User
-                          </th>
-                          {OFFICE_HOURS.map((h) => (
-                            <th
-                              key={h}
-                              className="text-center py-2 px-2 text-xs font-semibold text-muted-foreground"
-                            >
-                              {h}:00
-                            </th>
-                          ))}
-                          <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">
-                            Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activityRows.map((r) => (
-                          <tr
-                            key={r.id}
-                            className="border-b border-border/50 hover:bg-muted/30 transition-colors"
-                          >
-                            <td className="py-2.5 px-3 font-medium text-foreground sticky left-0 bg-card">
-                              <p className="truncate max-w-[160px]">{r.name}</p>
-                              <p className="text-xs text-muted-foreground truncate max-w-[160px]">
-                                {r.role}
-                              </p>
-                            </td>
-                            {OFFICE_HOURS.map((h) => {
-                              const c = r.byHour[h] || 0;
-                              return (
-                                <td key={h} className="py-2.5 px-2 text-center">
-                                  {c > 0 ? (
-                                    <span className="inline-flex w-7 h-7 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-bold">
-                                      {c}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground/40">·</span>
-                                  )}
-                                </td>
-                              );
-                            })}
-                            <td className="py-2.5 px-3 text-center font-bold text-foreground">
-                              {r.total}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {actionTypes.length > 0 && (
-                    <div className="mt-4 overflow-x-auto">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                        Breakdown by action
-                      </p>
-                      <table className="w-full text-sm whitespace-nowrap">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                              User
-                            </th>
-                            {actionTypes.map((t) => (
-                              <th
-                                key={t}
-                                className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground"
-                              >
-                                {t}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {activityRows.map((r) => (
-                            <tr key={r.id} className="border-b border-border/50">
-                              <td className="py-2 px-3 font-medium text-foreground">{r.name}</td>
-                              {actionTypes.map((t) => (
-                                <td key={t} className="py-2 px-3 text-right text-muted-foreground">
-                                  {r.byAction[t] || 0}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ── Attendance Report ─────────────────────────────────────────── */}
-          {extrasAdmin && (
-            <div className="bg-card border border-border rounded-xl p-5">
-              <div className="mb-4">
-                <h2 className="text-sm font-semibold text-foreground">Attendance Report</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Per-user office attendance for the selected period · Office hours 12:00 – 20:00 ·
-                  Arriving after 12:30 = <span className="text-amber-600 font-medium">Late</span>
+              <>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Showing activity at{' '}
+                  <span className="font-semibold text-foreground">{hourLabel(hourFilter)}</span>{' '}
+                  · Calls = phone / video-call follow-ups
                 </p>
-              </div>
-              {extrasLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <Loader2 size={24} className="animate-spin text-primary" />
-                </div>
-              ) : attendanceRows.length === 0 ? (
-                <EmptyChart />
-              ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm whitespace-nowrap">
                     <thead>
@@ -1104,73 +1067,337 @@ export default function ReportsScreen() {
                           User
                         </th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                          Days Present
+                          Actions
                         </th>
                         <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                          On Time
+                          Calls
                         </th>
-                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                          Late
-                        </th>
-                        <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
-                          Absent
-                        </th>
-                        <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">
-                          Warning
-                        </th>
+                        {actionTypes.map((t) => (
+                          <th
+                            key={t}
+                            className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground"
+                          >
+                            {t}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {attendanceRows
-                        .sort((a, b) => b.late - a.late)
-                        .map((r) => (
-                          <tr
-                            key={r.id}
-                            className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                      {hourRows.map((r) => (
+                        <tr
+                          key={r.id}
+                          className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                        >
+                          <td className="py-2.5 px-3">
+                            <p className="font-medium text-foreground truncate max-w-[160px]">
+                              {r.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                              {r.role}
+                            </p>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-foreground">
+                            {r.actions}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {r.calls > 0 ? (
+                              <span className="inline-flex items-center text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                                {r.calls} calls
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          {actionTypes.map((t) => (
+                            <td
+                              key={t}
+                              className="py-2.5 px-3 text-right text-muted-foreground"
+                            >
+                              {r.byAction[t] || 0}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )
+          ) : activityRows.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground sticky left-0 bg-card">
+                        User
+                      </th>
+                      {OFFICE_HOURS.map((h) => (
+                        <th
+                          key={h}
+                          className="text-center py-2 px-2 text-xs font-semibold text-muted-foreground"
+                        >
+                          {h}:00
+                        </th>
+                      ))}
+                      <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activityRows.map((r) => (
+                      <tr
+                        key={r.id}
+                        className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="py-2.5 px-3 font-medium text-foreground sticky left-0 bg-card">
+                          <p className="truncate max-w-[160px]">{r.name}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                            {r.role}
+                          </p>
+                        </td>
+                        {OFFICE_HOURS.map((h) => {
+                          const c = r.byHour[h] || 0;
+                          return (
+                            <td key={h} className="py-2.5 px-2 text-center">
+                              {c > 0 ? (
+                                <span className="inline-flex w-7 h-7 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-bold">
+                                  {c}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/40">·</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="py-2.5 px-3 text-center font-bold text-foreground">
+                          {r.total}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {actionTypes.length > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Breakdown by action
+                  </p>
+                  <table className="w-full text-sm whitespace-nowrap">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                          User
+                        </th>
+                        {actionTypes.map((t) => (
+                          <th
+                            key={t}
+                            className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground"
                           >
-                            <td className="py-2.5 px-3">
-                              <p className="font-medium text-foreground truncate max-w-[160px]">
-                                {r.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate max-w-[160px]">
-                                {r.role}
-                              </p>
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-medium text-foreground">
-                              {r.present}
-                            </td>
-                            <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
-                              {r.onTime}
-                            </td>
-                            <td className="py-2.5 px-3 text-right text-amber-600 font-medium">
-                              {r.late}
-                            </td>
-                            <td className="py-2.5 px-3 text-right text-muted-foreground">
-                              {r.absent}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <div className="flex justify-center">
-                                {r.late > 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                                    ⚠ {r.late} late{r.late > 1 ? 's' : ''}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center text-xs text-emerald-600 font-medium">
-                                    ✓ On track
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
+                            {t}
+                          </th>
                         ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activityRows.map((r) => (
+                        <tr key={r.id} className="border-b border-border/50">
+                          <td className="py-2 px-3 font-medium text-foreground">{r.name}</td>
+                          {actionTypes.map((t) => (
+                            <td key={t} className="py-2 px-3 text-right text-muted-foreground">
+                              {r.byAction[t] || 0}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AttendanceTab({
+  attendanceRows,
+  extrasLoading,
+  extrasAdmin,
+}: {
+  attendanceRows: AttendanceRow[];
+  extrasLoading: boolean;
+  extrasAdmin: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      {/* ── Attendance Report ─────────────────────────────────────────── */}
+      {extrasAdmin && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Attendance Report</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Per-user office attendance for the selected period · Office hours 12:00 – 20:00 ·
+              Arriving after 12:30 = <span className="text-amber-600 font-medium">Late</span>
+            </p>
+          </div>
+          {extrasLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 size={24} className="animate-spin text-primary" />
+            </div>
+          ) : attendanceRows.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm whitespace-nowrap">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                      User
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                      Days Present
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                      On Time
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                      Late
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                      Absent
+                    </th>
+                    <th className="text-center py-2 px-3 text-xs font-semibold text-muted-foreground">
+                      Warning
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceRows
+                    .sort((a, b) => b.late - a.late)
+                    .map((r) => (
+                      <tr
+                        key={r.id}
+                        className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                      >
+                        <td className="py-2.5 px-3">
+                          <p className="font-medium text-foreground truncate max-w-[160px]">
+                            {r.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                            {r.role}
+                          </p>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-medium text-foreground">
+                          {r.present}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
+                          {r.onTime}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-amber-600 font-medium">
+                          {r.late}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-muted-foreground">
+                          {r.absent}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex justify-center">
+                            {r.late > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                                ⚠ {r.late} late{r.late > 1 ? 's' : ''}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center text-xs text-emerald-600 font-medium">
+                                ✓ On track
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function CallsTab({ data }: { data: ReportData }) {
+  return (
+    <div className="space-y-6">
+      {/* Calls by Employee */}
+      {data.callsByEmployee.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">
+            Calls by Employee
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-mobile">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Employee
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Calls
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-emerald-600">
+                    Connected
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    No answer
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-sky-600">
+                    Incoming
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    Duration
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.callsByEmployee
+                  .slice()
+                  .sort((a, b) => b.calls - a.calls)
+                  .map((emp, i) => (
+                    <tr
+                      key={emp.userId || i}
+                      className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 font-medium text-foreground">{emp.name}</td>
+                      <td className="py-2.5 px-3 text-right font-bold text-foreground">
+                        {emp.calls}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
+                        {emp.connected}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-muted-foreground">
+                        {emp.noAnswer}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-sky-600 font-medium">
+                        {emp.incoming}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-muted-foreground">
+                        {fmtMinutes(emp.totalDurationSeconds)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Call logs */}
       <div className="mt-8 border-t border-border pt-8">
         <CallLogsReport />
       </div>
