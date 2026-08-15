@@ -267,6 +267,18 @@ interface ReportData {
     noAnswer: number;
     incoming: number;
   }[];
+  previousPeriod?: {
+    from: string;
+    to: string;
+    totalLeads: number;
+    totalCustomers: number;
+    totalRevenue: number;
+    conversionRate: number;
+    leadsChange: number;
+    customersChange: number;
+    revenueChange: number;
+    conversionChange: number;
+  } | null;
 }
 
 function fmtMinutes(seconds: number): string {
@@ -570,7 +582,7 @@ export default function ReportsScreen() {
         <div className="flex-1 overflow-auto px-6 py-6">
           {/* Overview tab */}
           <div className={activeTab === 'overview' ? 'block space-y-6' : 'hidden'}>
-            <OverviewTab data={data} />
+            <OverviewTab data={data} showDelta={rangePreset !== 'all'} />
           </div>
 
           {/* Leads tab */}
@@ -623,7 +635,16 @@ export default function ReportsScreen() {
 
 /* ── Tab panels ──────────────────────────────────────────────────────────── */
 
-function OverviewTab({ data }: { data: ReportData }) {
+function OverviewTab({ data, showDelta }: { data: ReportData; showDelta: boolean }) {
+  const prev = showDelta ? data.previousPeriod : null;
+
+  const deltaFor = (change?: number): { value: string; direction: 'up' | 'down' | 'flat' } | null => {
+    if (prev == null || change === undefined || change === null) return null;
+    const abs = Math.abs(change);
+    const direction = abs < 0.05 ? 'flat' : change > 0 ? 'up' : 'down';
+    return { value: `${change > 0 ? '+' : ''}${abs.toFixed(1)}%`, direction };
+  };
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -633,24 +654,32 @@ function OverviewTab({ data }: { data: ReportData }) {
           iconBg="bg-blue-50 text-primary"
           label="Total Leads"
           value={String(data.totalLeads)}
+          delta={deltaFor(prev?.leadsChange)}
+          deltaTitle={`vs ${prev?.from} → ${prev?.to}`}
         />
         <KPICard
           icon={<UserCheck size={20} />}
           iconBg="bg-emerald-50 text-emerald-600"
           label="Total Customers"
           value={String(data.totalCustomers)}
+          delta={deltaFor(prev?.customersChange)}
+          deltaTitle={`vs ${prev?.from} → ${prev?.to}`}
         />
         <KPICard
           icon={<DollarSign size={20} />}
           iconBg="bg-purple-50 text-purple-600"
           label="Total Revenue"
           value={formatCurrency(data.totalRevenue)}
+          delta={deltaFor(prev?.revenueChange)}
+          deltaTitle={`vs ${prev?.from} → ${prev?.to}`}
         />
         <KPICard
           icon={<Target size={20} />}
           iconBg="bg-amber-50 text-amber-600"
           label="Conversion Rate"
           value={`${data.conversionRate}%`}
+          delta={deltaFor(prev?.conversionChange)}
+          deltaTitle={`vs ${prev?.from} → ${prev?.to}`}
         />
       </div>
 
@@ -1459,12 +1488,25 @@ function KPICard({
   iconBg,
   label,
   value,
+  delta,
+  deltaTitle,
 }: {
   icon: React.ReactNode;
   iconBg: string;
   label: string;
   value: string;
+  delta?: { value: string; direction: 'up' | 'down' | 'flat' } | null;
+  deltaTitle?: string;
 }) {
+  const deltaCls =
+    delta?.direction === 'up'
+      ? 'text-emerald-600'
+      : delta?.direction === 'down'
+        ? 'text-red-500'
+        : 'text-muted-foreground';
+  const deltaArrow =
+    delta?.direction === 'up' ? '↑' : delta?.direction === 'down' ? '↓' : '•';
+
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
       <div
@@ -1472,9 +1514,14 @@ function KPICard({
       >
         {icon}
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-xl font-bold text-foreground">{value}</p>
+        {delta && (
+          <p className={`text-[11px] font-semibold leading-tight ${deltaCls}`} title={deltaTitle}>
+            {deltaArrow} {delta.value} <span className="font-normal text-muted-foreground">vs prev.</span>
+          </p>
+        )}
       </div>
     </div>
   );

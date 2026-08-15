@@ -4,6 +4,14 @@ import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
+function isoDay(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
 
@@ -295,6 +303,66 @@ export async function GET(request: Request) {
     });
   }
 
+  // ── Previous period comparison (for the Overview KPI deltas) ─────────────
+  // The previous period is the same number of days immediately before the
+  // selected range. Computed server-side; the client only displays it.
+  let previousPeriod: {
+    from: string;
+    to: string;
+    totalLeads: number;
+    totalCustomers: number;
+    totalRevenue: number;
+    conversionRate: number;
+    leadsChange: number;
+    customersChange: number;
+    revenueChange: number;
+    conversionChange: number;
+  } | null = null;
+
+  if (hasRange) {
+    const days = Math.round((rangeEnd - rangeStart) / 86400000) + 1;
+    const prevEndMs = rangeStart - 1;
+    const prevStartMs = prevEndMs - (days - 1) * 86400000;
+    const prevFrom = isoDay(prevStartMs);
+    const prevTo = isoDay(prevEndMs);
+
+    const inPrev = (iso: string | null | undefined) => {
+      if (!iso) return false;
+      const ts = new Date(iso).getTime();
+      return Number.isFinite(ts) && ts >= prevStartMs && ts <= prevEndMs;
+    };
+    const inPrevDate = (date: string | null | undefined) =>
+      !!date && date >= prevFrom && date <= prevTo;
+
+    const prevLeads = allLeads.filter((l: any) => inPrev(l.created_at));
+    const prevCustomers = allCustomers.filter((c: any) => inPrev(c.created_at));
+    const prevExpenses = allExpenses.filter((e: any) => inPrevDate(e.expense_date));
+
+    const pTotalLeads = prevLeads.length;
+    const pTotalCustomers = prevCustomers.length;
+    const pTotalRevenue = prevCustomers.reduce(
+      (sum: number, c: any) => sum + Number(c.budget_max || 0),
+      0
+    );
+    const pConversionRate = pTotalLeads > 0 ? (pTotalCustomers / pTotalLeads) * 100 : 0;
+
+    const pct = (cur: number, prevVal: number): number =>
+      prevVal === 0 ? (cur === 0 ? 0 : 100) : ((cur - prevVal) / prevVal) * 100;
+
+    previousPeriod = {
+      from: prevFrom,
+      to: prevTo,
+      totalLeads: pTotalLeads,
+      totalCustomers: pTotalCustomers,
+      totalRevenue: pTotalRevenue,
+      conversionRate: pConversionRate,
+      leadsChange: pct(leads.length, pTotalLeads),
+      customersChange: pct(customers.length, pTotalCustomers),
+      revenueChange: pct(totalRevenue, pTotalRevenue),
+      conversionChange: pct(Number(conversionRate) || 0, pConversionRate),
+    };
+  }
+
   return NextResponse.json({
     totalLeads: leads.length,
     totalCustomers: customers.length,
@@ -313,5 +381,6 @@ export async function GET(request: Request) {
     })),
     teamPerformance,
     callsByEmployee: Object.values(callsByEmployee).sort((a: any, b: any) => b.calls - a.calls),
+    previousPeriod,
   });
 }
