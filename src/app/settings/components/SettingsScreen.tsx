@@ -16,6 +16,7 @@ import {
   Monitor,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { isAdminRole } from '@/lib/roles';
@@ -385,39 +386,8 @@ function NotificationsTab() {
 }
 
 // ─── Appearance Tab ───────────────────────────────────────────────────────────
-const THEME_KEY = 'brokly_theme';
-
-function resolveTheme(pref: 'light' | 'dark' | 'system'): boolean {
-  if (pref === 'dark') return true;
-  if (pref === 'light') return false;
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
-}
-
-function applyTheme(pref: 'light' | 'dark' | 'system') {
-  const dark = resolveTheme(pref);
-  document.documentElement.classList.toggle('dark', dark);
-}
-
 function AppearanceTab() {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
-    if (typeof window === 'undefined') return 'system';
-    return (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'system') || 'system';
-  });
-
-  useEffect(() => {
-    applyTheme(theme);
-    if (theme === 'system') {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const onChange = () => applyTheme('system');
-      mq.addEventListener('change', onChange);
-      return () => mq.removeEventListener('change', onChange);
-    }
-  }, [theme]);
-
-  const select = (value: 'light' | 'dark' | 'system') => {
-    setTheme(value);
-    localStorage.setItem(THEME_KEY, value);
-  };
+  const { theme, setTheme } = useTheme();
 
   const themes = [
     { value: 'light' as const, label: 'Light', icon: <Sun size={18} /> },
@@ -437,7 +407,7 @@ function AppearanceTab() {
           {themes.map((t) => (
             <button
               key={t.value}
-              onClick={() => select(t.value)}
+              onClick={() => setTheme(t.value)}
               className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors ${
                 theme === t.value
                   ? 'border-primary bg-primary/5'

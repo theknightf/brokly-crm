@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans, JetBrains_Mono, Fraunces } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { PWAProvider } from '@/components/PWAProvider';
 import { MobileTableLabeler } from '@/components/MobileTableLabeler';
 import '../styles/tailwind.css';
@@ -74,8 +75,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={plusJakartaSans.className}>
         <AuthProvider>
           <LanguageProvider>
-            {children}
-            <Toaster position="bottom-right" richColors closeButton />
+            <ThemeProvider>
+              {children}
+              <Toaster position="bottom-right" richColors closeButton />
+            </ThemeProvider>
           </LanguageProvider>
         </AuthProvider>
         <PWAProvider />

@@ -13,9 +13,12 @@ import {
   UserRound,
   Settings,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import NotificationBell from './NotificationBell';
 
 interface TopbarProps {
@@ -30,6 +33,7 @@ export default function Topbar({
   sidebarCollapsed,
 }: TopbarProps) {
   const { t, lang, toggleLang } = useLanguage();
+  const { resolvedDark, toggleTheme } = useTheme();
   const { user, profile, signOut } = useAuth();
   const router = useRouter();
   const [search, setSearch] = useState('');
@@ -107,6 +111,16 @@ export default function Topbar({
           <Plus size={14} />
           <span className="hidden md:inline">{t('common.newLead')}</span>
         </Link>
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="btn-ghost flex items-center p-2 rounded-lg"
+          aria-label={resolvedDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={resolvedDark ? 'Light mode' : 'Dark mode'}
+        >
+          {resolvedDark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
 
         {/* Language toggle */}
         <button
