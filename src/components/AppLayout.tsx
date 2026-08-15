@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import MobileBottomNav from './MobileBottomNav';
+import QuickActions from './QuickActions';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -48,6 +49,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Mobile bottom navigation (small screens only) */}
       <MobileBottomNav onOpenMenu={() => setMobileSidebarOpen(true)} />
+
+      {/* Global quick actions launcher */}
+      <QuickActions />
     </div>
   );
 }

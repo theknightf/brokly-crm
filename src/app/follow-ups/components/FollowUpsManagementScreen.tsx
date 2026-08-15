@@ -127,13 +127,18 @@ export default function FollowUpsManagementScreen() {
 
   useEffect(() => {
     try {
-      const tab = new URLSearchParams(window.location.search).get('tab');
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
       if (tab && ['all', 'overdue', 'today', 'upcoming', 'completed', 'profiles'].includes(tab)) {
         setActiveTab(tab as typeof activeTab);
-        const url = new URL(window.location.href);
-        url.searchParams.delete('tab');
-        window.history.replaceState({}, '', url.toString());
       }
+      if (params.get('new') === '1') {
+        setAddModalOpen(true);
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tab');
+      url.searchParams.delete('new');
+      window.history.replaceState({}, '', url.toString());
     } catch {
       // ignore
     }

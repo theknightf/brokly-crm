@@ -11,7 +11,6 @@ import {
   DollarSign,
   Target,
   FileDown,
-  Activity,
   Clock,
   CalendarCheck,
   CheckSquare,
@@ -81,29 +80,40 @@ function monthStartIso(): string {
   return isoDay(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
-// Used for the "All time" preset: a floor early enough to capture every record
-// while still letting the unified filter pass a concrete from/to everywhere.
-const ALL_TIME_START = '2000-01-01';
-
-type RangePreset = 'today' | '7d' | 'month' | 'all' | 'custom';
+type RangePreset = 'today' | 'week' | 'month' | 'year' | 'custom';
 
 const RANGE_PRESETS: { key: RangePreset; label: string }[] = [
   { key: 'today', label: 'Today' },
-  { key: '7d', label: 'Last 7 days' },
+  { key: 'week', label: 'This week' },
   { key: 'month', label: 'This month' },
-  { key: 'all', label: 'All time' },
+  { key: 'year', label: 'This year' },
 ];
+
+function weekStartIso(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = (day + 6) % 7;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+  return isoDay(monday);
+}
+
+function yearStartIso(): string {
+  const now = new Date();
+  return isoDay(new Date(now.getFullYear(), 0, 1));
+}
 
 function presetRange(key: RangePreset): { from: string; to: string } {
   const today = todayIso();
   switch (key) {
     case 'today':
       return { from: today, to: today };
+    case 'week':
+      return { from: weekStartIso(), to: today };
     case 'month':
       return { from: monthStartIso(), to: today };
-    case 'all':
-      return { from: ALL_TIME_START, to: today };
-    case '7d':
+    case 'year':
+      return { from: yearStartIso(), to: today };
+    case 'custom':
     default:
       return { from: daysAgoIso(6), to: today };
   }
@@ -309,19 +319,26 @@ function fmtMinutes(seconds: number): string {
 
 type TabKey = 'overview' | 'leads' | 'sales' | 'team' | 'attendance' | 'calls';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'leads', label: 'Leads' },
-  { key: 'sales', label: 'Sales' },
-  { key: 'team', label: 'Team' },
-  { key: 'attendance', label: 'Attendance' },
-  { key: 'calls', label: 'Calls' },
+// Landing cards — a small set of friendly CATEGORY CARDS. `target` is either
+// an in-page tab key or a route to an existing dedicated page/section.
+type ReportCardTarget = TabKey | string;
+const CATEGORY_CARDS: {
+  key: string;
+  title: string;
+  desc: string;
+  icon: React.ComponentType<{ size?: number | string; className?: string }>;
+  target: ReportCardTarget;
+}[] = [
+  { key: 'myPerformance', title: 'My performance', desc: 'Your leads, wins and conversion at a glance', icon: UserCheck, target: 'overview' },
+  { key: 'teamPerformance', title: 'Team performance', desc: 'How every agent and team is doing', icon: Users, target: 'team' },
+  { key: 'leadsFollowUps', title: 'Leads & follow-ups', desc: 'Where leads come from and follow-up status', icon: BarChart3, target: 'leads' },
+  { key: 'salesRevenue', title: 'Sales & revenue', desc: 'Deals closed and money earned', icon: DollarSign, target: 'sales' },
+  { key: 'calls', title: 'Calls', desc: 'Call volume, duration and outcomes', icon: Phone, target: 'calls' },
+  { key: 'attendance', title: 'Attendance', desc: 'Who was on time, late or absent', icon: Clock, target: 'attendance' },
 ];
 
-// Landing cards — one per required report type. `target` is either an in-page
-// tab key or a route to an existing dedicated page/section.
-type ReportCardTarget = TabKey | string;
-const REPORT_CARDS: {
+// Secondary, route-based reports kept one tap away under "More reports".
+const MORE_CARDS: {
   key: string;
   title: string;
   desc: string;
@@ -329,14 +346,8 @@ const REPORT_CARDS: {
   target: ReportCardTarget;
   adminOnly?: boolean;
 }[] = [
-  { key: 'userPerformance', title: 'User Performance', desc: 'Leads, wins and conversion per agent', icon: Users, target: 'team' },
-  { key: 'userActivities', title: 'User Activities', desc: 'Every user action grouped by hour and type', icon: Activity, target: 'team' },
-  { key: 'leads', title: 'Leads', desc: 'Lead volume, status, sources and property types', icon: BarChart3, target: 'leads' },
-  { key: 'attendance', title: 'Attendance', desc: 'On-time, late and absent days per user', icon: Clock, target: 'attendance' },
   { key: 'meetings', title: 'Meetings', desc: 'Scheduled site visits and meetings', icon: CalendarCheck, target: '/calendar' },
   { key: 'followUps', title: 'Follow-ups', desc: 'Pending and completed follow-ups', icon: CheckSquare, target: '/follow-ups' },
-  { key: 'calls', title: 'Calls', desc: 'Call volume, duration and outcomes', icon: Phone, target: 'calls' },
-  { key: 'sales', title: 'Sales / Deals', desc: 'Revenue, won deals and average deal value', icon: DollarSign, target: 'sales' },
   { key: 'projects', title: 'Projects', desc: 'Project pipeline and pitches', icon: FolderKanban, target: '/projects' },
   { key: 'expenses', title: 'Expenses', desc: 'Spend by category and team', icon: Receipt, target: '/expenses' },
   { key: 'payroll', title: 'Payroll', desc: 'Payroll entries, bonuses and deductions', icon: Banknote, target: '/admin?tab=payroll', adminOnly: true },
@@ -344,13 +355,24 @@ const REPORT_CARDS: {
   { key: 'kpis', title: 'KPIs', desc: 'Team KPI targets vs actual results', icon: Target, target: '/admin?tab=kpiTargets', adminOnly: true },
 ];
 
+// Friendly title shown when a category report is open.
+const VIEW_TITLES: Record<string, string> = {
+  overview: 'My performance',
+  team: 'Team performance',
+  leads: 'Leads & follow-ups',
+  sales: 'Sales & revenue',
+  calls: 'Calls',
+  attendance: 'Attendance',
+};
+
 export default function ReportsScreen() {
   const router = useRouter();
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rangePreset, setRangePreset] = useState<RangePreset>('7d');
-  const [from, setFrom] = useState(daysAgoIso(6));
-  const [to, setTo] = useState(todayIso());
+  const [rangePreset, setRangePreset] = useState<RangePreset>('week');
+  const initialRange = presetRange('week');
+  const [from, setFrom] = useState(initialRange.from);
+  const [to, setTo] = useState(initialRange.to);
   const [activity, setActivity] = useState<any>(null);
   const [attendance, setAttendance] = useState<any>(null);
   const [hourFilter, setHourFilter] = useState<number | 'all'>('all');
@@ -591,7 +613,7 @@ export default function ReportsScreen() {
             <BarChart3 size={22} className="text-primary" />
             Reports & Analytics
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Live data from your CRM database</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Pick a report to see your numbers</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -626,9 +648,9 @@ export default function ReportsScreen() {
         </div>
       </div>
 
-      {/* Unified date range filter */}
-      <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3 border-b border-border bg-card flex-shrink-0">
-        <div className="flex items-center gap-1 overflow-x-auto">
+      {/* Date range presets */}
+      <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-b border-border bg-card flex-shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
           {RANGE_PRESETS.map((p) => (
             <button
               key={p.key}
@@ -636,22 +658,22 @@ export default function ReportsScreen() {
                 const r = presetRange(p.key);
                 applyRange(r.from, r.to, p.key);
               }}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+              className={`min-h-[40px] px-4 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
                 rangePreset === p.key
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-[0_8px_22px_-8px_rgba(132,204,22,0.6)]'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               {p.label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
           <select
             value={userFilter}
             onChange={(e) => setUserFilter(e.target.value)}
-            className="input-base text-sm"
-            title="Filter reports by user"
+            className="input-base text-sm min-h-[40px] w-auto"
+            title="Show data for"
           >
             <option value="all">All users</option>
             {userOptions.map((u) => (
@@ -660,57 +682,30 @@ export default function ReportsScreen() {
               </option>
             ))}
           </select>
-          <input
-            type="date"
-            value={from}
-            max={to}
-            onChange={(e) => {
-              if (e.target.value) applyRange(e.target.value, to, 'custom');
-            }}
-            className="input-base text-sm"
-            title="From"
-          />
-          <span className="text-xs text-muted-foreground">to</span>
-          <input
-            type="date"
-            value={to}
-            max={todayIso()}
-            onChange={(e) => {
-              if (e.target.value) applyRange(from, e.target.value, 'custom');
-            }}
-            className="input-base text-sm"
-            title="To"
-          />
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={from}
+              max={to}
+              onChange={(e) => {
+                if (e.target.value) applyRange(e.target.value, to, 'custom');
+              }}
+              className="input-base text-sm min-h-[40px] w-auto"
+              title="From"
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <input
+              type="date"
+              value={to}
+              max={todayIso()}
+              onChange={(e) => {
+                if (e.target.value) applyRange(from, e.target.value, 'custom');
+              }}
+              className="input-base text-sm min-h-[40px] w-auto"
+              title="To"
+            />
+          </div>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto px-4 sm:px-6 py-2 border-b border-border bg-card flex-shrink-0">
-        <button
-          onClick={() => setView('landing')}
-          className={`px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-            view === 'landing'
-              ? 'bg-primary/10 text-primary'
-              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-          }`}
-        >
-          All Reports
-        </button>
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => {
-              setView(t.key);
-            }}
-            className={`px-3.5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-              view === t.key
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
       </div>
 
       {loading ? (
@@ -724,7 +719,7 @@ export default function ReportsScreen() {
       ) : (
         <div className="flex-1 overflow-auto px-6 py-6">
           {view === 'landing' ? (
-            <div className="space-y-6">
+            <div className="space-y-8 max-w-6xl">
               {selectedUserId ? (
                 <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
                   <Users size={16} className="text-primary flex-shrink-0" />
@@ -744,57 +739,98 @@ export default function ReportsScreen() {
                 </div>
               ) : null}
 
-              {/* Report cards landing */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {REPORT_CARDS.filter((c) => !c.adminOnly || extrasAdmin).map((card) => (
-                  <button
-                    key={card.key}
-                    onClick={() => openReport(card.target)}
-                    className="text-left bg-card border border-border rounded-xl p-5 hover:border-primary/50 hover:shadow-sm transition-all group"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-3">
-                      <card.icon size={20} />
-                    </div>
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">{card.title}</h3>
-                      <ChevronRight
-                        size={16}
-                        className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-0.5"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">{card.desc}</p>
-                    <span className="inline-block mt-3 text-xs font-semibold text-primary">
-                      {TABS.some((t) => t.key === card.target)
-                        ? 'Open report'
-                        : 'Open section'}
-                    </span>
-                  </button>
-                ))}
+              {/* Big friendly category cards */}
+              <div>
+                <h2 className="section-header mb-4">Pick a report</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {CATEGORY_CARDS.map((card) => (
+                    <button
+                      key={card.key}
+                      onClick={() => openReport(card.target)}
+                      className="card-base !p-6 text-left flex flex-col gap-4 hover:border-primary/50 hover:lime-glow group"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                        <card.icon size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground">
+                          {card.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                          {card.desc}
+                        </p>
+                      </div>
+                      <span className="btn-primary mt-auto w-full min-h-[44px] inline-flex items-center justify-center gap-2 group-hover:-translate-y-0.5 transition-all">
+                        View report
+                        <ChevronRight size={16} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Secondary route-based reports */}
+              <div>
+                <h2 className="section-header mb-4">More reports</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {MORE_CARDS.filter((c) => !c.adminOnly || extrasAdmin).map((card) => (
+                    <button
+                      key={card.key}
+                      onClick={() => openReport(card.target)}
+                      className="card-base !p-4 text-left flex items-center gap-3 hover:border-primary/50 group"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                        <card.icon size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {card.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {card.desc}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
-            <>
+            <div className="space-y-6 max-w-6xl">
+              {/* Contextual header with back button */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setView('landing')}
+                  className="btn-secondary min-h-[40px] inline-flex items-center gap-2"
+                >
+                  <ChevronRight size={16} className="rotate-180" />
+                  All reports
+                </button>
+                <h2 className="section-header">{VIEW_TITLES[view] ?? 'Report'}</h2>
+              </div>
+
+              {selectedUserId ? (
+                <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+                  <Users size={16} className="text-primary flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Showing reports for{' '}
+                    <span className="font-semibold text-foreground">
+                      {selectedUserName ?? 'this user'}
+                    </span>
+                    .{' '}
+                    <button
+                      onClick={() => setUserFilter('all')}
+                      className="text-primary font-semibold hover:underline"
+                    >
+                      View all users
+                    </button>
+                  </p>
+                </div>
+              ) : null}
+
               {/* Overview tab */}
               <div className={view === 'overview' ? 'block space-y-6' : 'hidden'}>
-                {selectedUserId ? (
-                  <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
-                    <Users size={16} className="text-primary flex-shrink-0" />
-                    <p className="text-sm text-muted-foreground">
-                      Showing reports for{' '}
-                      <span className="font-semibold text-foreground">
-                        {selectedUserName ?? 'this user'}
-                      </span>
-                      .{' '}
-                      <button
-                        onClick={() => setUserFilter('all')}
-                        className="text-primary font-semibold hover:underline"
-                      >
-                        View all users
-                      </button>
-                    </p>
-                  </div>
-                ) : null}
-                <OverviewTab data={filteredData!} showDelta={rangePreset !== 'all' && !selectedUserId} />
+                <OverviewTab data={filteredData!} showDelta={rangePreset !== 'year' && !selectedUserId} />
               </div>
 
               {/* Leads tab */}
@@ -839,7 +875,7 @@ export default function ReportsScreen() {
               <div className={view === 'calls' ? 'block space-y-6' : 'hidden'}>
                 <CallsTab data={filteredData!} />
               </div>
-            </>
+            </div>
           )}
         </div>
       )}

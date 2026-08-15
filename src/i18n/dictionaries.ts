@@ -74,6 +74,15 @@ export const dictionaries: Dict = {
   'dashboard.step2': { en: 'Schedule a follow-up', ar: 'حدّد متابعة' },
   'dashboard.step3': { en: 'Browse projects & units', ar: 'تصفّح المشاريع والوحدات' },
   'dashboard.dismissGuide': { en: 'Dismiss guide', ar: 'قفل الدليل' },
+  'quick.title': { en: 'Quick actions', ar: 'إجراءات سريعة' },
+  'quick.subtitle': {
+    en: 'Do it in two taps — no menus needed.',
+    ar: 'اعملها بلمستين — من غير قوائم.',
+  },
+  'quick.addLead': { en: 'Add lead', ar: 'ضيف عميل' },
+  'quick.addFollowUp': { en: 'Add follow-up', ar: 'ضيف متابعة' },
+  'quick.checkIn': { en: 'Check in', ar: 'سجّل حضور' },
+  'quick.shareLocation': { en: 'Share location', ar: 'شارك موقعك' },
 
   'nav.overview.desc': { en: 'Your home and daily check-in', ar: 'الرئيسية وتسجيل الحضور اليومي' },
   'nav.pipeline.desc': {
