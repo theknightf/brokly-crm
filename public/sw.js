@@ -6,15 +6,15 @@
  *  - API requests: network-only (data must stay fresh)
  *  2026-08-06: bumped version + added web-push handlers.
  */
-const VERSION = 'brokly-v1.1.0';
+const VERSION = 'brokly-v1.1.1';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL_CACHE = `${VERSION}-shell`;
 
 const STATIC_ASSETS = [
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon-maskable-512.png',
-  '/icons/apple-touch-icon.png',
+  '/icons/icon-192-v2.png',
+  '/icons/icon-512-v2.png',
+  '/icons/icon-maskable-512-v2.png',
+  '/icons/apple-touch-icon-v2.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -60,8 +60,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Brokly';
   const options = {
     body: payload.body || '',
-    icon: payload.icon || '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    icon: payload.icon || '/icons/icon-192-v2.png',
+    badge: '/icons/icon-192-v2.png',
     data: { url: payload.url || '/' },
     vibrate: [100, 50, 100],
     tag: payload.tag || '',

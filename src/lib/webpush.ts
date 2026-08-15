@@ -36,7 +36,7 @@ export async function sendToSubscription(
         title: payload.title,
         body: payload.body || '',
         url: payload.url || '/',
-        icon: payload.icon || '/icons/icon-192.png',
+        icon: payload.icon || '/icons/icon-192-v2.png',
         tag: payload.tag || '',
       })
     );

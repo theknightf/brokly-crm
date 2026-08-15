@@ -18,19 +18,19 @@ export default function manifest(): MetadataRoute.Manifest {
     dir: 'ltr',
     icons: [
       {
-        src: '/icons/icon-192.png',
+        src: '/icons/icon-192-v2.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/icons/icon-512.png',
+        src: '/icons/icon-512-v2.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/icons/icon-maskable-512.png',
+        src: '/icons/icon-maskable-512-v2.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',
@@ -41,19 +41,19 @@ export default function manifest(): MetadataRoute.Manifest {
         name: 'Dashboard',
         short_name: 'Dashboard',
         url: '/',
-        icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+        icons: [{ src: '/icons/icon-192-v2.png', sizes: '192x192' }],
       },
       {
         name: 'Leads',
         short_name: 'Leads',
         url: '/leads-management',
-        icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+        icons: [{ src: '/icons/icon-192-v2.png', sizes: '192x192' }],
       },
       {
         name: 'Customers',
         short_name: 'Customers',
         url: '/customers',
-        icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
+        icons: [{ src: '/icons/icon-192-v2.png', sizes: '192x192' }],
       },
     ],
   };
