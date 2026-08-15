@@ -59,7 +59,7 @@ export default function GettingStarted() {
           <Link
             key={step.key}
             href={step.href}
-            className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary/50 transition-colors"
+            className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-primary transition-colors"
           >
             <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary flex-shrink-0">
               {step.icon}

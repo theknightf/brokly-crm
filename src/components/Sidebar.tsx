@@ -303,7 +303,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
         <div className="flex items-center justify-between px-4 h-14 border-b border-border">
           <div className="flex items-center gap-2">
             <AppLogo size={28} />
-            <span className="font-bold text-base text-foreground">Brokly</span>
+            <span className="font-bold text-base text-lime-gradient">Brokly</span>
           </div>
           <button onClick={onMobileClose} className="btn-ghost p-1.5">
             <ChevronRight size={16} />
@@ -356,7 +356,9 @@ function SidebarContent({
         }`}
       >
         <AppLogo size={28} />
-        {!collapsed && <span className="font-bold text-base text-foreground truncate">Brokly</span>}
+        {!collapsed && (
+          <span className="font-bold text-base text-lime-gradient truncate">Brokly</span>
+        )}
       </div>
 
       {/* Nav groups */}
