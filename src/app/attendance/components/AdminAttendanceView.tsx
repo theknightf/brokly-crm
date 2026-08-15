@@ -423,7 +423,7 @@ export default function AdminAttendanceView() {
             <button
               key={key}
               onClick={() => setRange(key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 range === key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -554,7 +554,7 @@ export default function AdminAttendanceView() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusBadge(r.lastStatus)}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(r.lastStatus)}`}>
                           {STATUS_LABELS[r.lastStatus] || r.lastStatus}
                         </span>
                       </td>
@@ -619,7 +619,7 @@ export default function AdminAttendanceView() {
                         <p className="text-xs text-muted-foreground truncate">{badge.label}</p>
                       </div>
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium flex-shrink-0 ${statusBadge(r.lastStatus)}`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${statusBadge(r.lastStatus)}`}>
                       {STATUS_LABELS[r.lastStatus] || r.lastStatus}
                     </span>
                   </div>

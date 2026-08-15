@@ -18,7 +18,7 @@
   --border: #e5e7eb;
   --input: #e5e7eb;
   --ring: #84cc16;
-  --radius: 12px;
+  --radius: 16px;
   --font-sans: var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif;
   --font-display: var(--font-fraunces), Fraunces, serif;
   --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
@@ -166,19 +166,19 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold text-sm btn-press hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-secondary {
-    @apply bg-card text-foreground border border-border px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+    @apply bg-card text-foreground border border-border px-4 py-2 rounded-xl font-semibold text-sm btn-press hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
   }
   .btn-ghost {
-    @apply bg-transparent text-muted-foreground px-3 py-2 rounded-lg text-sm btn-press hover:bg-muted hover:text-foreground focus:outline-none;
+    @apply bg-transparent text-muted-foreground px-3 py-2 rounded-xl text-sm btn-press hover:bg-muted hover:text-foreground focus:outline-none;
   }
   .btn-danger {
-    @apply bg-clay text-white px-4 py-2 rounded-lg font-semibold text-sm btn-press hover:bg-clay-dark focus:outline-none focus:ring-2 focus:ring-clay focus:ring-offset-2;
+    @apply bg-clay text-white px-4 py-2 rounded-xl font-semibold text-sm btn-press hover:bg-clay-dark focus:outline-none focus:ring-2 focus:ring-clay focus:ring-offset-2;
   }
   .input-base {
-    @apply w-full border border-input bg-card text-foreground rounded-lg px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition-colors;
+    @apply w-full border border-input bg-card text-foreground rounded-xl px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary transition-colors;
   }
   .label-base {
     @apply block text-sm font-medium text-foreground mb-1;
@@ -199,7 +199,7 @@
     @apply text-xs font-medium text-muted-foreground tracking-wide uppercase;
   }
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground;
   }
   .nav-item-active {
     @apply bg-foreground text-background font-semibold shadow-sm;
@@ -258,7 +258,7 @@
     display: block;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius);
     margin-bottom: 10px;
     overflow: hidden;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);

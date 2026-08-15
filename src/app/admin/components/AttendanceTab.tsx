@@ -437,7 +437,7 @@ export default function AttendanceTab() {
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${badge.color}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.color}`}
                       >
                         {badge.label}
                       </span>

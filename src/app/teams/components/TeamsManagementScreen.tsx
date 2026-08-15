@@ -516,7 +516,7 @@ function PerformancePanel({
             <button
               key={r.value}
               onClick={() => setRange(r.value)}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
                 range === r.value ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground'
               }`}
             >

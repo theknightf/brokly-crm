@@ -1051,18 +1051,18 @@ export default function ProjectsScreen() {
                     <div className="flex gap-1.5">
                       {stats ? (
                         <>
-                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
+                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
                             {stats.available} Avail
                           </span>
-                          <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-semibold">
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-semibold">
                             {stats.reserved} Rsrv
                           </span>
-                          <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold">
+                          <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-semibold">
                             {stats.sold} Sold
                           </span>
                         </>
                       ) : (
-                        <span className="px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground text-[11px] font-semibold">
+                        <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-semibold">
                           No units
                         </span>
                       )}
@@ -1074,13 +1074,13 @@ export default function ProjectsScreen() {
                       {sp.slice(0, 3).map((point, i) => (
                         <span
                           key={i}
-                          className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground truncate max-w-full"
+                          className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] text-muted-foreground truncate max-w-full"
                         >
                           {point}
                         </span>
                       ))}
                       {sp.length > 3 && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground">
+                        <span className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] text-muted-foreground">
                           +{sp.length - 3}
                         </span>
                       )}

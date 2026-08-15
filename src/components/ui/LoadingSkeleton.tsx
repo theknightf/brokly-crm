@@ -5,7 +5,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ className = '' }: SkeletonProps) {
-  return <div className={`shimmer rounded-md ${className}`} />;
+  return <div className={`shimmer rounded-lg ${className}`} />;
 }
 
 export function KPICardSkeleton() {

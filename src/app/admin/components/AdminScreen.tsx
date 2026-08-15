@@ -669,7 +669,7 @@ export default function AdminScreen() {
                           {hasColor(activeTab) && (
                             <td className="px-4 py-3">
                               <div
-                                className="w-6 h-6 rounded-md border border-border/50"
+                                className="w-6 h-6 rounded-lg border border-border/50"
                                 style={{ backgroundColor: item.color ?? '#94a3b8' }}
                               />
                             </td>

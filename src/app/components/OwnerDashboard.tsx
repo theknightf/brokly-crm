@@ -202,7 +202,7 @@ export default function OwnerDashboard() {
             <button
               key={r}
               onClick={() => setRange(r)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 range === r ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -464,7 +464,7 @@ export default function OwnerDashboard() {
                 <div className="absolute -left-[7px] mt-1.5 w-3.5 h-3.5 rounded-full bg-primary/30 border-2 border-primary flex-shrink-0" />
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="text-sm font-medium text-foreground">{ev.employee}</p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground capitalize">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground capitalize">
                     {ev.action.replace(/_/g, ' ')}
                   </span>
                   <span className="text-xs text-muted-foreground">

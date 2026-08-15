@@ -245,7 +245,7 @@ export default function EmployeeAttendanceView() {
                 <button
                   key={r}
                   onClick={() => setRange(r)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                     range === r ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
                   }`}
                 >

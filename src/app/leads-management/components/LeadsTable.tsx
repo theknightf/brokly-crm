@@ -490,7 +490,7 @@ export default function LeadsTable({
                           const next = nextStage(lead.status);
                           if (next && next !== lead.status) onStatusChange(lead.id, next);
                         }}
-                        className="w-6 h-6 rounded-md hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                        className="w-6 h-6 rounded-full hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
                         title={
                           nextStage(lead.status)
                             ? `One-click: move to ${nextStage(lead.status)}`

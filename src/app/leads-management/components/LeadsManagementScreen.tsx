@@ -911,7 +911,7 @@ export default function LeadsManagementScreen({
                       {viewLead.name || `Lead ${viewLead.id}`}
                     </h2>
                     {viewLead.leadNumber && (
-                      <span className="text-[10px] font-semibold font-mono text-primary bg-primary/10 rounded-md px-1.5 py-0.5">
+                      <span className="text-[10px] font-semibold font-mono text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
                         {viewLead.leadNumber}
                       </span>
                     )}

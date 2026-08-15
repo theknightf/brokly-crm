@@ -90,7 +90,7 @@ export default function UnitCard({
             )}
           </div>
           {unit.unitCode && (
-            <span className="text-[10px] font-semibold font-mono text-muted-foreground bg-muted rounded-md px-1.5 py-0.5 flex items-center gap-1 shrink-0">
+            <span className="text-[10px] font-semibold font-mono text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 flex items-center gap-1 shrink-0">
               <Hash size={9} /> {unit.unitCode}
             </span>
           )}

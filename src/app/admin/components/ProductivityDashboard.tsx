@@ -368,7 +368,7 @@ export default function ProductivityDashboard() {
               <button
                 key={q.key}
                 onClick={() => setPeriod(q.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${period === q.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${period === q.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 {q.label}
               </button>

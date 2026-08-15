@@ -202,7 +202,7 @@ export default function CalendarScreen() {
                         {items.slice(0, 3).map((f) => (
                           <div
                             key={f.id}
-                            className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium truncate ${statusCls(
+                            className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium truncate ${statusCls(
                               f.status
                             )}`}
                           >
