@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FollowUp,
   FollowUpStatus,
@@ -32,6 +32,13 @@ interface LeadResult {
 
 export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFormProps) {
   const [agentList, setAgentList] = useState<string[]>(() => getActiveAgentNames());
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches) {
+      titleRef.current?.focus();
+    }
+  }, []);
 
   useEffect(() => {
     const refresh = () => setAgentList(getActiveAgentNames());
@@ -196,7 +203,7 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
         <div className="sm:col-span-2">
           <Field label="Follow-up Title *" error={errors.title}>
             <input
-              autoFocus
+              ref={titleRef}
               className="input-base"
               placeholder="e.g. Follow up on site visit feedback"
               value={form.title}

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Loader2, Hash, Building2, RefreshCw, ChevronDown } from 'lucide-react';
 import {
@@ -74,6 +74,13 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches) {
+      nameRef.current?.focus();
+    }
+  }, []);
 
   const {
     register,
@@ -257,6 +264,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   };
 
   const selectClass = 'input-base appearance-none pr-8';
+  const nameField = register('name');
 
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} noValidate>
@@ -282,10 +290,13 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <label className="label-base">Full name</label>
               <input
                 type="text"
-                autoFocus
                 className="input-base"
                 placeholder="Ahmed Hassan"
-                {...register('name')}
+                {...nameField}
+                ref={(el) => {
+                  nameField.ref(el);
+                  nameRef.current = el;
+                }}
               />
             </div>
             <div>

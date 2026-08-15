@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Loader2, ChevronDown } from 'lucide-react';
 import {
@@ -95,6 +95,15 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   >([]);
   const [showDetails, setShowDetails] = useState(false);
   const [openSection, setOpenSection] = useState<'dev' | 'prop' | 'pipe' | null>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Auto-focus only on devices with a precise pointer (mouse/trackpad).
+    // On touch devices this would pop the keyboard and push the modal under it.
+    if (typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches) {
+      phoneRef.current?.focus();
+    }
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -205,6 +214,11 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   const selectClass = (hasError: boolean) =>
     `input-base appearance-none pr-8 ${hasError ? 'border-red-400' : ''}`;
 
+  const phoneField = register('phone', {
+    required: 'Phone number is required',
+    minLength: { value: 7, message: 'Enter a valid phone number' },
+  });
+
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} noValidate>
       <div className="px-6 py-5 space-y-5 pop-in">
@@ -216,13 +230,13 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           <input
             id="add-phone"
             type="tel"
-            autoFocus
             className={`input-base text-base ${errors.phone ? 'border-red-400' : ''}`}
             placeholder="+20 10 0000 0000"
-            {...register('phone', {
-              required: 'Phone number is required',
-              minLength: { value: 7, message: 'Enter a valid phone number' },
-            })}
+            {...phoneField}
+            ref={(el) => {
+              phoneField.ref(el);
+              phoneRef.current = el;
+            }}
           />
           {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
         </div>
