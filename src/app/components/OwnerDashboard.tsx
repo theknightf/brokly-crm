@@ -15,6 +15,7 @@ import {
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
+import Leaderboard from './Leaderboard';
 
 interface DashboardData {
   generated_at: string;
@@ -194,7 +195,7 @@ export default function OwnerDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Company Overview</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            A quick view of your team, attendance, performance and expenses.
+            Track your team, monitor every action, and see who’s performing.
           </p>
         </div>
         <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
@@ -211,6 +212,9 @@ export default function OwnerDashboard() {
           ))}
         </div>
       </div>
+
+      {/* Team leaderboard — action-based ranking for sales, telesales & everyone */}
+      <Leaderboard />
 
       {/* Executive summary */}
       <div>

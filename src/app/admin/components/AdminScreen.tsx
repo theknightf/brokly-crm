@@ -118,9 +118,9 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
   },
   {
     key: 'productivity',
-    label: 'Productivity',
+    label: 'Leaderboard',
     icon: <Trophy size={16} />,
-    description: 'Leaderboard & per-user analytics: leads, calls, actions, active time',
+    description: 'Action-based ranking for sales, telesales & the whole team',
   },
   {
     key: 'callLogs',
