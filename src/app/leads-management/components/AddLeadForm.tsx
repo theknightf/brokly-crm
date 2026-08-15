@@ -47,6 +47,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string; status: string }[]
   >([]);
+  const [showDetails, setShowDetails] = useState(false);
+  const [openSection, setOpenSection] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -158,399 +160,444 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   const selectClass = (hasError: boolean) =>
     `input-base appearance-none pr-8 ${hasError ? 'border-red-400' : ''}`;
 
+  function AccordionSection({
+    index,
+    title,
+    open,
+    onToggle,
+    children,
+  }: {
+    index: number;
+    title: string;
+    open: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+  }) {
+    return (
+      <div className="border border-border rounded-xl overflow-hidden bg-card">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-full flex items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/50 active:scale-[0.99]"
+        >
+          <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {index}
+          </span>
+          <span className="text-sm font-semibold text-foreground flex-1">{title}</span>
+          <ChevronDown
+            size={16}
+            className={`text-muted-foreground transition-transform duration-300 ${
+              open ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-out ${
+            open ? 'max-h-[1500px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} noValidate>
-      <div className="px-6 py-5 space-y-6">
-        {/* Section 1: Contact Information */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              1
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Contact Information</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label htmlFor="add-name" className="label-base">
-                Full name{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                id="add-name"
-                type="text"
-                className={`input-base ${errors.name ? 'border-red-400' : ''}`}
-                placeholder="Ahmed Hassan"
-                {...register('name')}
-              />
-              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
-            </div>
-            <div>
-              <label htmlFor="add-phone" className="label-base">
-                Phone number
-              </label>
-              <input
-                id="add-phone"
-                type="tel"
-                className={`input-base ${errors.phone ? 'border-red-400' : ''}`}
-                placeholder="+20 10 0000 0000"
-                {...register('phone', {
-                  required: 'Phone number is required',
-                  minLength: { value: 7, message: 'Enter a valid phone number' },
-                })}
-              />
-              {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
-            </div>
-            <div>
-              <label htmlFor="add-email" className="label-base">
-                Email address{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                id="add-email"
-                type="email"
-                className={`input-base ${errors.email ? 'border-red-400' : ''}`}
-                placeholder="ahmed@email.com"
-                {...register('email', {
-                  pattern: { value: /^\S+@\S+\.\S+$/, message: 'Enter a valid email address' },
-                })}
-              />
-              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
-            </div>
-            <div>
-              <label htmlFor="add-location" className="label-base">
-                City / Location{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                id="add-location"
-                type="text"
-                className={`input-base ${errors.location ? 'border-red-400' : ''}`}
-                placeholder="Cairo"
-                {...register('location')}
-              />
-              {errors.location && (
-                <p className="mt-1 text-xs text-red-500">{errors.location.message}</p>
-              )}
-            </div>
-          </div>
+    <form onSubmit={handleSubmit(onFormSubmit)} noValidate className="flex flex-col max-h-[88vh] pop-in">
+      <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+        {/* Quick add — phone only (default view) */}
+        <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
+          <label htmlFor="add-phone" className="label-base font-medium">
+            Phone number <span className="text-primary">*</span>
+          </label>
+          <input
+            id="add-phone"
+            type="tel"
+            autoFocus
+            className={`input-base text-lg mt-1 ${errors.phone ? 'border-red-400' : ''}`}
+            placeholder="+20 10 0000 0000"
+            {...register('phone', {
+              required: 'Phone number is required',
+              minLength: { value: 7, message: 'Enter a valid phone number' },
+            })}
+          />
+          {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
         </div>
 
-        <div className="border-t border-border" />
+        {/* Expand for full details */}
+        <button
+          type="button"
+          onClick={() => setShowDetails((v) => !v)}
+          className="group flex items-center justify-center gap-1.5 w-full text-sm font-medium text-primary hover:text-primary/80 transition-colors py-1 active:scale-[0.97]"
+        >
+          {showDetails ? 'Hide extra details' : 'Add more details'}
+          <ChevronDown
+            size={15}
+            className={`transition-transform duration-300 ${showDetails ? 'rotate-180' : ''}`}
+          />
+        </button>
 
-        {/* Section 2: Developer & Project */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              2
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Developer & Project</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="add-developer" className="label-base">
-                Developer{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="add-developer"
-                  className="input-base appearance-none pr-8"
-                  value={selectedDeveloperId}
-                  onChange={(e) => handleDeveloperChange(e.target.value)}
-                >
-                  <option value="">— Select Developer —</option>
-                  {developers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+        {/* Full details (animated) */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-out ${
+            showDetails ? 'max-h-[2800px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="space-y-3 pt-1">
+            {/* Name / Email / Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label htmlFor="add-name" className="label-base">
+                  Full name{' '}
+                  <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                </label>
+                <input
+                  id="add-name"
+                  type="text"
+                  className={`input-base ${errors.name ? 'border-red-400' : ''}`}
+                  placeholder="Ahmed Hassan"
+                  {...register('name')}
                 />
+                {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
+              </div>
+              <div>
+                <label htmlFor="add-email" className="label-base">
+                  Email address{' '}
+                  <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                </label>
+                <input
+                  id="add-email"
+                  type="email"
+                  className={`input-base ${errors.email ? 'border-red-400' : ''}`}
+                  placeholder="ahmed@email.com"
+                  {...register('email', {
+                    pattern: { value: /^\S+@\S+\.\S+$/, message: 'Enter a valid email address' },
+                  })}
+                />
+                {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
+              </div>
+              <div>
+                <label htmlFor="add-location" className="label-base">
+                  City / Location{' '}
+                  <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                </label>
+                <input
+                  id="add-location"
+                  type="text"
+                  className={`input-base ${errors.location ? 'border-red-400' : ''}`}
+                  placeholder="Cairo"
+                  {...register('location')}
+                />
+                {errors.location && (
+                  <p className="mt-1 text-xs text-red-500">{errors.location.message}</p>
+                )}
               </div>
             </div>
-            <div>
-              <label htmlFor="add-project" className="label-base">
-                Project{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="add-project"
-                  className={`input-base appearance-none pr-8 ${!selectedDeveloperId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  disabled={!selectedDeveloperId}
-                  {...register('project')}
-                >
-                  <option value="">
-                    {selectedDeveloperId
-                      ? filteredProjects.length === 0
-                        ? 'No active projects'
-                        : '— Select Project —'
-                      : 'Select a developer first'}
+
+        <AccordionSection
+          index={2}
+          title="Developer & Project"
+          open={openSection === 2}
+          onToggle={() => setOpenSection(openSection === 2 ? null : 2)}
+        >
+          <div>
+            <label htmlFor="add-developer" className="label-base">
+              Developer{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="add-developer"
+                className="input-base appearance-none pr-8"
+                value={selectedDeveloperId}
+                onChange={(e) => handleDeveloperChange(e.target.value)}
+              >
+                <option value="">— Select Developer —</option>
+                {developers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
                   </option>
-                  {filteredProjects.map((p) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-border" />
-
-        {/* Section 3: Property Requirements */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              3
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Property Requirements</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="add-proptype" className="label-base">
-                Property type{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="add-proptype"
-                  className={selectClass(!!errors.propertyType)}
-                  {...register('propertyType')}
-                >
-                  {ALL_PROPERTY_TYPES.map((p) => (
-                    <option key={`add-prop-${p}`} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              {errors.propertyType && (
-                <p className="mt-1 text-xs text-red-500">{errors.propertyType.message}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="add-budgetmin" className="label-base">
-                Budget min <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                id="add-budgetmin"
-                type="number"
-                min={1}
-                className={`input-base font-mono-data ${errors.budgetMin ? 'border-red-400' : ''}`}
-                placeholder="500000"
-                {...register('budgetMin', {
-                  min: { value: 1, message: 'Must be at least 1 ج.م' },
-                  valueAsNumber: true,
-                })}
-              />
-              {errors.budgetMin && (
-                <p className="mt-1 text-xs text-red-500">{errors.budgetMin.message}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="add-budgetmax" className="label-base">
-                Budget max <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                id="add-budgetmax"
-                type="number"
-                min={1}
-                className={`input-base font-mono-data ${errors.budgetMax ? 'border-red-400' : ''}`}
-                placeholder="800000"
-                {...register('budgetMax', {
-                  min: { value: 1, message: 'Must be at least 1 ج.م' },
-                  valueAsNumber: true,
-                  validate: (val) =>
-                    !budgetMin || !val || val >= Number(budgetMin) || 'Max must be ≥ min budget',
-                })}
-              />
-              {errors.budgetMax && (
-                <p className="mt-1 text-xs text-red-500">{errors.budgetMax.message}</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-border" />
-
-        {/* Section 4: Pipeline & Assignment */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              4
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Pipeline & Assignment</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="add-source" className="label-base">
-                Lead source{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="add-source"
-                  className={selectClass(!!errors.source)}
-                  {...register('source')}
-                >
-                  {ALL_SOURCES.map((s) => (
-                    <option key={`add-source-${s}`} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              {errors.source && (
-                <p className="mt-1 text-xs text-red-500">{errors.source.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="add-status" className="label-base">
-                Lead status / stage{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="add-status"
-                  className={selectClass(!!errors.status)}
-                  {...register('status')}
-                >
-                  {ALL_STATUSES.map((s) => (
-                    <option key={`add-status-${s}`} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              {errors.status && (
-                <p className="mt-1 text-xs text-red-500">{errors.status.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="add-agent" className="label-base">
-                Agent name{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="add-agent"
-                  className={selectClass(!!errors.agent)}
-                  {...register('agent')}
-                >
-                  <option value="">— Select Agent —</option>
-                  {agentList.map((a) => (
-                    <option key={`add-agent-${a}`} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              {errors.agent && <p className="mt-1 text-xs text-red-500">{errors.agent.message}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="add-assignedto" className="label-base">
-                Assign to user{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <p className="text-xs text-muted-foreground mb-1">
-                Admin: any user · Team leader: own team only
-              </p>
-              <div className="relative">
-                <select
-                  id="add-assignedto"
-                  className="input-base appearance-none pr-8"
-                  {...register('assignedTo')}
-                >
-                  <option value="">— Unassigned —</option>
-                  {userList.map((u) => (
-                    <option key={`add-user-${u.id}`} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="add-followup" className="label-base">
-                First follow-up date{' '}
-                <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                id="add-followup"
-                type="date"
-                className={`input-base ${errors.followUpDue ? 'border-red-400' : ''}`}
-                {...register('followUpDue')}
-              />
-              {errors.followUpDue && (
-                <p className="mt-1 text-xs text-red-500">{errors.followUpDue.message}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-2">
-              <label htmlFor="add-notes" className="label-base">
-                Notes
-              </label>
-              <textarea
-                id="add-notes"
-                rows={3}
-                className="input-base resize-none"
-                placeholder="e.g. Interested in Palm Hills New Cairo, wants 3BR unit, flexible on payment plan"
-                {...register('notes')}
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
               />
             </div>
+          </div>
+          <div>
+            <label htmlFor="add-project" className="label-base">
+              Project{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="add-project"
+                className={`input-base appearance-none pr-8 ${!selectedDeveloperId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={!selectedDeveloperId}
+                {...register('project')}
+              >
+                <option value="">
+                  {selectedDeveloperId
+                    ? filteredProjects.length === 0
+                      ? 'No active projects'
+                      : '— Select Project —'
+                    : 'Select a developer first'}
+                </option>
+                {filteredProjects.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          index={3}
+          title="Property Requirements"
+          open={openSection === 3}
+          onToggle={() => setOpenSection(openSection === 3 ? null : 3)}
+        >
+          <div>
+            <label htmlFor="add-proptype" className="label-base">
+              Property type{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="add-proptype"
+                className={selectClass(!!errors.propertyType)}
+                {...register('propertyType')}
+              >
+                {ALL_PROPERTY_TYPES.map((p) => (
+                  <option key={`add-prop-${p}`} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+            {errors.propertyType && (
+              <p className="mt-1 text-xs text-red-500">{errors.propertyType.message}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="add-budgetmin" className="label-base">
+              Budget min <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <input
+              id="add-budgetmin"
+              type="number"
+              min={1}
+              className={`input-base font-mono-data ${errors.budgetMin ? 'border-red-400' : ''}`}
+              placeholder="500000"
+              {...register('budgetMin', {
+                min: { value: 1, message: 'Must be at least 1 ج.م' },
+                valueAsNumber: true,
+              })}
+            />
+            {errors.budgetMin && (
+              <p className="mt-1 text-xs text-red-500">{errors.budgetMin.message}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="add-budgetmax" className="label-base">
+              Budget max <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <input
+              id="add-budgetmax"
+              type="number"
+              min={1}
+              className={`input-base font-mono-data ${errors.budgetMax ? 'border-red-400' : ''}`}
+              placeholder="800000"
+              {...register('budgetMax', {
+                min: { value: 1, message: 'Must be at least 1 ج.م' },
+                valueAsNumber: true,
+                validate: (val) =>
+                  !budgetMin || !val || val >= Number(budgetMin) || 'Max must be ≥ min budget',
+              })}
+            />
+            {errors.budgetMax && (
+              <p className="mt-1 text-xs text-red-500">{errors.budgetMax.message}</p>
+            )}
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          index={4}
+          title="Pipeline & Assignment"
+          open={openSection === 4}
+          onToggle={() => setOpenSection(openSection === 4 ? null : 4)}
+        >
+          <div>
+            <label htmlFor="add-source" className="label-base">
+              Lead source{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="add-source"
+                className={selectClass(!!errors.source)}
+                {...register('source')}
+              >
+                {ALL_SOURCES.map((s) => (
+                  <option key={`add-source-${s}`} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+            {errors.source && (
+              <p className="mt-1 text-xs text-red-500">{errors.source.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="add-status" className="label-base">
+              Lead status / stage{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="add-status"
+                className={selectClass(!!errors.status)}
+                {...register('status')}
+              >
+                {ALL_STATUSES.map((s) => (
+                  <option key={`add-status-${s}`} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+            {errors.status && (
+              <p className="mt-1 text-xs text-red-500">{errors.status.message}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="add-agent" className="label-base">
+              Agent name{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="add-agent"
+                className={selectClass(!!errors.agent)}
+                {...register('agent')}
+              >
+                <option value="">— Select Agent —</option>
+                {agentList.map((a) => (
+                  <option key={`add-agent-${a}`} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+            {errors.agent && <p className="mt-1 text-xs text-red-500">{errors.agent.message}</p>}
+          </div>
+
+          <div>
+            <label htmlFor="add-assignedto" className="label-base">
+              Assign to user{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <p className="text-xs text-muted-foreground mb-1">
+              Admin: any user · Team leader: own team only
+            </p>
+            <div className="relative">
+              <select
+                id="add-assignedto"
+                className="input-base appearance-none pr-8"
+                {...register('assignedTo')}
+              >
+                <option value="">— Unassigned —</option>
+                {userList.map((u) => (
+                  <option key={`add-user-${u.id}`} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="add-followup" className="label-base">
+              First follow-up date{' '}
+              <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+            </label>
+            <input
+              id="add-followup"
+              type="date"
+              className={`input-base ${errors.followUpDue ? 'border-red-400' : ''}`}
+              {...register('followUpDue')}
+            />
+            {errors.followUpDue && (
+              <p className="mt-1 text-xs text-red-500">{errors.followUpDue.message}</p>
+            )}
+          </div>
+
+          <div className="sm:col-span-2">
+            <label htmlFor="add-notes" className="label-base">
+              Notes
+            </label>
+            <textarea
+              id="add-notes"
+              rows={3}
+              className="input-base resize-none"
+              placeholder="e.g. Interested in Palm Hills New Cairo, wants 3BR unit, flexible on payment plan"
+              {...register('notes')}
+            />
+          </div>
+        </AccordionSection>
           </div>
         </div>
       </div>
 
       {/* Sticky footer */}
-      <div className="sticky bottom-0 bg-card border-t border-border px-6 py-4 flex items-center justify-between gap-3 rounded-b-2xl">
-        <p className="text-xs text-muted-foreground">
+      <div className="sticky bottom-0 z-10 bg-card border-t border-border px-6 py-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 rounded-b-2xl">
+        <p className="hidden sm:block text-xs text-muted-foreground">
           Only a phone number is required — everything else is optional
         </p>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={onCancel} className="btn-secondary">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn-secondary flex-1 sm:flex-none active:scale-[0.97] transition-transform"
+          >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary flex items-center gap-2 min-w-[130px] justify-center"
+            className="btn-primary flex items-center gap-2 flex-1 sm:flex-none min-w-[130px] justify-center active:scale-[0.97] transition-transform"
           >
             {isSubmitting ? (
               <>
