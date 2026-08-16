@@ -567,7 +567,11 @@ export default function LeadsManagementScreen({
       toast.success(`Lead marked as ${status}`);
       try {
         const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         await supabase.from('activity_log').insert({
+          user_id: user?.id ?? undefined,
           action_type: status === 'Reservation' ? 'Lead Reserved' : 'Done Deal',
           entity_type: 'lead',
           entity_id: next.id,
