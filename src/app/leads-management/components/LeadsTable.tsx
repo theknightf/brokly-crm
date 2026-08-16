@@ -302,11 +302,11 @@ export default function LeadsTable({
                   <button
                     onClick={() => next != null && next !== lead.status && onStatusChange(lead.id, next)}
                     disabled={!next || next === lead.status}
-                    className="h-10 px-3 rounded-xl bg-primary/10 text-primary flex items-center gap-1 text-xs font-bold disabled:opacity-40 active:scale-95 transition-transform"
+                    className="h-10 px-3 rounded-xl bg-primary text-primary-foreground flex items-center gap-1 text-xs font-bold disabled:opacity-40 active:scale-95 transition-transform shadow-sm"
                     aria-label="Advance status"
                   >
                     <Zap size={15} />
-                    Next stage
+                    {next ? `Next: ${next}` : 'Final stage'}
                   </button>
                   <div className="ml-auto text-right">
                     <p className="text-sm font-bold text-foreground tabular-nums leading-tight">
@@ -494,7 +494,8 @@ export default function LeadsTable({
                           const next = nextPipelineStage(lead.status);
                           if (next && next !== lead.status) onStatusChange(lead.id, next);
                         }}
-                        className="w-6 h-6 rounded-full hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                        disabled={!nextPipelineStage(lead.status)}
+                        className="h-7 px-2.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap"
                         title={
                           nextPipelineStage(lead.status)
                             ? `One-click: move to ${nextPipelineStage(lead.status)}`
@@ -503,6 +504,7 @@ export default function LeadsTable({
                         aria-label="Advance lead status one step"
                       >
                         <Zap size={13} />
+                        {nextPipelineStage(lead.status) || 'Done'}
                       </button>
                     </div>
                   </td>
