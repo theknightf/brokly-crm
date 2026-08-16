@@ -36,11 +36,12 @@ export async function POST(request: Request) {
   const code = ((body.code as string) || '').trim();
   const role = ALLOWED_ROLES.includes(body.role as string) ? (body.role as string) : 'agent';
 
-  // Only the business owner may create further owners/admins' peers: a
-  // non-owner admin cannot grant the owner role.
-  if (role === 'owner' && guard.actor.role !== 'owner') {
+  // Owners and admins may provision any role — including owner. The route is
+  // already gated by requireUserManager (owner/admin only), so these checks
+  // are defense-in-depth.
+  if (role === 'owner' && guard.actor.role !== 'owner' && guard.actor.role !== 'admin') {
     return NextResponse.json(
-      { error: 'Only the business owner can create another owner' },
+      { error: 'Only an owner or admin can create an owner' },
       { status: 403 }
     );
   }

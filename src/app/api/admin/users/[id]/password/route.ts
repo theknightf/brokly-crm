@@ -21,23 +21,9 @@ export async function PATCH(
   const guard = await requireUserManager(supabase);
   if (!guard.ok) return guard.response;
 
-  // An admin cannot change the password of another admin/owner without being
-  // an owner — prevents lateral privilege tampering between admins.
-  if (guard.actor.role !== 'owner') {
-    const { data: target } = await supabase
-      .from('user_profiles')
-      .select('role')
-      .eq('id', id)
-      .maybeSingle();
-    if (target && (target.role === 'owner' || target.role === 'admin')) {
-      if (guard.actor.id !== id) {
-        return NextResponse.json(
-          { error: 'Only the business owner can change the password of privileged users' },
-          { status: 403 }
-        );
-      }
-    }
-  }
+  // Owners and admins (requireUserManager) may change the password of any
+  // user — including other admins/owners. The only restriction is that a
+  // manager cannot reset their own password here (use the Settings page).
 
   // Self-service is not allowed through this admin endpoint (users change their
   // own password through the settings page instead).
