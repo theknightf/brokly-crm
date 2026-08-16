@@ -1,6 +1,7 @@
 # Node modules
 node_modules/
-package-lock.json
+# package-lock.json is tracked so Vercel installs identical dependency versions
+# package-lock.json
 
 # Environment variables (never commit secrets)
 .env
