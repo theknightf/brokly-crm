@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminSettingsService } from '@/lib/services/crmService';
+import { companySettingsService, DEFAULT_WORKING_HOURS } from '@/lib/services/peopleOpsService';
+import { buildOfficeHours, formatMinutes, type OfficeHoursConfig } from '@/lib/officeHours';
 import { roleBadgeOf } from '@/lib/ui';
 
 interface AttendanceUser {
@@ -59,8 +61,6 @@ function nowHHMM(): string {
   const m = String(now.getMinutes()).padStart(2, '0');
   return `${h}:${m}`;
 }
-
-const LATE_AFTER_MIN = 12 * 60 + 30; // 12:30
 
 function WorkLocationCard() {
   const [lat, setLat] = useState('30.0444');
@@ -195,9 +195,9 @@ function localMinutes(iso: string | null): number {
 
 // Build a safe arrival timestamp for the given date + "HH:MM".
 // Falls back to "now" if the inputs are invalid.
-function buildArrivalISO(date: string, time: string): string {
+function buildArrivalISO(date: string, time: string, officeStart = '12:00'): string {
   const day = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayLocal();
-  const d = new Date(`${day}T${time || '12:00'}`);
+  const d = new Date(`${day}T${time || officeStart}`);
   if (Number.isNaN(d.getTime())) return new Date().toISOString();
   return d.toISOString();
 }
@@ -211,6 +211,9 @@ export default function AttendanceTab() {
   const [acting, setActing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [arrival, setArrival] = useState<Record<string, string>>({});
+  const [officeCfg, setOfficeCfg] = useState<OfficeHoursConfig>(() =>
+    buildOfficeHours(DEFAULT_WORKING_HOURS)
+  );
 
   const load = useCallback(async (targetDate: string) => {
     setLoading(true);
@@ -236,15 +239,22 @@ export default function AttendanceTab() {
     load(date);
   }, [date, load]);
 
+  useEffect(() => {
+    companySettingsService
+      .getWorkingHours()
+      .then((w) => setOfficeCfg(buildOfficeHours(w)))
+      .catch(() => {});
+  }, []);
+
   const mark = async (action: 'checkin' | 'checkout', userId: string) => {
     setActing(userId);
     // Always send an explicit arrival time: use the admin's chosen time,
-    // otherwise default to "now" (today) or office start 12:00 (other days).
+    // otherwise default to "now" (today) or office start (other days).
     let timeISO: string | undefined;
     if (action === 'checkin') {
       const chosen = arrival[userId];
-      const effective = chosen || (isToday ? nowHHMM() : '12:00');
-      timeISO = buildArrivalISO(date, effective);
+      const effective = chosen || (isToday ? nowHHMM() : officeCfg.start);
+      timeISO = buildArrivalISO(date, effective, officeCfg.start);
     }
     try {
       const res = await fetch('/api/attendance', {
@@ -287,7 +297,7 @@ export default function AttendanceTab() {
           <div>
             <h2 className="text-base font-semibold text-foreground">Attendance</h2>
             <p className="text-xs text-muted-foreground">
-              Office hours 12:00 – 20:00 · Arrival after 12:30 = Late · GPS check-ins are radius-verified
+              Office hours {officeCfg.start} – {officeCfg.end} · Arrival after {formatMinutes(officeCfg.toleranceMinutes)} = Late · GPS check-ins are radius-verified
             </p>
           </div>
         </div>
@@ -402,7 +412,7 @@ export default function AttendanceTab() {
                 const checkIn = formatTime(rec?.check_in_time ?? null);
                 const checkOut = formatTime(rec?.check_out_time ?? null);
                 const minutes = localMinutes(rec?.check_in_time ?? null);
-                const status = minutes < 0 ? null : minutes <= LATE_AFTER_MIN ? 'on-time' : 'late';
+                const status = minutes < 0 ? null : minutes <= officeCfg.toleranceMinutes ? 'on-time' : 'late';
                 const initials = user.full_name
                   ? user.full_name
                       .split(' ')
@@ -503,7 +513,7 @@ export default function AttendanceTab() {
                                     setArrival((s) => ({ ...s, [user.id]: e.target.value }))
                                   }
                                   className="input-base text-xs w-[92px]"
-                                  title="Arrival time — leave empty to use now (today) or 12:00 (other days)"
+                                  title="Arrival time — leave empty to use now (today) or office start (other days)"
                                 />
                                 <button
                                   onClick={() => mark('checkin', user.id)}
@@ -513,11 +523,12 @@ export default function AttendanceTab() {
                                 </button>
                               </div>
                               <p className="text-[10px] text-muted-foreground">
-                                Empty time → {isToday ? 'now' : '12:00'} · saves{' '}
+                                Empty time → {isToday ? 'now' : officeCfg.start} · saves{' '}
                                 {formatTime(
                                   buildArrivalISO(
                                     date,
-                                    arrival[user.id] || (isToday ? nowHHMM() : '12:00')
+                                    arrival[user.id] || (isToday ? nowHHMM() : officeCfg.start),
+                                    officeCfg.start
                                   )
                                 )}
                               </p>

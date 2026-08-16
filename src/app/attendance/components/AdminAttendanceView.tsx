@@ -22,6 +22,8 @@ import {
 import { toast } from 'sonner';
 import { roleBadgeOf } from '@/lib/ui';
 import { teamsService } from '@/lib/services/crmService';
+import { companySettingsService, DEFAULT_WORKING_HOURS } from '@/lib/services/peopleOpsService';
+import { buildOfficeHours, formatMinutes, type OfficeHoursConfig } from '@/lib/officeHours';
 import { exportPDF, exportCSV } from '@/lib/exportReport';
 import ManualAttendanceModal from './ManualAttendanceModal';
 
@@ -45,9 +47,6 @@ interface TeamOption {
   id: string;
   name: string;
 }
-
-const OFFICE_TOLERANCE_MIN = 12 * 60 + 30; // 12:30
-const OFFICE_END_MIN = 20 * 60; // 20:00
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -135,6 +134,9 @@ export default function AdminAttendanceView() {
   const [manualOpen, setManualOpen] = useState(false);
   const [editUser, setEditUser] = useState<AttendanceUser | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [officeCfg, setOfficeCfg] = useState<OfficeHoursConfig>(() =>
+    buildOfficeHours(DEFAULT_WORKING_HOURS)
+  );
 
   const { from, to, isSingleDay } = useMemo(() => {
     switch (range) {
@@ -186,6 +188,13 @@ export default function AdminAttendanceView() {
     load();
   }, [load, reloadTick]);
 
+  useEffect(() => {
+    companySettingsService
+      .getWorkingHours()
+      .then((w) => setOfficeCfg(buildOfficeHours(w)))
+      .catch(() => {});
+  }, []);
+
   const recordByUser = useMemo(() => {
     const map: Record<string, AttendanceRecord[]> = {};
     records.forEach((r) => {
@@ -212,17 +221,17 @@ export default function AdminAttendanceView() {
         if (r.check_in_time) {
           present += 1;
           const min = minutesOfDay(r.check_in_time);
-          if (min > OFFICE_TOLERANCE_MIN) late += 1;
+          if (min > officeCfg.toleranceMinutes) late += 1;
           if (!r.check_out_time) checkedInNotOut += 1;
           const sec = durationSeconds(r.check_in_time, r.check_out_time);
           totalSec += sec;
           const outMin = minutesOfDay(r.check_out_time);
-          if (outMin > OFFICE_END_MIN) overtimeMin += outMin - OFFICE_END_MIN;
+          if (outMin > officeCfg.endMinutes) overtimeMin += outMin - officeCfg.endMinutes;
         }
       });
       const todayRec = recs.find((r) => r.attendance_date === todayLocal());
       if (todayRec?.check_in_time && !todayRec.check_out_time) lastStatus = 'checked-out';
-      else if (todayRec?.check_in_time) lastStatus = minutesOfDay(todayRec.check_in_time) > OFFICE_TOLERANCE_MIN ? 'late' : 'present';
+      else if (todayRec?.check_in_time) lastStatus = minutesOfDay(todayRec.check_in_time) > officeCfg.toleranceMinutes ? 'late' : 'present';
       else if (todayRec) lastStatus = 'not-checked-in';
       else if (isSingleDay) lastStatus = 'absent';
       const absent = Math.max(0, daysInRange - present);
@@ -241,7 +250,7 @@ export default function AdminAttendanceView() {
       };
     });
     return out;
-  }, [activeUsers, recordByUser, from, to, isSingleDay]);
+  }, [activeUsers, recordByUser, from, to, isSingleDay, officeCfg]);
 
   const summary = useMemo(() => {
     const todayRecs = recordByUser;
@@ -252,7 +261,7 @@ export default function AdminAttendanceView() {
       const rec = (todayRecs[u.id] || []).find((r) => r.attendance_date === todayLocal());
       if (rec?.check_in_time) {
         present += 1;
-        if (minutesOfDay(rec.check_in_time) > OFFICE_TOLERANCE_MIN) late += 1;
+        if (minutesOfDay(rec.check_in_time) > officeCfg.toleranceMinutes) late += 1;
       } else if (isSingleDay) notCheckedIn += 1;
     });
     const totalEmployees = activeUsers.length;
@@ -272,7 +281,7 @@ export default function AdminAttendanceView() {
       attendanceRate,
       totalEmployees,
     };
-  }, [activeUsers, recordByUser, rows, isSingleDay, from, to]);
+  }, [activeUsers, recordByUser, rows, isSingleDay, from, to, officeCfg]);
 
   const filteredRows = useMemo(() => {
     const q = search.toLowerCase();
@@ -362,7 +371,7 @@ export default function AdminAttendanceView() {
       fmtTime(r.check_in_time),
       fmtTime(r.check_out_time),
       fmtDuration(durationSeconds(r.check_in_time, r.check_out_time)),
-      r.check_in_time ? (minutesOfDay(r.check_in_time) > OFFICE_TOLERANCE_MIN ? 'Late' : 'Present') : 'Absent',
+      r.check_in_time ? (minutesOfDay(r.check_in_time) > officeCfg.toleranceMinutes ? 'Late' : 'Present') : 'Absent',
     ]);
     exportPDF(
       `Attendance Report — ${user.full_name || user.email}`,
@@ -390,7 +399,7 @@ export default function AdminAttendanceView() {
           <div>
             <h1 className="text-xl font-bold text-foreground">Attendance</h1>
             <p className="text-sm text-muted-foreground">
-              Office hours 12:00–20:00. Arriving after 12:30 counts as late.
+              Office hours {officeCfg.start}–{officeCfg.end}. Arriving after {formatMinutes(officeCfg.toleranceMinutes)} counts as late.
             </p>
           </div>
         </div>

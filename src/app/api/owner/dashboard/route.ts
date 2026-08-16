@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
+import { loadOfficeHours } from '@/lib/officeHours';
 
 export const dynamic = 'force-dynamic';
-
-const OFFICE_START = '12:00';
-const OFFICE_END = '20:00';
-const OFFICE_TOLERANCE = '12:30';
-const TOLERANCE_MIN = 12 * 60 + 30; // 12:30
-const OFFICE_END_MIN = 20 * 60; // 20:00
 
 function isSchemaError(msg?: string): boolean {
   if (!msg) return false;
@@ -48,11 +43,14 @@ function durationHours(checkIn?: string | null, checkOut?: string | null): numbe
   return (b - a) / 3600000;
 }
 
-function statusOf(rec: { check_in_time?: string | null; check_out_time?: string | null }): string {
+function statusOf(
+  rec: { check_in_time?: string | null; check_out_time?: string | null },
+  toleranceMinutes: number
+): string {
   if (!rec?.check_in_time) return 'absent';
   const min = minutesOfDay(rec.check_in_time);
   if (min < 0) return 'present';
-  return min <= TOLERANCE_MIN ? 'present' : 'late';
+  return min <= toleranceMinutes ? 'present' : 'late';
 }
 
 export async function GET(request: Request) {
@@ -70,6 +68,8 @@ export async function GET(request: Request) {
   if (!actor || actor.is_active === false || !isAdminRole(actor.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const office = await loadOfficeHours(supabase);
 
   const url = new URL(request.url);
   const rangeParam = url.searchParams.get('range') || 'week';
@@ -131,7 +131,7 @@ export async function GET(request: Request) {
     const rec = todayMap[e.user_id];
     if (rec?.check_in_time) {
       presentToday += 1;
-      if (statusOf(rec) === 'late') {
+      if (statusOf(rec, office.toleranceMinutes) === 'late') {
         lateToday += 1;
         attentionToday.push(`${e.full_name} is late today`);
       }
@@ -147,7 +147,7 @@ export async function GET(request: Request) {
   const dayKeys = new Set<string>();
   (periodRes.data || []).forEach((r: any) => {
     dayKeys.add(r.attendance_date);
-    const s = statusOf(r);
+    const s = statusOf(r, office.toleranceMinutes);
     const cur = periodByUser[r.user_id] || { present: 0, late: 0, hours: 0 };
     if (r.check_in_time) cur.present += 1;
     if (s === 'late') cur.late += 1;
@@ -161,7 +161,7 @@ export async function GET(request: Request) {
   let totalOvertime = 0;
   (periodRes.data || []).forEach((r: any) => {
     const out = minutesOfDay(r.check_out_time);
-    if (out > OFFICE_END_MIN) totalOvertime += out - OFFICE_END_MIN;
+    if (out > office.endMinutes) totalOvertime += out - office.endMinutes;
   });
 
   // Attendance rate = present / (workingDays * employees)
@@ -259,7 +259,7 @@ export async function GET(request: Request) {
   // ── Monthly summary (attendance, team perf, expenses) ────────────────
   const monthByUser: Record<string, { present: number; late: number; hours: number }> = {};
   (monthRes.data || []).forEach((r: any) => {
-    const s = statusOf(r);
+    const s = statusOf(r, office.toleranceMinutes);
     const cur = monthByUser[r.user_id] || { present: 0, late: 0, hours: 0 };
     if (r.check_in_time) cur.present += 1;
     if (s === 'late') cur.late += 1;

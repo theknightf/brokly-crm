@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
+import { loadOfficeHours, formatMinutes } from '@/lib/officeHours';
 
 export const dynamic = 'force-dynamic';
-
-const OFFICE_START = '12:00';
-const OFFICE_END = '20:00';
-const OFFICE_TOLERANCE = '12:30';
 
 function localDay(offset = 0): string {
   const d = new Date();
@@ -44,6 +41,11 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const from = url.searchParams.get('from') || localDay(0);
   const to = url.searchParams.get('to') || localDay(0);
+
+  const office = await loadOfficeHours(supabase);
+  const OFFICE_START = office.start;
+  const OFFICE_END = office.end;
+  const OFFICE_TOLERANCE = formatMinutes(office.toleranceMinutes);
 
   const [usersRes, attendanceRes] = await Promise.all([
     supabase

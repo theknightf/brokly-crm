@@ -22,6 +22,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
+import { companySettingsService, type WorkingHours, DEFAULT_WORKING_HOURS } from '@/lib/services/peopleOpsService';
+import { buildOfficeHours, formatMinutes, type OfficeHoursConfig } from '@/lib/officeHours';
 import { toast } from 'sonner';
 import { exportPDF, exportCSV } from '@/lib/exportReport';
 import CallLogsReport from './CallLogsReport';
@@ -135,9 +137,6 @@ function toLocalMinutes(iso: string | null): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-const OFFICE_HOURS = [12, 13, 14, 15, 16, 17, 18, 19, 20];
-const TOLERANCE_MINUTES = 12 * 60 + 30; // 12:30
-
 interface ActivityRow {
   id: string;
   name: string;
@@ -225,7 +224,12 @@ function hourLabel(hour: number): string {
   return `${h12}:00 ${hour >= 12 ? 'PM' : 'AM'}`;
 }
 
-function buildAttendanceRows(attendance: any, from: string, to: string): AttendanceRow[] {
+function buildAttendanceRows(
+  attendance: any,
+  from: string,
+  to: string,
+  toleranceMinutes: number
+): AttendanceRow[] {
   const users = attendance?.users || [];
   const totalDays = countDays(from, to);
   const rows: AttendanceRow[] = users.map((u: any) => ({
@@ -247,7 +251,7 @@ function buildAttendanceRows(attendance: any, from: string, to: string): Attenda
     const m = toLocalMinutes(a.check_in_time);
     r.present++;
     r.absent = Math.max(0, r.absent - 1);
-    if (m >= 0 && m <= TOLERANCE_MINUTES) {
+    if (m >= 0 && m <= toleranceMinutes) {
       r.onTime++;
       r.records.push({ date: a.attendance_date, minutes: m });
     } else if (m >= 0) {
@@ -376,6 +380,9 @@ export default function ReportsScreen() {
   const [activity, setActivity] = useState<any>(null);
   const [attendance, setAttendance] = useState<any>(null);
   const [hourFilter, setHourFilter] = useState<number | 'all'>('all');
+  const [officeCfg, setOfficeCfg] = useState<OfficeHoursConfig>(() =>
+    buildOfficeHours(DEFAULT_WORKING_HOURS)
+  );
   const [extrasLoading, setExtrasLoading] = useState(false);
   const [extrasAdmin, setExtrasAdmin] = useState(true);
   const [view, setView] = useState<'landing' | TabKey>('landing');
@@ -384,6 +391,10 @@ export default function ReportsScreen() {
   useEffect(() => {
     loadReports(from, to);
     loadExtras(from, to);
+    companySettingsService
+      .getWorkingHours()
+      .then((w: WorkingHours) => setOfficeCfg(buildOfficeHours(w)))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -442,7 +453,9 @@ export default function ReportsScreen() {
 
   const activityRows = activity ? buildActivityRows(activity) : [];
   const hourRows = hourFilter === 'all' ? [] : buildHourRows(activity, hourFilter);
-  const attendanceRows = attendance ? buildAttendanceRows(attendance, from, to) : [];
+  const attendanceRows = attendance
+    ? buildAttendanceRows(attendance, from, to, officeCfg.toleranceMinutes)
+    : [];
   const actionTypes = Array.from(
     new Set(activityRows.flatMap((r) => Object.keys(r.byAction)))
   ).sort();
@@ -549,11 +562,11 @@ export default function ReportsScreen() {
     }
     if (filteredActivityRows.length) {
       tables.push({
-        caption: `Team Activity — Actions per Hour (${from} → ${to}; office hours 12:00–20:00)`,
-        headers: ['User', ...OFFICE_HOURS.map((h) => `${h}:00`), 'Total'],
+        caption: `Team Activity — Actions per Hour (${from} → ${to}; office hours ${officeCfg.start}–${officeCfg.end})`,
+        headers: ['User', ...officeCfg.officeHours.map((h) => `${h}:00`), 'Total'],
         rows: filteredActivityRows.map((r) => [
           r.name,
-          ...OFFICE_HOURS.map((h) => String(r.byHour[h] || 0)),
+          ...officeCfg.officeHours.map((h) => String(r.byHour[h] || 0)),
           String(r.total),
         ]),
       });
@@ -859,6 +872,7 @@ export default function ReportsScreen() {
                   setHourFilter={setHourFilter}
                   extrasLoading={extrasLoading}
                   extrasAdmin={extrasAdmin}
+                  officeCfg={officeCfg}
                 />
               </div>
 
@@ -868,6 +882,7 @@ export default function ReportsScreen() {
                   attendanceRows={filteredAttendanceRows}
                   extrasLoading={extrasLoading}
                   extrasAdmin={extrasAdmin}
+                  officeCfg={officeCfg}
                 />
               </div>
 
@@ -1169,6 +1184,7 @@ function TeamTab({
   setHourFilter,
   extrasLoading,
   extrasAdmin,
+  officeCfg,
 }: {
   data: ReportData;
   activityRows: ActivityRow[];
@@ -1178,6 +1194,7 @@ function TeamTab({
   setHourFilter: (v: number | 'all') => void;
   extrasLoading: boolean;
   extrasAdmin: boolean;
+  officeCfg: OfficeHoursConfig;
 }) {
   return (
     <div className="space-y-6">
@@ -1350,8 +1367,8 @@ function TeamTab({
                 Team Activity — Actions per Hour
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Every user action (lead / follow-up / comment) grouped by hour · Office hours
-                12:00 – 20:00
+                Every user action (lead / follow-up / comment) grouped by hour · Office hours{' '}
+                {officeCfg.start} – {officeCfg.end}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1462,7 +1479,7 @@ function TeamTab({
                       <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground sticky left-0 bg-card">
                         User
                       </th>
-                      {OFFICE_HOURS.map((h) => (
+                      {officeCfg.officeHours.map((h) => (
                         <th
                           key={h}
                           className="text-center py-2 px-2 text-xs font-semibold text-muted-foreground"
@@ -1487,7 +1504,7 @@ function TeamTab({
                             {r.role}
                           </p>
                         </td>
-                        {OFFICE_HOURS.map((h) => {
+                        {officeCfg.officeHours.map((h) => {
                           const c = r.byHour[h] || 0;
                           return (
                             <td key={h} className="py-2.5 px-2 text-center">
@@ -1558,10 +1575,12 @@ function AttendanceTab({
   attendanceRows,
   extrasLoading,
   extrasAdmin,
+  officeCfg,
 }: {
   attendanceRows: AttendanceRow[];
   extrasLoading: boolean;
   extrasAdmin: boolean;
+  officeCfg: OfficeHoursConfig;
 }) {
   return (
     <div className="space-y-6">
@@ -1571,8 +1590,10 @@ function AttendanceTab({
           <div className="mb-4">
             <h2 className="text-sm font-semibold text-foreground">Attendance Report</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Per-user office attendance for the selected period · Office hours 12:00 – 20:00 ·
-              Arriving after 12:30 = <span className="text-amber-600 font-medium">Late</span>
+              Per-user office attendance for the selected period · Office hours{' '}
+              {officeCfg.start} – {officeCfg.end} · Arriving after{' '}
+              {formatMinutes(officeCfg.toleranceMinutes)} ={' '}
+              <span className="text-amber-600 font-medium">Late</span>
             </p>
           </div>
           {extrasLoading ? (

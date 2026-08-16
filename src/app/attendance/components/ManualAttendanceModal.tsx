@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, Loader2, Save, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { companySettingsService, DEFAULT_WORKING_HOURS } from '@/lib/services/peopleOpsService';
+import { buildOfficeHours, type OfficeHoursConfig } from '@/lib/officeHours';
 
 interface AttendanceUser {
   id: string;
@@ -49,14 +51,23 @@ export default function ManualAttendanceModal({
 }: ManualAttendanceModalProps) {
   const [userId, setUserId] = useState(editUserId || '');
   const [date, setDate] = useState(defaultDate || todayLocal());
-  const [checkIn, setCheckIn] = useState('12:00');
+  const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [officeCfg, setOfficeCfg] = useState<OfficeHoursConfig>(() =>
+    buildOfficeHours(DEFAULT_WORKING_HOURS)
+  );
 
   const isEdit = !!editUserId;
   const activeUsers = useMemo(() => users.filter((u) => u.is_active !== false), [users]);
   const selectedUser = users.find((u) => u.id === userId);
+
+  // Default the check-in to the company's shift start (office hours setting).
+  useEffect(() => {
+    if (editUserId) return;
+    setCheckIn(officeCfg.start);
+  }, [officeCfg.start, editUserId]);
 
   // When editing, pre-fill current values from the admin daily endpoint.
   useEffect(() => {
@@ -78,6 +89,13 @@ export default function ManualAttendanceModal({
       }
     })();
   }, [editUserId, date]);
+
+  useEffect(() => {
+    companySettingsService
+      .getWorkingHours()
+      .then((w) => setOfficeCfg(buildOfficeHours(w)))
+      .catch(() => {});
+  }, []);
 
   const submit = async () => {
     if (!userId) {
