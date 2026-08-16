@@ -24,12 +24,19 @@ import {
   Tag,
   TriangleAlert,
   RefreshCw,
+  Search,
+  LayoutGrid,
+  List,
+  ClipboardList,
+  Activity,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
+import LeadBoard from './LeadBoard';
 import LeadsFilters from './LeadsFilters';
 import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
@@ -211,6 +218,9 @@ export default function LeadsManagementScreen({
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+  const [showFilters, setShowFilters] = useState(true);
+  const [viewTab, setViewTab] = useState<'overview' | 'activity' | 'units' | 'comments'>('overview');
   const [sortKey, setSortKey] = useState<keyof Lead>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [siteVisitProject, setSiteVisitProject] = useState<{
@@ -793,8 +803,18 @@ export default function LeadsManagementScreen({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={32} className="animate-spin text-primary" />
+      <div className="space-y-5 animate-in fade-in">
+        <div className="h-9 w-44 bg-muted rounded-lg animate-pulse" />
+        <div className="h-11 bg-muted rounded-xl animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={`sk-${i}`}
+              className="h-36 bg-muted rounded-2xl animate-pulse"
+              style={{ animationDelay: `${Math.min(i, 7) * 60}ms` }}
+            />
+          ))}
+        </div>
       </div>
     );
   }
@@ -823,20 +843,22 @@ export default function LeadsManagementScreen({
           <button
             onClick={handleExport}
             className="btn-secondary flex items-center gap-1.5 text-sm"
+            title="Export to CSV"
           >
             <Download size={15} />
-            <span className="hidden sm:inline">Export CSV</span>
+            <span className="hidden sm:inline">Export</span>
           </button>
           <button
             onClick={() => setImportModalOpen(true)}
             className="btn-secondary flex items-center gap-1.5 text-sm"
+            title="Import leads"
           >
             <Upload size={15} />
-            <span className="hidden sm:inline">Import Leads</span>
+            <span className="hidden sm:inline">Import</span>
           </button>
           <button
             onClick={() => setAddModalOpen(true)}
-            className="btn-primary flex items-center gap-1.5 text-sm"
+            className="btn-primary flex items-center gap-1.5 text-sm shadow-sm"
           >
             <Plus size={15} />
             Add lead
@@ -844,35 +866,98 @@ export default function LeadsManagementScreen({
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card-base !p-4">
-        <div className="flex items-center gap-2 mb-0.5">
-          <SlidersHorizontal size={14} className="text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">Filters</span>
-          {activeFilterCount > 0 && (
-            <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full font-semibold">
-              {activeFilterCount}
-            </span>
-          )}
-          {(activeFilterCount > 0 || filters.search) && (
-            <button
-              onClick={clearFilters}
-              className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Clear all
-            </button>
-          )}
+      {/* Sticky toolbar */}
+      <div className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-in fade-in">
+        <div className="relative flex-1">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          />
+          <input
+            value={filters.search}
+            onChange={(e) => {
+              setFilters((f) => ({ ...f, search: e.target.value }));
+              setCurrentPage(1);
+            }}
+            placeholder="Search name, phone, project…"
+            className="input-base h-11 pl-9 pr-3 w-full"
+          />
         </div>
-        <LeadsFilters
-          filters={filters}
-          onChange={(f) => {
-            setFilters(f);
-            setCurrentPage(1);
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`btn-secondary h-11 flex items-center gap-1.5 text-sm ${
+              activeFilterCount > 0 ? 'ring-1 ring-primary/40 text-primary' : ''
+            }`}
+          >
+            <SlidersHorizontal size={15} />
+            <span className="hidden sm:inline">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-primary text-primary-foreground text-[10px] px-1.5 rounded-full font-semibold">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <div className="flex items-center bg-muted rounded-xl p-1 h-11">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-card text-primary shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              aria-label="List view"
+            >
+              <List size={15} />
+              <span className="hidden md:inline">List</span>
+            </button>
+            <button
+              onClick={() => setViewMode('board')}
+              className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                viewMode === 'board'
+                  ? 'bg-card text-primary shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              aria-label="Board view"
+            >
+              <LayoutGrid size={15} />
+              <span className="hidden md:inline">Board</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Table */}
+      {/* Filters */}
+      {showFilters && (
+        <div className="card-base !p-4 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 mb-0.5">
+            <SlidersHorizontal size={14} className="text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full font-semibold">
+                {activeFilterCount}
+              </span>
+            )}
+            {(activeFilterCount > 0 || filters.search) && (
+              <button
+                onClick={clearFilters}
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          <LeadsFilters
+            filters={filters}
+            onChange={(f) => {
+              setFilters(f);
+              setCurrentPage(1);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Table / Board */}
       {loadError && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -882,39 +967,51 @@ export default function LeadsManagementScreen({
               <p className="text-xs opacity-80">{loadError}</p>
             </div>
           </div>
-          <button
-            onClick={fetchLeads}
-            className="btn-secondary shrink-0"
-          >
+          <button onClick={fetchLeads} className="btn-secondary shrink-0">
             <RefreshCw size={14} />
             Retry
           </button>
         </div>
       )}
-      <div className="card-base !p-0 overflow-hidden">
-        <LeadsTable
-          leads={leads}
-          allLeads={leads}
-          selectedIds={selectedIds}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={handleSort}
-          onSelectAll={handleSelectAll}
-          onSelectRow={handleSelectRow}
-          onStatusChange={handleStatusChange}
-          onDelete={handleDeleteLead}
-          onView={(lead) => setViewLead(lead)}
-          onEdit={(lead) => setEditLead(lead)}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          totalCount={total}
-          onPageChange={setCurrentPage}
-          onPageSizeChange={(s) => {
-            setPageSize(s);
-            setCurrentPage(1);
-          }}
-        />
+      <div className="card-base !p-0 overflow-hidden animate-in fade-in">
+        {viewMode === 'board' ? (
+          <LeadBoard
+            leads={leads}
+            onView={(lead) => {
+              setViewLead(lead);
+              setViewTab('overview');
+            }}
+            onEdit={(lead) => setEditLead(lead)}
+            onStatusChange={handleStatusChange}
+          />
+        ) : (
+          <LeadsTable
+            leads={leads}
+            allLeads={leads}
+            selectedIds={selectedIds}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+            onSelectAll={handleSelectAll}
+            onSelectRow={handleSelectRow}
+            onStatusChange={handleStatusChange}
+            onDelete={handleDeleteLead}
+            onView={(lead) => {
+              setViewLead(lead);
+              setViewTab('overview');
+            }}
+            onEdit={(lead) => setEditLead(lead)}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalCount={total}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setCurrentPage(1);
+            }}
+          />
+        )}
       </div>
 
       {/* Bulk action bar */}
@@ -1019,14 +1116,14 @@ export default function LeadsManagementScreen({
         }}
       />
 
-      {/* View Lead Modal */}
+      {/* View Lead Drawer */}
       {viewLead && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end">
           <div
-            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm animate-in fade-in"
             onClick={() => setViewLead(null)}
           />
-          <div className="relative flex flex-col bg-card border border-border sm:rounded-2xl rounded-t-2xl shadow-modal w-full sm:max-w-lg fade-in sm:max-h-[90vh] max-h-[92dvh] slide-up-enter overflow-hidden">
+          <div className="relative flex flex-col bg-card border-border shadow-modal w-full sm:max-w-md sm:w-full sm:h-full sm:border-l sm:rounded-none rounded-t-2xl max-h-[92dvh] sm:max-h-full overflow-hidden animate-in fade-in slide-in-from-right-4">
             <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border flex-shrink-0 bg-card z-10">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
@@ -1425,10 +1522,52 @@ export default function LeadsManagementScreen({
                 </div>
               )}
 
-              <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
-              <RecommendedUnitsSection leadId={viewLead.id} />
-              <LeadTimeline leadId={viewLead.id} />
-              <LeadCommentsSection leadId={viewLead.id} />
+              {/* Section tabs */}
+              <div className="sticky top-0 z-10 -mx-5 sm:-mx-6 px-5 sm:px-6 py-2 bg-card/95 backdrop-blur border-b border-border flex gap-1 animate-in fade-in">
+                {(
+                  [
+                    ['overview', 'Overview', ClipboardList],
+                    ['activity', 'Activity', Activity],
+                    ['units', 'Units', Building2],
+                    ['comments', 'Comments', MessageSquare],
+                  ] as const
+                ).map(([key, label, Icon]) => (
+                  <button
+                    key={key}
+                    onClick={() => setViewTab(key)}
+                    className={`flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold transition-colors ${
+                      viewTab === key
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Icon size={14} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {viewTab === 'overview' && (
+                <div className="space-y-4">
+                  <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
+                </div>
+              )}
+              {viewTab === 'activity' && (
+                <div className="space-y-4">
+                  <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
+                  <LeadTimeline leadId={viewLead.id} />
+                </div>
+              )}
+              {viewTab === 'units' && (
+                <div className="space-y-4">
+                  <RecommendedUnitsSection leadId={viewLead.id} />
+                </div>
+              )}
+              {viewTab === 'comments' && (
+                <div className="space-y-4">
+                  <LeadCommentsSection leadId={viewLead.id} />
+                </div>
+              )}
             </div>
             <div className="px-5 sm:px-6 py-4 border-t border-border flex items-center justify-between gap-2 flex-shrink-0">
               <button
