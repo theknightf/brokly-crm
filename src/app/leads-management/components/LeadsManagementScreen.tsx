@@ -36,7 +36,13 @@ import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
 import ImportLeadsModal from './ImportLeadsModal';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction, ALL_STATUSES } from './mockLeads';
+import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction } from './mockLeads';
+import {
+  PIPELINE_STAGES,
+  OUTCOME_STAGES,
+  pipelineIndex,
+  ALL_REAL_STATUSES,
+} from './leadStages';
 import { leadsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -263,7 +269,7 @@ export default function LeadsManagementScreen({
       window.history.replaceState({}, '', url.toString());
       setFilters((f) => ({ ...f, search: searchParam }));
     }
-    if (statusParam && ALL_STATUSES.includes(statusParam as LeadStatus)) {
+    if (statusParam && ALL_REAL_STATUSES.includes(statusParam as LeadStatus)) {
       const url = new URL(window.location.href);
       url.searchParams.delete('status');
       window.history.replaceState({}, '', url.toString());
@@ -1077,28 +1083,72 @@ export default function LeadsManagementScreen({
                   <p className="text-xs text-muted-foreground font-medium">Stage</p>
                   <StatusBadge status={viewLead.status || 'Fresh Leads'} showDot />
                 </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-                  {ALL_STATUSES.map((s) => {
-                    const isActive = s === (viewLead.status || 'Fresh Leads');
-                    return (
-                      <button
-                        key={`view-status-${viewLead.id}-${s}`}
-                        onClick={() => {
-                          if (isActive) return;
-                          const next = s as LeadStatus;
-                          handleStatusChange(viewLead.id, next);
-                        }}
-                        className={`whitespace-nowrap px-3 h-9 rounded-full text-xs flex items-center gap-1.5 transition-all active:scale-[0.98] border ${
-                          isActive
-                            ? 'bg-primary text-primary-foreground border-primary font-semibold'
-                            : 'text-foreground bg-card border-border hover:bg-muted font-medium'
-                        }`}
-                      >
-                        {isActive && <Check size={12} className="flex-shrink-0" />}
-                        {s}
-                      </button>
-                    );
-                  })}
+                <div className="space-y-2">
+                  {/* Forward pipeline stepper — progress bar with tappable stages */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+                    {PIPELINE_STAGES.map((s, i) => {
+                      const curIdx = pipelineIndex(viewLead.status);
+                      const isActive = s === (viewLead.status || 'Fresh Leads');
+                      const isDone = curIdx > -1 && i < curIdx;
+                      return (
+                        <React.Fragment key={`pipe-step-${viewLead.id}-${s}`}>
+                          {i > 0 && (
+                            <span
+                              className={`h-0.5 w-3 flex-shrink-0 rounded-full ${
+                                isDone ? 'bg-primary' : 'bg-border'
+                              }`}
+                            />
+                          )}
+                          <button
+                            onClick={() => {
+                              if (isActive) return;
+                              handleStatusChange(viewLead.id, s);
+                            }}
+                            title={s}
+                            className={`whitespace-nowrap shrink-0 px-3 h-9 rounded-full text-xs flex items-center gap-1.5 transition-all active:scale-[0.98] border ${
+                              isActive
+                                ? 'bg-primary text-primary-foreground border-primary font-semibold'
+                                : isDone
+                                ? 'text-primary bg-primary/5 border-primary/40 hover:bg-primary/10 font-medium'
+                                : 'text-foreground bg-card border-border hover:bg-muted font-medium'
+                            }`}
+                          >
+                            {isActive ? (
+                              <Check size={12} className="flex-shrink-0" />
+                            ) : isDone ? (
+                              <CheckCircle2 size={12} className="flex-shrink-0" />
+                            ) : (
+                              <span className="text-[10px] font-bold opacity-50">{i + 1}</span>
+                            )}
+                            {s}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  {/* Negative / terminal outcomes */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {OUTCOME_STAGES.map((s) => {
+                      const isActive = s === (viewLead.status || 'Fresh Leads');
+                      return (
+                        <button
+                          key={`view-outcome-${viewLead.id}-${s}`}
+                          onClick={() => {
+                            if (isActive) return;
+                            handleStatusChange(viewLead.id, s);
+                          }}
+                          className={`px-2.5 h-7 rounded-full text-[11px] border transition-all active:scale-[0.98] ${
+                            isActive
+                              ? 'bg-clay-soft text-clay border-clay/40 font-semibold'
+                              : 'text-muted-foreground bg-card border-border hover:bg-muted font-medium'
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

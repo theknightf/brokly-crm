@@ -16,7 +16,12 @@ import {
   Zap,
 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { Lead, LeadStatus, ALL_STATUSES } from './mockLeads';
+import { Lead, LeadStatus } from './mockLeads';
+import {
+  PIPELINE_STAGES,
+  OUTCOME_STAGES,
+  nextPipelineStage,
+} from './leadStages';
 import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 
@@ -56,25 +61,6 @@ function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   );
 }
 
-/** Forward-order pipeline used for one-click status advancement. */
-const PIPELINE: LeadStatus[] = [
-  'Fresh Leads',
-  'Cold Calls',
-  'Pending Leads',
-  'Following Up',
-  'Meeting',
-  'Interested',
-  'Done Deal',
-];
-
-function nextStage(current?: LeadStatus): LeadStatus | undefined {
-  if (!current) return undefined;
-  const i = PIPELINE.indexOf(current);
-  return i >= 0 && i < PIPELINE.length - 1 ? PIPELINE[i + 1] : current;
-}
-
-const FALLBACK_STATUS: LeadStatus = 'Fresh Leads';
-
 const leadId = (lead: Lead): string =>
   lead.leadNumber || `LEAD-${String(lead.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)}`;
 
@@ -94,15 +80,33 @@ function StatusDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-40 bg-card border border-border rounded-xl shadow-modal min-w-[200px] py-1 fade-in max-h-72 overflow-y-auto">
-            {ALL_STATUSES.map((s) => (
+          <div className="absolute left-0 top-full mt-1 z-40 bg-card border border-border rounded-xl shadow-modal min-w-[220px] py-1 fade-in max-h-72 overflow-y-auto">
+            <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Pipeline
+            </p>
+            {PIPELINE_STAGES.map((s) => (
               <button
                 key={`status-opt-${leadId}-${s}`}
                 onClick={() => {
                   onStatusChange(leadId, s as LeadStatus);
                   setOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+              >
+                <StatusBadge status={s} showDot />
+              </button>
+            ))}
+            <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Outcomes
+            </p>
+            {OUTCOME_STAGES.map((s) => (
+              <button
+                key={`status-opt-${leadId}-${s}`}
+                onClick={() => {
+                  onStatusChange(leadId, s as LeadStatus);
+                  setOpen(false);
+                }}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
               >
                 <StatusBadge status={s} showDot />
               </button>
@@ -226,7 +230,7 @@ export default function LeadsTable({
           />
         ) : (
           leads.map((lead) => {
-            const next = nextStage(lead.status);
+            const next = nextPipelineStage(lead.status);
             const due = isOverdue(lead.followUpDue);
             return (
               <div
@@ -291,7 +295,7 @@ export default function LeadsTable({
                 {/* Status + budget */}
                 <div className="flex items-center gap-2 mt-3">
                   <StatusDropdown
-                    currentStatus={lead.status || FALLBACK_STATUS}
+                    currentStatus={lead.status || 'Fresh Leads'}
                     leadId={lead.id}
                     onStatusChange={onStatusChange}
                   />
@@ -481,19 +485,19 @@ export default function LeadsTable({
                   <td className="table-td">
                     <div className="flex items-center gap-1.5">
                       <StatusDropdown
-                        currentStatus={lead.status || FALLBACK_STATUS}
+                        currentStatus={lead.status || 'Fresh Leads'}
                         leadId={lead.id}
                         onStatusChange={onStatusChange}
                       />
                       <button
                         onClick={() => {
-                          const next = nextStage(lead.status);
+                          const next = nextPipelineStage(lead.status);
                           if (next && next !== lead.status) onStatusChange(lead.id, next);
                         }}
                         className="w-6 h-6 rounded-full hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
                         title={
-                          nextStage(lead.status)
-                            ? `One-click: move to ${nextStage(lead.status)}`
+                          nextPipelineStage(lead.status)
+                            ? `One-click: move to ${nextPipelineStage(lead.status)}`
                             : 'At final pipeline stage'
                         }
                         aria-label="Advance lead status one step"
