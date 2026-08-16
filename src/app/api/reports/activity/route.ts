@@ -44,8 +44,9 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const from = url.searchParams.get('from') || localDay(0);
-  const to = url.searchParams.get('to') || localDay(0);
-  const bounds = dayBounds(from);
+  const to = url.searchParams.get('to') || from || localDay(0);
+  const fromBounds = dayBounds(from);
+  const toBounds = dayBounds(to);
 
   const [usersRes, activityRes] = await Promise.all([
     supabase
@@ -55,8 +56,8 @@ export async function GET(request: Request) {
     supabase
       .from('activity_log')
       .select('user_id, action_type, entity_type, detail, meta, created_at')
-      .gte('created_at', bounds.start)
-      .lte('created_at', bounds.end)
+      .gte('created_at', fromBounds.start)
+      .lte('created_at', toBounds.end)
       .order('created_at'),
   ]);
 
