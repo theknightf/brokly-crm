@@ -245,17 +245,13 @@ const mapKpi = (r: Row): KpiTarget => ({
 export const kpiTargetsService = {
   async getAll(): Promise<KpiTarget[]> {
     const supabase = createClient();
-    try {
-      const { data, error } = await supabase
-        .from('kpi_targets')
-        .select('*')
-        .order('period_type', { ascending: true })
-        .order('metric', { ascending: true });
-      if (error) return [];
-      return listRows(data, mapKpi);
-    } catch {
-      return [];
-    }
+    const { data, error } = await supabase
+      .from('kpi_targets')
+      .select('*')
+      .order('period_type', { ascending: true })
+      .order('metric', { ascending: true });
+    if (error) throw error;
+    return listRows(data, mapKpi);
   },
 
   async upsert(target: Partial<KpiTarget>) {

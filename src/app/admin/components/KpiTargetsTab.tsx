@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Save, Target, Trash2 } from 'lucide-react';
+import { Loader2, Save, Target, Trash2, TriangleAlert } from 'lucide-react';
 import { kpiTargetsService, type KpiTarget } from '@/lib/services/peopleOpsService';
 
 const METRIC_META: Record<string, { label: string; unit: string; periodType: string }> = {
@@ -22,12 +22,19 @@ export default function KpiTargetsTab() {
 
   const [metric, setMetric] = useState('daily_calls');
   const [value, setValue] = useState('30');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
-    const list = await kpiTargetsService.getAll();
-    setTargets(list);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const list = await kpiTargetsService.getAll();
+      setTargets(list);
+    } catch (e: any) {
+      setLoadError(e?.message || 'Failed to load KPI targets');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -111,6 +118,19 @@ export default function KpiTargetsTab() {
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 size={20} className="animate-spin text-primary" />
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center gap-2 text-center py-10 px-4">
+            <TriangleAlert size={20} className="text-clay" />
+            <p className="text-sm font-semibold text-foreground">KPI targets aren't set up yet</p>
+            <p className="text-xs text-muted-foreground max-w-sm">
+              The <code className="font-mono">kpi_targets</code> table is missing from the database.
+              Apply the pending Supabase migrations (e.g. <code className="font-mono">supabase db push</code>) to
+              create it.
+            </p>
+            <button onClick={load} className="btn-secondary text-xs mt-1">
+              Retry
+            </button>
           </div>
         ) : targets.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-10">
