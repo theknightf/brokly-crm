@@ -556,33 +556,35 @@ export const leadsService = {
 
   async getStatusCounts() {
     const supabase = createClient();
+    // Prefer the server-side aggregate (single rowset, no full-table transfer).
+    // Any failure (including a missing RPC on a DB that's behind on migrations)
+    // must degrade to the client-side fallback — never throw.
     try {
-      // Prefer the server-side aggregate (single rowset, no full-table transfer).
       const { data, error } = await supabase.rpc('get_lead_status_counts');
       if (!error && Array.isArray(data)) {
         const counts: Record<string, number> = {};
         (data as { status: string; count: number }[]).forEach((r) => {
           counts[r.status] = Number(r.count);
         });
-        return counts;
+        if (Object.keys(counts).length) return counts;
       }
-      if (error && isSchemaError(error)) throw error;
-    } catch (err: any) {
-      if (isSchemaError(err)) throw err;
+    } catch {
+      // fall through to client aggregation
     }
-    // Fallback: client-side aggregation over two light columns.
+    // Fallback: client-side aggregation over the status columns.
     return cachedRead('statusCounts', async () => {
-      const { data, error } = await supabase.from('leads').select('crm_status, lead_status');
-      if (error) {
-        if (isSchemaError(error)) throw error;
+      try {
+        const { data, error } = await supabase.from('leads').select('crm_status, lead_status');
+        if (error) return {};
+        const counts: Record<string, number> = {};
+        (data || []).forEach((row: any) => {
+          const s = row.crm_status || row.lead_status || 'Fresh Leads';
+          counts[s] = (counts[s] || 0) + 1;
+        });
+        return counts;
+      } catch {
         return {};
       }
-      const counts: Record<string, number> = {};
-      (data || []).forEach((row: any) => {
-        const s = row.crm_status || row.lead_status || 'Fresh Leads';
-        counts[s] = (counts[s] || 0) + 1;
-      });
-      return counts;
     });
   },
 
