@@ -20,8 +20,7 @@ interface EditLeadFormData {
   email: string;
   location: string;
   propertyType: PropertyType;
-  budgetMin: number;
-  budgetMax: number;
+  budgetRange: string;
   source: LeadSource;
   agent: string;
   assignedTo: string;
@@ -64,6 +63,26 @@ const money = (v: any) => {
   return isNaN(n) ? 0 : n;
 };
 
+const budgetRangeValue = (min?: number, max?: number) => {
+  if (min == null && max == null) return '';
+  if (min != null && max != null) return `${min} - ${max}`;
+  if (min != null) return `${min} -`;
+  return `- ${max}`;
+};
+
+const parseBudgetRange = (value: string) => {
+  const cleaned = value.replace(/[,\u00a0]/g, ' ').trim();
+  if (!cleaned) return { budgetMin: undefined, budgetMax: undefined };
+  const parts = cleaned
+    .split(/[-–]/)
+    .map((part) => Number(part.trim().replace(/[^\d.]/g, '')))
+    .filter((n) => !Number.isNaN(n));
+  return {
+    budgetMin: parts[0] ?? undefined,
+    budgetMax: parts[1] ?? undefined,
+  };
+};
+
 export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormProps) {
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string | null; developerName: string }[]
@@ -95,8 +114,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       email: lead.email || '',
       location: lead.location || '',
       propertyType: (lead.propertyType as PropertyType) || '2BHK Apartment',
-      budgetMin: lead.budgetMin ?? undefined,
-      budgetMax: lead.budgetMax ?? undefined,
+      budgetRange: budgetRangeValue(lead.budgetMin, lead.budgetMax),
       source: (lead.source as LeadSource) || 'Facebook Ads',
       agent: lead.agent || '',
       assignedTo: lead.assignedTo || '',
@@ -211,6 +229,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   const onFormSubmit = async (data: EditLeadFormData) => {
     const unit = projectUnits.find((u) => u.id === data.unitId);
     const assignedUser = users.find((u) => u.id === data.assignedTo);
+    const { budgetMin, budgetMax } = parseBudgetRange(data.budgetRange);
     const updated: Lead = {
       ...lead,
       name: data.name,
@@ -218,8 +237,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       email: data.email,
       location: data.location,
       propertyType: data.propertyType,
-      budgetMin: data.budgetMin ? money(data.budgetMin) : undefined,
-      budgetMax: data.budgetMax ? money(data.budgetMax) : undefined,
+      budgetMin,
+      budgetMax,
       source: data.source,
       agent: data.agent,
       agentInitials: data.agent
@@ -277,15 +296,17 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
           </div>
         )}
 
-        {/* Section 1: Contact Information */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              1
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Contact Information</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
+          <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
+            <span className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+                1
+              </span>
+              <span className="text-sm font-semibold text-foreground">Contact Information</span>
+            </span>
+            <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="label-base">Full name</label>
               <input
@@ -323,8 +344,21 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                 type="text"
                 className="input-base"
                 placeholder="Cairo"
+                list="edit-cities"
                 {...register('location')}
               />
+              <datalist id="edit-cities">
+                {Array.from(
+                  new Set(
+                    projects
+                      .map((p) => p.developerName)
+                      .concat(projects.map((p) => p.name))
+                      .filter(Boolean)
+                  )
+                ).map((value) => (
+                  <option key={value} value={value} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="label-base">Property type</label>
@@ -337,41 +371,30 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               </select>
             </div>
             <div>
-              <label className="label-base">Budget min (EGP)</label>
+              <label className="label-base">Budget range (EGP)</label>
               <input
-                type="number"
-                min="0"
+                type="text"
                 className="input-base"
-                placeholder="500000"
-                {...register('budgetMin')}
-              />
-            </div>
-            <div>
-              <label className="label-base">Budget max (EGP)</label>
-              <input
-                type="number"
-                min="0"
-                className="input-base"
-                placeholder="1200000"
-                {...register('budgetMax')}
+                placeholder="500000 - 1200000"
+                {...register('budgetRange')}
               />
             </div>
           </div>
-        </div>
+        </details>
 
-        <div className="border-t border-border" />
-
-        {/* Section 2: Classification & Assignment */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              2
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Classification &amp; Assignment
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <details className="group rounded-2xl border border-border bg-card overflow-hidden">
+          <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
+            <span className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+                2
+              </span>
+              <span className="text-sm font-semibold text-foreground">
+                Classification &amp; Assignment
+              </span>
+            </span>
+            <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label-base">Lead status</label>
               <select className={selectClass} {...register('status')}>
@@ -463,9 +486,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               />
             </div>
           </div>
-        </div>
-
-        <div className="border-t border-border" />
+        </details>
 
         <button
           type="button"
@@ -483,16 +504,17 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         </button>
 
         {showPlan && (
-        <>
-        {/* Section 3: Unit & Payment Plan */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              3
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Unit &amp; Payment Plan</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
+            <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
+              <span className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  3
+                </span>
+                <span className="text-sm font-semibold text-foreground">Unit &amp; Payment Plan</span>
+              </span>
+              <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label-base">Project</label>
               <select
@@ -642,12 +664,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               </p>
             </div>
           </div>
-        </div>
-
-        </>
+          </details>
         )}
-
-        <div className="border-t border-border" />
 
         {/* Section 4: Reservation / Deal */}
         <div>

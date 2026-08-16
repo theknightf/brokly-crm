@@ -2609,16 +2609,24 @@ export const usersService = {
 
   /** Admin sets a user's base salary for payroll (user_profiles.base_salary). */
   async updateSalary(id: string, baseSalary: number) {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .update({ base_salary: Number(baseSalary) || 0 })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
+    // user_profiles RLS only allows users to update their own row, so the
+    // write must go through the service-role API route.
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}/salary`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseSalary: Number(baseSalary) || 0 }),
+    });
+    if (!res.ok) {
+      let message = `Failed to update salary (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
     invalidateCache();
-    return rowToUserProfile(data);
   },
 
   async delete(id: string) {
