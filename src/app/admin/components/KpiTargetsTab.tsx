@@ -3,7 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Save, Target, Trash2, TriangleAlert } from 'lucide-react';
-import { kpiTargetsService, type KpiTarget } from '@/lib/services/peopleOpsService';
+import {
+  kpiTargetsService,
+  TARGET_ROLE_OPTIONS,
+  TARGET_ROLE_LABEL,
+  type KpiTarget,
+} from '@/lib/services/peopleOpsService';
 
 const METRIC_META: Record<string, { label: string; unit: string; periodType: string }> = {
   daily_calls: { label: 'Daily calls', unit: 'calls', periodType: 'day' },
@@ -22,6 +27,7 @@ export default function KpiTargetsTab() {
 
   const [metric, setMetric] = useState('daily_calls');
   const [value, setValue] = useState('30');
+  const [role, setRole] = useState('all');
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async () => {
@@ -51,6 +57,7 @@ export default function KpiTargetsTab() {
         label: METRIC_META[metric]?.label || metric,
         targetValue: num,
         periodType: (METRIC_META[metric]?.periodType || 'day') as 'day' | 'week' | 'month',
+        targetRole: role,
       });
       toast.success('Target saved');
       setValue('30');
@@ -102,6 +109,20 @@ export default function KpiTargetsTab() {
               className="input-base text-sm"
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-muted-foreground">For</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="input-base text-sm"
+            >
+              {TARGET_ROLE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-end">
             <button onClick={save} disabled={saving} className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save target
@@ -142,6 +163,7 @@ export default function KpiTargetsTab() {
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Metric</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">For</th>
                   <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Period</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Target</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Actions</th>
@@ -152,6 +174,9 @@ export default function KpiTargetsTab() {
                   <tr key={t.id} className="hover:bg-muted/30">
                     <td className="px-3 py-2 font-medium text-foreground">
                       {METRIC_META[t.metric]?.label || t.label || t.metric}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {TARGET_ROLE_LABEL(t.targetRole)}
                     </td>
                     <td className="px-3 py-2 capitalize text-muted-foreground">{t.periodType}</td>
                     <td className="px-3 py-2 text-right font-semibold tabular-nums">

@@ -232,6 +232,23 @@ export interface KpiTarget {
   isActive: boolean;
 }
 
+export interface KpiProgress extends KpiTarget {
+  actual: number;
+  pct: number;
+}
+
+/** Roles an owner/admin can aim a KPI target or task at. */
+export const TARGET_ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: 'Everyone' },
+  { value: 'broker', label: 'Brokers' },
+  { value: 'senior_agent', label: 'Senior Agents' },
+  { value: 'agent', label: 'Sales Agents' },
+  { value: 'telecaller', label: 'Telecallers' },
+];
+
+export const TARGET_ROLE_LABEL = (v: string): string =>
+  TARGET_ROLE_OPTIONS.find((o) => o.value === v)?.label || v.replace('_', ' ');
+
 const mapKpi = (r: Row): KpiTarget => ({
   id: r.id,
   metric: r.metric,
@@ -279,6 +296,216 @@ export const kpiTargetsService = {
     const { error } = await supabase.from('kpi_targets').delete().eq('id', id);
     if (error) throw error;
     return true;
+  },
+
+  /** Active targets that apply to a given role ('all' or the user's own role). */
+  async getForRole(role: string): Promise<KpiTarget[]> {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('kpi_targets')
+        .select('*')
+        .eq('is_active', true)
+        .in('target_role', ['all', role])
+        .order('period_type', { ascending: true })
+        .order('metric', { ascending: true });
+      if (error) return [];
+      return listRows(data, mapKpi);
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * KPIs for a user with their live "actual" progress for each target.
+   * Best-effort: any missing table/column degrades to actual = 0 so the
+   * dashboard never breaks when the DB is behind on migrations.
+   */
+  async getMyProgress(userId: string, role: string): Promise<KpiProgress[]> {
+    try {
+      const targets = await this.getForRole(role);
+      if (!targets.length) return [];
+      const supabase = createClient();
+
+      const periodStart = (periodType: string): string => {
+        const now = new Date();
+        if (periodType === 'day') {
+          now.setHours(0, 0, 0, 0);
+        } else if (periodType === 'week') {
+          const dow = (now.getDay() + 6) % 7; // Monday = 0
+          now.setDate(now.getDate() - dow);
+          now.setHours(0, 0, 0, 0);
+        } else {
+          now.setDate(1);
+          now.setHours(0, 0, 0, 0);
+        }
+        return now.toISOString();
+      };
+
+      const after = (dt: any, start: string) => !!dt && dt >= start;
+      const money = (r: Row) => Number(r.final_price ?? r.total_price ?? 0);
+      const DONE = ['Done Deal', 'Won'];
+
+      // Load the source rows for every metric once (each best-effort).
+      const [calls, followUps, visits, leads] = await Promise.all([
+        supabase.from('call_logs').select('created_at').eq('user_id', userId),
+        supabase.from('follow_ups').select('created_at').eq('created_by', userId),
+        supabase.from('site_visits').select('check_in_at').eq('user_id', userId),
+        supabase
+          .from('leads')
+          .select('crm_status, final_price, total_price, updated_at')
+          .eq('assigned_to', userId),
+      ]);
+
+      const callTimes: string[] = ((calls.data || []) as Row[]).map((r) => r.created_at);
+      const followTimes: string[] = ((followUps.data || []) as Row[]).map((r) => r.created_at);
+      const visitTimes: string[] = ((visits.data || []) as Row[]).map((r) => r.check_in_at);
+      const leadRows: Row[] = (leads.data || []) as Row[];
+
+      return targets.map((t) => {
+        const start = periodStart(t.periodType);
+        let actual = 0;
+        switch (t.metric) {
+          case 'daily_calls':
+            actual = callTimes.filter((dt) => after(dt, start)).length;
+            break;
+          case 'daily_followups':
+            actual = followTimes.filter((dt) => after(dt, start)).length;
+            break;
+          case 'daily_meetings':
+            actual = visitTimes.filter((dt) => after(dt, start)).length;
+            break;
+          case 'leads_worked':
+            actual = leadRows.filter((r) => after(r.updated_at, start)).length;
+            break;
+          case 'deals':
+            actual = leadRows.filter((r) => DONE.includes(r.crm_status) && after(r.updated_at, start)).length;
+            break;
+          case 'revenue':
+            actual = leadRows
+              .filter((r) => DONE.includes(r.crm_status) && after(r.updated_at, start))
+              .reduce((s, r) => s + money(r), 0);
+            break;
+        }
+        const pct = t.targetValue > 0 ? Math.min(100, Math.round((actual / t.targetValue) * 100)) : 0;
+        return { ...t, actual, pct };
+      });
+    } catch {
+      return [];
+    }
+  },
+};
+
+// ─── TASKS (role-assigned to-dos) ────────────────────────────────────────────
+
+export interface TaskItem {
+  id: string;
+  title: string;
+  description: string;
+  targetRole: string;
+  dueDate: string | null;
+  priority: string;
+  assignedBy: string | null;
+  createdAt: string | null;
+  doneByMe: boolean;
+}
+
+const mapTask = (r: Row): TaskItem => ({
+  id: r.id,
+  title: r.title,
+  description: r.description || '',
+  targetRole: r.target_role || 'all',
+  dueDate: r.due_date || null,
+  priority: r.priority || 'Medium',
+  assignedBy: r.assigned_by || null,
+  createdAt: r.created_at || null,
+  doneByMe: false,
+});
+
+export const tasksService = {
+  /** All active tasks (admin/owner view). */
+  async getAll(): Promise<TaskItem[]> {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return listRows(data, mapTask);
+    } catch {
+      return [];
+    }
+  },
+
+  /** Tasks relevant to the current user, annotated with their done state. */
+  async getForUser(userId: string, role: string): Promise<TaskItem[]> {
+    try {
+      const supabase = createClient();
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('is_active', true)
+        .in('target_role', ['all', role])
+        .order('created_at', { ascending: false });
+      const ids = ((tasks || []) as Row[]).map((t) => t.id);
+      const doneSet = new Set<string>();
+      if (ids.length) {
+        const { data: comps } = await supabase
+          .from('task_completions')
+          .select('task_id')
+          .eq('user_id', userId)
+          .in('task_id', ids);
+        ((comps || []) as Row[]).forEach((c) => doneSet.add(c.task_id));
+      }
+      return listRows(tasks, (r) => ({ ...mapTask(r), doneByMe: doneSet.has(r.id) }));
+    } catch {
+      return [];
+    }
+  },
+
+  /** Create a task aimed at a role ('all' = everyone). */
+  async create(input: {
+    title: string;
+    description?: string;
+    targetRole: string;
+    dueDate?: string;
+    priority: string;
+  }): Promise<void> {
+    const supabase = createClient();
+    const { error } = await supabase.from('tasks').insert({
+      title: input.title,
+      description: input.description || '',
+      target_role: input.targetRole || 'all',
+      due_date: input.dueDate || null,
+      priority: input.priority || 'Medium',
+    });
+    if (error) throw error;
+  },
+
+  async remove(id: string): Promise<void> {
+    const supabase = createClient();
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Toggle the current user's done state for a task. */
+  async setDone(taskId: string, userId: string, done: boolean): Promise<void> {
+    const supabase = createClient();
+    if (done) {
+      const { error } = await supabase
+        .from('task_completions')
+        .insert({ task_id: taskId, user_id: userId });
+      if (error && !/duplicate/i.test(String(error.message))) throw error;
+    } else {
+      const { error } = await supabase
+        .from('task_completions')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('user_id', userId);
+      if (error) throw error;
+    }
   },
 };
 

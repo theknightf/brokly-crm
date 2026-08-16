@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const DashboardHeader = dynamic(() => import('./components/DashboardHeader'));
 const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
 const DashboardKpis = dynamic(() => import('./components/DashboardKpis'));
+const MyTargetsTasks = dynamic(() => import('./components/MyTargetsTasks'));
 const DashboardCharts = dynamic(() => import('./components/DashboardCharts'));
 const OverdueFollowUps = dynamic(() => import('./components/OverdueFollowUps'));
 const RecentActivity = dynamic(() => import('./components/RecentActivity'));
@@ -48,6 +49,9 @@ export default function DashboardPage() {
         </div>
         <div className="order-4 lg:order-2">
           <DashboardKpis />
+        </div>
+        <div className="order-4 lg:order-2">
+          <MyTargetsTasks />
         </div>
         <div className="order-5 lg:order-3">
           <KPIBentoGrid />

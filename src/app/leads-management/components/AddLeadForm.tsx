@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, ChevronDown } from 'lucide-react';
+import { Loader2, ChevronDown, Plus } from 'lucide-react';
 import {
   Lead,
   LeadStatus,
@@ -222,15 +222,22 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} noValidate>
       <div className="px-6 py-5 space-y-5 pop-in">
-        {/* Phone — always visible, first for speed */}
+        {/* Phone — the ONE required field, front and center */}
         <div>
-          <label htmlFor="add-phone" className="label-base">
-            Phone number
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="add-phone" className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+              Phone number
+              <span className="text-xs font-normal text-red-500 ml-0.5">*</span>
+            </label>
+            <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5 tracking-wide">
+              Required
+            </span>
+          </div>
           <input
             id="add-phone"
             type="tel"
-            className={`input-base text-base ${errors.phone ? 'border-red-400' : ''}`}
+            className={`input-base text-base h-12 ${errors.phone ? 'border-red-400' : 'border-primary/30 focus:border-primary'}`}
             placeholder="+20 10 0000 0000"
             {...phoneField}
             ref={(el) => {
@@ -239,6 +246,9 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             }}
           />
           {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            💡 Just enter a phone number and hit <strong>Add lead</strong> — takes 3 seconds
+          </p>
         </div>
 
         {/* Expandable extra details */}
@@ -604,20 +614,20 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             setShowDetails((v) => !v);
             if (!showDetails) setOpenSection('dev');
           }}
-          className="btn-press inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline active:scale-[0.97] transition-transform"
+          className="btn-press inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline active:scale-[0.97] transition-transform bg-primary/8 px-3 py-1.5 rounded-lg"
         >
           <ChevronDown
             size={15}
             className={`transition-transform duration-300 ${showDetails ? 'rotate-180' : ''}`}
           />
-          {showDetails ? 'Hide extra details' : 'Add more details'}
+          {showDetails ? 'Hide extra details' : '+ Add more details (name, source, agent…)'}
         </button>
       </div>
 
       {/* Sticky footer */}
       <div className="sticky bottom-0 z-10 bg-card border-t border-border px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-2xl">
         <p className="text-xs text-muted-foreground hidden sm:block">
-          Only a phone number is required — everything else is optional
+          ✅ Only phone is required
         </p>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
@@ -630,15 +640,18 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           <button
             type="submit"
             disabled={isSubmitting}
-            className="btn-primary btn-press flex items-center gap-2 min-w-[130px] justify-center flex-1 sm:flex-none"
+            className="relative btn-press flex items-center gap-2 min-w-[140px] justify-center flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-[0_6px_20px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_10px_28px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>
                 <Loader2 size={15} className="animate-spin" />
-                <span>Adding lead…</span>
+                <span>Adding…</span>
               </>
             ) : (
-              'Add lead'
+              <>
+                <Plus size={15} strokeWidth={2.5} />
+                <span>Add lead</span>
+              </>
             )}
           </button>
         </div>

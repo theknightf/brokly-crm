@@ -10,6 +10,7 @@ import {
   MapPin,
   Flag,
   Building2,
+  ClipboardList,
   X,
   Check,
   GripVertical,
@@ -40,6 +41,7 @@ import EmailTemplatesTab from './EmailTemplatesTab';
 import PayrollTab from './PayrollTab';
 import LeaveTab from './LeaveTab';
 import KpiTargetsTab from './KpiTargetsTab';
+import TasksTab from './TasksTab';
 import RotationTab from './RotationTab';
 
 type TabKey =
@@ -57,6 +59,7 @@ type TabKey =
   | 'payroll'
   | 'leave'
   | 'kpiTargets'
+  | 'tasks'
   | 'rotation';
 
 interface AdminItem {
@@ -151,6 +154,12 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
     label: 'KPI Targets',
     icon: <Target size={16} />,
     description: 'Set daily and monthly performance targets for the team',
+  },
+  {
+    key: 'tasks',
+    label: 'Tasks',
+    icon: <ClipboardList size={16} />,
+    description: 'Assign to-dos to a role — they appear on each user\'s dashboard',
   },
   {
     key: 'rotation',
@@ -331,6 +340,7 @@ export default function AdminScreen() {
         | 'payroll'
         | 'leave'
         | 'kpiTargets'
+        | 'tasks'
         | 'rotation'
       >,
       AdminItem[]
@@ -405,6 +415,7 @@ export default function AdminScreen() {
     activeTab === 'payroll' ||
     activeTab === 'leave' ||
     activeTab === 'kpiTargets' ||
+    activeTab === 'tasks' ||
     activeTab === 'rotation';
   const items = !isPanelTab
     ? settings[
@@ -418,6 +429,7 @@ export default function AdminScreen() {
           | 'payroll'
           | 'leave'
           | 'kpiTargets'
+          | 'tasks'
           | 'rotation'
         >
       ] || []
@@ -572,6 +584,7 @@ export default function AdminScreen() {
             const isPayroll = tab.key === 'payroll';
             const isLeave = tab.key === 'leave';
             const isKpi = tab.key === 'kpiTargets';
+            const isTasks = tab.key === 'tasks';
             const isRotation = tab.key === 'rotation';
             const isSpecial =
               isUsers ||
@@ -583,6 +596,7 @@ export default function AdminScreen() {
               isPayroll ||
               isLeave ||
               isKpi ||
+              isTasks ||
               isRotation;
             const count = isSpecial
               ? 0
@@ -598,6 +612,7 @@ export default function AdminScreen() {
                       | 'payroll'
                       | 'leave'
                       | 'kpiTargets'
+                      | 'tasks'
                       | 'rotation'
                     >
                   ] || []
@@ -616,6 +631,7 @@ export default function AdminScreen() {
                       | 'payroll'
                       | 'leave'
                       | 'kpiTargets'
+                      | 'tasks'
                       | 'rotation'
                     >
                   ] || []
@@ -647,6 +663,8 @@ export default function AdminScreen() {
                     <p className="text-xs text-muted-foreground">Leave requests</p>
                   ) : isKpi ? (
                     <p className="text-xs text-muted-foreground">Daily & monthly goals</p>
+                  ) : isTasks ? (
+                    <p className="text-xs text-muted-foreground">Role-assigned to-dos</p>
                   ) : isRotation ? (
                     <p className="text-xs text-muted-foreground">Auto-reassign inactive leads</p>
                   ) : (
@@ -679,6 +697,8 @@ export default function AdminScreen() {
             <LeaveTab />
           ) : activeTab === 'kpiTargets' ? (
             <KpiTargetsTab />
+          ) : activeTab === 'tasks' ? (
+            <TasksTab />
           ) : activeTab === 'rotation' ? (
             <RotationTab />
           ) : loading ? (

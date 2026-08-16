@@ -213,6 +213,23 @@ export default function LeadsManagementScreen({
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
+
+  // Keyboard shortcut: press 'N' (when not in an input) to open Add Lead modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'n' &&
+        !e.ctrlKey && !e.metaKey && !e.altKey &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement) &&
+        !(e.target instanceof HTMLSelectElement)
+      ) {
+        setAddModalOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [viewLead, setViewLead] = useState<Lead | null>(null);
   const [editLead, setEditLead] = useState<Lead | null>(null);
@@ -856,13 +873,21 @@ export default function LeadsManagementScreen({
             <Upload size={15} />
             <span className="hidden sm:inline">Import</span>
           </button>
-          <button
-            onClick={() => setAddModalOpen(true)}
-            className="btn-primary flex items-center gap-1.5 text-sm shadow-sm"
-          >
-            <Plus size={15} />
-            Add lead
-          </button>
+          {/* ── Prominent Add Lead CTA ── */}
+          <div className="relative">
+            {/* Animated glow ring */}
+            <span className="absolute inset-0 rounded-xl bg-primary/40 animate-ping" style={{ animationDuration: '2s' }} />
+            <button
+              id="add-lead-btn"
+              onClick={() => setAddModalOpen(true)}
+              className="relative flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-[0_8px_24px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_12px_30px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 whitespace-nowrap"
+              title="Add lead (press N)"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+              <span>Add lead</span>
+              <span className="hidden sm:flex items-center justify-center ml-1 w-5 h-5 rounded-md bg-primary-foreground/20 text-primary-foreground text-[10px] font-bold tracking-wider">N</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1028,8 +1053,8 @@ export default function LeadsManagementScreen({
       <Modal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
-        title="Add New Lead"
-        subtitle="Fill in the details to add this lead"
+        title="Add lead"
+        subtitle="Enter a phone number — everything else is optional"
         size="xl"
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />

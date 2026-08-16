@@ -1,15 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Plus,
   CalendarClock,
   CalendarCheck2,
   MapPin,
-  X,
-  Zap,
   Users,
+  ChevronUp,
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -55,87 +54,82 @@ const ACTIONS: QuickAction[] = [
 export default function QuickActions() {
   const { t } = useLanguage();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Hide the FAB on the leads-management page (the page already has a prominent button)
+  const onLeadsPage = pathname === '/leads-management' || pathname?.startsWith('/leads-management/');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') setMenuOpen(false);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
   const run = (href: string) => {
-    setOpen(false);
+    setMenuOpen(false);
     router.push(href);
   };
 
+  if (onLeadsPage) return null;
+
   return (
     <>
-      {/* Floating action button */}
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-20 lg:bottom-6 right-4 z-40 flex items-center gap-2 h-14 px-4 rounded-full bg-primary text-primary-foreground font-semibold shadow-[0_12px_30px_-8px_rgba(132,204,22,0.6)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 btn-press lg:pr-5"
-        aria-label={t('quick.title')}
-      >
-        <Zap size={20} className={open ? 'hidden' : 'block'} />
-        <span className="hidden lg:inline">{t('quick.title')}</span>
-      </button>
-
-      {/* Sheet / modal */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
-          <div
-            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm fade-in"
-            onClick={() => setOpen(false)}
-          />
-          <div className="relative w-full lg:max-w-md bg-card border border-border rounded-t-3xl lg:rounded-3xl p-5 pop-in max-h-[85vh] overflow-y-auto">
-            <div className="flex items-start justify-between mb-1">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground font-display flex items-center gap-2">
-                  <Zap size={18} className="text-primary" />
-                  {t('quick.title')}
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {t('quick.subtitle')}
-                </p>
-              </div>
+      {/* ── Main FAB: direct Add Lead shortcut ── */}
+      <div className="fixed bottom-20 lg:bottom-6 right-4 z-40 flex flex-col items-end gap-2">
+        {/* Secondary actions menu (other than Add Lead) */}
+        {menuOpen && (
+          <div className="flex flex-col gap-2 mb-1 animate-in fade-in slide-in-from-bottom-2">
+            {ACTIONS.slice(1).map((action) => (
               <button
-                onClick={() => setOpen(false)}
-                className="btn-ghost p-1.5 rounded-lg"
-                aria-label={t('common.close')}
+                key={action.key}
+                onClick={() => run(action.href)}
+                className="flex items-center gap-2.5 self-end pr-4 pl-3 py-2 rounded-full bg-card border border-border shadow-lg text-sm font-medium text-foreground hover:border-primary/50 transition-all active:scale-95"
               >
-                <X size={18} />
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center ${action.tint} flex-shrink-0`}>
+                  {action.icon}
+                </span>
+                {t(action.labelKey)}
               </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              {ACTIONS.map((action) => (
-                <button
-                  key={action.key}
-                  onClick={() => run(action.href)}
-                  className="flex flex-col items-center justify-center gap-2.5 p-5 rounded-2xl bg-muted/50 hover:bg-muted border border-border hover:border-primary/50 hover:-translate-y-0.5 transition-all duration-200 min-h-[104px]"
-                >
-                  <span
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center ${action.tint}`}
-                  >
-                    {action.icon}
-                  </span>
-                  <span className="text-sm font-medium text-foreground text-center">
-                    {t(action.labelKey)}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setOpen(false)}
-              className="w-full mt-4 btn-secondary"
-            >
-              {t('common.close')}
-            </button>
+            ))}
           </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          {/* More actions toggle */}
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className={`h-10 w-10 rounded-full border border-border bg-card shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 active:scale-90 transition-all duration-150 ${
+              menuOpen ? 'rotate-180' : ''
+            }`}
+            aria-label="More quick actions"
+            title="More actions"
+          >
+            <ChevronUp size={18} />
+          </button>
+
+          {/* Primary: Add Lead */}
+          <button
+            onClick={() => run('/leads-management?new=1')}
+            className="relative flex items-center gap-2 h-14 px-5 rounded-full bg-primary text-primary-foreground font-semibold shadow-[0_12px_30px_-8px_rgba(132,204,22,0.65)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200"
+            aria-label={t('quick.addLead')}
+          >
+            {/* pulse ring */}
+            <span className="absolute inset-0 rounded-full bg-primary/40 animate-ping" style={{ animationDuration: '2s' }} />
+            <Plus size={22} strokeWidth={2.5} className="relative z-10 flex-shrink-0" />
+            <span className="relative z-10 hidden lg:inline">Add lead</span>
+          </button>
         </div>
+      </div>
+
+      {/* More actions sheet (when menu is open) — backdrop */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-30"
+          onClick={() => setMenuOpen(false)}
+        />
       )}
     </>
   );

@@ -103,10 +103,11 @@ export default function Topbar({
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
-        {/* Quick action: new lead */}
+        {/* Quick action: new lead — visible on all sizes */}
         <Link
           href="/leads-management?new=1"
-          className="hidden sm:inline-flex btn-primary !h-9 !px-3 items-center gap-1.5 text-xs"
+          className="inline-flex btn-primary !h-9 !px-3 items-center gap-1.5 text-xs"
+          title="Add lead"
         >
           <Plus size={14} />
           <span className="hidden md:inline">{t('common.newLead')}</span>
