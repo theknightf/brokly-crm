@@ -579,6 +579,15 @@ export default function AdminScreen() {
     .map((key) => TABS.find((tab) => tab.key === key))
     .filter((tab): tab is (typeof TABS)[number] => Boolean(tab))
     .filter((t) => t.key !== 'users' || canUsers);
+  const navGroup = (key: TabKey) => {
+    if (['users', 'attendance', 'productivity', 'activity', 'callLogs'].includes(key)) {
+      return 'People & performance';
+    }
+    if (['tasks', 'kpiTargets', 'leave', 'payroll', 'rotation'].includes(key)) {
+      return 'Operations';
+    }
+    return 'CRM setup';
+  };
 
   return (
     <div className="page-aurora flex flex-col h-full bg-background">
@@ -597,7 +606,7 @@ export default function AdminScreen() {
       </div>
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-        <div className="w-full md:w-56 flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card overflow-y-auto py-2 px-2 flex flex-col gap-1 md:sticky md:top-0">
+        <div className="w-full md:w-60 flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card overflow-y-auto p-3 grid grid-cols-2 md:flex md:flex-col gap-1.5 md:sticky md:top-0">
           {visibleTabs.map((tab) => {
             const isUsers = tab.key === 'users';
             const isAttendance = tab.key === 'attendance';
@@ -660,43 +669,49 @@ export default function AdminScreen() {
                   ] || []
                 ).filter((i) => i.active).length;
             return (
+              <React.Fragment key={tab.key}>
+              {(visibleTabs.indexOf(tab) === 0 || navGroup(visibleTabs[visibleTabs.indexOf(tab) - 1].key) !== navGroup(tab.key)) && (
+                <p className="col-span-2 md:col-span-1 px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70 first:pt-1">
+                  {navGroup(tab.key)}
+                </p>
+              )}
               <button
-                key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${activeTab === tab.key ? 'bg-primary/10 text-primary shadow-sm translate-x-0.5' : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5'}`}
+                className={`group flex w-full items-center gap-3 px-3 py-3 rounded-2xl text-left transition-all duration-200 ${activeTab === tab.key ? 'bg-primary text-primary-foreground shadow-[0_8px_24px_-12px_rgba(132,204,22,0.9)] scale-[1.01]' : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5'}`}
               >
-                <span className="flex-shrink-0">{tab.icon}</span>
+                <span className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${activeTab === tab.key ? 'text-primary-foreground' : 'text-primary'}`}>{tab.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p
-                    className={`text-sm font-medium truncate ${activeTab === tab.key ? 'text-primary' : 'text-foreground'}`}
+                    className={`text-sm font-semibold truncate ${activeTab === tab.key ? 'text-primary-foreground' : 'text-foreground'}`}
                   >
                     {tab.label}
                   </p>
                   {isUsers ? (
-                    <p className="text-xs text-muted-foreground">Manage access</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Manage access</p>
                   ) : isAttendance ? (
-                    <p className="text-xs text-muted-foreground">Office check-ins</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Office check-ins</p>
                   ) : isActivity ? (
-                    <p className="text-xs text-muted-foreground">Sessions & usage</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Sessions & usage</p>
                   ) : isProductivity ? (
-                    <p className="text-xs text-muted-foreground">Leaderboard & ranking</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Leaderboard & ranking</p>
                   ) : isPayroll ? (
-                    <p className="text-xs text-muted-foreground">Salaries & periods</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Salaries & periods</p>
                   ) : isLeave ? (
-                    <p className="text-xs text-muted-foreground">Leave requests</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Leave requests</p>
                   ) : isKpi ? (
-                    <p className="text-xs text-muted-foreground">Daily & monthly goals</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Daily & monthly goals</p>
                   ) : isTasks ? (
-                    <p className="text-xs text-muted-foreground">Role-assigned to-dos</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Role-assigned to-dos</p>
                   ) : isRotation ? (
-                    <p className="text-xs text-muted-foreground">Auto-reassign inactive leads</p>
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Auto-reassign inactive leads</p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>
                       {active}/{count} active
                     </p>
                   )}
                 </div>
               </button>
+              </React.Fragment>
             );
           })}
         </div>
