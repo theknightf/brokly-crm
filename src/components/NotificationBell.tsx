@@ -42,7 +42,9 @@ export default function NotificationBell() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [pushState, setPushState] = useState<'unsupported' | 'denied' | 'granted' | 'idle'>('idle');
+  const [pushState, setPushState] = useState<
+    'unsupported' | 'default' | 'denied' | 'granted' | 'idle'
+  >('idle');
   const [pushBusy, setPushBusy] = useState(false);
   const lastReadRef = useRef<string>('');
 
@@ -66,9 +68,13 @@ export default function NotificationBell() {
     }
     const readPerm = () =>
       setPushState(
-        typeof Notification !== 'undefined' && Notification.permission === 'granted'
-          ? 'granted'
-          : 'denied'
+        typeof Notification === 'undefined'
+          ? 'unsupported'
+          : Notification.permission === 'granted'
+            ? 'granted'
+            : Notification.permission === 'denied'
+              ? 'denied'
+              : 'default'
       );
     readPerm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -260,8 +266,12 @@ export default function NotificationBell() {
                 tag: 'brokly-assignment',
               }),
             });
-            void res;
-            localStorage.setItem(pushedKey, '1');
+            // Only throttle when the push was actually delivered or attempted
+            // for a real subscription; otherwise retry once one exists.
+            const json = await res.json().catch(() => null);
+            if (!json || json.reason !== 'no_subscription') {
+              localStorage.setItem(pushedKey, '1');
+            }
           }
         } catch {
           // ignore
@@ -384,6 +394,8 @@ export default function NotificationBell() {
                   )}
                   {pushState === 'denied'
                     ? 'Notifications blocked — allow in browser settings'
+                    : pushState === 'default'
+                      ? 'Enable phone notifications'
                     : 'Enable phone notifications'}
                 </button>
               )}
