@@ -11,12 +11,12 @@ interface StatusBadgeProps {
 
 export default function StatusBadge({ status, onClick, showDot = true }: StatusBadgeProps) {
   const colorClass = colorClassOf(status);
-  const [bg, text] = colorClass.split(' ');
-  const dotColor = text?.replace('text-', 'bg-') || 'bg-muted-foreground';
+  const textToken = colorClass.split(' ').find((cls) => cls.startsWith('text-')) || '';
+  const dotColor = textToken.replace('text-', 'bg-') || 'bg-muted-foreground';
 
   return (
     <span
-      className={`status-badge ${bg} ${text} ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
+      className={`status-badge ${colorClass} ${onClick ? 'cursor-pointer hover:opacity-80' : ''}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}

@@ -28,10 +28,10 @@ export const ALL_STATUSES: string[] = [
 export const STATUS_COLORS: Record<string, string> = {
   'Fresh Leads': 'bg-gold-soft text-gold',
   'Cold Calls': 'bg-dusk-soft text-dusk',
-  'Pending Leads': 'bg-muted text-muted-foreground',
-  'Following Up': 'bg-teal-soft text-teal',
+  'Pending Leads': 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300',
+  'Following Up': 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
   Meeting: 'bg-dusk-soft text-dusk',
-  Interested: 'bg-teal-soft text-teal',
+  Interested: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
   'Not Interested': 'bg-clay-soft text-clay',
   Cancellation: 'bg-clay-soft text-clay',
   'Done Deal': 'bg-sage-soft text-sage',

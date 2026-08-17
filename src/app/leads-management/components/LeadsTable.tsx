@@ -76,11 +76,19 @@ function StatusDropdown({
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <StatusBadge status={currentStatus} onClick={() => setOpen((o) => !o)} />
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1.5"
+        aria-label={`Change status from ${currentStatus}`}
+      >
+        <StatusBadge status={currentStatus} />
+        <ChevronDown size={12} className="text-muted-foreground" />
+      </button>
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-40 bg-card border border-border rounded-xl shadow-modal min-w-[220px] py-1 fade-in max-h-72 overflow-y-auto">
+          <div className="absolute left-0 top-full mt-1 z-40 bg-card border border-border rounded-xl shadow-modal min-w-[240px] py-1 fade-in max-h-72 overflow-y-auto">
             <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               Pipeline
             </p>
@@ -91,7 +99,7 @@ function StatusDropdown({
                   onStatusChange(leadId, s as LeadStatus);
                   setOpen(false);
                 }}
-                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
               >
                 <StatusBadge status={s} showDot />
               </button>
@@ -106,7 +114,7 @@ function StatusDropdown({
                   onStatusChange(leadId, s as LeadStatus);
                   setOpen(false);
                 }}
-                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
               >
                 <StatusBadge status={s} showDot />
               </button>

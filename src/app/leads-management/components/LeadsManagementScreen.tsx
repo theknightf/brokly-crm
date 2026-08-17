@@ -1498,14 +1498,21 @@ export default function LeadsManagementScreen({
                 </div>
               )}
 
-              {/* WhatsApp quick actions — vertical one-per-row */}
               {viewLead.phone && (
-                <div className="bg-muted/40 rounded-xl px-3 py-2.5">
-                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <MessageCircle size={11} />
-                    WhatsApp Actions
-                  </p>
-                  <div className="flex flex-col gap-1.5">
+                <details className="bg-muted/40 rounded-xl px-3 py-2.5 group" open>
+                  <summary className="cursor-pointer list-none text-xs text-muted-foreground flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle size={11} />
+                      WhatsApp Activity
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground group-open:hidden">
+                      Expand
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hidden group-open:inline">
+                      Collapse
+                    </span>
+                  </summary>
+                  <div className="mt-2 flex flex-col gap-1.5">
                     {[
                       {
                         label: 'WA Sent',
@@ -1544,7 +1551,7 @@ export default function LeadsManagementScreen({
                       </button>
                     ))}
                   </div>
-                </div>
+                </details>
               )}
 
               {/* Section tabs */}
