@@ -346,15 +346,37 @@ export const kpiTargetsService = {
       const money = (r: Row) => Number(r.final_price ?? r.total_price ?? 0);
       const DONE = ['Done Deal', 'Won'];
 
+      // Bound the fetch to the widest window any target needs so we never pull
+      // the user's full history into the browser (month > week > day start).
+      const periodTypes = new Set(targets.map((t) => t.periodType));
+      const earliestStart = periodTypes.has('month')
+        ? periodStart('month')
+        : periodTypes.has('week')
+          ? periodStart('week')
+          : periodStart('day');
+
       // Load the source rows for every metric once (each best-effort).
       const [calls, followUps, visits, leads] = await Promise.all([
-        supabase.from('call_logs').select('created_at').eq('user_id', userId),
-        supabase.from('follow_ups').select('created_at').eq('created_by', userId),
-        supabase.from('site_visits').select('check_in_at').eq('user_id', userId),
+        supabase
+          .from('call_logs')
+          .select('created_at')
+          .eq('user_id', userId)
+          .gte('created_at', earliestStart),
+        supabase
+          .from('follow_ups')
+          .select('created_at')
+          .eq('created_by', userId)
+          .gte('created_at', earliestStart),
+        supabase
+          .from('site_visits')
+          .select('check_in_at')
+          .eq('user_id', userId)
+          .gte('check_in_at', earliestStart),
         supabase
           .from('leads')
           .select('crm_status, final_price, total_price, updated_at')
-          .eq('assigned_to', userId),
+          .eq('assigned_to', userId)
+          .gte('updated_at', earliestStart),
       ]);
 
       const callTimes: string[] = ((calls.data || []) as Row[]).map((r) => r.created_at);
