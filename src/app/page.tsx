@@ -41,33 +41,36 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="flex flex-col gap-6">
-        <div className="order-2 lg:order-1">
-          <GettingStarted />
-        </div>
-        <div className="order-3 lg:order-2">
+        <div className="order-1">
           <DashboardHeader />
         </div>
-        <div className="order-4 lg:order-2">
+        <div className="order-2">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <MobileTodayFollowUps />
+            <div className="hidden xl:block"><OverdueFollowUps /></div>
+          </div>
+        </div>
+        <div className="order-3">
           <DashboardKpis />
         </div>
-        <div className="order-4 lg:order-2">
+        <div className="order-4">
           <MyTargetsTasks />
         </div>
-        <div className="order-5 lg:order-3">
+        <div className="order-5">
           <KPIBentoGrid />
         </div>
-        <div className="order-6 lg:order-4">
+        <div className="order-6">
           <DashboardCharts />
         </div>
-        <div className="order-1 lg:order-5 grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <MobileTodayFollowUps />
-          <div className="hidden lg:block">
-            <OverdueFollowUps />
-          </div>
+        <div className="order-7 grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="hidden lg:block">
             <RecentActivity />
           </div>
+          <div className="lg:hidden">
+            <GettingStarted />
+          </div>
         </div>
+        <div className="hidden lg:block order-8"><GettingStarted /></div>
       </div>
     </AppLayout>
   );

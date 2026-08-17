@@ -53,6 +53,7 @@ import {
 import { leadsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import LeadCommentsSection from './LeadCommentsSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
 import LeadTimeline from './LeadTimeline';
@@ -198,6 +199,7 @@ export default function LeadsManagementScreen({
   subtitle,
 }: LeadsManagementScreenProps = {}) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -863,7 +865,7 @@ export default function LeadsManagementScreen({
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-[1.75rem] border border-border/70 bg-card/80 p-4 sm:p-5 shadow-sm backdrop-blur-xl">
         <div className="animate-rise-in">
-          <h1 className="page-title">{title || 'Leads'}</h1>
+          <h1 className="page-title">{title || t('leads.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {subtitle ||
               `${total} lead${total !== 1 ? 's' : ''} in your list${
@@ -878,7 +880,7 @@ export default function LeadsManagementScreen({
             title="Export to CSV"
           >
             <Download size={15} />
-            <span className="hidden sm:inline">Export</span>
+            <span className="hidden sm:inline">{t('leads.export')}</span>
           </button>
           <button
             onClick={() => setImportModalOpen(true)}
@@ -886,7 +888,7 @@ export default function LeadsManagementScreen({
             title="Import leads"
           >
             <Upload size={15} />
-            <span className="hidden sm:inline">Import</span>
+            <span className="hidden sm:inline">{t('leads.import')}</span>
           </button>
           {/* ── Prominent Add Lead CTA ── */}
           <div className="relative">
@@ -899,7 +901,7 @@ export default function LeadsManagementScreen({
               title="Add lead (press N)"
             >
               <Plus size={16} strokeWidth={2.5} />
-              <span>Add lead</span>
+              <span>{t('leads.add')}</span>
               <span className="hidden sm:flex items-center justify-center ml-1 w-5 h-5 rounded-md bg-primary-foreground/20 text-primary-foreground text-[10px] font-bold tracking-wider">N</span>
             </button>
           </div>
@@ -919,7 +921,7 @@ export default function LeadsManagementScreen({
               setFilters((f) => ({ ...f, search: e.target.value }));
               setCurrentPage(1);
             }}
-            placeholder="Search name, phone, project…"
+            placeholder={t('leads.search')}
             className="input-base h-11 pl-9 pr-3 w-full bg-card/90 shadow-sm"
           />
         </div>
@@ -931,7 +933,7 @@ export default function LeadsManagementScreen({
             }`}
           >
             <SlidersHorizontal size={15} />
-            <span className="hidden sm:inline">Filters</span>
+            <span className="hidden sm:inline">{t('leads.filters')}</span>
             {activeFilterCount > 0 && (
               <span className="bg-primary text-primary-foreground text-[10px] px-1.5 rounded-full font-semibold">
                 {activeFilterCount}
@@ -949,7 +951,7 @@ export default function LeadsManagementScreen({
               aria-label="List view"
             >
               <List size={15} />
-              <span className="hidden md:inline">List</span>
+              <span className="hidden md:inline">{t('leads.list')}</span>
             </button>
             <button
               onClick={() => setViewMode('board')}
@@ -961,7 +963,7 @@ export default function LeadsManagementScreen({
               aria-label="Board view"
             >
               <LayoutGrid size={15} />
-              <span className="hidden md:inline">Board</span>
+              <span className="hidden md:inline">{t('leads.board')}</span>
             </button>
           </div>
         </div>

@@ -217,9 +217,6 @@ export default function OwnerDashboard() {
         </div>
       </div>
 
-      {/* Team leaderboard — action-based ranking for sales, telesales & everyone */}
-      <Leaderboard />
-
       {/* Leads pipeline summary */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -268,6 +265,9 @@ export default function OwnerDashboard() {
           </div>
         )}
       </div>
+
+      {/* Compact team leaderboard */}
+      <Leaderboard />
 
       {/* Executive summary */}
       <div>

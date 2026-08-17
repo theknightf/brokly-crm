@@ -101,14 +101,14 @@ export default function Leaderboard() {
   }, [load]);
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="bg-card border border-border rounded-2xl p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Trophy size={18} className="text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Trophy size={16} className="text-primary" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
               Team Leaderboard
             </h2>
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -121,7 +121,7 @@ export default function Leaderboard() {
             <button
               key={p.key}
               onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
                 period === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -145,24 +145,24 @@ export default function Leaderboard() {
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-10">No team activity yet.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {rows.map((row) => {
             const s = statOf(row, period);
             const top = row.rank <= 3;
             return (
               <li
                 key={row.user_id}
-                className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                className={`flex items-center gap-2 p-2 rounded-xl border transition-colors ${
                   top ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/30'
                 }`}
               >
-                <RankBadge rank={row.rank} />
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div className="scale-90 origin-left"><RankBadge rank={row.rank} /></div>
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold text-primary">{initials(row.full_name || row.email)}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground truncate">{row.full_name || row.email}</p>
+                    <p className="text-xs font-semibold text-foreground truncate">{row.full_name || row.email}</p>
                     {row.online && <Circle size={7} className="text-emerald-500 fill-emerald-500 flex-shrink-0" />}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
@@ -174,9 +174,9 @@ export default function Leaderboard() {
                   <Metric label="Calls" value={s.calls} />
                   <Metric label="Actions" value={s.actions} />
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <Zap size={14} className="text-primary" />
-                  <span className="text-lg font-bold text-foreground tabular-nums">{row.score}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Zap size={12} className="text-primary" />
+                  <span className="text-sm font-bold text-foreground tabular-nums">{row.score}</span>
                 </div>
               </li>
             );

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { adminSettingsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole, canManageUsers } from '@/lib/roles';
 import { toast } from 'sonner';
 import UsersTab from './UsersTab';
@@ -346,6 +347,7 @@ function DeleteConfirm({
 }
 
 export default function AdminScreen() {
+  const { t } = useLanguage();
   const { profile, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('leadSources');
   const [settings, setSettings] = useState<
@@ -581,13 +583,15 @@ export default function AdminScreen() {
     .filter((t) => t.key !== 'users' || canUsers);
   const navGroup = (key: TabKey) => {
     if (['users', 'attendance', 'productivity', 'activity', 'callLogs'].includes(key)) {
-      return 'People & performance';
+      return t('admin.people');
     }
     if (['tasks', 'kpiTargets', 'leave', 'payroll', 'rotation'].includes(key)) {
-      return 'Operations';
+      return t('admin.operations');
     }
-    return 'CRM setup';
+    return t('admin.crmSetup');
   };
+  const tabLabel = (key: TabKey, fallback: string) =>
+    t(`admin.${key}`) === `admin.${key}` ? fallback : t(`admin.${key}`);
 
   return (
     <div className="page-aurora flex flex-col h-full bg-background">
@@ -597,9 +601,9 @@ export default function AdminScreen() {
             <ShieldCheck size={18} className="text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground tracking-tight">Admin Command Center</h1>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">{t('admin.title')}</h1>
             <p className="text-sm text-muted-foreground">
-              Manage CRM configuration — no code changes needed
+              {t('admin.subtitle')}
             </p>
           </div>
         </div>
@@ -684,7 +688,7 @@ export default function AdminScreen() {
                   <p
                     className={`text-sm font-semibold truncate ${activeTab === tab.key ? 'text-primary-foreground' : 'text-foreground'}`}
                   >
-                    {tab.label}
+                    {tabLabel(tab.key, tab.label)}
                   </p>
                   {isUsers ? (
                     <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Manage access</p>
