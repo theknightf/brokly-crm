@@ -581,14 +581,14 @@ export default function AdminScreen() {
     .filter((t) => t.key !== 'users' || canUsers);
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <div className="px-6 pt-6 pb-4 border-b border-border bg-card flex-shrink-0">
+    <div className="page-aurora flex flex-col h-full bg-background">
+      <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-border/70 bg-card/85 backdrop-blur-xl flex-shrink-0">
         <div className="flex items-center gap-3 mb-1">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <ShieldCheck size={18} className="text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Admin Settings</h1>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">Admin Command Center</h1>
             <p className="text-sm text-muted-foreground">
               Manage CRM configuration — no code changes needed
             </p>

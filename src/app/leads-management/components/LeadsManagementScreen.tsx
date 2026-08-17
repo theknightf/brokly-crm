@@ -859,10 +859,10 @@ export default function LeadsManagementScreen({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="page-aurora min-h-full space-y-5 rounded-[2rem] p-3 sm:p-5">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-[1.75rem] border border-border/70 bg-card/80 p-4 sm:p-5 shadow-sm backdrop-blur-xl">
+        <div className="animate-rise-in">
           <h1 className="page-title">{title || 'Leads'}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {subtitle ||
@@ -871,7 +871,7 @@ export default function LeadsManagementScreen({
               }`}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap animate-rise-in" style={{ animationDelay: '80ms' }}>
           <button
             onClick={handleExport}
             className="btn-secondary flex items-center gap-1.5 text-sm"
@@ -907,7 +907,7 @@ export default function LeadsManagementScreen({
       </div>
 
       {/* Sticky toolbar */}
-      <div className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-in fade-in">
+      <div className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-rise-in" style={{ animationDelay: '140ms' }}>
         <div className="relative flex-1">
           <Search
             size={16}
@@ -920,7 +920,7 @@ export default function LeadsManagementScreen({
               setCurrentPage(1);
             }}
             placeholder="Search name, phone, project…"
-            className="input-base h-11 pl-9 pr-3 w-full"
+            className="input-base h-11 pl-9 pr-3 w-full bg-card/90 shadow-sm"
           />
         </div>
         <div className="flex items-center gap-2">
