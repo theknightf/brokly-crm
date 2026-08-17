@@ -169,6 +169,26 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
   },
 ];
 
+// Keep the most frequently used admin workflows at the top of the rail.
+const TAB_ORDER: TabKey[] = [
+  'users',
+  'attendance',
+  'productivity',
+  'activity',
+  'callLogs',
+  'tasks',
+  'kpiTargets',
+  'leave',
+  'payroll',
+  'rotation',
+  'emailTemplates',
+  'leadSources',
+  'pipelineStages',
+  'areas',
+  'priorities',
+  'developers',
+];
+
 const hasColor = (key: TabKey) =>
   key === 'leadSources' || key === 'pipelineStages' || key === 'priorities';
 const hasOrder = (key: TabKey) => key === 'pipelineStages' || key === 'priorities';
@@ -555,7 +575,10 @@ export default function AdminScreen() {
   }
 
   const canUsers = canManageUsers(profile?.role);
-  const visibleTabs = TABS.filter((t) => t.key !== 'users' || canUsers);
+  const visibleTabs = TAB_ORDER
+    .map((key) => TABS.find((tab) => tab.key === key))
+    .filter((tab): tab is (typeof TABS)[number] => Boolean(tab))
+    .filter((t) => t.key !== 'users' || canUsers);
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -574,7 +597,7 @@ export default function AdminScreen() {
       </div>
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-        <div className="w-full md:w-56 flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card overflow-y-auto py-2 px-2 flex flex-col gap-1">
+        <div className="w-full md:w-56 flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card overflow-y-auto py-2 px-2 flex flex-col gap-1 md:sticky md:top-0">
           {visibleTabs.map((tab) => {
             const isUsers = tab.key === 'users';
             const isAttendance = tab.key === 'attendance';
@@ -640,7 +663,7 @@ export default function AdminScreen() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${activeTab === tab.key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${activeTab === tab.key ? 'bg-primary/10 text-primary shadow-sm translate-x-0.5' : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5'}`}
               >
                 <span className="flex-shrink-0">{tab.icon}</span>
                 <div className="flex-1 min-w-0">

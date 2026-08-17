@@ -116,8 +116,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error(normalizeAuthError(error));
       }
       // Activity session is started automatically by useActivityTracker when
-      // `user` is set by onAuthStateChange. No manual POST needed here.
-      router.refresh();
+      // `user` is set by onAuthStateChange. Avoid refreshing the current route
+      // here; the login screen performs the navigation immediately after this
+      // promise resolves.
       return data;
     } catch (err: any) {
       // Already normalized above — propagate the user-safe message as-is.

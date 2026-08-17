@@ -446,12 +446,14 @@ export const leadsService = {
       .from('leads')
       .update({ assigned_to: assignedTo })
       .eq('id', id)
-      .select('*')
+      .select('id, assigned_to, agent, agent_initials, crm_status, lead_status')
       .single();
     if (error) throw error;
-    await pushAssignmentNotifications(supabase, [id], assignedTo);
-    await followUpsService.syncFromLead(data);
+    if (assignedTo) {
+      await pushAssignmentNotifications(supabase, [id], assignedTo);
+    }
     invalidateCache();
+    return data;
   },
 
   async delete(id: string) {

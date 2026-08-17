@@ -560,10 +560,25 @@ export default function LeadsManagementScreen({
 
   const handleEditSave = async (updated: Lead) => {
     try {
-      const saved = await leadsService.update(updated.id, updated);
+      const original = editLead;
+      const assignmentOnly =
+        original &&
+        original.assignedTo !== updated.assignedTo &&
+        Object.keys(updated).every((key) => {
+          if (key === 'assignedTo' || key === 'assignedToName') return true;
+          return (updated as any)[key] === (original as any)[key];
+        });
+      const saved = assignmentOnly
+        ? await leadsService.assignLead(updated.id, updated.assignedTo || null).then((row: any) => ({
+            ...updated,
+            assignedTo: row.assigned_to,
+            assignedToName: row.assigned_to ? updated.assignedToName : null,
+          }))
+        : await leadsService.update(updated.id, updated);
       setLeads((prev) => prev.map((l) => (l.id === updated.id ? (saved as Lead) : l)));
+      setViewLead((current) => (current?.id === updated.id ? (saved as Lead) : current));
       setEditLead(null);
-      toast.success(`Lead "${updated.name}" updated`);
+      toast.success(assignmentOnly ? 'Lead reassigned successfully' : `Lead "${updated.name}" updated`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update lead');
     }

@@ -67,6 +67,10 @@ interface DashboardData {
     avgHours: number;
     totalHours: number;
   };
+  leadSummary: {
+    total: number;
+    byStage: { stage: string; count: number }[];
+  };
   timeline: { id: string; employee: string; action: string; detail: string; entityType: string; createdAt: string }[];
 }
 
@@ -215,6 +219,55 @@ export default function OwnerDashboard() {
 
       {/* Team leaderboard — action-based ranking for sales, telesales & everyone */}
       <Leaderboard />
+
+      {/* Leads pipeline summary */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Leads Pipeline
+          </h2>
+          <Link
+            href="/leads-management"
+            className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+          >
+            View leads <ArrowRight size={13} />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard
+            label="Total Leads"
+            value={data.leadSummary.total}
+            icon={<Users size={18} />}
+            tone="primary"
+          />
+          {data.leadSummary.byStage.slice(0, 3).map((item) => (
+            <StatCard
+              key={item.stage}
+              label={item.stage}
+              value={item.count}
+              icon={<Activity size={18} />}
+            />
+          ))}
+        </div>
+        {data.leadSummary.byStage.length > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-4 mt-3 space-y-3">
+            {data.leadSummary.byStage.map((item) => {
+              const width = data.leadSummary.total
+                ? Math.max(3, Math.round((item.count / data.leadSummary.total) * 100))
+                : 0;
+              return (
+                <div key={item.stage} className="flex items-center gap-3 text-sm">
+                  <span className="w-32 shrink-0 truncate text-muted-foreground">{item.stage}</span>
+                  <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
+                  </div>
+                  <span className="w-8 text-right font-semibold text-foreground">{item.count}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Executive summary */}
       <div>

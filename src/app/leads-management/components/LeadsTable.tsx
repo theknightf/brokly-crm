@@ -88,7 +88,7 @@ function StatusDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-40 bg-card border border-border rounded-xl shadow-modal min-w-[240px] py-1 fade-in max-h-72 overflow-y-auto">
+          <div className="absolute left-0 top-full mt-1 z-40 flex flex-col bg-card border border-border rounded-xl shadow-modal min-w-[240px] py-1 fade-in max-h-72 overflow-y-auto">
             <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               Pipeline
             </p>

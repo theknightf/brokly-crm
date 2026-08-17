@@ -82,7 +82,7 @@ export async function GET(request: Request) {
 
   const period = rangeParam === 'month' ? thisMonth : { from: weekAgo, to: today };
 
-  const [profilesRes, todayRes, periodRes, prevMonthRes, monthRes, expensesThisRes, expensesPrevRes, activityRes] =
+  const [profilesRes, todayRes, periodRes, prevMonthRes, monthRes, expensesThisRes, expensesPrevRes, activityRes, leadsRes] =
     await Promise.all([
       supabase
         .from('user_profiles')
@@ -114,7 +114,17 @@ export async function GET(request: Request) {
         .select('user_id, action_type, detail, meta, entity_type, created_at')
         .order('created_at', { ascending: false })
         .limit(80),
+      supabase.from('leads').select('crm_status, lead_status'),
     ]);
+
+  const leadsByStage: Record<string, number> = {};
+  (leadsRes.data || []).forEach((lead: any) => {
+    const stage = String(lead.crm_status || lead.lead_status || 'Unknown');
+    leadsByStage[stage] = (leadsByStage[stage] || 0) + 1;
+  });
+  const leadStageSummary = Object.entries(leadsByStage)
+    .map(([stage, count]) => ({ stage, count }))
+    .sort((a, b) => b.count - a.count);
 
   const profiles = (profilesRes.data || []).filter((p: any) => p.is_active !== false);
   const employees = profiles.filter((p: any) => p.role !== 'owner');
@@ -321,6 +331,10 @@ export async function GET(request: Request) {
       lateRate: monthLateRate,
       avgHours: Math.round(monthAvgHours * 10) / 10,
       totalHours: Math.round(monthHours * 10) / 10,
+    },
+    leadSummary: {
+      total: (leadsRes.data || []).length,
+      byStage: leadStageSummary,
     },
     timeline,
   });

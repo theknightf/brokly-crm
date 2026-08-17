@@ -45,7 +45,7 @@ export default function LoginForm(_props?: LoginFormProps) {
     try {
       await signIn(data.email, data.password);
       toast.success('Signed in successfully');
-      router.push('/');
+      router.replace('/');
     } catch (err: any) {
       setError('root', {
         message: err?.message || 'Invalid email or password',
