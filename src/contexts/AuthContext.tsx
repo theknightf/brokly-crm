@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const getSupabase = () => (supabaseRef.current ??= createClient());
   const router = useRouter();
-  const profileRequestRef = useRef<string | null>(null);
+  const profileRequestRef = useRef<{ userId: string; promise: Promise<void> } | null>(null);
 
   // Activity tracking — automatically tracks login/session/heartbeat/logout
   useActivityTracker(user?.id || null);
@@ -32,26 +32,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchProfile = async (userId: string) => {
     // getSession() and onAuthStateChange() both fire on mount; skip the
     // duplicate in-flight request for the same user.
-    if (profileRequestRef.current === userId) return;
-    profileRequestRef.current = userId;
-    try {
-      const { data } = await getSupabase().from('user_profiles').select('*').eq('id', userId).single();
-      // Deactivated accounts are signed out immediately so deactivation takes
-      // effect on the very next profile fetch (mount, login, or session change).
-      if (data && data.is_active === false) {
+    if (profileRequestRef.current?.userId === userId) return profileRequestRef.current.promise;
+
+    const promise = (async () => {
+      try {
+        const { data } = await getSupabase().from('user_profiles').select('*').eq('id', userId).single();
+        // Deactivated accounts are signed out immediately so deactivation takes
+        // effect on the very next profile fetch (mount, login, or session change).
+        if (data && data.is_active === false) {
+          setProfile(null);
+          const { error } = await getSupabase().auth.signOut();
+          if (error) console.error('[AuthContext] signOut (disabled account) failed', error);
+          router.push('/sign-up-login');
+          router.refresh();
+          return;
+        }
+        setProfile(data);
+      } catch {
         setProfile(null);
-        const { error } = await getSupabase().auth.signOut();
-        if (error) console.error('[AuthContext] signOut (disabled account) failed', error);
-        router.push('/sign-up-login');
-        router.refresh();
-        return;
+      } finally {
+        if (profileRequestRef.current?.userId === userId) profileRequestRef.current = null;
       }
-      setProfile(data);
-    } catch {
-      setProfile(null);
-    } finally {
-      profileRequestRef.current = null;
-    }
+    })();
+
+    profileRequestRef.current = { userId, promise };
+    return promise;
   };
 
   useEffect(() => {
@@ -115,6 +120,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
         throw new Error(normalizeAuthError(error));
       }
+      if (!data.user) throw new Error('Sign in failed. Please try again.');
+      // Do not navigate until the profile (including the user's role) is ready.
+      // This prevents the dashboard from rendering as an anonymous user until
+      // a manual browser refresh.
+      setSession(data.session);
+      setUser(data.user);
+      await fetchProfile(data.user.id);
       // Activity session is started automatically by useActivityTracker when
       // `user` is set by onAuthStateChange. Avoid refreshing the current route
       // here; the login screen performs the navigation immediately after this
