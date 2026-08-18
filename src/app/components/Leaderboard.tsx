@@ -54,23 +54,23 @@ function statOf(row: Row, period: Period) {
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1)
     return (
-      <div className="w-8 h-8 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center font-bold text-sm shadow">
+      <div className="w-7 h-7 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center font-bold text-xs shadow">
         1
       </div>
     );
   if (rank === 2)
     return (
-      <div className="w-8 h-8 rounded-full bg-slate-300 text-slate-800 flex items-center justify-center font-bold text-sm shadow">
+      <div className="w-7 h-7 rounded-full bg-slate-300 text-slate-800 flex items-center justify-center font-bold text-xs shadow">
         2
       </div>
     );
   if (rank === 3)
     return (
-      <div className="w-8 h-8 rounded-full bg-orange-400 text-orange-950 flex items-center justify-center font-bold text-sm shadow">
+      <div className="w-7 h-7 rounded-full bg-orange-400 text-orange-950 flex items-center justify-center font-bold text-xs shadow">
         3
       </div>
     );
-  return <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground">{rank}</div>;
+  return <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">{rank}</div>;
 }
 
 export default function Leaderboard() {
@@ -101,11 +101,11 @@ export default function Leaderboard() {
   }, [load]);
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-3 sm:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+    <div className="bg-card border border-border rounded-2xl p-2.5 sm:p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Trophy size={16} className="text-primary" />
+          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Trophy size={14} className="text-primary" />
           </div>
           <div>
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -145,19 +145,19 @@ export default function Leaderboard() {
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-10">No team activity yet.</p>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-1">
           {rows.map((row) => {
             const s = statOf(row, period);
             const top = row.rank <= 3;
             return (
               <li
                 key={row.user_id}
-                className={`flex items-center gap-2 p-2 rounded-xl border transition-colors ${
+                className={`flex items-center gap-1.5 p-1.5 rounded-xl border transition-colors ${
                   top ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/30'
                 }`}
               >
                 <div className="scale-90 origin-left"><RankBadge rank={row.rank} /></div>
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-bold text-primary">{initials(row.full_name || row.email)}</span>
                 </div>
                 <div className="min-w-0 flex-1">
@@ -169,7 +169,7 @@ export default function Leaderboard() {
                     {ROLE_LABEL[row.role] || row.role}
                   </p>
                 </div>
-                <div className="hidden sm:flex items-center gap-3 text-center">
+                <div className="hidden sm:flex items-center gap-2 text-center">
                   <Metric label="Leads" value={s.leads} />
                   <Metric label="Calls" value={s.calls} />
                   <Metric label="Actions" value={s.actions} />
