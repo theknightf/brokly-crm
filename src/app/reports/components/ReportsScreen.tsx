@@ -292,6 +292,16 @@ interface ReportData {
     leaderRatingComment: string;
     leaderRatingAt: string | null;
   }[];
+  teamAgentPerformance: {
+    id: string;
+    name: string;
+    teamId: string | null;
+    teamName: string;
+    totalLeads: number;
+    pending: number;
+    new: number;
+    calls: number;
+  }[];
   callsByEmployee: {
     userId: string;
     name: string;
@@ -863,6 +873,13 @@ export default function ReportsScreen() {
 
               {/* Team tab */}
               <div className={view === 'team' ? 'block space-y-6' : 'hidden'}>
+                <SimpleTeamPerformance
+                  data={filteredData!}
+                  monthlyLeads={filteredData!.monthlyLeads}
+                  teamOptions={data.teamPerformance.map((team) => ({ id: team.id, name: team.name }))}
+                />
+                {/* Detailed team analytics remain available below the simplified view. */}
+                <div className="hidden">
                 <TeamTab
                   data={filteredData!}
                   activityRows={filteredActivityRows}
@@ -874,6 +891,7 @@ export default function ReportsScreen() {
                   extrasAdmin={extrasAdmin}
                   officeCfg={officeCfg}
                 />
+                </div>
               </div>
 
               {/* Attendance tab */}
@@ -899,6 +917,112 @@ export default function ReportsScreen() {
 }
 
 /* ── Tab panels ──────────────────────────────────────────────────────────── */
+
+function SimpleTeamPerformance({
+  data,
+  monthlyLeads,
+  teamOptions,
+}: {
+  data: ReportData;
+  monthlyLeads: { month: string; leads: number; won: number }[];
+  teamOptions: { id: string; name: string }[];
+}) {
+  const [teamId, setTeamId] = useState('all');
+  const rows = teamId === 'all'
+    ? data.teamAgentPerformance
+    : data.teamAgentPerformance.filter((row) => row.teamId === teamId);
+  const totals = rows.reduce(
+    (sum, row) => ({
+      totalLeads: sum.totalLeads + row.totalLeads,
+      pending: sum.pending + row.pending,
+      new: sum.new + row.new,
+      calls: sum.calls + row.calls,
+    }),
+    { totalLeads: 0, pending: 0, new: 0, calls: 0 }
+  );
+  const maxTrend = Math.max(1, ...monthlyLeads.map((item) => item.leads));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <KPICard icon={<Users size={16} />} label="Total Leads" value={totals.totalLeads} />
+        <KPICard icon={<Phone size={16} />} label="Total Calls" value={totals.calls} />
+        <KPICard icon={<UserCheck size={16} />} label="Agents / Teams" value={rows.length} />
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Leads trend</h2>
+            <p className="text-xs text-muted-foreground">Last 6 months</p>
+          </div>
+          <BarChart3 size={17} className="text-primary" />
+        </div>
+        <div className="flex items-end gap-2 h-28">
+          {monthlyLeads.slice(-6).map((item) => (
+            <div key={item.month} className="flex-1 h-full flex flex-col items-center justify-end gap-1">
+              <span className="text-[10px] text-muted-foreground">{item.leads}</span>
+              <div className="w-full max-w-10 rounded-t-lg bg-primary/80 transition-all" style={{ height: `${Math.max(8, (item.leads / maxTrend) * 76)}px` }} />
+              <span className="text-[10px] text-muted-foreground truncate max-w-full">{item.month}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-border">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Team Performance</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">A quick view of leads and calls</p>
+          </div>
+          <select value={teamId} onChange={(event) => setTeamId(event.target.value)} className="input-base w-auto min-w-[150px] text-sm">
+            <option value="all">All Teams</option>
+            {teamOptions.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+          </select>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                {['Agent Name', 'Total Leads', 'Pending', 'New', 'Calls'].map((label, index) => (
+                  <th key={label} className={`px-4 py-3 text-xs font-semibold text-muted-foreground ${index ? 'text-right' : 'text-left'}`}>{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-3 font-medium text-foreground">{row.name}<span className="block text-[11px] text-muted-foreground">{row.teamName}</span></td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground">{row.totalLeads}</td>
+                  <td className="px-4 py-3 text-right text-amber-600">{row.pending}</td>
+                  <td className="px-4 py-3 text-right text-primary">{row.new}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">{row.calls}</td>
+                </tr>
+              ))}
+              <tr className="bg-primary/5 font-bold">
+                <td className="px-4 py-3 text-foreground">Totals</td>
+                <td className="px-4 py-3 text-right text-foreground">{totals.totalLeads}</td>
+                <td className="px-4 py-3 text-right text-amber-600">{totals.pending}</td>
+                <td className="px-4 py-3 text-right text-primary">{totals.new}</td>
+                <td className="px-4 py-3 text-right text-foreground">{totals.calls}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">No team members found.</p>}
+      </div>
+    </div>
+  );
+}
+
+function KPICard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
+      <div><p className="text-xl font-bold text-foreground">{value.toLocaleString()}</p><p className="text-xs text-muted-foreground">{label}</p></div>
+    </div>
+  );
+}
 
 function OverviewTab({ data, showDelta }: { data: ReportData; showDelta: boolean }) {
   const prev = showDelta ? data.previousPeriod : null;

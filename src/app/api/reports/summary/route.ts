@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   const inDateRange = (date: string | null | undefined): boolean =>
     !hasRange || (!!date && date >= fromParam && date <= toParam);
 
-  const [leadsRes, followUpsRes, customersRes, teamRes, callsRes, membershipsRes, teamsRes, expensesRes, ratingsRes] =
+  const [leadsRes, followUpsRes, customersRes, teamRes, callsRes, membershipsRes, teamsRes, expensesRes, ratingsRes, profilesRes] =
     await Promise.all([
       supabase
         .from('leads')
@@ -72,6 +72,7 @@ export async function GET(request: Request) {
       supabase.from('teams').select('id, name, leader_id, description'),
       supabase.from('expenses').select('created_by, amount, expense_date'),
       supabase.from('team_leader_ratings').select('*'),
+      supabase.from('user_profiles').select('id, full_name, email, role, team_id, is_active'),
     ]);
 
   if (
@@ -85,6 +86,7 @@ export async function GET(request: Request) {
       teamsRes.error,
       expensesRes.error,
       ratingsRes.error,
+      profilesRes.error,
     ].some(Boolean)
   ) {
     return NextResponse.json({ error: 'Failed to load report data' }, { status: 500 });
@@ -110,6 +112,7 @@ export async function GET(request: Request) {
   const memberships = membershipsRes.data || [];
   const allTeams = teamsRes.data || [];
   const ratings = ratingsRes.data || [];
+  const profiles = profilesRes.data || [];
 
   // Lead status breakdown
   const leadsByStatus: Record<string, number> = {};
@@ -290,6 +293,31 @@ export async function GET(request: Request) {
     };
   });
 
+  const visibleProfileIds = new Set<string>();
+  profiles.forEach((p: any) => {
+    if (isAdmin || visibleTeams.some((t: any) => t.id === p.team_id)) visibleProfileIds.add(p.id);
+  });
+  const terminalStages = new Set(['Done Deal', 'Not Interested', 'Cancellation', 'Wrong Number', 'No Answer', 'No Answer At All', 'Closed Number', 'Low Budget', 'Data Rotation']);
+  const teamAgentPerformance = profiles
+    .filter((p: any) => p.is_active !== false && visibleProfileIds.has(p.id))
+    .map((p: any) => {
+      const mine = leads.filter((l: any) => l.assigned_to === p.id || l.created_by === p.id);
+      const stageOf = (l: any) => l.crm_status || l.lead_status || 'Fresh Leads';
+      const newCount = mine.filter((l: any) => stageOf(l) === 'Fresh Leads' || stageOf(l) === 'New').length;
+      const pendingCount = mine.filter((l: any) => !terminalStages.has(stageOf(l)) && !['Fresh Leads', 'New'].includes(stageOf(l))).length;
+      return {
+        id: p.id,
+        name: p.full_name || p.email,
+        teamId: p.team_id || null,
+        teamName: allTeams.find((t: any) => t.id === p.team_id)?.name || 'No team',
+        totalLeads: mine.length,
+        pending: pendingCount,
+        new: newCount,
+        calls: calls.filter((c: any) => c.user_id === p.id).length,
+      };
+    })
+    .sort((a, b) => b.totalLeads - a.totalLeads);
+
   // Attach leader names.
   const leaderIds = visibleTeams.map((t: any) => t.leader_id).filter(Boolean);
   if (leaderIds.length) {
@@ -380,6 +408,7 @@ export async function GET(request: Request) {
       rate: stats.leads > 0 ? ((stats.won / stats.leads) * 100).toFixed(1) : '0',
     })),
     teamPerformance,
+    teamAgentPerformance,
     callsByEmployee: Object.values(callsByEmployee).sort((a: any, b: any) => b.calls - a.calls),
     previousPeriod,
   });
