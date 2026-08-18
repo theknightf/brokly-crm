@@ -16,6 +16,7 @@ import {
   CheckSquare,
   Phone,
   FolderKanban,
+  GitBranch,
   Receipt,
   Banknote,
   Wallet,
@@ -345,6 +346,7 @@ const CATEGORY_CARDS: {
 }[] = [
   { key: 'myPerformance', title: 'My performance', desc: 'Your leads, wins and conversion at a glance', icon: UserCheck, target: 'overview' },
   { key: 'teamPerformance', title: 'Team performance', desc: 'How every agent and team is doing', icon: Users, target: 'team' },
+  { key: 'leadStages', title: 'Lead stages', desc: 'See how many leads are New, Pending, Interested and Won', icon: GitBranch, target: 'leads' },
   { key: 'leadsFollowUps', title: 'Leads & follow-ups', desc: 'Where leads come from and follow-up status', icon: BarChart3, target: 'leads' },
   { key: 'salesRevenue', title: 'Sales & revenue', desc: 'Deals closed and money earned', icon: DollarSign, target: 'sales' },
   { key: 'calls', title: 'Calls', desc: 'Call volume, duration and outcomes', icon: Phone, target: 'calls' },
