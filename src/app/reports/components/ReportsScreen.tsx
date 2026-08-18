@@ -646,7 +646,7 @@ export default function ReportsScreen() {
               if (window.history.length > 1) router.back();
               else router.push('/');
             }}
-            className="mb-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground active:scale-95"
+            className="mb-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3 text-xs font-bold text-primary shadow-sm transition-all hover:bg-primary/15 hover:-translate-y-0.5 active:scale-95"
             aria-label={t('common.back')}
           >
             {lang === 'ar' ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}
