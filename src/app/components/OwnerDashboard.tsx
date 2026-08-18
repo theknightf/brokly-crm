@@ -100,12 +100,14 @@ function StatCard({
   icon,
   tone = 'default',
   sub,
+  href,
 }: {
   label: string;
   value: string | number;
   icon: React.ReactNode;
   tone?: 'default' | 'green' | 'red' | 'amber' | 'primary';
   sub?: string;
+  href?: string;
 }) {
   const tones: Record<string, string> = {
     default: 'text-foreground',
@@ -114,8 +116,8 @@ function StatCard({
     amber: 'text-gold-dark',
     primary: 'text-primary',
   };
-  return (
-    <div className="bg-card border border-border rounded-2xl px-4 py-4">
+  const card = (
+    <div className={`bg-card border border-border rounded-2xl px-4 py-4 ${href ? 'transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md cursor-pointer' : ''}`}>
       <div className="flex items-center justify-between">
         <div>
           <p className={`text-2xl font-bold ${tones[tone]}`}>{value}</p>
@@ -128,6 +130,7 @@ function StatCard({
       <p className="text-xs text-muted-foreground mt-1.5">{label}</p>
     </div>
   );
+  return href ? <Link href={href}>{card}</Link> : card;
 }
 
 export default function OwnerDashboard() {
@@ -236,6 +239,7 @@ export default function OwnerDashboard() {
             value={data.leadSummary.total}
             icon={<Users size={18} />}
             tone="primary"
+            href="/leads-management"
           />
           {data.leadSummary.byStage.slice(0, 3).map((item) => (
             <StatCard
@@ -243,6 +247,7 @@ export default function OwnerDashboard() {
               label={item.stage}
               value={item.count}
               icon={<Activity size={18} />}
+              href={`/leads-management?status=${encodeURIComponent(item.stage)}`}
             />
           ))}
         </div>
@@ -273,23 +278,24 @@ export default function OwnerDashboard() {
       <div>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employees</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total Employees" value={s.totalEmployees} icon={<Users size={18} />} />
-          <StatCard label="Present Today" value={s.presentToday} icon={<CalendarCheck2 size={18} />} tone="green" />
-          <StatCard label="Absent Today" value={s.absentToday} icon={<Users size={18} />} tone="red" />
-          <StatCard label="Late Today" value={s.lateToday} icon={<Clock size={18} />} tone="amber" />
+          <StatCard label="Total Employees" value={s.totalEmployees} icon={<Users size={18} />} href="/admin" />
+          <StatCard label="Present Today" value={s.presentToday} icon={<CalendarCheck2 size={18} />} tone="green" href="/attendance" />
+          <StatCard label="Absent Today" value={s.absentToday} icon={<Users size={18} />} tone="red" href="/attendance" />
+          <StatCard label="Late Today" value={s.lateToday} icon={<Clock size={18} />} tone="amber" href="/attendance" />
         </div>
       </div>
 
       <div>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Working Hours</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatCard label="Average Working Hours" value={`${s.avgHours}h`} icon={<Clock size={18} />} />
-          <StatCard label="Total Working Hours" value={`${s.totalHours}h`} icon={<Timer size={18} />} />
+          <StatCard label="Average Working Hours" value={`${s.avgHours}h`} icon={<Clock size={18} />} href="/attendance" />
+          <StatCard label="Total Working Hours" value={`${s.totalHours}h`} icon={<Timer size={18} />} href="/attendance" />
           <StatCard
             label="Overtime"
             value={fmtDuration(s.overtimeMinutes * 60)}
             icon={<Timer size={18} />}
             tone="green"
+            href="/attendance"
           />
         </div>
       </div>
@@ -297,20 +303,21 @@ export default function OwnerDashboard() {
       <div>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Attendance</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatCard label="Attendance Rate" value={`${s.attendanceRate}%`} icon={<CalendarCheck2 size={18} />} tone="primary" />
-          <StatCard label="Absence Rate" value={`${s.absenceRate}%`} icon={<Users size={18} />} tone="red" />
-          <StatCard label="Late Rate" value={`${s.lateRate}%`} icon={<Clock size={18} />} tone="amber" />
+          <StatCard label="Attendance Rate" value={`${s.attendanceRate}%`} icon={<CalendarCheck2 size={18} />} tone="primary" href="/attendance" />
+          <StatCard label="Absence Rate" value={`${s.absenceRate}%`} icon={<Users size={18} />} tone="red" href="/attendance" />
+          <StatCard label="Late Rate" value={`${s.lateRate}%`} icon={<Clock size={18} />} tone="amber" href="/attendance" />
         </div>
       </div>
 
       <div>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Expenses</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatCard label="Operating Expenses This Month" value={fmtCurrency(s.expensesThisMonth)} icon={<Receipt size={18} />} tone="primary" sub={s.expensesPrevMonth > 0 ? `vs ${fmtCurrency(s.expensesPrevMonth)} last month` : undefined} />
+          <StatCard label="Operating Expenses This Month" value={fmtCurrency(s.expensesThisMonth)} icon={<Receipt size={18} />} tone="primary" href="/expenses" sub={s.expensesPrevMonth > 0 ? `vs ${fmtCurrency(s.expensesPrevMonth)} last month` : undefined} />
           <StatCard
             label="Previous Month"
             value={fmtCurrency(s.expensesPrevMonth)}
             icon={<Receipt size={18} />}
+            href="/expenses"
           />
           <StatCard
             label="Change"
@@ -318,6 +325,7 @@ export default function OwnerDashboard() {
             icon={expChange > 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
             tone={expChange > 0 ? 'amber' : 'green'}
             sub={expChange > 0 ? 'Spending increased' : expChange < 0 ? 'Spending decreased' : 'No change'}
+            href="/expenses"
           />
         </div>
       </div>
