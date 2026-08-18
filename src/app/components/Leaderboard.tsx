@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Trophy, Medal, Circle, Loader2, RefreshCw, Zap } from 'lucide-react';
+import { Trophy, Circle, Loader2, RefreshCw, Zap, ChevronDown } from 'lucide-react';
 
 type Period = 'day' | 'week' | 'month' | 'total';
 
@@ -75,6 +75,7 @@ function RankBadge({ rank }: { rank: number }) {
 
 export default function Leaderboard() {
   const [period, setPeriod] = useState<Period>('week');
+  const [expanded, setExpanded] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -103,7 +104,13 @@ export default function Leaderboard() {
   return (
     <div className="bg-card border border-border rounded-2xl p-2.5 sm:p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="flex items-center gap-2 text-left rounded-lg transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          aria-expanded={expanded}
+          aria-controls="owner-leaderboard-content"
+        >
           <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
             <Trophy size={14} className="text-primary" />
           </div>
@@ -115,22 +122,26 @@ export default function Leaderboard() {
               <Circle size={8} className="text-emerald-500 fill-emerald-500" /> {onlineCount} online now
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                period === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+          <ChevronDown size={15} className={`text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+        {expanded && (
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                className={`px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  period === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {expanded && <div id="owner-leaderboard-content">
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 size={26} className="animate-spin text-primary" />
@@ -165,9 +176,7 @@ export default function Leaderboard() {
                     <p className="text-xs font-semibold text-foreground truncate">{row.full_name || row.email}</p>
                     {row.online && <Circle size={7} className="text-emerald-500 fill-emerald-500 flex-shrink-0" />}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {ROLE_LABEL[row.role] || row.role}
-                  </p>
+                  <p className="text-[11px] text-muted-foreground">{ROLE_LABEL[row.role] || row.role}</p>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 text-center">
                   <Metric label="Leads" value={s.leads} />
@@ -183,6 +192,7 @@ export default function Leaderboard() {
           })}
         </ul>
       )}
+      </div>}
     </div>
   );
 }
