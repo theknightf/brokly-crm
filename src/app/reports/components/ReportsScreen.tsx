@@ -21,11 +21,14 @@ import {
   Banknote,
   Wallet,
   ChevronRight,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
 import { companySettingsService, type WorkingHours, DEFAULT_WORKING_HOURS } from '@/lib/services/peopleOpsService';
 import { buildOfficeHours, formatMinutes, type OfficeHoursConfig } from '@/lib/officeHours';
 import { toast } from 'sonner';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { exportPDF, exportCSV } from '@/lib/exportReport';
 import CallLogsReport from './CallLogsReport';
 import {
@@ -384,6 +387,7 @@ const VIEW_TITLES: Record<string, string> = {
 
 export default function ReportsScreen() {
   const router = useRouter();
+  const { lang, t } = useLanguage();
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [rangePreset, setRangePreset] = useState<RangePreset>('week');
@@ -636,6 +640,18 @@ export default function ReportsScreen() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card flex-shrink-0">
         <div>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push('/');
+            }}
+            className="mb-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground active:scale-95"
+            aria-label={t('common.back')}
+          >
+            {lang === 'ar' ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}
+            {t('common.back')}
+          </button>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <BarChart3 size={22} className="text-primary" />
             Reports & Analytics
