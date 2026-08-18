@@ -5,7 +5,7 @@ import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
-const SALES_ROLES = ['broker', 'branch_manager', 'senior_agent', 'agent', 'telecaller'];
+const SALES_ROLES = ['broker', 'branch_manager', 'team_leader', 'senior_agent', 'agent', 'telecaller'];
 const CALL_TYPES = ['Call', 'Video Call'];
 
 function pad(n: number) {

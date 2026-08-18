@@ -242,7 +242,7 @@ const ROLE_GROUP_ORDER: Record<string, string[]> = {
 function roleClassOf(role?: string): 'sales' | 'management' | 'admin' {
   if (!role) return 'admin';
   if (role === 'agent' || role === 'senior_agent' || role === 'telecaller') return 'sales';
-  if (role === 'broker' || role === 'branch_manager') return 'management';
+  if (role === 'broker' || role === 'branch_manager' || role === 'team_leader') return 'management';
   return 'admin';
 }
 

@@ -4,7 +4,7 @@
 // brokers) must be promoted to admin by an owner to see the admin panel.
 export const ADMIN_ROLES = ['owner', 'admin'];
 export const USER_MANAGEMENT_ROLES = ['owner', 'admin'];
-export const TEAM_LEAD_ROLE = 'Team Lead';
+export const TEAM_LEAD_ROLE = 'team_leader';
 
 export function isAdminRole(role?: string | null): boolean {
   return !!role && ADMIN_ROLES.includes(role);
@@ -21,7 +21,7 @@ export function canManageUsers(role?: string | null): boolean {
  *  - regular members cannot see the team.
  */
 export function canViewTeams(role?: string | null): boolean {
-  return isAdminRole(role) || role === TEAM_LEAD_ROLE;
+  return isAdminRole(role) || role === TEAM_LEAD_ROLE || role === 'Team Lead';
 }
 
 /** Owners & admins can manage (add/edit/remove) all members. Leaders view only. */

@@ -11,6 +11,7 @@ const ALLOWED_ROLES = [
   'owner',
   'broker',
   'branch_manager',
+  'team_leader',
   'senior_agent',
   'agent',
   'telecaller',

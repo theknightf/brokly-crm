@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Self-signup can never claim a privileged role (backed by the
     // handle_new_user trigger which also downgrades unknown/privileged roles).
     const requestedRole = String(metadata?.role || 'agent');
-    const safeRole = ['agent', 'broker', 'branch_manager', 'senior_agent', 'telecaller'].includes(
+    const safeRole = ['agent', 'broker', 'branch_manager', 'team_leader', 'senior_agent', 'telecaller'].includes(
       requestedRole
     )
       ? requestedRole

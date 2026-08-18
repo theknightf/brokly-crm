@@ -22,6 +22,7 @@ const ROLES = [
   { value: 'admin', label: 'Admin', color: 'bg-blue-100 text-blue-700' },
   { value: 'broker', label: 'Broker', color: 'bg-indigo-100 text-indigo-700' },
   { value: 'branch_manager', label: 'Branch Manager', color: 'bg-cyan-100 text-cyan-700' },
+  { value: 'team_leader', label: 'Team Leader', color: 'bg-teal-100 text-teal-700' },
   { value: 'senior_agent', label: 'Senior Agent', color: 'bg-emerald-100 text-emerald-700' },
   { value: 'agent', label: 'Sales', color: 'bg-amber-100 text-amber-700' },
   { value: 'telecaller', label: 'Telecaller', color: 'bg-rose-100 text-rose-700' },
@@ -96,7 +97,7 @@ function UserModal({
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Full Name *
@@ -138,7 +139,7 @@ function UserModal({
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Role *</label>
               <div className="relative">
@@ -428,7 +429,7 @@ function CreateUserModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Full Name *
@@ -484,7 +485,7 @@ function CreateUserModal({
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Role *</label>
               <div className="relative">

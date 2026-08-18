@@ -100,6 +100,7 @@ export const ROLE_BADGES: Record<string, { label: string; color: string }> = {
   admin: { label: 'Admin', color: 'bg-teal-soft text-teal' },
   broker: { label: 'Broker', color: 'bg-sage-soft text-sage' },
   branch_manager: { label: 'Branch Manager', color: 'bg-dusk-soft text-dusk' },
+  team_leader: { label: 'Team Leader', color: 'bg-teal-soft text-teal' },
   senior_agent: { label: 'Senior Agent', color: 'bg-sage-soft text-sage' },
   agent: { label: 'Sales', color: 'bg-gold-soft text-gold' },
   telecaller: { label: 'Telecaller', color: 'bg-clay-soft text-clay' },

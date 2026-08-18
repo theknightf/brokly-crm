@@ -20,6 +20,7 @@ interface SignUpFormData {
 const roleOptions = [
   { value: 'broker', label: 'Broker / Owner' },
   { value: 'branch_manager', label: 'Branch Manager' },
+  { value: 'team_leader', label: 'Team Leader' },
   { value: 'senior_agent', label: 'Senior Agent' },
   { value: 'agent', label: 'Sales Agent' },
   { value: 'telecaller', label: 'Telecaller' },
