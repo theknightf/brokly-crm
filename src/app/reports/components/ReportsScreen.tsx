@@ -397,8 +397,8 @@ export default function ReportsScreen() {
   );
   const [extrasLoading, setExtrasLoading] = useState(false);
   const [extrasAdmin, setExtrasAdmin] = useState(true);
-  // Open on the most actionable report so first-time users see stage counts immediately.
-  const [view, setView] = useState<'landing' | TabKey>('leads');
+  // Start at the chooser so every report, including Lead Stages, is discoverable.
+  const [view, setView] = useState<'landing' | TabKey>('landing');
   const [userFilter, setUserFilter] = useState<string>('all');
 
   useEffect(() => {
