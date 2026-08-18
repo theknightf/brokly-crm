@@ -319,6 +319,18 @@ export async function GET(request: Request) {
     })
     .sort((a, b) => b.totalLeads - a.totalLeads);
 
+  const leadStageByAgent = Array.from(
+    leads.reduce((groups: Map<string, { stage: string; agent: string; count: number }>, lead: any) => {
+      const stage = lead.crm_status || lead.lead_status || 'Fresh Leads';
+      const agent = profiles.find((profile: any) => profile.id === lead.assigned_to)?.full_name || lead.agent || 'Unassigned';
+      const key = `${stage}::${agent}`;
+      const current = groups.get(key);
+      groups.set(key, current || { stage, agent, count: 0 });
+      groups.get(key)!.count += 1;
+      return groups;
+    }, new Map()).values()
+  ).sort((a, b) => b.count - a.count);
+
   // Attach leader names.
   const leaderIds = visibleTeams.map((t: any) => t.leader_id).filter(Boolean);
   if (leaderIds.length) {
@@ -410,6 +422,7 @@ export async function GET(request: Request) {
     })),
     teamPerformance,
     teamAgentPerformance,
+    leadStageByAgent,
     callsByEmployee: Object.values(callsByEmployee).sort((a: any, b: any) => b.calls - a.calls),
     previousPeriod,
   });

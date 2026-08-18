@@ -303,6 +303,7 @@ interface ReportData {
     new: number;
     calls: number;
   }[];
+  leadStageByAgent: { stage: string; agent: string; count: number }[];
   callsByEmployee: {
     userId: string;
     name: string;
@@ -862,6 +863,7 @@ export default function ReportsScreen() {
               {/* Leads tab */}
               <div className={view === 'leads' ? 'block space-y-6' : 'hidden'}>
                 <LeadsTab
+                  leadStageByAgent={filteredData!.leadStageByAgent}
                   leadsByStatusData={leadsByStatusData}
                   leadsBySourceData={leadsBySourceData}
                   leadsByPropertyData={leadsByPropertyData}
@@ -1115,11 +1117,13 @@ function OverviewTab({ data, showDelta }: { data: ReportData; showDelta: boolean
 }
 
 function LeadsTab({
+  leadStageByAgent,
   leadsByStatusData,
   leadsBySourceData,
   leadsByPropertyData,
   followUpStatusData,
 }: {
+  leadStageByAgent: { stage: string; agent: string; count: number }[];
   leadsByStatusData: { name: string; value: number }[];
   leadsBySourceData: { name: string; value: number }[];
   leadsByPropertyData: { name: string; value: number }[];
@@ -1127,6 +1131,34 @@ function LeadsTab({
 }) {
   return (
     <div className="space-y-6">
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-foreground">Leads by Stage and Salesperson</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">See how many leads each salesperson has at every stage.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Stage</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Salesperson</th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Leads</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leadStageByAgent.map((row) => (
+                <tr key={`${row.stage}-${row.agent}`} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-3 py-2.5 text-foreground">{row.stage}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{row.agent}</td>
+                  <td className="px-3 py-2.5 text-right font-bold text-primary">{row.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {leadStageByAgent.length === 0 && <p className="py-5 text-center text-sm text-muted-foreground">No lead stage data available.</p>}
+      </div>
+
       {/* Lead Status + Source */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card border border-border rounded-xl p-5">
