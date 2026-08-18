@@ -25,7 +25,6 @@ import {
   type PayrollRules,
   DEFAULT_WORKING_HOURS,
   DEFAULT_PAYROLL_RULES,
-  round2,
 } from '@/lib/services/peopleOpsService';
 import { usersService } from '@/lib/services/crmService';
 
