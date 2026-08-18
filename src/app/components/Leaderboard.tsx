@@ -138,7 +138,7 @@ export default function Leaderboard() {
               </button>
             ))}
           </div>
-        </div>
+        )}
       </div>
 
       {expanded && <div id="owner-leaderboard-content">

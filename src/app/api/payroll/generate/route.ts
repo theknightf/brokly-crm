@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
-import { computePayrollEntry, round2 } from '@/lib/services/peopleOpsService';
+import { computePayrollEntry, round2 } from '@/lib/payrollMath';
 
 export const dynamic = 'force-dynamic';
 
