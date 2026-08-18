@@ -945,82 +945,219 @@ function SimpleTeamPerformance({
     }),
     { totalLeads: 0, pending: 0, new: 0, calls: 0 }
   );
-  const maxTrend = Math.max(1, ...monthlyLeads.map((item) => item.leads));
+
+  const chartData = monthlyLeads.slice(-6).map((m) => ({ month: m.month, leads: m.leads }));
+  const tooltipStyle: React.CSSProperties = {
+    borderRadius: 12,
+    border: '1px solid var(--border)',
+    background: 'var(--card)',
+    color: 'var(--foreground)',
+    fontSize: 12,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+  };
+
+  const filterChip = (active: boolean) =>
+    `h-8 shrink-0 rounded-full px-3.5 text-xs font-semibold transition-colors ${
+      active
+        ? 'bg-primary text-primary-foreground shadow-sm'
+        : 'bg-muted text-muted-foreground hover:text-foreground'
+    }`;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <KPICard icon={<Users size={16} />} label="Total Leads" value={totals.totalLeads} />
-        <KPICard icon={<Phone size={16} />} label="Total Calls" value={totals.calls} />
-        <KPICard icon={<UserCheck size={16} />} label="Agents / Teams" value={rows.length} />
-      </div>
-
-      <div className="bg-card border border-border rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Leads trend</h2>
-            <p className="text-xs text-muted-foreground">Last 6 months</p>
-          </div>
-          <BarChart3 size={17} className="text-primary" />
-        </div>
-        <div className="flex items-end gap-2 h-28">
-          {monthlyLeads.slice(-6).map((item) => (
-            <div key={item.month} className="flex-1 h-full flex flex-col items-center justify-end gap-1">
-              <span className="text-[10px] text-muted-foreground">{item.leads}</span>
-              <div className="w-full max-w-10 rounded-t-lg bg-primary/80 transition-all" style={{ height: `${Math.max(8, (item.leads / maxTrend) * 76)}px` }} />
-              <span className="text-[10px] text-muted-foreground truncate max-w-full">{item.month}</span>
+      {/* Leads trend chart + donut total */}
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
+        <div className="bg-card border border-border rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Leads trend</h2>
+              <p className="text-xs text-muted-foreground">Last 6 months</p>
             </div>
-          ))}
+            <BarChart3 size={17} className="text-primary" />
+          </div>
+          <div className="h-36">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis
+                  dataKey="month"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  width={36}
+                  allowDecimals={false}
+                  tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                />
+                <Tooltip
+                  cursor={{ fill: 'rgba(132, 204, 22, 0.08)' }}
+                  contentStyle={tooltipStyle}
+                  formatter={(value) => [`${value}`, 'Leads']}
+                />
+                <Bar dataKey="leads" fill="var(--primary)" radius={[6, 6, 0, 0]} maxBarSize={24} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Donut "Total" indicator */}
+        <div className="bg-card border border-border rounded-2xl p-4 flex flex-col items-center justify-center">
+          <p className="text-xs text-muted-foreground mb-1 self-start">Total leads</p>
+          <div className="relative">
+            <PieChart width={132} height={132}>
+              <Pie
+                data={[{ name: 'Total', value: totals.totalLeads }]}
+                dataKey="value"
+                cx={66}
+                cy={66}
+                innerRadius={46}
+                outerRadius={60}
+                startAngle={90}
+                endAngle={-270}
+                strokeWidth={0}
+                isAnimationActive
+              >
+                <Cell fill="var(--primary)" />
+              </Pie>
+            </PieChart>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-bold text-foreground tabular-nums">
+                {totals.totalLeads.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-muted-foreground">leads</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-border">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Team Performance</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">A quick view of leads and calls</p>
-          </div>
-          <select value={teamId} onChange={(event) => setTeamId(event.target.value)} className="input-base w-auto min-w-[150px] text-sm">
-            <option value="all">All Teams</option>
-            {teamOptions.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-          </select>
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KPICard icon={<Users size={16} />} label="Total Leads" value={totals.totalLeads} />
+        <KPICard icon={<UserCheck size={16} />} label="Pending" value={totals.pending} />
+        <KPICard icon={<GitBranch size={16} />} label="New" value={totals.new} />
+        <KPICard icon={<Phone size={16} />} label="Calls" value={totals.calls} />
+      </div>
+
+      {/* Team filter */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <button onClick={() => setTeamId('all')} className={filterChip(teamId === 'all')}>
+          All Teams
+        </button>
+        {teamOptions.map((team) => (
+          <button key={team.id} onClick={() => setTeamId(team.id)} className={filterChip(teamId === team.id)}>
+            {team.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Team performance</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Every agent, one clean view</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                {['Agent Name', 'Total Leads', 'Pending', 'New', 'Calls'].map((label, index) => (
-                  <th key={label} className={`px-4 py-3 text-xs font-semibold text-muted-foreground ${index ? 'text-right' : 'text-left'}`}>{label}</th>
+                {['Agent name', 'Total leads', 'Pending', 'New', 'Calls'].map((label, index) => (
+                  <th
+                    key={label}
+                    className={`px-4 py-3 text-xs font-semibold text-muted-foreground ${index ? 'text-right' : 'text-left'}`}
+                  >
+                    {label}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3 font-medium text-foreground">{row.name}<span className="block text-[11px] text-muted-foreground">{row.teamName}</span></td>
-                  <td className="px-4 py-3 text-right font-semibold text-foreground">{row.totalLeads}</td>
-                  <td className="px-4 py-3 text-right text-amber-600">{row.pending}</td>
-                  <td className="px-4 py-3 text-right text-primary">{row.new}</td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">{row.calls}</td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-foreground">{row.name}</p>
+                    {row.teamName && <p className="text-[11px] text-muted-foreground">{row.teamName}</p>}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">{row.totalLeads}</td>
+                  <td className="px-4 py-3 text-right text-amber-600 tabular-nums">{row.pending}</td>
+                  <td className="px-4 py-3 text-right text-primary tabular-nums">{row.new}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{row.calls}</td>
                 </tr>
               ))}
-              <tr className="bg-primary/5 font-bold">
+              <tr className="bg-primary/10 font-semibold">
                 <td className="px-4 py-3 text-foreground">Totals</td>
-                <td className="px-4 py-3 text-right text-foreground">{totals.totalLeads}</td>
-                <td className="px-4 py-3 text-right text-amber-600">{totals.pending}</td>
-                <td className="px-4 py-3 text-right text-primary">{totals.new}</td>
-                <td className="px-4 py-3 text-right text-foreground">{totals.calls}</td>
+                <td className="px-4 py-3 text-right text-foreground tabular-nums">{totals.totalLeads}</td>
+                <td className="px-4 py-3 text-right text-amber-600 tabular-nums">{totals.pending}</td>
+                <td className="px-4 py-3 text-right text-primary tabular-nums">{totals.new}</td>
+                <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{totals.calls}</td>
               </tr>
             </tbody>
           </table>
         </div>
-        {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">No team members found.</p>}
+        {rows.length === 0 && (
+          <p className="p-6 text-center text-sm text-muted-foreground">No team members found.</p>
+        )}
+      </div>
+
+      {/* Mobile stacked cards */}
+      <div className="md:hidden space-y-2">
+        {rows.length === 0 && (
+          <p className="p-6 text-center text-sm text-muted-foreground bg-card border border-border rounded-2xl">
+            No team members found.
+          </p>
+        )}
+        {rows.map((row) => (
+          <div key={row.id} className="bg-card border border-border rounded-2xl p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-semibold text-foreground">{row.name}</p>
+              {row.teamName && (
+                <span className="text-[11px] text-muted-foreground shrink-0">{row.teamName}</span>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-2 mt-3">
+              <MobileStat label="Total" value={row.totalLeads} className="font-bold text-foreground" />
+              <MobileStat label="Pending" value={row.pending} className="text-amber-600" />
+              <MobileStat label="New" value={row.new} className="text-primary" />
+              <MobileStat label="Calls" value={row.calls} className="text-muted-foreground" />
+            </div>
+          </div>
+        ))}
+        {rows.length > 0 && (
+          <div className="rounded-2xl border border-primary/25 bg-primary/10 p-4">
+            <p className="text-sm font-semibold text-foreground mb-3">Totals</p>
+            <div className="grid grid-cols-4 gap-2">
+              <MobileStat label="Total" value={totals.totalLeads} className="font-bold text-foreground" />
+              <MobileStat label="Pending" value={totals.pending} className="text-amber-600" />
+              <MobileStat label="New" value={totals.new} className="text-primary" />
+              <MobileStat label="Calls" value={totals.calls} className="text-muted-foreground" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function KPICard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function MobileStat({
+  label,
+  value,
+  className = 'text-foreground',
+}: {
+  label: string;
+  value: number;
+  className?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className={`text-base tabular-nums ${className}`}>{value.toLocaleString()}</span>
+      <span className="text-[10px] text-muted-foreground mt-0.5">{label}</span>
+    </div>
+  );
+}
+
+function MiniKPI({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
       <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
@@ -1161,7 +1298,7 @@ function LeadsTab({
 
       {/* Lead Status + Source */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="hidden">
           <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Status</h2>
           {leadsByStatusData.length === 0 ? (
             <EmptyChart />
@@ -1186,7 +1323,7 @@ function LeadsTab({
           )}
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="hidden">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Where your leads are</h2>
