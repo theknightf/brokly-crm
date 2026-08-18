@@ -37,6 +37,7 @@ export const dictionaries: Dict = {
   'common.loading': { en: 'Loading…', ar: 'جارٍ التحميل…' },
   'common.filter': { en: 'Filters', ar: 'الفلاتر' },
   'common.close': { en: 'Close', ar: 'قفل' },
+  'common.back': { en: 'Back', ar: 'رجوع' },
   'common.done': { en: 'Done', ar: 'تمام' },
   'common.toDo': { en: 'To do', ar: 'لازم يتعمل' },
   'common.cancelled': { en: 'Cancelled', ar: 'ملغي' },

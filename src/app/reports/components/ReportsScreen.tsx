@@ -995,7 +995,7 @@ function SimpleTeamPerformance({
                 <Tooltip
                   cursor={{ fill: 'rgba(132, 204, 22, 0.08)' }}
                   contentStyle={tooltipStyle}
-                  formatter={(value) => [`${value}`, 'Leads']}
+                  formatter={(value: number) => [`${value}`, 'Leads']}
                 />
                 <Bar dataKey="leads" fill="var(--primary)" radius={[6, 6, 0, 0]} maxBarSize={24} />
               </BarChart>
@@ -1035,10 +1035,10 @@ function SimpleTeamPerformance({
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KPICard icon={<Users size={16} />} label="Total Leads" value={totals.totalLeads} />
-        <KPICard icon={<UserCheck size={16} />} label="Pending" value={totals.pending} />
-        <KPICard icon={<GitBranch size={16} />} label="New" value={totals.new} />
-        <KPICard icon={<Phone size={16} />} label="Calls" value={totals.calls} />
+        <MiniKPI icon={<Users size={16} />} label="Total Leads" value={totals.totalLeads} />
+        <MiniKPI icon={<UserCheck size={16} />} label="Pending" value={totals.pending} />
+        <MiniKPI icon={<GitBranch size={16} />} label="New" value={totals.new} />
+        <MiniKPI icon={<Phone size={16} />} label="Calls" value={totals.calls} />
       </div>
 
       {/* Team filter */}
