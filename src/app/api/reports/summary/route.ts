@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       supabase
         .from('leads')
         .select(
-          'lead_status, source, property_type, budget_max, created_at, agent, assigned_to, created_by'
+          'crm_status, lead_status, source, property_type, budget_max, created_at, agent, assigned_to, created_by'
         ),
       supabase
         .from('follow_ups')
@@ -117,7 +117,8 @@ export async function GET(request: Request) {
   // Lead status breakdown
   const leadsByStatus: Record<string, number> = {};
   leads.forEach((l: any) => {
-    leadsByStatus[l.lead_status] = (leadsByStatus[l.lead_status] || 0) + 1;
+    const stage = l.crm_status || l.lead_status || 'Fresh Leads';
+    leadsByStatus[stage] = (leadsByStatus[stage] || 0) + 1;
   });
 
   // Lead source breakdown

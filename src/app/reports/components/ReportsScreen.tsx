@@ -1152,6 +1152,42 @@ function LeadsTab({
         </div>
 
         <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Where your leads are</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">A quick view of each lead’s current stage</p>
+            </div>
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+              {leadsByStatusData.reduce((sum, item) => sum + item.value, 0)} total
+            </span>
+          </div>
+          {leadsByStatusData.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <div className="space-y-2">
+              {leadsByStatusData
+                .slice()
+                .sort((a, b) => b.value - a.value)
+                .map((item, index) => {
+                  const total = leadsByStatusData.reduce((sum, current) => sum + current.value, 0);
+                  const width = total ? Math.max(5, Math.round((item.value / total) * 100)) : 0;
+                  return (
+                  <div key={item.name} className="animate-rise-in rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5" style={{ animationDelay: `${index * 45}ms` }}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
+                      <span className="min-w-8 text-right font-bold text-primary">{item.value}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out" style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-5">
           <h2 className="text-sm font-semibold text-foreground mb-4">Leads by Source</h2>
           {leadsBySourceData.length === 0 ? (
             <EmptyChart />
