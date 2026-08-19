@@ -1,6 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Users,
   CalendarCheck2,
@@ -71,7 +72,7 @@ interface DashboardData {
     total: number;
     byStage: { stage: string; count: number }[];
   };
-  timeline: { id: string; employee: string; action: string; detail: string; entityType: string; createdAt: string }[];
+  timeline: { id: string; employee: string; action: string; detail: string; entityType: string; entityId?: string; createdAt: string }[];
 }
 
 const fmtCurrency = (n: number) => {
@@ -134,6 +135,7 @@ function StatCard({
 }
 
 export default function OwnerDashboard() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [range, setRange] = useState<'week' | 'month'>('week');
   const [loading, setLoading] = useState(true);
@@ -258,13 +260,17 @@ export default function OwnerDashboard() {
                 ? Math.max(3, Math.round((item.count / data.leadSummary.total) * 100))
                 : 0;
               return (
-                <div key={item.stage} className="flex items-center gap-3 text-sm">
+                <Link
+                  key={item.stage}
+                  href={`/leads-management?status=${encodeURIComponent(item.stage)}`}
+                  className="flex items-center gap-3 text-sm rounded-lg px-2 py-1.5 -mx-2 hover:bg-muted/60 transition-colors"
+                >
                   <span className="w-32 shrink-0 truncate text-muted-foreground">{item.stage}</span>
                   <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
                   </div>
                   <span className="w-8 text-right font-semibold text-foreground">{item.count}</span>
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -348,10 +354,10 @@ export default function OwnerDashboard() {
               { label: 'Late', value: data.attendanceOverview.late, color: 'text-gold-dark' },
               { label: 'Leave', value: data.attendanceOverview.leave, color: 'text-dusk' },
             ].map((x) => (
-              <div key={x.label} className="bg-muted/50 rounded-xl py-4">
+              <Link href={`/attendance?status=${x.label.toLowerCase()}`} key={x.label} className="bg-muted/50 rounded-xl py-4 hover:bg-muted transition-colors">
                 <p className={`text-xl font-bold ${x.color}`}>{x.value}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">{x.label}</p>
-              </div>
+              </Link>
             ))}
           </div>
           <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
@@ -369,9 +375,11 @@ export default function OwnerDashboard() {
           ) : (
             <ul className="space-y-2">
               {data.attentionNeeded.slice(0, 8).map((a, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm">
+                <li key={i}>
+                  <Link href={a.id ? `/admin/employees/${a.id}` : '/attendance'} className="flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 -mx-2 hover:bg-muted/60 transition-colors">
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${attentionTypes[a.type] || 'bg-muted'}`} />
                   <span className="text-foreground">{a.text}</span>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -400,7 +408,16 @@ export default function OwnerDashboard() {
             </thead>
             <tbody className="divide-y divide-border">
               {data.performance.slice(0, 12).map((p) => (
-                <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                <tr
+                  key={p.id}
+                  className="hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/admin/employees/${p.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') router.push(`/admin/employees/${p.id}`);
+                  }}
+                  tabIndex={0}
+                  role="link"
+                >
                   <td className="px-5 py-3">
                     <Link href={`/admin/employees/${p.id}`} className="flex items-center gap-3 group">
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -445,14 +462,14 @@ export default function OwnerDashboard() {
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-muted/50 rounded-xl p-4">
+            <Link href="/expenses" className="bg-muted/50 rounded-xl p-4 hover:bg-muted transition-colors">
               <p className="text-2xl font-bold text-foreground">{fmtCurrency(data.expenses.totalThis)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">This month</p>
-            </div>
-            <div className="bg-muted/50 rounded-xl p-4">
+            </Link>
+            <Link href="/expenses" className="bg-muted/50 rounded-xl p-4 hover:bg-muted transition-colors">
               <p className="text-2xl font-bold text-foreground">{fmtCurrency(data.expenses.totalPrev)}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Previous month</p>
-            </div>
+            </Link>
           </div>
           {data.expenses.categories.length > 0 ? (
             <>
@@ -462,10 +479,12 @@ export default function OwnerDashboard() {
                   const pct = data.expenses.totalThis ? (c.amount / data.expenses.totalThis) * 100 : 0;
                   return (
                     <li key={c.name}>
+                      <Link href={`/expenses?category=${encodeURIComponent(c.name)}`} className="block rounded-lg px-2 py-1 -mx-2 hover:bg-muted/60 transition-colors">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-foreground">{c.name}</span>
                         <span className="text-muted-foreground">{fmtCurrency(c.amount)}</span>
                       </div>
+                      </Link>
                       <div className="mt-1 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
                       </div>
@@ -492,14 +511,14 @@ export default function OwnerDashboard() {
                 { label: 'Avg Working Hours', value: `${data.monthlySummary.avgHours}h` },
                 { label: 'Total Hours', value: `${data.monthlySummary.totalHours}h` },
               ].map((x) => (
-                <div key={x.label} className="bg-muted/50 rounded-xl p-3">
+                <Link key={x.label} href="/attendance" className="bg-muted/50 rounded-xl p-3 hover:bg-muted transition-colors">
                   <p className="text-lg font-bold text-foreground">{x.value}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{x.label}</p>
-                </div>
+                </Link>
               ))}
             </div>
             {data.bestEmployee && (
-              <div className="mt-4 bg-teal-soft rounded-xl p-3 flex items-center justify-between">
+              <Link href={`/admin/employees/${data.bestEmployee.id}`} className="mt-4 bg-teal-soft rounded-xl p-3 flex items-center justify-between hover:brightness-95 transition-all">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Best performing employee</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -509,7 +528,7 @@ export default function OwnerDashboard() {
                 <Link href={`/admin/employees/${data.bestEmployee.id}`} className="text-teal font-medium text-xs hover:underline flex-shrink-0">
                   View profile
                 </Link>
-              </div>
+              </Link>
             )}
           </div>
         </div>
@@ -526,6 +545,10 @@ export default function OwnerDashboard() {
           <ol className="relative border-l border-border ml-2 space-y-4">
             {data.timeline.slice(0, 15).map((ev) => (
               <li key={ev.id} className="ml-4">
+                <Link
+                  href={ev.entityType === 'lead' ? '/leads-management' : ev.entityType === 'user' && ev.entityId ? `/admin/employees/${ev.entityId}` : '/admin'}
+                  className="block rounded-lg px-2 py-1 -mx-2 hover:bg-muted/60 transition-colors"
+                >
                 <div className="absolute -left-[7px] mt-1.5 w-3.5 h-3.5 rounded-full bg-primary/30 border-2 border-primary flex-shrink-0" />
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="text-sm font-medium text-foreground">{ev.employee}</p>
@@ -537,6 +560,7 @@ export default function OwnerDashboard() {
                   </span>
                 </div>
                 {ev.detail ? <p className="text-xs text-muted-foreground mt-0.5">{ev.detail}</p> : null}
+                </Link>
               </li>
             ))}
           </ol>

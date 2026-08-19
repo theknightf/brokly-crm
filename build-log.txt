@@ -1,0 +1,94 @@
+
+> realtyflow@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.18
+   - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 2.0min
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/28) ...
+   Generating static pages (7/28) 
+   Generating static pages (14/28) 
+   Generating static pages (21/28) 
+ ✓ Generating static pages (28/28)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    1.77 kB         275 kB
+├ ○ /_not-found                            235 B         103 kB
+├ ○ /admin                               33.4 kB         331 kB
+├ ƒ /admin/employees/[id]                7.88 kB         281 kB
+├ ƒ /api/admin/activity                    235 B         103 kB
+├ ƒ /api/admin/analytics                   235 B         103 kB
+├ ƒ /api/admin/reports                     235 B         103 kB
+├ ƒ /api/admin/users                       235 B         103 kB
+├ ƒ /api/admin/users/[id]/password         235 B         103 kB
+├ ƒ /api/admin/users/[id]/salary           235 B         103 kB
+├ ƒ /api/attendance                        235 B         103 kB
+├ ƒ /api/attendance/report                 235 B         103 kB
+├ ƒ /api/attendance/self                   235 B         103 kB
+├ ƒ /api/auth/heartbeat                    235 B         103 kB
+├ ƒ /api/auth/session                      235 B         103 kB
+├ ƒ /api/call-log                          235 B         103 kB
+├ ƒ /api/company-settings                  235 B         103 kB
+├ ƒ /api/employees/[id]/report             235 B         103 kB
+├ ƒ /api/expenses                          235 B         103 kB
+├ ƒ /api/expenses/[id]                     235 B         103 kB
+├ ƒ /api/kpi-targets                       235 B         103 kB
+├ ƒ /api/lead-activity                     235 B         103 kB
+├ ƒ /api/leave                             235 B         103 kB
+├ ƒ /api/leave/[id]                        235 B         103 kB
+├ ƒ /api/messages/email                    235 B         103 kB
+├ ƒ /api/messages/sms                      235 B         103 kB
+├ ƒ /api/notifications                     235 B         103 kB
+├ ƒ /api/owner/dashboard                   235 B         103 kB
+├ ƒ /api/payroll                           235 B         103 kB
+├ ƒ /api/payroll/[id]                      235 B         103 kB
+├ ƒ /api/payroll/generate                  235 B         103 kB
+├ ƒ /api/performance                       235 B         103 kB
+├ ƒ /api/projects/pitch                    235 B         103 kB
+├ ƒ /api/push/send                         235 B         103 kB
+├ ƒ /api/push/subscribe                    235 B         103 kB
+├ ƒ /api/reports/activity                  235 B         103 kB
+├ ƒ /api/reports/summary                   235 B         103 kB
+├ ƒ /api/rotation                          235 B         103 kB
+├ ƒ /api/rotation/run                      235 B         103 kB
+├ ƒ /api/site-visits                       235 B         103 kB
+├ ƒ /api/teams/performance                 235 B         103 kB
+├ ƒ /api/workspace/follow-ups              235 B         103 kB
+├ ○ /attendance                          12.2 kB         310 kB
+├ ƒ /auth/callback                         235 B         103 kB
+├ ○ /calculator                           9.6 kB         303 kB
+├ ○ /calendar                            2.89 kB         287 kB
+├ ○ /call-logs                           3.71 kB         277 kB
+├ ○ /customers                           4.59 kB         196 kB
+├ ○ /deals                                 163 B         360 kB
+├ ○ /expenses                            7.44 kB         301 kB
+├ ○ /follow-ups                          10.6 kB         295 kB
+├ ○ /leads-management                      163 B         360 kB
+├ ○ /locations                           8.09 kB         302 kB
+├ ○ /manifest.webmanifest                  235 B         103 kB
+├ ○ /projects                            10.7 kB         311 kB
+├ ○ /reports                              132 kB         331 kB
+├ ○ /reservations                          163 B         360 kB
+├ ○ /settings                            5.66 kB         189 kB
+├ ○ /sign-up-login                       3.17 kB         197 kB
+├ ○ /teams                                8.2 kB         203 kB
+├ ○ /units                                6.1 kB         302 kB
+└ ○ /workspace                           4.78 kB         298 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/1255-eae4096fb21f1304.js        46 kB
+  ├ chunks/4bd1b696-100b9d70ed4e49c1.js  54.2 kB
+  └ other shared chunks (total)          2.49 kB
+
+
+ƒ Middleware                               93 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
