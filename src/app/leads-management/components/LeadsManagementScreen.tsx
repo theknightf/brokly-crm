@@ -1349,6 +1349,12 @@ export default function LeadsManagementScreen({
                   { label: 'Budget', value: formatDisplayBudget(viewLead) },
                   { label: 'Agent', value: viewLead.agent || 'Unassigned' },
                   { label: 'Assigned To', value: viewLead.assignedToName || 'Unassigned' },
+                  ...(viewLead.referredTo
+                    ? [{ label: 'Referred To', value: viewLead.referredToName || 'Second user' }]
+                    : []),
+                  ...(viewLead.referredBy
+                    ? [{ label: 'Referred By', value: viewLead.referredByName || 'Recorded user' }]
+                    : []),
                 ].map(({ label, value, href }) => (
                   <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
                     <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>

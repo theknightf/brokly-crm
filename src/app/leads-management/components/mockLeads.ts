@@ -80,6 +80,10 @@ export interface Lead {
   status?: LeadStatus;
   assignedTo?: string;
   assignedToName?: string;
+  referredTo?: string | null;
+  referredToName?: string | null;
+  referredBy?: string | null;
+  referredByName?: string | null;
   adminId?: string | null;
   adminName?: string | null;
   lastContact?: string;

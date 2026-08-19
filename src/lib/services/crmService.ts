@@ -299,7 +299,11 @@ export const leadsService = {
       await pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
     }
     await followUpsService.syncFromLead(data);
-    return rowToLead(data);
+    return {
+      ...rowToLead(data),
+      referredToName: lead.referredToName || null,
+      referredByName: lead.referredByName || null,
+    };
   },
 
   /**
@@ -846,6 +850,10 @@ function rowToLead(row: any) {
     status: row.crm_status || row.lead_status || 'Fresh Leads',
     assignedTo: row.assigned_to || null,
     assignedToName: row.assigned_to_profile?.full_name || null,
+    referredTo: row.referred_to || null,
+    referredToName: row.referred_to_profile?.full_name || null,
+    referredBy: row.referred_by || null,
+    referredByName: row.referred_by_profile?.full_name || null,
     adminId: row.admin_id || null,
     adminName: row.admin?.full_name || null,
     lastContact: row.last_contact,
@@ -903,6 +911,8 @@ function leadToRow(lead: any, userId?: string) {
     developer: lead.developer || '',
     project: lead.project || '',
     assigned_to: lead.assignedTo || null,
+    referred_to: lead.referredTo || null,
+    referred_by: lead.referredBy || null,
     unit: lead.unit || '',
     interest_level: lead.interestLevel || '',
     lead_rating: lead.leadRating || '',

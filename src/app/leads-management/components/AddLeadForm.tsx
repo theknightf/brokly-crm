@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Loader2, ChevronDown, Plus } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 import {
   Lead,
   LeadStatus,
@@ -14,6 +16,7 @@ import {
 import { projectsService, teamService, teamsService } from '@/lib/services/crmService';
 
 interface AddLeadFormData {
+  leadNumber: string;
   name: string;
   phone: string;
   email: string;
@@ -24,6 +27,7 @@ interface AddLeadFormData {
   source: LeadSource;
   agent: string;
   assignedTo: string;
+  referralTo: string;
   status: LeadStatus;
   followUpDue: string;
   notes: string;
@@ -86,6 +90,8 @@ function AccordionSection({
 }
 
 export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLeadFormProps) {
+  const { profile } = useAuth();
+  const canEditProtectedFields = isAdminRole(profile?.role);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
   const [agentList, setAgentList] = useState<string[]>([]);
   const [userList, setUserList] = useState<{ id: string; name: string }[]>([]);
@@ -95,6 +101,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   >([]);
   const [showDetails, setShowDetails] = useState(false);
   const [openSection, setOpenSection] = useState<'dev' | 'prop' | 'pipe' | null>(null);
+  const [referralEnabled, setReferralEnabled] = useState(Boolean(initialData?.referredTo));
   const phoneRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -147,10 +154,12 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     formState: { errors, isSubmitting },
   } = useForm<AddLeadFormData>({
     defaultValues: {
+      leadNumber: initialData?.leadNumber || '',
       status: (initialData?.status as LeadStatus) || 'Fresh Leads',
       source: (initialData?.source as LeadSource) || 'Facebook Ads',
       agent: initialData?.agent || '',
       assignedTo: initialData?.assignedTo || '',
+      referralTo: initialData?.referredTo || '',
       propertyType: (initialData?.propertyType as PropertyType) || '2BHK Apartment',
       developer: initialData?.developer || '',
       project: initialData?.project || '',
@@ -166,6 +175,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   });
 
   const budgetMin = watch('budgetMin');
+  const assignedTo = watch('assignedTo');
 
   const filteredProjects = selectedDeveloperId
     ? projects.filter((p) => p.developerId === selectedDeveloperId && p.status === 'Active')
@@ -183,6 +193,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     const assignedUser = userList.find((u) => u.id === data.assignedTo);
     const newLead: Lead = {
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
+      leadNumber: data.leadNumber || undefined,
       name: data.name,
       phone: data.phone,
       email: data.email,
@@ -190,7 +201,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       propertyType: data.propertyType,
       budgetMin: data.budgetMin ? Number(data.budgetMin) : undefined,
       budgetMax: data.budgetMax ? Number(data.budgetMax) : undefined,
-      source: data.source,
+      source: data.source || initialData?.source || 'Facebook Ads',
       agent: data.agent,
       agentInitials: data.agent
         ? data.agent
@@ -201,6 +212,10 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       status: data.status,
       assignedTo: data.assignedTo || undefined,
       assignedToName: assignedUser?.name,
+      referredTo: data.referralTo || null,
+      referredBy: data.referralTo ? profile?.id || null : null,
+      referredToName: userList.find((u) => u.id === data.referralTo)?.name || null,
+      referredByName: data.referralTo ? profile?.full_name || profile?.fullName || null : null,
       lastContact: today,
       followUpDue: data.followUpDue || undefined,
       createdAt: today,
@@ -247,8 +262,52 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           />
           {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            💡 Just enter a phone number and hit <strong>Add lead</strong> — takes 3 seconds
+            Enter the phone number, then add the lead. Number and source are protected automatically.
           </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-rise-in">
+          <div>
+            <label htmlFor="add-lead-number" className="label-base">
+              Lead number <span className="text-xs font-normal text-red-500">*</span>
+            </label>
+            <input
+              id="add-lead-number"
+              type="text"
+              readOnly={!canEditProtectedFields}
+              className={`input-base font-mono-data ${!canEditProtectedFields ? 'bg-muted/60 text-muted-foreground cursor-not-allowed' : ''}`}
+              placeholder={canEditProtectedFields ? 'LEAD-000001' : 'Auto-generated on save'}
+              {...register('leadNumber', {
+                required: canEditProtectedFields ? 'Lead number is required' : false,
+              })}
+            />
+            {!canEditProtectedFields && (
+              <p className="mt-1 text-[11px] text-muted-foreground">Assigned automatically and locked.</p>
+            )}
+            {errors.leadNumber && <p className="mt-1 text-xs text-red-500">{errors.leadNumber.message}</p>}
+          </div>
+          <div>
+            <label htmlFor="add-source" className="label-base">
+              Lead source <span className="text-xs font-normal text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                id="add-source"
+                disabled={!canEditProtectedFields}
+                className={`${selectClass(!!errors.source)} ${!canEditProtectedFields ? 'bg-muted/60 text-muted-foreground cursor-not-allowed' : ''}`}
+                {...register('source', { required: 'Lead source is required' })}
+              >
+                {ALL_SOURCES.map((s) => (
+                  <option key={`quick-source-${s}`} value={s}>{s}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            </div>
+            {!canEditProtectedFields && (
+              <p className="mt-1 text-[11px] text-muted-foreground">Only Admin and Owner can change it.</p>
+            )}
+            {errors.source && <p className="mt-1 text-xs text-red-500">{errors.source.message}</p>}
+          </div>
         </div>
 
         {/* Expandable extra details */}
@@ -470,32 +529,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 onToggle={() => setOpenSection(openSection === 'pipe' ? null : 'pipe')}
               >
                 <div>
-                  <label htmlFor="add-source" className="label-base">
-                    Lead source{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="add-source"
-                      className={selectClass(!!errors.source)}
-                      {...register('source')}
-                    >
-                      {ALL_SOURCES.map((s) => (
-                        <option key={`add-source-${s}`} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
-                  </div>
-                  {errors.source && (
-                    <p className="mt-1 text-xs text-red-500">{errors.source.message}</p>
-                  )}
-                </div>
-                <div>
                   <label htmlFor="add-status" className="label-base">
                     Lead status / stage{' '}
                     <span className="text-muted-foreground font-normal text-xs">(optional)</span>
@@ -575,6 +608,42 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     />
                   </div>
                 </div>
+                <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={referralEnabled}
+                      onChange={(e) => {
+                        setReferralEnabled(e.target.checked);
+                        if (!e.target.checked) setValue('referralTo', '');
+                      }}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="text-sm font-semibold text-foreground">Referral assignment</span>
+                  </label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Share this lead with a second user and keep a record of who referred it.
+                  </p>
+                  {referralEnabled && (
+                    <div className="relative mt-3 animate-rise-in">
+                      <select
+                        id="add-referral-to"
+                        disabled={!referralEnabled}
+                        className="input-base appearance-none pr-8"
+                        {...register('referralTo', { required: referralEnabled ? 'Choose a referral recipient' : false })}
+                      >
+                        <option value="">— Select second user —</option>
+                        {userList
+                          .filter((u) => u.id !== assignedTo)
+                          .map((u) => (
+                            <option key={`add-referral-${u.id}`} value={u.id}>{u.name}</option>
+                          ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                      {errors.referralTo && <p className="mt-1 text-xs text-red-500">{errors.referralTo.message}</p>}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label htmlFor="add-followup" className="label-base">
                     First follow-up date{' '}
@@ -627,7 +696,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       {/* Sticky footer */}
       <div className="sticky bottom-0 z-10 bg-card border-t border-border px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-2xl">
         <p className="text-xs text-muted-foreground hidden sm:block">
-          ✅ Only phone is required
+          ✅ Phone, lead number and source are required
         </p>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
