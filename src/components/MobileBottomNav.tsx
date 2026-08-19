@@ -32,7 +32,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   void isAdminRole(profile?.role);
 
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border pb-safe">
+    <nav className="mobile-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 pb-safe">
       <div className="flex items-stretch h-16 relative">
 
         {/* Left items */}
@@ -42,7 +42,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
             <Link
               key={item.labelKey}
               href={item.href}
-              className={`flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium transition-colors ${
+              className={`mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium transition-all ${
                 active ? 'text-primary' : 'text-muted-foreground'
               }`}
               aria-label={t(item.labelKey)}
@@ -82,7 +82,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
             <Link
               key={item.labelKey}
               href={item.href}
-              className={`flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium transition-colors ${
+              className={`mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium transition-all ${
                 active ? 'text-primary' : 'text-muted-foreground'
               }`}
               aria-label={t(item.labelKey)}
@@ -102,7 +102,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
         {/* Menu */}
         <button
           onClick={onOpenMenu}
-          className="flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium text-muted-foreground transition-colors"
+          className="mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium text-muted-foreground transition-all"
           aria-label="Open menu"
         >
           <span className="w-10 h-6 flex items-center justify-center rounded-full">

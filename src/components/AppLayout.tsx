@@ -26,7 +26,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="pwa-shell flex h-screen bg-background overflow-hidden">
       {/* Mobile overlay */}
       {mobileSidebarOpen && (
         <div
@@ -52,8 +52,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           onMobileMenuOpen={() => setMobileSidebarOpen(true)}
           sidebarCollapsed={sidebarCollapsed}
         />
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-24 lg:pb-6">
+        <main className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="pwa-content max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-24 lg:pb-6">
             {!isDashboard && (
               <button
                 type="button"

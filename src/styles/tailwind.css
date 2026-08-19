@@ -423,6 +423,20 @@
   }
   body {
     overscroll-behavior-y: contain;
+    -webkit-text-size-adjust: 100%;
+  }
+  .pwa-content {
+    animation: pwaPageIn 260ms ease-out both;
+  }
+  .pwa-shell input,
+  .pwa-shell select,
+  .pwa-shell textarea {
+    font-size: 16px;
+  }
+  .pwa-shell button,
+  .pwa-shell a {
+    -webkit-user-select: none;
+    user-select: none;
   }
   /* Comfortable minimum tap targets without growing desktop-only chrome */
   .nav-item,
@@ -501,6 +515,25 @@
   }
 }
 
+/* Native-feel bottom navigation: translucent surface, home-indicator spacing,
+   and a small lift for the active destination. */
+.mobile-bottom-nav {
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+.mobile-nav-item:active {
+  transform: scale(0.92);
+}
+.mobile-nav-item > span {
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+.mobile-nav-item:hover > span {
+  transform: translateY(-1px);
+}
+
 /* Safe-area insets for standalone PWA (iPhone home indicator / notch) */
 .is-standalone body {
   padding-bottom: env(safe-area-inset-bottom);
@@ -511,6 +544,11 @@
 }
 .pt-safe {
   padding-top: calc(env(safe-area-inset-top));
+}
+
+@keyframes pwaPageIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ---------- RTL (Arabic) adjustments ---------- */
