@@ -1,8 +1,9 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import type { PayrollRules } from '@/lib/payrollMath';
-export { type PayrollRules, computePayrollEntry, round2 } from '@/lib/payrollMath';
+import { computePayrollEntry, round2, type PayrollRules } from '@/lib/payrollMath';
+export { computePayrollEntry, round2 };
+export type { PayrollRules };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // People-Ops services: Company Settings (working hours / payroll rules),

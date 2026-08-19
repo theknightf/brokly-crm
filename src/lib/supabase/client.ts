@@ -8,9 +8,16 @@ const canUseCookies = (() => {
     if (typeof document === 'undefined') return false;
     if (cache !== null) return cache;
     const k = '__sb_test__';
-    document.cookie = `${k}=1; Path=/; SameSite=None; Secure; Partitioned`;
-    cache = document.cookie.includes(k);
-    document.cookie = `${k}=; Path=/; Max-Age=0; SameSite=None; Secure`;
+    try {
+      document.cookie = `${k}=1; Path=/; SameSite=None; Secure; Partitioned`;
+      cache = document.cookie.includes(k);
+      document.cookie = `${k}=; Path=/; Max-Age=0; SameSite=None; Secure`;
+    } catch {
+      // Cookie access can throw on non-secure contexts or when third-party
+      // cookies are blocked (preview iframes, webviews, Safari ITP). Never
+      // crash the app at module load — fall back to storage.
+      cache = false;
+    }
     return cache;
   };
 })();
@@ -38,14 +45,18 @@ const fromStorage = () => {
 };
 
 const setCookie = (name: string, value: string, options?: any) => {
-  // Only force Secure on HTTPS. Plain HTTP (localhost / LAN WebView) drops
-  // Secure cookies silently, breaking session persistence.
-  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
-  let s = `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}; SameSite=Lax${secure ? '; Secure' : ''}${secure ? '; Partitioned' : ''}`;
-  if (options?.maxAge) s += `; Max-Age=${options.maxAge}`;
-  if (options?.domain) s += `; Domain=${options.domain}`;
-  if (options?.expires) s += `; Expires=${new Date(options.expires).toUTCString()}`;
-  document.cookie = s;
+  try {
+    // Only force Secure on HTTPS. Plain HTTP (localhost / LAN WebView) drops
+    // Secure cookies silently, breaking session persistence.
+    const secure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    let s = `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}; SameSite=Lax${secure ? '; Secure' : ''}${secure ? '; Partitioned' : ''}`;
+    if (options?.maxAge) s += `; Max-Age=${options.maxAge}`;
+    if (options?.domain) s += `; Domain=${options.domain}`;
+    if (options?.expires) s += `; Expires=${new Date(options.expires).toUTCString()}`;
+    document.cookie = s;
+  } catch {
+    // Ignore — cookie writes can throw when third-party cookies are blocked.
+  }
 };
 
 const deleteCookie = (name: string) => {
