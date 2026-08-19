@@ -16,7 +16,6 @@ import {
 import { projectsService, teamService, teamsService } from '@/lib/services/crmService';
 
 interface AddLeadFormData {
-  leadNumber: string;
   name: string;
   phone: string;
   email: string;
@@ -154,7 +153,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     formState: { errors, isSubmitting },
   } = useForm<AddLeadFormData>({
     defaultValues: {
-      leadNumber: initialData?.leadNumber || '',
       status: (initialData?.status as LeadStatus) || 'Fresh Leads',
       source: (initialData?.source as LeadSource) || 'Facebook Ads',
       agent: initialData?.agent || '',
@@ -193,7 +191,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     const assignedUser = userList.find((u) => u.id === data.assignedTo);
     const newLead: Lead = {
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
-      leadNumber: data.leadNumber || undefined,
       name: data.name,
       phone: data.phone,
       email: data.email,
@@ -267,25 +264,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-rise-in">
-          <div>
-            <label htmlFor="add-lead-number" className="label-base">
-              Lead number <span className="text-xs font-normal text-red-500">*</span>
-            </label>
-            <input
-              id="add-lead-number"
-              type="text"
-              readOnly={!canEditProtectedFields}
-              className={`input-base font-mono-data ${!canEditProtectedFields ? 'bg-muted/60 text-muted-foreground cursor-not-allowed' : ''}`}
-              placeholder={canEditProtectedFields ? 'LEAD-000001' : 'Auto-generated on save'}
-              {...register('leadNumber', {
-                required: canEditProtectedFields ? 'Lead number is required' : false,
-              })}
-            />
-            {!canEditProtectedFields && (
-              <p className="mt-1 text-[11px] text-muted-foreground">Assigned automatically and locked.</p>
-            )}
-            {errors.leadNumber && <p className="mt-1 text-xs text-red-500">{errors.leadNumber.message}</p>}
-          </div>
           <div>
             <label htmlFor="add-source" className="label-base">
               Lead source <span className="text-xs font-normal text-red-500">*</span>
@@ -696,7 +674,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       {/* Sticky footer */}
       <div className="sticky bottom-0 z-10 bg-card border-t border-border px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-2xl">
         <p className="text-xs text-muted-foreground hidden sm:block">
-          ✅ Phone, lead number and source are required
+          ✅ Phone and source are required
         </p>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button

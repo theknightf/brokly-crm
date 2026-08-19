@@ -760,24 +760,9 @@ export const leadsService = {
 
       const q = search.trim();
       if (q) {
-        // lead_number was added later — retry without it if the column is
-        // missing so search never breaks on an un-migrated database.
-        try {
-          const withNumber = await query
-            .or(
-              `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%,lead_number.ilike.%${q}%`
-            )
-            .order(column, { ascending: sortDir !== 'desc' })
-            .range(0, 0);
-          if (withNumber.error) throw withNumber.error;
-          query = query.or(
-            `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%,lead_number.ilike.%${q}%`
-          );
-        } catch {
-          query = query.or(
-            `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
-          );
-        }
+        query = query.or(
+          `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
+        );
       }
       if (status) query = query.eq('crm_status', status);
       if (source) query = query.eq('source', source);
@@ -864,7 +849,6 @@ function rowToLead(row: any) {
     project: row.project,
     unit: row.unit,
     interestLevel: row.interest_level,
-    leadNumber: row.lead_number || '',
     leadRating: row.lead_rating || '',
     priority: row.priority || 'Normal',
     team: row.team || '',
@@ -944,9 +928,6 @@ function leadToRow(lead: any, userId?: string) {
     const iso = String(lead.createdAt);
     row.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
   }
-  // Only push the DB-generated lead number on explicit user edits — never
-  // overwrite the sequence-assigned value with null/empty on partial updates.
-  if (lead.leadNumber) row.lead_number = lead.leadNumber;
   if (userId) row.created_by = userId;
   return row;
 }

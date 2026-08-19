@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Hash, Building2, RefreshCw, ChevronDown } from 'lucide-react';
+import { Loader2, Building2, RefreshCw, ChevronDown } from 'lucide-react';
 import {
   Lead,
   LeadStatus,
@@ -288,14 +288,6 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} noValidate>
       <div className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
-        {/* Lead ID badge */}
-        {lead.leadNumber && (
-          <div className="flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 rounded-lg px-3 py-2 w-fit">
-            <Hash size={13} />
-            {lead.leadNumber}
-          </div>
-        )}
-
         <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
           <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
             <span className="flex items-center gap-2">

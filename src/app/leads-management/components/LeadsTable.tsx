@@ -61,9 +61,6 @@ function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   );
 }
 
-const leadId = (lead: Lead): string =>
-  lead.leadNumber || `LEAD-${String(lead.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)}`;
-
 function StatusDropdown({
   currentStatus,
   leadId,
@@ -273,9 +270,6 @@ export default function LeadsTable({
                       <p className="font-semibold text-foreground truncate">
                         {lead.name || `Lead ${lead.id}`}
                       </p>
-                      <p className="text-[10px] text-primary font-semibold font-mono truncate">
-                        {leadId(lead)}
-                      </p>
                       <p className="text-xs text-muted-foreground truncate flex items-center gap-0.5">
                         <MapPin size={10} className="flex-shrink-0" />
                         {lead.location || '—'}
@@ -427,11 +421,6 @@ export default function LeadsTable({
                         </span>
                       </div>
                     </div>
-                  </td>
-                  <td className="table-td">
-                    <span className="text-xs font-mono font-semibold text-primary whitespace-nowrap">
-                      {leadId(lead)}
-                    </span>
                   </td>
                   <td className="table-td">
                     <div className="space-y-0.5">

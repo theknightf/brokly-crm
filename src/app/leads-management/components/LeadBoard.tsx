@@ -20,9 +20,6 @@ const formatBudget = (min?: number, max?: number) => {
   return `₹${parts.join('–')}`;
 };
 
-const leadId = (lead: Lead): string =>
-  lead.leadNumber || `LEAD-${String(lead.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)}`;
-
 function BoardCard({
   lead,
   onView,
@@ -53,7 +50,6 @@ function BoardCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground text-sm truncate">{lead.name || 'Lead'}</p>
-          <p className="text-[10px] font-mono text-primary font-semibold truncate">{leadId(lead)}</p>
         </div>
         <button
           onClick={(e) => {

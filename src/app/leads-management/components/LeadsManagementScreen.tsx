@@ -637,7 +637,6 @@ export default function LeadsManagementScreen({
 
   const handleExport = async () => {
     const headers = [
-      'Lead ID',
       'Name',
       'Phone',
       'Email',
@@ -672,7 +671,6 @@ export default function LeadsManagementScreen({
         action: filters.action || undefined,
       });
       const rows = (res.data || []).map((l: any) => [
-        l.leadNumber || `LEAD-${String(l.id).slice(0, 8)}`,
         l.name,
         l.phone,
         l.email,
@@ -1180,11 +1178,6 @@ export default function LeadsManagementScreen({
                     <h2 className="text-base font-semibold text-foreground">
                       {viewLead.name || `Lead ${viewLead.id}`}
                     </h2>
-                    {viewLead.leadNumber && (
-                      <span className="text-[10px] font-semibold font-mono text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
-                        {viewLead.leadNumber}
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap mt-1">
                     {viewLead.source && (
@@ -1502,7 +1495,6 @@ export default function LeadsManagementScreen({
                   { label: 'Rating', value: viewLead.leadRating || '—' },
                   { label: 'Team', value: viewLead.team || '—' },
                   { label: 'CS Agent', value: viewLead.csAgent || '—' },
-                  { label: 'Lead Number', value: viewLead.leadNumber || '—' },
                   ...(viewLead.developer
                     ? [{ label: 'Developer', value: viewLead.developer }]
                     : []),
@@ -1658,11 +1650,7 @@ export default function LeadsManagementScreen({
           open={!!editLead}
           onClose={() => setEditLead(null)}
           title="Edit lead"
-          subtitle={
-            editLead.leadNumber
-              ? `Editing ${editLead.leadNumber}`
-              : `Editing details for ${editLead.name}`
-          }
+          subtitle={`Editing details for ${editLead.name}`}
           size="xl"
         >
           <EditLeadForm

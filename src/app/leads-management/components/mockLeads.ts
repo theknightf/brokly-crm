@@ -95,7 +95,6 @@ export interface Lead {
   project?: string;
   unit?: string;
   interestLevel?: string;
-  leadNumber?: string;
   leadRating?: string;
   priority?: string;
   team?: string;

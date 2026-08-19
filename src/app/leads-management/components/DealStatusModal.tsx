@@ -146,7 +146,7 @@ export default function DealStatusModal({
       open
       onClose={onClose}
       title={isReservation ? 'Confirm Reservation' : 'Confirm Done Deal'}
-      subtitle={`${lead.name || 'This lead'} — ${lead.leadNumber || lead.phone || ''}`}
+      subtitle={[lead.name || 'This lead', lead.phone].filter(Boolean).join(' — ')}
       size="sm"
     >
       <div className="p-6 space-y-4">
@@ -186,7 +186,7 @@ export default function DealStatusModal({
               {lead.name || 'Unnamed lead'}
             </span>
             <span className="text-xs text-muted-foreground flex-shrink-0">
-              {lead.leadNumber || lead.phone || ''}
+              {lead.phone || ''}
             </span>
           </div>
           {leadSearchOpen && (
