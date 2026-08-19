@@ -2698,10 +2698,12 @@ export const usersService = {
 };
 
 function rowToUserProfile(row: any) {
+  const admin = Array.isArray(row.admin) ? row.admin[0] : row.admin;
+  const fullName = typeof row.full_name === 'string' ? row.full_name : row.full_name?.full_name || '';
   return {
     id: row.id,
     email: row.email,
-    fullName: row.full_name || '',
+    fullName,
     phone: row.phone || '',
     role: row.role || 'agent',
     brokerageName: row.brokerage_name || '',
@@ -2710,7 +2712,7 @@ function rowToUserProfile(row: any) {
     teamId: row.team_id || null,
     agentCode: row.agent_code || '',
     adminId: row.admin_id || null,
-    adminName: row.admin?.full_name || null,
+    adminName: typeof admin?.full_name === 'string' ? admin.full_name : null,
     baseSalary: Number(row.base_salary ?? 0),
     hireDate: row.hire_date || null,
     employmentStatus: row.employment_status || 'active',

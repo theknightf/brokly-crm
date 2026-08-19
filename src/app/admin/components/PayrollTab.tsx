@@ -111,7 +111,20 @@ export default function PayrollTab() {
   useEffect(() => {
     usersService
       .getAll()
-      .then((u: any) => setUsers(Array.isArray(u) ? u : []))
+      .then((u: any) =>
+        setUsers(
+          (Array.isArray(u) ? u : []).map((user: any) => ({
+            ...user,
+            fullName:
+              typeof user.fullName === 'string'
+                ? user.fullName
+                : typeof user.full_name === 'string'
+                  ? user.full_name
+                  : user.full_name?.full_name || '',
+            role: typeof user.role === 'string' ? user.role : 'agent',
+          }))
+        )
+      )
       .catch(() => setUsers([]));
   }, []);
 
