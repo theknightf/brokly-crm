@@ -13,7 +13,7 @@ import {
   KeyRound,
   ChevronDown,
 } from 'lucide-react';
-import { usersService } from '@/lib/services/crmService';
+import { usersService, teamsService } from '@/lib/services/crmService';
 import { validateCreateUser } from '@/lib/userValidation';
 import { toast } from 'sonner';
 
@@ -353,6 +353,7 @@ function CreateUserModal({
   admins,
   onSave,
   onClose,
+  teams,
 }: {
   admins: Partial<UserProfile>[];
   onSave: (data: {
@@ -362,8 +363,10 @@ function CreateUserModal({
     role: string;
     code: string;
     adminId: string | null;
+    teamId: string;
   }) => Promise<void>;
   onClose: () => void;
+  teams: { id: string; name: string }[];
 }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -371,6 +374,7 @@ function CreateUserModal({
   const [role, setRole] = useState('agent');
   const [code, setCode] = useState('');
   const [adminId, setAdminId] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -398,6 +402,7 @@ function CreateUserModal({
         role,
         code: code.trim(),
         adminId: adminId || null,
+        teamId,
       });
     } catch (err: any) {
       if (err?.fields) setErrors(err.fields as Record<string, string>);
@@ -555,6 +560,32 @@ function CreateUserModal({
               </p>
             )}
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Team</label>
+            <div className="relative">
+              <select
+                value={teamId}
+                onChange={(e) => {
+                  setTeamId(e.target.value);
+                  setErrors((p) => ({ ...p, teamId: '' }));
+                }}
+                className="input-base w-full appearance-none pr-8"
+              >
+                <option value="">No team</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Optional — assigns the user to a team on creation.</p>
+          </div>
         </div>
 
         <div className="flex gap-3 mt-6">
@@ -578,6 +609,7 @@ function CreateUserModal({
 export default function UsersTab() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [admins, setAdmins] = useState<UserProfile[]>([]);
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -613,12 +645,14 @@ export default function UsersTab() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [usersData, adminsData] = await Promise.all([
+      const [usersData, adminsData, teamsData] = await Promise.all([
         usersService.getAll(),
         usersService.getAdmins(),
+        teamsService.getAll(),
       ]);
       setUsers(usersData as UserProfile[]);
       setAdmins(adminsData as UserProfile[]);
+      setTeams(teamsData as { id: string; name: string }[]);
     } catch {
       toast.error('Failed to load users');
     } finally {
@@ -703,8 +737,16 @@ export default function UsersTab() {
     role: string;
     code: string;
     adminId: string | null;
+    teamId: string;
   }) => {
     const created = await usersService.createUser(data);
+    if (data.teamId && created?.id) {
+      try {
+        await teamsService.addMember(data.teamId, created.id, false);
+      } catch {
+        toast.error('User created but could not be added to the team');
+      }
+    }
     await loadData();
     setCreateState(false);
     toast.success(`User "${created.fullName || data.email}" created successfully`);
@@ -963,6 +1005,7 @@ export default function UsersTab() {
       {createState && (
         <CreateUserModal
           admins={admins}
+          teams={teams}
           onSave={handleCreateUser}
           onClose={() => setCreateState(false)}
         />

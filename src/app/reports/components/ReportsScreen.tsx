@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { exportPDF, exportCSV } from '@/lib/exportReport';
 import CallLogsReport from './CallLogsReport';
+import { ALL_REAL_STATUSES } from '../../leads-management/components/leadStages';
 import {
   BarChart,
   Bar,
@@ -927,7 +928,7 @@ export default function ReportsScreen() {
 
               {/* Calls tab */}
               <div className={view === 'calls' ? 'block space-y-6' : 'hidden'}>
-                <CallsTab data={filteredData!} />
+                <CallsTab data={filteredData!} selectedUserName={selectedUserName} />
               </div>
             </div>
           )}
@@ -2028,9 +2029,96 @@ function AttendanceTab({
   );
 }
 
-function CallsTab({ data }: { data: ReportData }) {
+function CallsTab({
+  data,
+  selectedUserName,
+}: {
+  data: ReportData;
+  selectedUserName?: string;
+}) {
+  const matrix = useMemo(() => {
+    const scoped = selectedUserName
+      ? data.leadStageByAgent.filter((r) => r.agent === selectedUserName)
+      : data.leadStageByAgent;
+    const stages = Array.from(new Set(scoped.map((r) => r.stage))).sort((a, b) => {
+      const ia = ALL_REAL_STATUSES.indexOf(a as any);
+      const ib = ALL_REAL_STATUSES.indexOf(b as any);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      return ia === -1 ? 1 : ib === -1 ? -1 : ia - ib;
+    });
+    const byAgent = new Map<string, Map<string, number>>();
+    const totals = new Map<string, number>();
+    for (const r of scoped) {
+      if (!byAgent.has(r.agent)) byAgent.set(r.agent, new Map());
+      const m = byAgent.get(r.agent)!;
+      m.set(r.stage, (m.get(r.stage) || 0) + r.count);
+      totals.set(r.agent, (totals.get(r.agent) || 0) + r.count);
+    }
+    const rows = Array.from(byAgent.entries())
+      .map(([agent, byStage]) => ({ agent, byStage, total: totals.get(agent) || 0 }))
+      .sort((a, b) => b.total - a.total);
+    return { stages, rows };
+  }, [data.leadStageByAgent, selectedUserName]);
+
   return (
     <div className="space-y-6">
+      {/* Leads by stage per user */}
+      {matrix.rows.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-1">
+            Leads by Stage per User
+          </h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            {selectedUserName
+              ? `Stage distribution for ${selectedUserName}`
+              : 'How many leads each user has at every stage'}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm table-mobile min-w-[520px]">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
+                    User
+                  </th>
+                  {matrix.stages.map((s) => (
+                    <th
+                      key={s}
+                      className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground"
+                    >
+                      {s}
+                    </th>
+                  ))}
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-foreground">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {matrix.rows.map((row) => (
+                  <tr
+                    key={row.agent}
+                    className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="py-2.5 px-3 font-medium text-foreground">{row.agent}</td>
+                    {matrix.stages.map((s) => (
+                      <td
+                        key={s}
+                        className="py-2.5 px-3 text-right tabular-nums text-muted-foreground"
+                      >
+                        {row.byStage.get(s) || 0}
+                      </td>
+                    ))}
+                    <td className="py-2.5 px-3 text-right font-bold text-foreground">
+                      {row.total}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Calls by Employee */}
       {data.callsByEmployee.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-5">
