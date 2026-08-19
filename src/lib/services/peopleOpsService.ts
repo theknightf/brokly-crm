@@ -23,6 +23,18 @@ function listRows<T>(rows: Row[] | null | undefined, map: (r: Row) => T): T[] {
   return (rows || []).map(map);
 }
 
+/**
+ * PostgREST to-one embeds (`alias:user_profiles!fk(full_name)`) can come back
+ * as a single object, an array, or null depending on the server version. Never
+ * let the raw embed leak into state/render — always extract the string.
+ */
+function embeddedName(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value[0]?.full_name || '';
+  if (value && typeof value === 'object') return (value as Row).full_name || '';
+  return '';
+}
+
 // ─── COMPANY SETTINGS ────────────────────────────────────────────────────────
 
 export interface WorkingHours {
@@ -124,7 +136,7 @@ export interface LeaveRequest {
 const mapLeave = (r: Row): LeaveRequest => ({
   id: r.id,
   userId: r.user_id,
-  userName: r.user_name || r.full_name || '',
+  userName: r.full_name || embeddedName(r.user_name),
   leaveType: r.leave_type,
   startDate: r.start_date,
   endDate: r.end_date,
@@ -146,7 +158,7 @@ export const leaveService = {
         .order('created_at', { ascending: false });
       if (error) return [];
       return listRows(data, (r) =>
-        mapLeave({ ...r, full_name: r.user_name?.[0]?.full_name || '' })
+        mapLeave({ ...r, full_name: embeddedName(r.user_name) })
       );
     } catch {
       return [];
@@ -162,7 +174,7 @@ export const leaveService = {
         .order('start_date', { ascending: false });
       if (error) return [];
       return listRows(data, (r) =>
-        mapLeave({ ...r, full_name: r.user_name?.[0]?.full_name || '' })
+        mapLeave({ ...r, full_name: embeddedName(r.user_name) })
       );
     } catch {
       return [];
@@ -573,7 +585,7 @@ const mapEntry = (r: Row): PayrollEntry => ({
   id: r.id,
   periodId: r.period_id,
   userId: r.user_id,
-  userName: r.user_name || r.full_name || '',
+  userName: r.full_name || embeddedName(r.user_name),
   totalWorkingDays: Number(r.total_working_days ?? 0),
   attendanceDays: Number(r.attendance_days ?? 0),
   lateDays: Number(r.late_days ?? 0),
@@ -622,7 +634,7 @@ export const payrollService = {
         .order('created_at', { ascending: true });
       if (error) return [];
       return listRows(data, (r) =>
-        mapEntry({ ...r, full_name: r.user_name?.[0]?.full_name || '' })
+        mapEntry({ ...r, full_name: embeddedName(r.user_name) })
       );
     } catch {
       return [];
