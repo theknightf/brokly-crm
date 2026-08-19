@@ -67,10 +67,15 @@ export default function PayrollTab() {
 
   const loadPeriods = useCallback(async () => {
     setLoadingPeriods(true);
-    const list = await payrollService.getPeriods();
-    setPeriods(list);
-    if (!selectedPeriod && list.length) setSelectedPeriod(list[0].id);
-    setLoadingPeriods(false);
+    try {
+      const list = await payrollService.getPeriods();
+      setPeriods(list);
+      if (!selectedPeriod && list.length) setSelectedPeriod(list[0].id);
+    } catch {
+      setPeriods([]);
+    } finally {
+      setLoadingPeriods(false);
+    }
   }, [selectedPeriod]);
 
   useEffect(() => {
@@ -89,17 +94,25 @@ export default function PayrollTab() {
 
   useEffect(() => {
     (async () => {
-      const [w, r] = await Promise.all([
-        companySettingsService.getWorkingHours(),
-        companySettingsService.getPayrollRules(),
-      ]);
-      setWh(w);
-      setRules(r);
+      try {
+        const [w, r] = await Promise.all([
+          companySettingsService.getWorkingHours(),
+          companySettingsService.getPayrollRules(),
+        ]);
+        setWh(w || DEFAULT_WORKING_HOURS);
+        setRules(r || DEFAULT_PAYROLL_RULES);
+      } catch {
+        setWh(DEFAULT_WORKING_HOURS);
+        setRules(DEFAULT_PAYROLL_RULES);
+      }
     })();
   }, []);
 
   useEffect(() => {
-    usersService.getAll().then((u: any) => setUsers(u || []));
+    usersService
+      .getAll()
+      .then((u: any) => setUsers(Array.isArray(u) ? u : []))
+      .catch(() => setUsers([]));
   }, []);
 
   const selected = periods.find((p) => p.id === selectedPeriod);
