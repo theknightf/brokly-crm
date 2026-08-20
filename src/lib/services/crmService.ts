@@ -2887,6 +2887,10 @@ async function fetchReportsSummary(from?: string, to?: string) {
   if (to) params.set('to', to);
   const qs = params.toString();
   const res = await fetch(`/api/reports/summary${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`Failed to load report data (${res.status})`);
+  if (!res.ok) {
+    const err: any = new Error(`Failed to load report data (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }

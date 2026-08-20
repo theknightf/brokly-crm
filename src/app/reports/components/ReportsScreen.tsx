@@ -25,6 +25,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
+import { createClient } from '@/lib/supabase/client';
 import { companySettingsService, type WorkingHours, DEFAULT_WORKING_HOURS } from '@/lib/services/peopleOpsService';
 import { buildOfficeHours, formatMinutes, type OfficeHoursConfig } from '@/lib/officeHours';
 import { toast } from 'sonner';
@@ -423,7 +424,24 @@ export default function ReportsScreen() {
       const result = await reportsService.getSummary(f || undefined, t || undefined);
       setData(result as ReportData);
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to load reports');
+      if (err?.status === 401) {
+        // The access token likely expired while the page was open. Refresh the
+        // session client-side once and retry before giving up.
+        try {
+          const supabase = createClient();
+          await supabase.auth.refreshSession();
+        } catch {
+          /* session refresh failed — the retry below will surface the real status */
+        }
+        try {
+          const result = await reportsService.getSummary(f || undefined, t || undefined);
+          setData(result as ReportData);
+        } catch (err2: any) {
+          toast.error('Your session expired. Please sign in again.');
+        }
+      } else {
+        toast.error(err?.message || 'Failed to load reports');
+      }
     } finally {
       setLoading(false);
     }
@@ -963,6 +981,25 @@ function SimpleTeamPerformance({
     { totalLeads: 0, pending: 0, new: 0, calls: 0 }
   );
 
+  const stageData = useMemo(() => {
+    const byAgent = new Map<string, Map<string, number>>();
+    for (const r of data.leadStageByAgent) {
+      if (!byAgent.has(r.agent)) byAgent.set(r.agent, new Map());
+      const m = byAgent.get(r.agent)!;
+      m.set(r.stage, (m.get(r.stage) || 0) + r.count);
+    }
+    const stages = Array.from(new Set(data.leadStageByAgent.map((r) => r.stage))).sort((a, b) => {
+      const ia = ALL_REAL_STATUSES.indexOf(a as any);
+      const ib = ALL_REAL_STATUSES.indexOf(b as any);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      return ia === -1 ? 1 : ib === -1 ? -1 : ia - ib;
+    });
+    return { byAgent, stages };
+  }, [data.leadStageByAgent]);
+  const stageTotals = stageData.stages.map((s) =>
+    rows.reduce((sum, row) => sum + (stageData.byAgent.get(row.name)?.get(s) || 0), 0)
+  );
+
   const chartData = monthlyLeads.slice(-6).map((m) => ({ month: m.month, leads: m.leads }));
   const tooltipStyle: React.CSSProperties = {
     borderRadius: 12,
@@ -1080,14 +1117,29 @@ function SimpleTeamPerformance({
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                {['Agent name', 'Total leads', 'Pending', 'New', 'Calls'].map((label, index) => (
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-left">
+                  Agent name
+                </th>
+                {stageData.stages.map((s) => (
                   <th
-                    key={label}
-                    className={`px-4 py-3 text-xs font-semibold text-muted-foreground ${index ? 'text-right' : 'text-left'}`}
+                    key={s}
+                    className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right whitespace-nowrap"
                   >
-                    {label}
+                    {s}
                   </th>
                 ))}
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
+                  Total leads
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
+                  Pending
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
+                  New
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">
+                  Calls
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1097,6 +1149,11 @@ function SimpleTeamPerformance({
                     <p className="font-medium text-foreground">{row.name}</p>
                     {row.teamName && <p className="text-[11px] text-muted-foreground">{row.teamName}</p>}
                   </td>
+                  {stageData.stages.map((s) => (
+                    <td key={s} className="px-4 py-3 text-right text-muted-foreground tabular-nums">
+                      {stageData.byAgent.get(row.name)?.get(s) || 0}
+                    </td>
+                  ))}
                   <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">{row.totalLeads}</td>
                   <td className="px-4 py-3 text-right text-amber-600 tabular-nums">{row.pending}</td>
                   <td className="px-4 py-3 text-right text-primary tabular-nums">{row.new}</td>
@@ -1105,6 +1162,11 @@ function SimpleTeamPerformance({
               ))}
               <tr className="bg-primary/10 font-semibold">
                 <td className="px-4 py-3 text-foreground">Totals</td>
+                {stageTotals.map((t, i) => (
+                  <td key={i} className="px-4 py-3 text-right text-foreground tabular-nums">
+                    {t}
+                  </td>
+                ))}
                 <td className="px-4 py-3 text-right text-foreground tabular-nums">{totals.totalLeads}</td>
                 <td className="px-4 py-3 text-right text-amber-600 tabular-nums">{totals.pending}</td>
                 <td className="px-4 py-3 text-right text-primary tabular-nums">{totals.new}</td>
@@ -1139,6 +1201,18 @@ function SimpleTeamPerformance({
               <MobileStat label="New" value={row.new} className="text-primary" />
               <MobileStat label="Calls" value={row.calls} className="text-muted-foreground" />
             </div>
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {stageData.stages
+                .filter((s) => (stageData.byAgent.get(row.name)?.get(s) || 0) > 0)
+                .map((s) => (
+                  <span
+                    key={s}
+                    className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                  >
+                    {s}: {stageData.byAgent.get(row.name)?.get(s) || 0}
+                  </span>
+                ))}
+            </div>
           </div>
         ))}
         {rows.length > 0 && (
@@ -1149,6 +1223,18 @@ function SimpleTeamPerformance({
               <MobileStat label="Pending" value={totals.pending} className="text-amber-600" />
               <MobileStat label="New" value={totals.new} className="text-primary" />
               <MobileStat label="Calls" value={totals.calls} className="text-muted-foreground" />
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {stageData.stages
+                .filter((s, i) => stageTotals[i] > 0)
+                .map((s, i) => (
+                  <span
+                    key={s}
+                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                  >
+                    {s}: {stageTotals[i]}
+                  </span>
+                ))}
             </div>
           </div>
         )}
