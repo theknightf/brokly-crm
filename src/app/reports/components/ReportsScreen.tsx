@@ -21,8 +21,10 @@ import {
   Banknote,
   Wallet,
   ChevronRight,
+  ChevronDown,
   ArrowLeft,
   ArrowRight,
+  X,
 } from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
 import { createClient } from '@/lib/supabase/client';
@@ -946,7 +948,7 @@ export default function ReportsScreen() {
 
               {/* Calls tab */}
               <div className={view === 'calls' ? 'block space-y-6' : 'hidden'}>
-                <CallsTab data={filteredData!} selectedUserName={selectedUserName} />
+                <CallsTab data={filteredData!} selectedUserName={selectedUserName} selectedUserId={selectedUserId} from={from} to={to} />
               </div>
             </div>
           )}
@@ -2118,11 +2120,18 @@ function AttendanceTab({
 function CallsTab({
   data,
   selectedUserName,
+  selectedUserId,
+  from,
+  to,
 }: {
   data: ReportData;
   selectedUserName?: string;
+  selectedUserId?: string | null;
+  from: string;
+  to: string;
 }) {
-  const matrix = useMemo(() => {
+  // Fallback matrix from already-fetched summary (used when new endpoint is unavailable or for instant first paint)
+  const fallbackMatrix = useMemo(() => {
     const scoped = selectedUserName
       ? data.leadStageByAgent.filter((r) => r.agent === selectedUserName)
       : data.leadStageByAgent;
@@ -2146,64 +2155,238 @@ function CallsTab({
     return { stages, rows };
   }, [data.leadStageByAgent, selectedUserName]);
 
+  // ── Filtered matrix via new API (real filtered data) ──
+  const [filters, setFilters] = useState({
+    agent: '',
+    teamLeader: '',
+    team: '',
+    project: '',
+    campaign: '',
+    source: '',
+    stage: '',
+  });
+  const [matrix, setMatrix] = useState<{
+    stages: string[];
+    rows: { agent: string; counts: number[]; total: number }[];
+    columnTotals: number[];
+    grandTotal: number;
+  } | null>(null);
+  const [loadingMatrix, setLoadingMatrix] = useState(false);
+  const [matrixError, setMatrixError] = useState<string | null>(null);
+  const [filterOptions, setFilterOptions] = useState<{
+    projects: string[];
+    sources: string[];
+    teams: { id: string; name: string }[];
+    teamLeaders: { id: string; name: string; teamId: string; teamName: string }[];
+    stages: string[];
+  }>({ projects: [], sources: [], teams: [], teamLeaders: [], stages: ALL_REAL_STATUSES as string[] });
+
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
+  const updateFilter = (key: keyof typeof filters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ agent: '', teamLeader: '', team: '', project: '', campaign: '', source: '', stage: '' });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoadingMatrix(true);
+      setMatrixError(null);
+      try {
+        const res = await reportsService.getCallsMatrix({
+          from,
+          to,
+          agent: filters.agent || selectedUserId || undefined,
+          teamLeader: filters.teamLeader || undefined,
+          team: filters.team || undefined,
+          project: filters.project || undefined,
+          campaign: filters.campaign || undefined,
+          source: filters.source || undefined,
+          stage: filters.stage || undefined,
+        });
+        if (cancelled) return;
+        setMatrix({ stages: res.stages, rows: res.rows, columnTotals: res.columnTotals, grandTotal: res.grandTotal });
+        if (res.filterOptions) {
+          setFilterOptions({
+            projects: res.filterOptions.projects || [],
+            sources: res.filterOptions.sources || [],
+            teams: res.filterOptions.teams || [],
+            teamLeaders: res.filterOptions.teamLeaders || [],
+            stages: res.filterOptions.stages || (ALL_REAL_STATUSES as string[]),
+          });
+        }
+      } catch (e: any) {
+        if (!cancelled) setMatrixError(e?.message || 'Failed to load matrix');
+      } finally {
+        if (!cancelled) setLoadingMatrix(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [from, to, filters, selectedUserId]);
+
+  // Use filtered matrix if available, otherwise fallback to summary matrix
+  const displayStages = matrix ? matrix.stages : fallbackMatrix.stages;
+  const displayRows = matrix
+    ? matrix.rows.map((r) => ({ agent: r.agent, counts: r.counts, total: r.total }))
+    : fallbackMatrix.rows.map((r) => ({
+        agent: r.agent,
+        counts: displayStages.map((s) => r.byStage.get(s) || 0),
+        total: r.total,
+      }));
+  const displayColumnTotals = matrix
+    ? matrix.columnTotals
+    : displayStages.map((_, idx) => displayRows.reduce((sum, r) => sum + (r.counts[idx] || 0), 0));
+  const displayGrandTotal = matrix ? matrix.grandTotal : displayColumnTotals.reduce((a, b) => a + b, 0);
+  const hasActiveFilters = activeFilterCount > 0 || !!selectedUserId;
+
   return (
     <div className="space-y-6">
-      {/* Leads by stage per user */}
-      {matrix.rows.length > 0 && (
-        <div className="bg-card border border-border rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-1">
-            Leads by Stage per User
-          </h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            {selectedUserName
-              ? `Stage distribution for ${selectedUserName}`
-              : 'How many leads each user has at every stage'}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm table-mobile min-w-[520px]">
+      {/* Agent × Lead Stage matrix with filters */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Agent × Lead Stage</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {hasActiveFilters ? 'Filtered view' : 'How many leads each agent has at every stage'} · {from} → {to}
+            </p>
+          </div>
+          {hasActiveFilters && (
+            <button onClick={clearFilters} className="btn-ghost text-xs px-3 py-1.5 rounded-full border border-border hover:bg-muted">
+              Clear filters ({activeFilterCount + (selectedUserId ? 1 : 0)})
+            </button>
+          )}
+        </div>
+
+        {/* Filters bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <div className="relative">
+            <select value={filters.teamLeader} onChange={(e) => updateFilter('teamLeader', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+              <option value="">All Team Leaders</option>
+              {filterOptions.teamLeaders.map((l) => (
+                <option key={l.id} value={l.id}>{l.name} · {l.teamName}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={filters.team} onChange={(e) => updateFilter('team', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+              <option value="">All Teams</option>
+              {filterOptions.teams.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={filters.project} onChange={(e) => updateFilter('project', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+              <option value="">All Projects</option>
+              {filterOptions.projects.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={filters.source} onChange={(e) => updateFilter('source', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+              <option value="">All Lead Sources</option>
+              {filterOptions.sources.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={filters.campaign} onChange={(e) => updateFilter('campaign', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+              <option value="">All Campaigns</option>
+              {filterOptions.sources.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={filters.stage} onChange={(e) => updateFilter('stage', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+              <option value="">All Stages</option>
+              {filterOptions.stages.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select value={filters.agent} onChange={(e) => updateFilter('agent', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+              <option value="">All Agents</option>
+              {data.teamAgentPerformance.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          </div>
+        </div>
+
+        {activeFilterCount > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {Object.entries(filters).filter(([, v]) => v).map(([k, v]) => (
+              <span key={k} className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-medium">
+                {k}: {v}
+                <button onClick={() => updateFilter(k as any, '')} className="hover:text-primary/70"><X size={12} /></button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {loadingMatrix ? (
+          <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-primary" /></div>
+        ) : matrixError ? (
+          <div className="py-8 text-center">
+            <p className="text-sm text-destructive mb-3">{matrixError}</p>
+            <button onClick={() => setFilters({ ...filters })} className="btn-secondary text-sm">Retry</button>
+          </div>
+        ) : displayRows.length === 0 ? (
+          <div className="py-12 text-center">
+            <p className="text-sm font-medium text-foreground">No results for selected filters</p>
+            <p className="text-xs text-muted-foreground mt-1">Try adjusting or clearing filters</p>
+            {hasActiveFilters && <button onClick={clearFilters} className="btn-secondary mt-3 text-sm">Clear filters</button>}
+          </div>
+        ) : (
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table className="w-full text-sm min-w-[800px]">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground">
-                    User
-                  </th>
-                  {matrix.stages.map((s) => (
-                    <th
-                      key={s}
-                      className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground"
-                    >
-                      {s}
-                    </th>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="sticky left-0 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground whitespace-nowrap z-10">Agent</th>
+                  {displayStages.map((s) => (
+                    <th key={s} className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground whitespace-nowrap">{s}</th>
                   ))}
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-foreground">
-                    Total
-                  </th>
+                  <th className="text-right px-3 py-3 text-xs font-semibold text-foreground whitespace-nowrap">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {matrix.rows.map((row) => (
-                  <tr
-                    key={row.agent}
-                    className="border-b border-border/50 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="py-2.5 px-3 font-medium text-foreground">{row.agent}</td>
-                    {matrix.stages.map((s) => (
-                      <td
-                        key={s}
-                        className="py-2.5 px-3 text-right tabular-nums text-muted-foreground"
-                      >
-                        {row.byStage.get(s) || 0}
-                      </td>
+                {displayRows.map((row) => (
+                  <tr key={row.agent} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <td className="sticky left-0 bg-card px-4 py-3 font-medium text-foreground whitespace-nowrap border-r border-border/50">{row.agent}</td>
+                    {row.counts.map((c, idx) => (
+                      <td key={idx} className="px-3 py-3 text-right tabular-nums text-muted-foreground">{c}</td>
                     ))}
-                    <td className="py-2.5 px-3 text-right font-bold text-foreground">
-                      {row.total}
-                    </td>
+                    <td className="px-3 py-3 text-right font-bold text-foreground tabular-nums">{row.total}</td>
                   </tr>
                 ))}
+                <tr className="bg-primary/10 font-semibold border-t-2 border-primary/20">
+                  <td className="sticky left-0 bg-primary/10 px-4 py-3 text-foreground whitespace-nowrap">Total</td>
+                  {displayColumnTotals.map((c, idx) => (
+                    <td key={idx} className="px-3 py-3 text-right tabular-nums text-foreground">{c}</td>
+                  ))}
+                  <td className="px-3 py-3 text-right font-bold text-primary tabular-nums">{displayGrandTotal}</td>
+                </tr>
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Calls by Employee */}
       {data.callsByEmployee.length > 0 && (

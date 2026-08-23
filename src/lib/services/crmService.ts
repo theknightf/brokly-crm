@@ -2862,6 +2862,37 @@ export const reportsService = {
     return cachedRead(key, () => fetchReportsSummary(from, to));
   },
 
+  async getCallsMatrix(filters: {
+    from?: string;
+    to?: string;
+    agent?: string;
+    teamLeader?: string;
+    team?: string;
+    project?: string;
+    campaign?: string;
+    source?: string;
+    stage?: string;
+  }) {
+    const params = new URLSearchParams();
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    if (filters.agent) params.set('agent', filters.agent);
+    if (filters.teamLeader) params.set('teamLeader', filters.teamLeader);
+    if (filters.team) params.set('team', filters.team);
+    if (filters.project) params.set('project', filters.project);
+    if (filters.campaign) params.set('campaign', filters.campaign);
+    if (filters.source) params.set('source', filters.source);
+    if (filters.stage) params.set('stage', filters.stage);
+    const qs = params.toString();
+    const res = await fetch(`/api/reports/calls-matrix${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+    if (!res.ok) {
+      const err: any = new Error(`Failed to load calls matrix (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  },
+
   async getActivity(from: string, to: string) {
     const res = await fetch(
       `/api/reports/activity?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,

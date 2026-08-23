@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Pencil,
   Trash2,
@@ -45,14 +45,22 @@ interface UserProfile {
   agentCode?: string;
   adminId?: string | null;
   adminName?: string | null;
+  teamId?: string | null;
+}
+
+const SALES_STRUCTURE_ROLES = ['team_leader', 'senior_agent', 'agent', 'telecaller'];
+function isSalesStructureRole(role: string): boolean {
+  return SALES_STRUCTURE_ROLES.includes(role);
 }
 
 function UserModal({
   user,
+  leaders,
   onSave,
   onClose,
 }: {
   user: Partial<UserProfile> | null;
+  leaders: { id: string; name: string; teamId: string | null; teamName: string }[];
   onSave: (data: any) => void;
   onClose: () => void;
 }) {
@@ -60,12 +68,39 @@ function UserModal({
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [role, setRole] = useState(user?.role ?? 'agent');
   const [isActive, setIsActive] = useState(user?.isActive !== false);
+  const [teamLeaderId, setTeamLeaderId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  const showTeamLeaderSection = isSalesStructureRole(role);
+  const selectedLeader = leaders.find((l) => l.id === teamLeaderId) || null;
+  const selectedTeamName = selectedLeader?.teamName || '';
+  const selectedTeamId = selectedLeader?.teamId || null;
+
+  useEffect(() => {
+    if (user?.teamId && leaders.length > 0) {
+      const leader = leaders.find((l) => l.teamId === user.teamId);
+      if (leader) setTeamLeaderId(leader.id);
+    }
+  }, [user?.teamId, leaders]);
+
+  // Initialize leader from user's current team
+  const initLeader = (teamId: string | null | undefined) => {
+    if (!teamId || leaders.length === 0) return;
+    const leader = leaders.find((l) => l.teamId === teamId);
+    if (leader) setTeamLeaderId(leader.id);
+  };
+  // Use effect to set initial leader when leaders load or user changes
+  // We need to import useEffect - already imported, so inline effect:
+  // This will be handled via a separate useEffect below - we inject it after state
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!fullName.trim()) e.fullName = 'Full name is required';
+    if (showTeamLeaderSection && teamLeaderId) {
+      const leader = leaders.find((l) => l.id === teamLeaderId);
+      if (leader && !leader.teamId) e.teamLeaderId = 'Selected team leader has no team. Assign a team to this leader first.';
+    }
     return e;
   };
 
@@ -76,7 +111,15 @@ function UserModal({
       return;
     }
     setSaving(true);
-    await onSave({ fullName: fullName.trim(), phone: phone.trim(), role, isActive });
+    await onSave({
+      fullName: fullName.trim(),
+      phone: phone.trim(),
+      role,
+      isActive,
+      teamLeaderId: showTeamLeaderSection ? teamLeaderId || null : null,
+      teamId: showTeamLeaderSection ? selectedTeamId : null,
+      teamName: showTeamLeaderSection ? selectedTeamName : '',
+    });
     setSaving(false);
   };
 
@@ -176,6 +219,47 @@ function UserModal({
               </button>
             </div>
           </div>
+          {showTeamLeaderSection && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Team Leader</label>
+                <div className="relative">
+                  <select
+                    value={teamLeaderId}
+                    onChange={(e) => {
+                      setTeamLeaderId(e.target.value);
+                      setErrors((p) => ({ ...p, teamLeaderId: '' }));
+                    }}
+                    className="input-base w-full appearance-none pr-8"
+                  >
+                    <option value="">No leader — no team</option>
+                    {leaders.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} {l.teamName ? `· ${l.teamName}` : '· No team'}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                </div>
+                {errors.teamLeaderId && (
+                  <p className="text-xs text-destructive mt-1">{errors.teamLeaderId}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Assigning a leader automatically assigns their team.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Team</label>
+                <div className="input-base w-full bg-muted/50 text-muted-foreground flex items-center min-h-[42px]">
+                  {selectedTeamName || '— No team —'}
+                </div>
+                {selectedLeader && !selectedTeamId && (
+                  <p className="text-xs text-amber-600 mt-1">This leader has no team assigned.</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 mt-6">
@@ -353,7 +437,7 @@ function CreateUserModal({
   admins,
   onSave,
   onClose,
-  teams,
+  leaders,
 }: {
   admins: Partial<UserProfile>[];
   onSave: (data: {
@@ -364,9 +448,10 @@ function CreateUserModal({
     code: string;
     adminId: string | null;
     teamId: string;
+    teamLeaderId: string | null;
   }) => Promise<void>;
   onClose: () => void;
-  teams: { id: string; name: string }[];
+  leaders: { id: string; name: string; teamId: string | null; teamName: string }[];
 }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -374,11 +459,15 @@ function CreateUserModal({
   const [role, setRole] = useState('agent');
   const [code, setCode] = useState('');
   const [adminId, setAdminId] = useState('');
-  const [teamId, setTeamId] = useState('');
+  const [teamLeaderId, setTeamLeaderId] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   const isAdminRole = role === 'admin' || role === 'owner';
+  const showTeamLeaderSection = isSalesStructureRole(role);
+  const selectedLeader = leaders.find((l) => l.id === teamLeaderId) || null;
+  const selectedTeamId = selectedLeader?.teamId || '';
+  const selectedTeamName = selectedLeader?.teamName || '';
 
   useEffect(() => {
     if (admins.length > 0 && !adminId) {
@@ -392,6 +481,13 @@ function CreateUserModal({
       setErrors(e as Record<string, string>);
       return;
     }
+    if (showTeamLeaderSection && teamLeaderId) {
+      const leader = leaders.find((l) => l.id === teamLeaderId);
+      if (leader && !leader.teamId) {
+        setErrors({ teamLeaderId: 'Selected team leader has no team. Assign a team to this leader first.' });
+        return;
+      }
+    }
     setSaving(true);
     setErrors({});
     try {
@@ -402,7 +498,8 @@ function CreateUserModal({
         role,
         code: code.trim(),
         adminId: adminId || null,
-        teamId,
+        teamId: showTeamLeaderSection ? selectedTeamId : '',
+        teamLeaderId: showTeamLeaderSection ? teamLeaderId || null : null,
       });
     } catch (err: any) {
       if (err?.fields) setErrors(err.fields as Record<string, string>);
@@ -561,31 +658,47 @@ function CreateUserModal({
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Team</label>
-            <div className="relative">
-              <select
-                value={teamId}
-                onChange={(e) => {
-                  setTeamId(e.target.value);
-                  setErrors((p) => ({ ...p, teamId: '' }));
-                }}
-                className="input-base w-full appearance-none pr-8"
-              >
-                <option value="">No team</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-              />
+          {showTeamLeaderSection && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Team Leader</label>
+                <div className="relative">
+                  <select
+                    value={teamLeaderId}
+                    onChange={(e) => {
+                      setTeamLeaderId(e.target.value);
+                      setErrors((p) => ({ ...p, teamLeaderId: '' }));
+                    }}
+                    className="input-base w-full appearance-none pr-8"
+                  >
+                    <option value="">No leader — no team</option>
+                    {leaders.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} {l.teamName ? `· ${l.teamName}` : '· No team'}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                </div>
+                {errors.teamLeaderId && (
+                  <p className="text-xs text-destructive mt-1">{errors.teamLeaderId}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Select a leader to auto-assign their team.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Team</label>
+                <div className="input-base w-full bg-muted/50 text-muted-foreground flex items-center min-h-[42px]">
+                  {selectedTeamName || '— No team —'}
+                </div>
+                {selectedLeader && !selectedLeader.teamId && (
+                  <p className="text-xs text-amber-600 mt-1">This leader has no team assigned.</p>
+                )}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Optional — assigns the user to a team on creation.</p>
-          </div>
+          )}
         </div>
 
         <div className="flex gap-3 mt-6">
@@ -609,7 +722,7 @@ function CreateUserModal({
 export default function UsersTab() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [admins, setAdmins] = useState<UserProfile[]>([]);
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+  const [teams, setTeams] = useState<{ id: string; name: string; leaderId: string | null; leaderName: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -652,13 +765,34 @@ export default function UsersTab() {
       ]);
       setUsers(usersData as UserProfile[]);
       setAdmins(adminsData as UserProfile[]);
-      setTeams(teamsData as { id: string; name: string }[]);
+      setTeams(teamsData as { id: string; name: string; leaderId: string | null; leaderName: string | null }[]);
     } catch {
       toast.error('Failed to load users');
     } finally {
       setLoading(false);
     }
   };
+
+  const leaders = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string; teamId: string | null; teamName: string }>();
+    for (const t of teams) {
+      if (t.leaderId) {
+        const u = users.find((x) => x.id === t.leaderId);
+        byId.set(t.leaderId, {
+          id: t.leaderId,
+          name: u?.fullName || t.leaderName || 'Unknown',
+          teamId: t.id,
+          teamName: t.name,
+        });
+      }
+    }
+    for (const u of users) {
+      if (u.role === 'team_leader' && !byId.has(u.id)) {
+        byId.set(u.id, { id: u.id, name: u.fullName || u.email, teamId: null, teamName: '' });
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [users, teams]);
 
   const filtered = users.filter((u) => {
     const matchSearch =
@@ -700,9 +834,20 @@ export default function UsersTab() {
           role: data.role,
           isActive: data.isActive,
         });
-        setUsers((prev) =>
-          prev.map((u) => (u.id === modalState.user!.id ? { ...u, ...updated } : u))
-        );
+        const prevTeamId = (modalState.user as any)?.teamId || null;
+        const nextTeamId = data.teamId || null;
+        if (nextTeamId && nextTeamId !== prevTeamId) {
+          try {
+            await teamsService.addMember(nextTeamId, modalState.user.id, false);
+          } catch (e: any) {
+            toast.error(e?.message || 'User saved but could not assign to team');
+          }
+        } else if (!nextTeamId && prevTeamId) {
+          try {
+            await teamsService.removeMember(prevTeamId, modalState.user.id);
+          } catch {}
+        }
+        await loadData();
         toast.success('User updated successfully');
       }
     } catch (err: any) {
@@ -738,13 +883,21 @@ export default function UsersTab() {
     code: string;
     adminId: string | null;
     teamId: string;
+    teamLeaderId: string | null;
   }) => {
+    if (data.teamLeaderId) {
+      const leader = leaders.find((l) => l.id === data.teamLeaderId);
+      if (leader && !leader.teamId) {
+        toast.error('Selected team leader has no team. Assign a team to this leader first.');
+        return;
+      }
+    }
     const created = await usersService.createUser(data);
     if (data.teamId && created?.id) {
       try {
         await teamsService.addMember(data.teamId, created.id, false);
-      } catch {
-        toast.error('User created but could not be added to the team');
+      } catch (e: any) {
+        toast.error(e?.message || 'User created but could not be added to the team');
       }
     }
     await loadData();
@@ -981,6 +1134,7 @@ export default function UsersTab() {
       {modalState.open && (
         <UserModal
           user={modalState.user}
+          leaders={leaders}
           onSave={handleSave}
           onClose={() => setModalState({ open: false, user: null })}
         />
@@ -1005,7 +1159,7 @@ export default function UsersTab() {
       {createState && (
         <CreateUserModal
           admins={admins}
-          teams={teams}
+          leaders={leaders}
           onSave={handleCreateUser}
           onClose={() => setCreateState(false)}
         />
