@@ -1401,6 +1401,63 @@ function LeadsTab({
         {leadStageByAgent.length === 0 && <p className="py-5 text-center text-sm text-muted-foreground">No lead stage data available.</p>}
       </div>
 
+      {/* Lead Status & Stage — aggregated overview */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Lead Status & Stage</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Aggregated overview of all leads by current stage</p>
+          </div>
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            {leadsByStatusData.reduce((sum, item) => sum + item.value, 0)} total
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[360px] text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Stage</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Leads</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leadsByStatusData.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    No lead status data available
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {leadsByStatusData
+                    .slice()
+                    .sort((a, b) => b.value - a.value)
+                    .map((item) => {
+                      const total = leadsByStatusData.reduce((sum, r) => sum + r.value, 0);
+                      const pct = total ? ((item.value / total) * 100).toFixed(1) : '0.0';
+                      return (
+                        <tr key={item.name} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 font-medium text-foreground">{item.name}</td>
+                          <td className="px-4 py-3 text-right font-bold text-primary tabular-nums">{item.value}</td>
+                          <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{pct}%</td>
+                        </tr>
+                      );
+                    })}
+                  <tr className="bg-primary/10 font-semibold border-t-2 border-primary/20">
+                    <td className="px-4 py-3 text-foreground">Total</td>
+                    <td className="px-4 py-3 text-right text-foreground tabular-nums">
+                      {leadsByStatusData.reduce((sum, r) => sum + r.value, 0)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-foreground tabular-nums">100%</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Lead Status + Source */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="hidden">
