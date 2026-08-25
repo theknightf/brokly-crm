@@ -2227,6 +2227,26 @@ function CallsTab({
     rows: { agent: string; counts: number[]; total: number }[];
     columnTotals: number[];
     grandTotal: number;
+    performance?: {
+      agent: string;
+      userId: string;
+      calls: number;
+      connected: number;
+      noAnswer: number;
+      incoming: number;
+      shortCalls: number;
+      durationSeconds: number;
+      reached: number;
+      notInterested: number;
+      callbacks: number;
+      whatsapp: number;
+      emails: number;
+      meetings: number;
+      notes: number;
+      actionsTotal: number;
+      byAction: Record<string, number>;
+      reachPct: number;
+    }[];
   } | null>(null);
   const [loadingMatrix, setLoadingMatrix] = useState(false);
   const [matrixError, setMatrixError] = useState<string | null>(null);
@@ -2266,7 +2286,7 @@ function CallsTab({
           stage: filters.stage || undefined,
         });
         if (cancelled) return;
-        setMatrix({ stages: res.stages, rows: res.rows, columnTotals: res.columnTotals, grandTotal: res.grandTotal });
+        setMatrix({ stages: res.stages, rows: res.rows, columnTotals: res.columnTotals, grandTotal: res.grandTotal, performance: res.performance || [] });
         if (res.filterOptions) {
           setFilterOptions({
             projects: res.filterOptions.projects || [],
@@ -2300,6 +2320,21 @@ function CallsTab({
     : displayStages.map((_, idx) => displayRows.reduce((sum, r) => sum + (r.counts[idx] || 0), 0));
   const displayGrandTotal = matrix ? matrix.grandTotal : displayColumnTotals.reduce((a, b) => a + b, 0);
   const hasActiveFilters = activeFilterCount > 0 || !!selectedUserId;
+  const performanceRows = (matrix?.performance || []).map((p) => ({
+    agent: p.agent,
+    calls: p.calls,
+    connected: p.connected,
+    noAnswer: p.noAnswer,
+    incoming: p.incoming,
+    shortCalls: p.shortCalls,
+    reached: p.reached,
+    notInterested: p.notInterested,
+    whatsapp: p.whatsapp,
+    emails: p.emails,
+    meetings: p.meetings,
+    notes: p.notes,
+    actionsTotal: p.actionsTotal,
+  }));
 
   return (
     <div className="space-y-6">
@@ -2444,6 +2479,89 @@ function CallsTab({
           </div>
         )}
       </div>
+
+      {/* Per-agent performance: stages + statuses + actions (real DB data) */}
+      {performanceRows.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Per-Agent Performance</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Calls, outcomes, lead stages and actions per agent · respects the filters above
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table className="w-full text-sm min-w-[1100px]">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th rowSpan={2} className="sticky left-0 z-10 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground border-r border-border/50">Agent</th>
+                  <th colSpan={7} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Calls &amp; Status</th>
+                  <th colSpan={displayStages.length} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Lead Stages</th>
+                  <th colSpan={5} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Actions</th>
+                </tr>
+                <tr className="border-b border-border">
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">Calls</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-600 whitespace-nowrap">Connected</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">No ans.</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">Incom.</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-amber-600 whitespace-nowrap">Short</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-700 whitespace-nowrap">Reached</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-red-500 whitespace-nowrap">Not int.</th>
+                  {displayStages.map((s) => (
+                    <th key={s} className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">{s}</th>
+                  ))}
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-primary whitespace-nowrap">WhatsApp</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">Email</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600 whitespace-nowrap">Meetings</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">Notes</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-foreground whitespace-nowrap">Total act.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {performanceRows.map((r) => (
+                  <tr key={r.agent} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <td className="sticky left-0 z-10 bg-card px-4 py-3 font-medium text-foreground whitespace-nowrap border-r border-border/50">{r.agent}</td>
+                    <td className="px-3 py-3 text-right tabular-nums font-bold">{r.calls}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-emerald-600">{r.connected}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{r.noAnswer}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sky-600">{r.incoming}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-amber-600">{r.shortCalls}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-emerald-700">{r.reached}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-red-500">{r.notInterested}</td>
+                    {displayStages.map((s, i) => {
+                      const stageIdx = displayStages.indexOf(s);
+                      const v = matrix?.rows.find((m) => m.agent === r.agent)?.counts[stageIdx] ?? 0;
+                      return <td key={s} className="px-3 py-3 text-right tabular-nums text-muted-foreground">{v}</td>;
+                    })}
+                    <td className="px-3 py-3 text-right tabular-nums text-primary">{r.whatsapp}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sky-600">{r.emails}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-violet-600">{r.meetings}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{r.notes}</td>
+                    <td className="px-3 py-3 text-right tabular-nums font-semibold">{r.actionsTotal}</td>
+                  </tr>
+                ))}
+                <tr className="bg-primary/10 font-semibold border-t-2 border-primary/20">
+                  <td className="sticky left-0 z-10 bg-primary/10 px-4 py-3 whitespace-nowrap">Total</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.calls, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.connected, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.noAnswer, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.incoming, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.shortCalls, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.reached, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.notInterested, 0)}</td>
+                  {matrix?.columnTotals.map((c, i) => <td key={i} className="px-3 py-3 text-right tabular-nums">{c || 0}</td>)}
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.whatsapp, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.emails, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.meetings, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.notes, 0)}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.actionsTotal, 0)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Calls by Employee */}
       {data.callsByEmployee.length > 0 && (
