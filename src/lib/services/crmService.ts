@@ -2581,23 +2581,27 @@ export const usersService = {
       isActive?: boolean;
     }
   ) {
-    const supabase = createClient();
-    const payload: any = {};
-    if (updates.fullName !== undefined) payload.full_name = updates.fullName;
-    if (updates.phone !== undefined) payload.phone = updates.phone;
-    if (updates.role !== undefined) payload.role = updates.role;
-    if (updates.teamId !== undefined) payload.team_id = updates.teamId;
-    if (updates.isActive !== undefined) payload.is_active = updates.isActive;
-    payload.updated_at = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .update(payload)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
+    const res = await fetch(`/api/admin/users`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        fullName: updates.fullName,
+        phone: updates.phone,
+        role: updates.role,
+        teamId: updates.teamId,
+        isActive: updates.isActive,
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      const err: any = new Error(errBody?.error || `Failed to update user (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
+    const { user } = await res.json();
     invalidateCache();
-    return rowToUserProfile(data);
+    return rowToUserProfile(user);
   },
 
   /** Admin sets a user's base salary for payroll (user_profiles.base_salary). */

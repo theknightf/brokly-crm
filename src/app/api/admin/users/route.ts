@@ -175,3 +175,88 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ user: profileRow }, { status: 201 });
 }
+
+export async function PATCH(request: Request) {
+  const supabase = await createServerClient();
+  const guard = await requireUserManager(supabase);
+  if (!guard.ok) return guard.response;
+
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== 'object' || !body.id) {
+    return NextResponse.json({ error: 'Missing user id' }, { status: 400 });
+  }
+
+  const targetId = String(body.id);
+  const actorRole = guard.actor.role;
+  if (actorRole !== 'owner' && actorRole !== 'admin') {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  }
+
+  const payload: Record<string, any> = {};
+  if (body.fullName !== undefined) payload.full_name = String(body.fullName).trim();
+  if (body.phone !== undefined) payload.phone = String(body.phone || '').trim();
+  if (body.role !== undefined) {
+    const role = String(body.role);
+    if (!ALLOWED_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+    }
+    if (role === 'owner' && actorRole !== 'owner') {
+      return NextResponse.json({ error: 'Only an owner can grant owner' }, { status: 403 });
+    }
+    if (role === 'admin' && actorRole !== 'owner') {
+      return NextResponse.json({ error: 'Only an owner can grant admin' }, { status: 403 });
+    }
+    payload.role = role;
+  }
+  if (body.isActive !== undefined) payload.is_active = Boolean(body.isActive);
+  if (body.teamId !== undefined) payload.team_id = body.teamId || null;
+
+  // Prevent privilege escalation: an admin cannot change their own role or
+  // is_active, and cannot change another user's role to admin/owner.
+  if (targetId === guard.actor.id) {
+    if (payload.role !== undefined) {
+      return NextResponse.json({ error: 'Cannot change your own role' }, { status: 403 });
+    }
+    if (payload.is_active === false) {
+      return NextResponse.json({ error: 'Cannot deactivate yourself' }, { status: 403 });
+    }
+  }
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey || serviceRoleKey.startsWith('replace-with-')) {
+    return NextResponse.json(
+      {
+        error:
+          'Server is missing a valid SUPABASE_SERVICE_ROLE_KEY. Add your real service-role key (Supabase dashboard → Settings → API) to the server environment variables and redeploy.',
+      },
+      { status: 500 }
+    );
+  }
+
+  const serviceClient = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { error: updateErr } = await serviceClient.from('user_profiles').update(payload).eq('id', targetId);
+  if (updateErr) {
+    return NextResponse.json({ error: updateErr.message }, { status: 400 });
+  }
+
+  const fullCols =
+    'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, agent_code, admin_id, created_at';
+  const baseCols = 'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, created_at';
+  let { data } = await serviceClient
+    .from('user_profiles')
+    .select(fullCols)
+    .eq('id', targetId)
+    .maybeSingle();
+  if (!data) {
+    ({ data } = await serviceClient
+      .from('user_profiles')
+      .select(baseCols)
+      .eq('id', targetId)
+      .maybeSingle());
+  }
+
+  return NextResponse.json({ user: data || { id: targetId, ...payload } });
+}
