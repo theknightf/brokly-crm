@@ -1,6 +1,6 @@
 'use client';
-import React from 'react';
-import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Building2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Building2, Trash2 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
@@ -10,6 +10,7 @@ interface LeadBoardProps {
   onView: (lead: Lead) => void;
   onEdit: (lead: Lead) => void;
   onStatusChange: (id: string, status: LeadStatus) => void;
+  onDelete: (id: string) => void;
 }
 
 const formatBudget = (min?: number, max?: number) => {
@@ -25,11 +26,13 @@ function BoardCard({
   onView,
   onEdit,
   onStatusChange,
+  onDelete,
 }: {
   lead: Lead;
   onView: (lead: Lead) => void;
   onEdit: (lead: Lead) => void;
   onStatusChange: (id: string, status: LeadStatus) => void;
+  onDelete: (id: string) => void;
 }) {
   const inPipeline = pipelineIndex(lead.status) >= 0;
   const prev = inPipeline ? prevPipelineStage(lead.status) : undefined;
@@ -60,6 +63,16 @@ function BoardCard({
           aria-label="Edit lead"
         >
           <Pencil size={13} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(lead.id);
+          }}
+          className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Delete lead"
+        >
+          <Trash2 size={13} />
         </button>
       </div>
 
@@ -141,13 +154,16 @@ function BoardCard({
   );
 }
 
-export default function LeadBoard({ leads, onView, onEdit, onStatusChange }: LeadBoardProps) {
+export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDelete }: LeadBoardProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deletingLead = leads.find((l) => l.id === deletingId) || null;
   const columns: { key: string; label: string; stage?: LeadStatus }[] = [
     ...PIPELINE_STAGES.map((s) => ({ key: s, label: s, stage: s })),
     { key: '__other__', label: 'Outcomes' },
   ];
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
+    <>
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
       {columns.map((col) => {
         const colLeads = col.stage
           ? leads.filter((l) => (l.status || 'Fresh Leads') === col.stage)
@@ -175,7 +191,7 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange }: Lea
               ) : (
                 colLeads.map((lead, i) => (
                   <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
-                    <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} />
+                    <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} onDelete={setDeletingId} />
                   </div>
                 ))
               )}
@@ -184,5 +200,31 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange }: Lea
         );
       })}
     </div>
+      {deletingLead && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40" onClick={() => setDeletingId(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-foreground">Delete lead?</h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Are you sure you want to delete <span className="font-medium text-foreground">{deletingLead.name || 'this lead'}</span>? This action cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setDeletingId(null)} className="h-9 px-4 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const id = deletingLead.id;
+                  setDeletingId(null);
+                  onDelete(id);
+                }}
+                className="h-9 px-4 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-500 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

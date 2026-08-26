@@ -1023,6 +1023,7 @@ export default function LeadsManagementScreen({
             }}
             onEdit={(lead) => setEditLead(lead)}
             onStatusChange={handleStatusChange}
+            onDelete={handleDeleteLead}
           />
         ) : (
           <LeadsTable

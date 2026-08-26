@@ -461,16 +461,36 @@ export const leadsService = {
   },
 
   async delete(id: string) {
-    const supabase = createClient();
-    const { error } = await supabase.from('leads').delete().eq('id', id);
-    if (error) throw error;
+    const res = await fetch(`/api/leads/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      let message = 'Failed to delete lead';
+      try {
+        const data = await res.json();
+        if (data?.error) message = data.error;
+      } catch {
+        /* ignore parse errors */
+      }
+      throw new Error(message);
+    }
     invalidateCache();
   },
 
   async bulkDelete(ids: string[]) {
-    const supabase = createClient();
-    const { error } = await supabase.from('leads').delete().in('id', ids);
-    if (error) throw error;
+    const res = await fetch('/api/leads/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) {
+      let message = 'Failed to delete leads';
+      try {
+        const data = await res.json();
+        if (data?.error) message = data.error;
+      } catch {
+        /* ignore parse errors */
+      }
+      throw new Error(message);
+    }
     invalidateCache();
   },
 
