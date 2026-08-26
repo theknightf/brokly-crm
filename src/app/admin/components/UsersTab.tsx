@@ -858,11 +858,13 @@ export default function UsersTab() {
 
   const handleDelete = async () => {
     try {
-      await usersService.update(deleteState.id, { isActive: false });
-      setUsers((prev) =>
-        prev.map((u) => (u.id === deleteState.id ? { ...u, isActive: false } : u))
-      );
-      toast.success('User deactivated successfully');
+      const res = await fetch(`/api/admin/users/${deleteState.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}) as any);
+        throw new Error(data?.error || 'Failed to remove user');
+      }
+      setUsers((prev) => prev.filter((u) => u.id !== deleteState.id));
+      toast.success('User removed successfully');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to remove user');
     }
