@@ -47,6 +47,16 @@
   --source-cold: #6b7280;
 }
 
+/* Expose the sidebar width to descendants so fixed/absolute elements
+   (e.g. the leads bulk-action bar) can center against the content area
+   instead of the full viewport. 240px = w-60 (expanded), 64px = w-16
+   (collapsed); 0 below lg where the sidebar is an overlay drawer. */
+.pwa-shell { --sidebar-w: 0px; }
+@media (min-width: 1024px) {
+  .pwa-shell { --sidebar-w: 240px; }
+  .pwa-shell.sidebar-collapsed { --sidebar-w: 64px; }
+}
+
 /* Dark theme — applied via the `dark` class on <html> (tailwind darkMode: 'class'). */
 .dark {
   --background: #0f1115;

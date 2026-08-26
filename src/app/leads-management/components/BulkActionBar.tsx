@@ -208,8 +208,11 @@ export default function BulkActionBar({
 
   return (
     <>
-      <div className="sticky bottom-6 z-40 flex justify-center pointer-events-none slide-up-enter px-3">
-        <div className="bg-foreground text-background rounded-2xl shadow-modal px-5 py-3 flex items-center gap-4 min-w-[380px] max-w-[94vw] overflow-x-auto">
+      <div
+        className="fixed bottom-6 left-0 right-0 z-40 flex justify-center pointer-events-none slide-up-enter px-3"
+        style={{ paddingLeft: 'calc(var(--sidebar-w) + 0.75rem)' }}
+      >
+        <div className="bg-foreground text-background rounded-2xl shadow-modal px-5 py-3 flex items-center gap-4 min-w-[min(380px,90vw)] max-w-full overflow-x-auto pointer-events-auto">
           <span className="text-sm font-semibold flex-shrink-0">
             {selectedCount} lead{selectedCount !== 1 ? 's' : ''} selected
           </span>
