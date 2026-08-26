@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Brokly</string>
+    <string name="title_activity_main">Brokly</string>
+    <string name="package_name">com.brokly.app</string>
+    <string name="custom_url_scheme">com.brokly.app</string>
+</resources>
