@@ -14,7 +14,10 @@ export async function GET(request: Request) {
   const periodId = url.searchParams.get('periodId');
 
   try {
-    const periodsQuery = db.from('payroll_periods').select('*').order('period_start', { ascending: false });
+    const periodsQuery = db
+      .from('payroll_periods')
+      .select('*')
+      .order('period_start', { ascending: false });
     const { data: periods, error: periodsError } = await periodsQuery;
     if (periodsError) throw periodsError;
 
@@ -26,7 +29,10 @@ export async function GET(request: Request) {
         .eq('period_id', periodId)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      entries = (rows || []).map((r: any) => ({ ...r, user_name: r.user_name?.[0]?.full_name || '' }));
+      entries = (rows || []).map((r: any) => ({
+        ...r,
+        user_name: r.user_name?.[0]?.full_name || '',
+      }));
     }
 
     return NextResponse.json({ periods: periods || [], entries });

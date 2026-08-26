@@ -47,7 +47,9 @@ export default function DashboardPage() {
         <div className="order-2">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <MobileTodayFollowUps />
-            <div className="hidden xl:block"><OverdueFollowUps /></div>
+            <div className="hidden xl:block">
+              <OverdueFollowUps />
+            </div>
           </div>
         </div>
         <div className="order-3">
@@ -70,7 +72,9 @@ export default function DashboardPage() {
             <GettingStarted />
           </div>
         </div>
-        <div className="hidden lg:block order-8"><GettingStarted /></div>
+        <div className="hidden lg:block order-8">
+          <GettingStarted />
+        </div>
       </div>
     </AppLayout>
   );

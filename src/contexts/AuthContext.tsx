@@ -36,7 +36,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const promise = (async () => {
       try {
-        const { data } = await getSupabase().from('user_profiles').select('*').eq('id', userId).single();
+        const { data } = await getSupabase()
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
         // Deactivated accounts are signed out immediately so deactivation takes
         // effect on the very next profile fetch (mount, login, or session change).
         if (data && data.is_active === false) {
@@ -60,12 +64,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    getSupabase().auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      setLoading(false);
-    });
+    getSupabase()
+      .auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) fetchProfile(session.user.id);
+        setLoading(false);
+      });
 
     const {
       data: { subscription },
@@ -84,9 +90,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Self-signup can never claim a privileged role (backed by the
     // handle_new_user trigger which also downgrades unknown/privileged roles).
     const requestedRole = String(metadata?.role || 'agent');
-    const safeRole = ['agent', 'broker', 'branch_manager', 'team_leader', 'senior_agent', 'telecaller'].includes(
-      requestedRole
-    )
+    const safeRole = [
+      'agent',
+      'broker',
+      'branch_manager',
+      'team_leader',
+      'senior_agent',
+      'telecaller',
+    ].includes(requestedRole)
       ? requestedRole
       : 'agent';
     const { data, error } = await getSupabase().auth.signUp({
@@ -134,7 +145,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return data;
     } catch (err: any) {
       // Already normalized above — propagate the user-safe message as-is.
-      if (err instanceof Error && /^(Invalid email|Unable to connect|Please confirm|Too many|Password does not|Sign in failed|Authentication is not configured)/.test(err.message)) {
+      if (
+        err instanceof Error &&
+        /^(Invalid email|Unable to connect|Please confirm|Too many|Password does not|Sign in failed|Authentication is not configured)/.test(
+          err.message
+        )
+      ) {
         throw err;
       }
       throw new Error(normalizeAuthError(err));

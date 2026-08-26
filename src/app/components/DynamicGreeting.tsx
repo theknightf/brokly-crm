@@ -31,7 +31,7 @@ export default function DynamicGreeting() {
     <h1 className="page-title">
       {line}
       <span className="block text-sm font-medium text-muted-foreground mt-1">
-        Here's what needs your attention today.
+        Here&apos;s what needs your attention today.
       </span>
     </h1>
   );

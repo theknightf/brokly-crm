@@ -181,7 +181,10 @@ export default function EmployeeAttendanceView() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {checkedIn ? (
                     <>
-                      In at <span className="font-medium text-foreground">{fmtTime(today?.check_in_time)}</span>
+                      In at{' '}
+                      <span className="font-medium text-foreground">
+                        {fmtTime(today?.check_in_time)}
+                      </span>
                       {today?.check_in_lat != null && (
                         <span className="inline-flex items-center gap-1 ml-2 text-emerald-600">
                           <MapPin size={12} /> GPS
@@ -189,7 +192,10 @@ export default function EmployeeAttendanceView() {
                       )}
                       {checkedOut ? (
                         <span className="ml-2">
-                          · Out at <span className="font-medium text-foreground">{fmtTime(today?.check_out_time)}</span>
+                          · Out at{' '}
+                          <span className="font-medium text-foreground">
+                            {fmtTime(today?.check_out_time)}
+                          </span>
                         </span>
                       ) : null}
                     </>
@@ -200,7 +206,9 @@ export default function EmployeeAttendanceView() {
                 {checkedIn && !checkedOut && (
                   <p className="text-xs text-muted-foreground mt-2 flex items-center justify-center gap-1.5">
                     <Timer size={12} className="text-primary" /> Worked so far:{' '}
-                    <span className="font-semibold text-foreground">{fmtDuration(workedToday)}</span>
+                    <span className="font-semibold text-foreground">
+                      {fmtDuration(workedToday)}
+                    </span>
                   </p>
                 )}
               </div>
@@ -231,9 +239,9 @@ export default function EmployeeAttendanceView() {
                 )}
                 {checkedIn && !checkedOut ? 'Check Out' : 'Check In'}
               </button>
-                <p className="text-[11px] text-muted-foreground">
-                  You can't change the time — it's saved automatically.
-                </p>
+              <p className="text-[11px] text-muted-foreground">
+                You can&apos;t change the time — it&apos;s saved automatically.
+              </p>
             </div>
           </div>
 
@@ -275,27 +283,38 @@ export default function EmployeeAttendanceView() {
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
                 <Clock size={20} className="text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium text-foreground mb-1">No attendance data available yet.</p>
+              <p className="text-sm font-medium text-foreground mb-1">
+                No attendance data available yet.
+              </p>
               <p className="text-xs text-muted-foreground">Your check-ins will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">
               {history.map((row) => (
-                <div key={row.id} className="bg-card border border-border rounded-xl p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div
+                  key={row.id}
+                  className="bg-card border border-border rounded-xl p-4 flex flex-wrap items-center gap-x-4 gap-y-2"
+                >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">
                       {(() => {
                         const d = new Date(row.attendance_date + 'T00:00:00');
-                        return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+                        return d.toLocaleDateString([], {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short',
+                        });
                       })()}
                     </p>
-                    <p className={`text-xs font-medium mt-0.5 ${
-                      row.check_in_time && row.check_out_time
-                        ? 'text-emerald-600'
-                        : row.check_in_time
-                          ? 'text-gold dark:text-gold'
-                          : 'text-muted-foreground'
-                    }`}>
+                    <p
+                      className={`text-xs font-medium mt-0.5 ${
+                        row.check_in_time && row.check_out_time
+                          ? 'text-emerald-600'
+                          : row.check_in_time
+                            ? 'text-gold dark:text-gold'
+                            : 'text-muted-foreground'
+                      }`}
+                    >
                       {row.check_in_time && row.check_out_time
                         ? 'Complete'
                         : row.check_in_time
@@ -312,7 +331,9 @@ export default function EmployeeAttendanceView() {
                     </span>
                   </div>
                   <div className="ml-auto text-right">
-                    <p className="text-sm font-semibold text-foreground">{fmtDuration(row.duration_seconds || 0)}</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {fmtDuration(row.duration_seconds || 0)}
+                    </p>
                     <p className="text-[10px] text-muted-foreground">worked</p>
                   </div>
                 </div>

@@ -28,7 +28,11 @@ import {
 } from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
 import { createClient } from '@/lib/supabase/client';
-import { companySettingsService, type WorkingHours, DEFAULT_WORKING_HOURS } from '@/lib/services/peopleOpsService';
+import {
+  companySettingsService,
+  type WorkingHours,
+  DEFAULT_WORKING_HOURS,
+} from '@/lib/services/peopleOpsService';
 import { buildOfficeHours, formatMinutes, type OfficeHoursConfig } from '@/lib/officeHours';
 import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -352,13 +356,55 @@ const CATEGORY_CARDS: {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
   target: ReportCardTarget;
 }[] = [
-  { key: 'myPerformance', title: 'My performance', desc: 'Your leads, wins and conversion at a glance', icon: UserCheck, target: 'overview' },
-  { key: 'teamPerformance', title: 'Team performance', desc: 'How every agent and team is doing', icon: Users, target: 'team' },
-  { key: 'leadStages', title: 'Lead stages', desc: 'See how many leads are New, Pending, Interested and Won', icon: GitBranch, target: 'leads' },
-  { key: 'leadsFollowUps', title: 'Leads & follow-ups', desc: 'Where leads come from and follow-up status', icon: BarChart3, target: 'leads' },
-  { key: 'salesRevenue', title: 'Sales & revenue', desc: 'Deals closed and money earned', icon: DollarSign, target: 'sales' },
-  { key: 'calls', title: 'Calls', desc: 'Call volume, duration and outcomes', icon: Phone, target: 'calls' },
-  { key: 'attendance', title: 'Attendance', desc: 'Who was on time, late or absent', icon: Clock, target: 'attendance' },
+  {
+    key: 'myPerformance',
+    title: 'My performance',
+    desc: 'Your leads, wins and conversion at a glance',
+    icon: UserCheck,
+    target: 'overview',
+  },
+  {
+    key: 'teamPerformance',
+    title: 'Team performance',
+    desc: 'How every agent and team is doing',
+    icon: Users,
+    target: 'team',
+  },
+  {
+    key: 'leadStages',
+    title: 'Lead stages',
+    desc: 'See how many leads are New, Pending, Interested and Won',
+    icon: GitBranch,
+    target: 'leads',
+  },
+  {
+    key: 'leadsFollowUps',
+    title: 'Leads & follow-ups',
+    desc: 'Where leads come from and follow-up status',
+    icon: BarChart3,
+    target: 'leads',
+  },
+  {
+    key: 'salesRevenue',
+    title: 'Sales & revenue',
+    desc: 'Deals closed and money earned',
+    icon: DollarSign,
+    target: 'sales',
+  },
+  {
+    key: 'calls',
+    title: 'Calls',
+    desc: 'Call volume, duration and outcomes',
+    icon: Phone,
+    target: 'calls',
+  },
+  {
+    key: 'attendance',
+    title: 'Attendance',
+    desc: 'Who was on time, late or absent',
+    icon: Clock,
+    target: 'attendance',
+  },
 ];
 
 // Secondary, route-based reports kept one tap away under "More reports".
@@ -370,13 +416,58 @@ const MORE_CARDS: {
   target: ReportCardTarget;
   adminOnly?: boolean;
 }[] = [
-  { key: 'meetings', title: 'Meetings', desc: 'Scheduled site visits and meetings', icon: CalendarCheck, target: '/calendar' },
-  { key: 'followUps', title: 'Follow-ups', desc: 'Pending and completed follow-ups', icon: CheckSquare, target: '/follow-ups' },
-  { key: 'projects', title: 'Projects', desc: 'Project pipeline and pitches', icon: FolderKanban, target: '/projects' },
-  { key: 'expenses', title: 'Expenses', desc: 'Spend by category and team', icon: Receipt, target: '/expenses' },
-  { key: 'payroll', title: 'Payroll', desc: 'Payroll entries, bonuses and deductions', icon: Banknote, target: '/admin?tab=payroll', adminOnly: true },
-  { key: 'accounts', title: 'Accounts', desc: 'Company accounts and balances', icon: Wallet, target: '/admin?tab=leadSources', adminOnly: true },
-  { key: 'kpis', title: 'KPIs', desc: 'Team KPI targets vs actual results', icon: Target, target: '/admin?tab=kpiTargets', adminOnly: true },
+  {
+    key: 'meetings',
+    title: 'Meetings',
+    desc: 'Scheduled site visits and meetings',
+    icon: CalendarCheck,
+    target: '/calendar',
+  },
+  {
+    key: 'followUps',
+    title: 'Follow-ups',
+    desc: 'Pending and completed follow-ups',
+    icon: CheckSquare,
+    target: '/follow-ups',
+  },
+  {
+    key: 'projects',
+    title: 'Projects',
+    desc: 'Project pipeline and pitches',
+    icon: FolderKanban,
+    target: '/projects',
+  },
+  {
+    key: 'expenses',
+    title: 'Expenses',
+    desc: 'Spend by category and team',
+    icon: Receipt,
+    target: '/expenses',
+  },
+  {
+    key: 'payroll',
+    title: 'Payroll',
+    desc: 'Payroll entries, bonuses and deductions',
+    icon: Banknote,
+    target: '/admin?tab=payroll',
+    adminOnly: true,
+  },
+  {
+    key: 'accounts',
+    title: 'Accounts',
+    desc: 'Company accounts and balances',
+    icon: Wallet,
+    target: '/admin?tab=leadSources',
+    adminOnly: true,
+  },
+  {
+    key: 'kpis',
+    title: 'KPIs',
+    desc: 'Team KPI targets vs actual results',
+    icon: Target,
+    target: '/admin?tab=kpiTargets',
+    adminOnly: true,
+  },
 ];
 
 // Friendly title shown when a category report is open.
@@ -558,7 +649,14 @@ export default function ReportsScreen() {
     : undefined;
 
   const openReport = (target: ReportCardTarget) => {
-    if (target === 'overview' || target === 'leads' || target === 'sales' || target === 'team' || target === 'attendance' || target === 'calls') {
+    if (
+      target === 'overview' ||
+      target === 'leads' ||
+      target === 'sales' ||
+      target === 'team' ||
+      target === 'attendance' ||
+      target === 'calls'
+    ) {
       setView(target);
     } else {
       router.push(target);
@@ -616,15 +714,19 @@ export default function ReportsScreen() {
         headers: ['User', 'Days Present', 'On Time', 'Late', 'Absent'],
         rows: filteredAttendanceRows
           .sort((a, b) => b.late - a.late)
-          .map((r) => [r.name, String(r.present), String(r.onTime), String(r.late), String(r.absent)]),
+          .map((r) => [
+            r.name,
+            String(r.present),
+            String(r.onTime),
+            String(r.late),
+            String(r.absent),
+          ]),
       });
     }
     exportPDF(
       'Reports & Analytics',
       `Generated for ${from} → ${to}${
-        selectedUserId
-          ? ` · User: ${selectedUserName ?? selectedUserId}`
-          : ' · All users'
+        selectedUserId ? ` · User: ${selectedUserName ?? selectedUserId}` : ' · All users'
       }`,
       [
         { label: 'Total Leads', value: String(filteredData.totalLeads) },
@@ -646,8 +748,14 @@ export default function ReportsScreen() {
       ['Total Customers', String(filteredData.totalCustomers)],
       ['Total Revenue', String(filteredData.totalRevenue)],
       ['Conversion Rate %', String(filteredData.conversionRate)],
-      ...Object.entries(filteredData.leadsByStatus).map(([k, v]) => [`Leads By Status — ${k}`, String(v)]),
-      ...Object.entries(filteredData.leadsBySource).map(([k, v]) => [`Leads By Source — ${k}`, String(v)]),
+      ...Object.entries(filteredData.leadsByStatus).map(([k, v]) => [
+        `Leads By Status — ${k}`,
+        String(v),
+      ]),
+      ...Object.entries(filteredData.leadsBySource).map(([k, v]) => [
+        `Leads By Source — ${k}`,
+        String(v),
+      ]),
       ...filteredData.agentPerformance
         .sort((a, b) => b.leads - a.leads)
         .map((a) => [`Agent ${a.name}`, `leads ${a.leads}, won ${a.won}, ${a.rate}%`]),
@@ -686,18 +794,18 @@ export default function ReportsScreen() {
             className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
             title="Export report as PDF"
           >
-              <FileDown size={15} />
-              Export PDF
-            </button>
+            <FileDown size={15} />
+            Export PDF
+          </button>
           <button
             onClick={exportReportsCSV}
             disabled={loading || !data}
             className="btn-secondary text-sm flex items-center gap-1.5 disabled:opacity-50"
             title="Export report as CSV"
           >
-              <FileDown size={15} />
-              Export CSV
-            </button>
+            <FileDown size={15} />
+            Export CSV
+          </button>
           <button
             onClick={() => {
               loadReports(from, to);
@@ -817,9 +925,7 @@ export default function ReportsScreen() {
                         <card.icon size={24} />
                       </div>
                       <div>
-                        <h3 className="text-base font-semibold text-foreground">
-                          {card.title}
-                        </h3>
+                        <h3 className="text-base font-semibold text-foreground">{card.title}</h3>
                         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                           {card.desc}
                         </p>
@@ -850,9 +956,7 @@ export default function ReportsScreen() {
                         <p className="text-sm font-semibold text-foreground truncate">
                           {card.title}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {card.desc}
-                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{card.desc}</p>
                       </div>
                     </button>
                   ))}
@@ -894,7 +998,10 @@ export default function ReportsScreen() {
 
               {/* Overview tab */}
               <div className={view === 'overview' ? 'block space-y-6' : 'hidden'}>
-                <OverviewTab data={filteredData!} showDelta={rangePreset !== 'year' && !selectedUserId} />
+                <OverviewTab
+                  data={filteredData!}
+                  showDelta={rangePreset !== 'year' && !selectedUserId}
+                />
               </div>
 
               {/* Leads tab */}
@@ -918,21 +1025,24 @@ export default function ReportsScreen() {
                 <SimpleTeamPerformance
                   data={filteredData!}
                   monthlyLeads={filteredData!.monthlyLeads}
-                  teamOptions={data.teamPerformance.map((team) => ({ id: team.id, name: team.name }))}
+                  teamOptions={data.teamPerformance.map((team) => ({
+                    id: team.id,
+                    name: team.name,
+                  }))}
                 />
                 {/* Detailed team analytics remain available below the simplified view. */}
                 <div className="hidden">
-                <TeamTab
-                  data={filteredData!}
-                  activityRows={filteredActivityRows}
-                  hourRows={filteredHourRows}
-                  actionTypes={actionTypes}
-                  hourFilter={hourFilter}
-                  setHourFilter={setHourFilter}
-                  extrasLoading={extrasLoading}
-                  extrasAdmin={extrasAdmin}
-                  officeCfg={officeCfg}
-                />
+                  <TeamTab
+                    data={filteredData!}
+                    activityRows={filteredActivityRows}
+                    hourRows={filteredHourRows}
+                    actionTypes={actionTypes}
+                    hourFilter={hourFilter}
+                    setHourFilter={setHourFilter}
+                    extrasLoading={extrasLoading}
+                    extrasAdmin={extrasAdmin}
+                    officeCfg={officeCfg}
+                  />
                 </div>
               </div>
 
@@ -948,7 +1058,13 @@ export default function ReportsScreen() {
 
               {/* Calls tab */}
               <div className={view === 'calls' ? 'block space-y-6' : 'hidden'}>
-                <CallsTab data={filteredData!} selectedUserName={selectedUserName} selectedUserId={selectedUserId} from={from} to={to} />
+                <CallsTab
+                  data={filteredData!}
+                  selectedUserName={selectedUserName}
+                  selectedUserId={selectedUserId}
+                  from={from}
+                  to={to}
+                />
               </div>
             </div>
           )}
@@ -970,9 +1086,10 @@ function SimpleTeamPerformance({
   teamOptions: { id: string; name: string }[];
 }) {
   const [teamId, setTeamId] = useState('all');
-  const rows = teamId === 'all'
-    ? data.teamAgentPerformance
-    : data.teamAgentPerformance.filter((row) => row.teamId === teamId);
+  const rows =
+    teamId === 'all'
+      ? data.teamAgentPerformance
+      : data.teamAgentPerformance.filter((row) => row.teamId === teamId);
   const totals = rows.reduce(
     (sum, row) => ({
       totalLeads: sum.totalLeads + row.totalLeads,
@@ -1103,7 +1220,11 @@ function SimpleTeamPerformance({
           All Teams
         </button>
         {teamOptions.map((team) => (
-          <button key={team.id} onClick={() => setTeamId(team.id)} className={filterChip(teamId === team.id)}>
+          <button
+            key={team.id}
+            onClick={() => setTeamId(team.id)}
+            className={filterChip(teamId === team.id)}
+          >
             {team.name}
           </button>
         ))}
@@ -1146,20 +1267,31 @@ function SimpleTeamPerformance({
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors">
+                <tr
+                  key={row.id}
+                  className="border-b border-border/60 last:border-0 hover:bg-muted/20 transition-colors"
+                >
                   <td className="px-4 py-3">
                     <p className="font-medium text-foreground">{row.name}</p>
-                    {row.teamName && <p className="text-[11px] text-muted-foreground">{row.teamName}</p>}
+                    {row.teamName && (
+                      <p className="text-[11px] text-muted-foreground">{row.teamName}</p>
+                    )}
                   </td>
                   {stageData.stages.map((s) => (
                     <td key={s} className="px-4 py-3 text-right text-muted-foreground tabular-nums">
                       {stageData.byAgent.get(row.name)?.get(s) || 0}
                     </td>
                   ))}
-                  <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">{row.totalLeads}</td>
-                  <td className="px-4 py-3 text-right text-amber-600 tabular-nums">{row.pending}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">
+                    {row.totalLeads}
+                  </td>
+                  <td className="px-4 py-3 text-right text-amber-600 tabular-nums">
+                    {row.pending}
+                  </td>
                   <td className="px-4 py-3 text-right text-primary tabular-nums">{row.new}</td>
-                  <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{row.calls}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
+                    {row.calls}
+                  </td>
                 </tr>
               ))}
               <tr className="bg-primary/10 font-semibold">
@@ -1169,10 +1301,16 @@ function SimpleTeamPerformance({
                     {t}
                   </td>
                 ))}
-                <td className="px-4 py-3 text-right text-foreground tabular-nums">{totals.totalLeads}</td>
-                <td className="px-4 py-3 text-right text-amber-600 tabular-nums">{totals.pending}</td>
+                <td className="px-4 py-3 text-right text-foreground tabular-nums">
+                  {totals.totalLeads}
+                </td>
+                <td className="px-4 py-3 text-right text-amber-600 tabular-nums">
+                  {totals.pending}
+                </td>
                 <td className="px-4 py-3 text-right text-primary tabular-nums">{totals.new}</td>
-                <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{totals.calls}</td>
+                <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
+                  {totals.calls}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1198,7 +1336,11 @@ function SimpleTeamPerformance({
               )}
             </div>
             <div className="grid grid-cols-4 gap-2 mt-3">
-              <MobileStat label="Total" value={row.totalLeads} className="font-bold text-foreground" />
+              <MobileStat
+                label="Total"
+                value={row.totalLeads}
+                className="font-bold text-foreground"
+              />
               <MobileStat label="Pending" value={row.pending} className="text-amber-600" />
               <MobileStat label="New" value={row.new} className="text-primary" />
               <MobileStat label="Calls" value={row.calls} className="text-muted-foreground" />
@@ -1221,7 +1363,11 @@ function SimpleTeamPerformance({
           <div className="rounded-2xl border border-primary/25 bg-primary/10 p-4">
             <p className="text-sm font-semibold text-foreground mb-3">Totals</p>
             <div className="grid grid-cols-4 gap-2">
-              <MobileStat label="Total" value={totals.totalLeads} className="font-bold text-foreground" />
+              <MobileStat
+                label="Total"
+                value={totals.totalLeads}
+                className="font-bold text-foreground"
+              />
               <MobileStat label="Pending" value={totals.pending} className="text-amber-600" />
               <MobileStat label="New" value={totals.new} className="text-primary" />
               <MobileStat label="Calls" value={totals.calls} className="text-muted-foreground" />
@@ -1265,8 +1411,13 @@ function MobileStat({
 function MiniKPI({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
-      <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
-      <div><p className="text-xl font-bold text-foreground">{value.toLocaleString()}</p><p className="text-xs text-muted-foreground">{label}</p></div>
+      <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+        {icon}
+      </div>
+      <div>
+        <p className="text-xl font-bold text-foreground">{value.toLocaleString()}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
     </div>
   );
 }
@@ -1274,7 +1425,9 @@ function MiniKPI({ icon, label, value }: { icon: React.ReactNode; label: string;
 function OverviewTab({ data, showDelta }: { data: ReportData; showDelta: boolean }) {
   const prev = showDelta ? data.previousPeriod : null;
 
-  const deltaFor = (change?: number): { value: string; direction: 'up' | 'down' | 'flat' } | null => {
+  const deltaFor = (
+    change?: number
+  ): { value: string; direction: 'up' | 'down' | 'flat' } | null => {
     if (prev == null || change === undefined || change === null) return null;
     const abs = Math.abs(change);
     const direction = abs < 0.05 ? 'flat' : change > 0 ? 'up' : 'down';
@@ -1376,20 +1529,31 @@ function LeadsTab({
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="mb-4">
           <h2 className="text-sm font-semibold text-foreground">Leads by Stage and Salesperson</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">See how many leads each salesperson has at every stage.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            See how many leads each salesperson has at every stage.
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] text-sm">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Stage</th>
-                <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Salesperson</th>
-                <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Leads</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">
+                  Stage
+                </th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">
+                  Salesperson
+                </th>
+                <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">
+                  Leads
+                </th>
               </tr>
             </thead>
             <tbody>
               {leadStageByAgent.map((row) => (
-                <tr key={`${row.stage}-${row.agent}`} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                <tr
+                  key={`${row.stage}-${row.agent}`}
+                  className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
+                >
                   <td className="px-3 py-2.5 text-foreground">{row.stage}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{row.agent}</td>
                   <td className="px-3 py-2.5 text-right font-bold text-primary">{row.count}</td>
@@ -1398,7 +1562,11 @@ function LeadsTab({
             </tbody>
           </table>
         </div>
-        {leadStageByAgent.length === 0 && <p className="py-5 text-center text-sm text-muted-foreground">No lead stage data available.</p>}
+        {leadStageByAgent.length === 0 && (
+          <p className="py-5 text-center text-sm text-muted-foreground">
+            No lead stage data available.
+          </p>
+        )}
       </div>
 
       {/* Lead Status & Stage — aggregated overview */}
@@ -1406,7 +1574,9 @@ function LeadsTab({
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Lead Status & Stage</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Aggregated overview of all leads by current stage</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Aggregated overview of all leads by current stage
+            </p>
           </div>
           <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
             {leadsByStatusData.reduce((sum, item) => sum + item.value, 0)} total
@@ -1416,9 +1586,15 @@ function LeadsTab({
           <table className="w-full min-w-[360px] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Stage</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Leads</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Share</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">
+                  Stage
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">
+                  Leads
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">
+                  Share
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1437,10 +1613,17 @@ function LeadsTab({
                       const total = leadsByStatusData.reduce((sum, r) => sum + r.value, 0);
                       const pct = total ? ((item.value / total) * 100).toFixed(1) : '0.0';
                       return (
-                        <tr key={item.name} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                        <tr
+                          key={item.name}
+                          className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
+                        >
                           <td className="px-4 py-3 font-medium text-foreground">{item.name}</td>
-                          <td className="px-4 py-3 text-right font-bold text-primary tabular-nums">{item.value}</td>
-                          <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{pct}%</td>
+                          <td className="px-4 py-3 text-right font-bold text-primary tabular-nums">
+                            {item.value}
+                          </td>
+                          <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
+                            {pct}%
+                          </td>
                         </tr>
                       );
                     })}
@@ -1467,11 +1650,7 @@ function LeadsTab({
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={leadsByStatusData} layout="vertical">
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--border)"
-                  horizontal={false}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 12 }} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
                 <Tooltip />
@@ -1489,7 +1668,9 @@ function LeadsTab({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Where your leads are</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">A quick view of each lead’s current stage</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                A quick view of each lead’s current stage
+              </p>
             </div>
             <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
               {leadsByStatusData.reduce((sum, item) => sum + item.value, 0)} total
@@ -1506,15 +1687,26 @@ function LeadsTab({
                   const total = leadsByStatusData.reduce((sum, current) => sum + current.value, 0);
                   const width = total ? Math.max(5, Math.round((item.value / total) * 100)) : 0;
                   return (
-                  <div key={item.name} className="animate-rise-in rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5" style={{ animationDelay: `${index * 45}ms` }}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
-                      <span className="min-w-8 text-right font-bold text-primary">{item.value}</span>
+                    <div
+                      key={item.name}
+                      className="animate-rise-in rounded-xl border border-border/70 bg-muted/25 px-3 py-2.5"
+                      style={{ animationDelay: `${index * 45}ms` }}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-foreground truncate">
+                          {item.name}
+                        </span>
+                        <span className="min-w-8 text-right font-bold text-primary">
+                          {item.value}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                          style={{ width: `${width}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out" style={{ width: `${width}%` }} />
-                    </div>
-                  </div>
                   );
                 })}
             </div>
@@ -1605,8 +1797,7 @@ function LeadsTab({
 }
 
 function SalesTab({ data }: { data: ReportData }) {
-  const avgDealValue =
-    data.totalCustomers > 0 ? data.totalRevenue / data.totalCustomers : 0;
+  const avgDealValue = data.totalCustomers > 0 ? data.totalRevenue / data.totalCustomers : 0;
 
   const revenueByTeam = data.teamPerformance
     .slice()
@@ -1653,7 +1844,11 @@ function SalesTab({ data }: { data: ReportData }) {
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={revenueByTeam} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v: number) => formatCurrency(Number(v))} />
+              <XAxis
+                type="number"
+                tick={{ fontSize: 12 }}
+                tickFormatter={(v: number) => formatCurrency(Number(v))}
+              />
               <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} />
               <Tooltip formatter={(v: number) => formatCurrency(Number(v))} />
               <Bar dataKey="revenue" name="Revenue" radius={[0, 4, 4, 0]}>
@@ -1751,8 +1946,7 @@ function TeamTab({
                 Team Performance & Profitability
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Per-team calls, deals, revenue, expenses and leader rating — scoped to your
-                role
+                Per-team calls, deals, revenue, expenses and leader rating — scoped to your role
               </p>
             </div>
           </div>
@@ -1801,9 +1995,7 @@ function TeamTab({
                       key={member.id || i}
                       className="border-b border-border/50 hover:bg-muted/30 transition-colors"
                     >
-                      <td className="py-2.5 px-3 font-medium text-foreground">
-                        {member.name}
-                      </td>
+                      <td className="py-2.5 px-3 font-medium text-foreground">{member.name}</td>
                       <td className="py-2.5 px-3 text-muted-foreground">
                         {member.leaderName || '—'}
                       </td>
@@ -1895,8 +2087,8 @@ function TeamTab({
               <>
                 <p className="text-xs text-muted-foreground mb-3">
                   Showing activity at{' '}
-                  <span className="font-semibold text-foreground">{hourLabel(hourFilter)}</span>{' '}
-                  · Calls = phone / video-call follow-ups
+                  <span className="font-semibold text-foreground">{hourLabel(hourFilter)}</span> ·
+                  Calls = phone / video-call follow-ups
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm whitespace-nowrap">
@@ -1948,10 +2140,7 @@ function TeamTab({
                             )}
                           </td>
                           {actionTypes.map((t) => (
-                            <td
-                              key={t}
-                              className="py-2.5 px-3 text-right text-muted-foreground"
-                            >
+                            <td key={t} className="py-2.5 px-3 text-right text-muted-foreground">
                               {r.byAction[t] || 0}
                             </td>
                           ))}
@@ -2084,9 +2273,8 @@ function AttendanceTab({
           <div className="mb-4">
             <h2 className="text-sm font-semibold text-foreground">Attendance Report</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Per-user office attendance for the selected period · Office hours{' '}
-              {officeCfg.start} – {officeCfg.end} · Arriving after{' '}
-              {formatMinutes(officeCfg.toleranceMinutes)} ={' '}
+              Per-user office attendance for the selected period · Office hours {officeCfg.start} –{' '}
+              {officeCfg.end} · Arriving after {formatMinutes(officeCfg.toleranceMinutes)} ={' '}
               <span className="text-amber-600 font-medium">Late</span>
             </p>
           </div>
@@ -2146,9 +2334,7 @@ function AttendanceTab({
                         <td className="py-2.5 px-3 text-right text-amber-600 font-medium">
                           {r.late}
                         </td>
-                        <td className="py-2.5 px-3 text-right text-muted-foreground">
-                          {r.absent}
-                        </td>
+                        <td className="py-2.5 px-3 text-right text-muted-foreground">{r.absent}</td>
                         <td className="py-2.5 px-3">
                           <div className="flex justify-center">
                             {r.late > 0 ? (
@@ -2256,7 +2442,13 @@ function CallsTab({
     teams: { id: string; name: string }[];
     teamLeaders: { id: string; name: string; teamId: string; teamName: string }[];
     stages: string[];
-  }>({ projects: [], sources: [], teams: [], teamLeaders: [], stages: ALL_REAL_STATUSES as string[] });
+  }>({
+    projects: [],
+    sources: [],
+    teams: [],
+    teamLeaders: [],
+    stages: ALL_REAL_STATUSES as string[],
+  });
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
@@ -2265,7 +2457,15 @@ function CallsTab({
   };
 
   const clearFilters = () => {
-    setFilters({ agent: '', teamLeader: '', team: '', project: '', campaign: '', source: '', stage: '' });
+    setFilters({
+      agent: '',
+      teamLeader: '',
+      team: '',
+      project: '',
+      campaign: '',
+      source: '',
+      stage: '',
+    });
   };
 
   useEffect(() => {
@@ -2286,7 +2486,13 @@ function CallsTab({
           stage: filters.stage || undefined,
         });
         if (cancelled) return;
-        setMatrix({ stages: res.stages, rows: res.rows, columnTotals: res.columnTotals, grandTotal: res.grandTotal, performance: res.performance || [] });
+        setMatrix({
+          stages: res.stages,
+          rows: res.rows,
+          columnTotals: res.columnTotals,
+          grandTotal: res.grandTotal,
+          performance: res.performance || [],
+        });
         if (res.filterOptions) {
           setFilterOptions({
             projects: res.filterOptions.projects || [],
@@ -2303,7 +2509,9 @@ function CallsTab({
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [from, to, filters, selectedUserId]);
 
   // Use filtered matrix if available, otherwise fallback to summary matrix
@@ -2318,7 +2526,9 @@ function CallsTab({
   const displayColumnTotals = matrix
     ? matrix.columnTotals
     : displayStages.map((_, idx) => displayRows.reduce((sum, r) => sum + (r.counts[idx] || 0), 0));
-  const displayGrandTotal = matrix ? matrix.grandTotal : displayColumnTotals.reduce((a, b) => a + b, 0);
+  const displayGrandTotal = matrix
+    ? matrix.grandTotal
+    : displayColumnTotals.reduce((a, b) => a + b, 0);
   const hasActiveFilters = activeFilterCount > 0 || !!selectedUserId;
   const performanceRows = (matrix?.performance || []).map((p) => ({
     agent: p.agent,
@@ -2344,11 +2554,15 @@ function CallsTab({
           <div>
             <h2 className="text-sm font-semibold text-foreground">Agent × Lead Stage</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {hasActiveFilters ? 'Filtered view' : 'How many leads each agent has at every stage'} · {from} → {to}
+              {hasActiveFilters ? 'Filtered view' : 'How many leads each agent has at every stage'}{' '}
+              · {from} → {to}
             </p>
           </div>
           {hasActiveFilters && (
-            <button onClick={clearFilters} className="btn-ghost text-xs px-3 py-1.5 rounded-full border border-border hover:bg-muted">
+            <button
+              onClick={clearFilters}
+              className="btn-ghost text-xs px-3 py-1.5 rounded-full border border-border hover:bg-muted"
+            >
               Clear filters ({activeFilterCount + (selectedUserId ? 1 : 0)})
             </button>
           )}
@@ -2357,122 +2571,230 @@ function CallsTab({
         {/* Filters bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <div className="relative">
-            <select value={filters.teamLeader} onChange={(e) => updateFilter('teamLeader', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+            <select
+              value={filters.teamLeader}
+              onChange={(e) => updateFilter('teamLeader', e.target.value)}
+              className="input-base w-full appearance-none pr-8 text-sm h-9"
+            >
               <option value="">All Team Leaders</option>
               {filterOptions.teamLeaders.map((l) => (
-                <option key={l.id} value={l.id}>{l.name} · {l.teamName}</option>
+                <option key={l.id} value={l.id}>
+                  {l.name} · {l.teamName}
+                </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
           <div className="relative">
-            <select value={filters.team} onChange={(e) => updateFilter('team', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+            <select
+              value={filters.team}
+              onChange={(e) => updateFilter('team', e.target.value)}
+              className="input-base w-full appearance-none pr-8 text-sm h-9"
+            >
               <option value="">All Teams</option>
               {filterOptions.teams.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
           <div className="relative">
-            <select value={filters.project} onChange={(e) => updateFilter('project', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+            <select
+              value={filters.project}
+              onChange={(e) => updateFilter('project', e.target.value)}
+              className="input-base w-full appearance-none pr-8 text-sm h-9"
+            >
               <option value="">All Projects</option>
               {filterOptions.projects.map((p) => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
           <div className="relative">
-            <select value={filters.source} onChange={(e) => updateFilter('source', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+            <select
+              value={filters.source}
+              onChange={(e) => updateFilter('source', e.target.value)}
+              className="input-base w-full appearance-none pr-8 text-sm h-9"
+            >
               <option value="">All Lead Sources</option>
               {filterOptions.sources.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
           <div className="relative">
-            <select value={filters.campaign} onChange={(e) => updateFilter('campaign', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+            <select
+              value={filters.campaign}
+              onChange={(e) => updateFilter('campaign', e.target.value)}
+              className="input-base w-full appearance-none pr-8 text-sm h-9"
+            >
               <option value="">All Campaigns</option>
               {filterOptions.sources.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
           <div className="relative">
-            <select value={filters.stage} onChange={(e) => updateFilter('stage', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+            <select
+              value={filters.stage}
+              onChange={(e) => updateFilter('stage', e.target.value)}
+              className="input-base w-full appearance-none pr-8 text-sm h-9"
+            >
               <option value="">All Stages</option>
               {filterOptions.stages.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
           <div className="relative">
-            <select value={filters.agent} onChange={(e) => updateFilter('agent', e.target.value)} className="input-base w-full appearance-none pr-8 text-sm h-9">
+            <select
+              value={filters.agent}
+              onChange={(e) => updateFilter('agent', e.target.value)}
+              className="input-base w-full appearance-none pr-8 text-sm h-9"
+            >
               <option value="">All Agents</option>
               {data.teamAgentPerformance.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+            />
           </div>
         </div>
 
         {activeFilterCount > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {Object.entries(filters).filter(([, v]) => v).map(([k, v]) => (
-              <span key={k} className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-medium">
-                {k}: {v}
-                <button onClick={() => updateFilter(k as any, '')} className="hover:text-primary/70"><X size={12} /></button>
-              </span>
-            ))}
+            {Object.entries(filters)
+              .filter(([, v]) => v)
+              .map(([k, v]) => (
+                <span
+                  key={k}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-medium"
+                >
+                  {k}: {v}
+                  <button
+                    onClick={() => updateFilter(k as any, '')}
+                    className="hover:text-primary/70"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
           </div>
         )}
 
         {loadingMatrix ? (
-          <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-primary" /></div>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 size={24} className="animate-spin text-primary" />
+          </div>
         ) : matrixError ? (
           <div className="py-8 text-center">
             <p className="text-sm text-destructive mb-3">{matrixError}</p>
-            <button onClick={() => setFilters({ ...filters })} className="btn-secondary text-sm">Retry</button>
+            <button onClick={() => setFilters({ ...filters })} className="btn-secondary text-sm">
+              Retry
+            </button>
           </div>
         ) : displayRows.length === 0 ? (
           <div className="py-12 text-center">
             <p className="text-sm font-medium text-foreground">No results for selected filters</p>
             <p className="text-xs text-muted-foreground mt-1">Try adjusting or clearing filters</p>
-            {hasActiveFilters && <button onClick={clearFilters} className="btn-secondary mt-3 text-sm">Clear filters</button>}
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="btn-secondary mt-3 text-sm">
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto -mx-5 px-5">
             <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className="sticky left-0 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground whitespace-nowrap z-10">Agent</th>
+                  <th className="sticky left-0 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground whitespace-nowrap z-10">
+                    Agent
+                  </th>
                   {displayStages.map((s) => (
-                    <th key={s} className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground whitespace-nowrap">{s}</th>
+                    <th
+                      key={s}
+                      className="text-right px-3 py-3 text-xs font-semibold text-muted-foreground whitespace-nowrap"
+                    >
+                      {s}
+                    </th>
                   ))}
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-foreground whitespace-nowrap">Total</th>
+                  <th className="text-right px-3 py-3 text-xs font-semibold text-foreground whitespace-nowrap">
+                    Total
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {displayRows.map((row) => (
-                  <tr key={row.agent} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="sticky left-0 bg-card px-4 py-3 font-medium text-foreground whitespace-nowrap border-r border-border/50">{row.agent}</td>
+                  <tr
+                    key={row.agent}
+                    className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="sticky left-0 bg-card px-4 py-3 font-medium text-foreground whitespace-nowrap border-r border-border/50">
+                      {row.agent}
+                    </td>
                     {row.counts.map((c, idx) => (
-                      <td key={idx} className="px-3 py-3 text-right tabular-nums text-muted-foreground">{c}</td>
+                      <td
+                        key={idx}
+                        className="px-3 py-3 text-right tabular-nums text-muted-foreground"
+                      >
+                        {c}
+                      </td>
                     ))}
-                    <td className="px-3 py-3 text-right font-bold text-foreground tabular-nums">{row.total}</td>
+                    <td className="px-3 py-3 text-right font-bold text-foreground tabular-nums">
+                      {row.total}
+                    </td>
                   </tr>
                 ))}
                 <tr className="bg-primary/10 font-semibold border-t-2 border-primary/20">
-                  <td className="sticky left-0 bg-primary/10 px-4 py-3 text-foreground whitespace-nowrap">Total</td>
+                  <td className="sticky left-0 bg-primary/10 px-4 py-3 text-foreground whitespace-nowrap">
+                    Total
+                  </td>
                   {displayColumnTotals.map((c, idx) => (
-                    <td key={idx} className="px-3 py-3 text-right tabular-nums text-foreground">{c}</td>
+                    <td key={idx} className="px-3 py-3 text-right tabular-nums text-foreground">
+                      {c}
+                    </td>
                   ))}
-                  <td className="px-3 py-3 text-right font-bold text-primary tabular-nums">{displayGrandTotal}</td>
+                  <td className="px-3 py-3 text-right font-bold text-primary tabular-nums">
+                    {displayGrandTotal}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -2495,67 +2817,175 @@ function CallsTab({
             <table className="w-full text-sm min-w-[1100px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th rowSpan={2} className="sticky left-0 z-10 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground border-r border-border/50">Agent</th>
-                  <th colSpan={7} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Calls &amp; Status</th>
-                  <th colSpan={displayStages.length} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Lead Stages</th>
-                  <th colSpan={5} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Actions</th>
+                  <th
+                    rowSpan={2}
+                    className="sticky left-0 z-10 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground border-r border-border/50"
+                  >
+                    Agent
+                  </th>
+                  <th
+                    colSpan={7}
+                    className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50"
+                  >
+                    Calls &amp; Status
+                  </th>
+                  <th
+                    colSpan={displayStages.length}
+                    className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50"
+                  >
+                    Lead Stages
+                  </th>
+                  <th
+                    colSpan={5}
+                    className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50"
+                  >
+                    Actions
+                  </th>
                 </tr>
                 <tr className="border-b border-border">
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">Calls</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-600 whitespace-nowrap">Connected</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">No ans.</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">Incom.</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-amber-600 whitespace-nowrap">Short</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-700 whitespace-nowrap">Reached</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-red-500 whitespace-nowrap">Not int.</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                    Calls
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-600 whitespace-nowrap">
+                    Connected
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                    No ans.
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">
+                    Incom.
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-amber-600 whitespace-nowrap">
+                    Short
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-700 whitespace-nowrap">
+                    Reached
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-red-500 whitespace-nowrap">
+                    Not int.
+                  </th>
                   {displayStages.map((s) => (
-                    <th key={s} className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">{s}</th>
+                    <th
+                      key={s}
+                      className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap"
+                    >
+                      {s}
+                    </th>
                   ))}
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-primary whitespace-nowrap">WhatsApp</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">Email</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600 whitespace-nowrap">Meetings</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">Notes</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-foreground whitespace-nowrap">Total act.</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-primary whitespace-nowrap">
+                    WhatsApp
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">
+                    Email
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600 whitespace-nowrap">
+                    Meetings
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                    Notes
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-foreground whitespace-nowrap">
+                    Total act.
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {performanceRows.map((r) => (
-                  <tr key={r.agent} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="sticky left-0 z-10 bg-card px-4 py-3 font-medium text-foreground whitespace-nowrap border-r border-border/50">{r.agent}</td>
+                  <tr
+                    key={r.agent}
+                    className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                  >
+                    <td className="sticky left-0 z-10 bg-card px-4 py-3 font-medium text-foreground whitespace-nowrap border-r border-border/50">
+                      {r.agent}
+                    </td>
                     <td className="px-3 py-3 text-right tabular-nums font-bold">{r.calls}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-emerald-600">{r.connected}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{r.noAnswer}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-emerald-600">
+                      {r.connected}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">
+                      {r.noAnswer}
+                    </td>
                     <td className="px-3 py-3 text-right tabular-nums text-sky-600">{r.incoming}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-amber-600">{r.shortCalls}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-emerald-700">{r.reached}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-red-500">{r.notInterested}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-amber-600">
+                      {r.shortCalls}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-emerald-700">
+                      {r.reached}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-red-500">
+                      {r.notInterested}
+                    </td>
                     {displayStages.map((s, i) => {
                       const stageIdx = displayStages.indexOf(s);
-                      const v = matrix?.rows.find((m) => m.agent === r.agent)?.counts[stageIdx] ?? 0;
-                      return <td key={s} className="px-3 py-3 text-right tabular-nums text-muted-foreground">{v}</td>;
+                      const v =
+                        matrix?.rows.find((m) => m.agent === r.agent)?.counts[stageIdx] ?? 0;
+                      return (
+                        <td
+                          key={s}
+                          className="px-3 py-3 text-right tabular-nums text-muted-foreground"
+                        >
+                          {v}
+                        </td>
+                      );
                     })}
                     <td className="px-3 py-3 text-right tabular-nums text-primary">{r.whatsapp}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-sky-600">{r.emails}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-violet-600">{r.meetings}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{r.notes}</td>
-                    <td className="px-3 py-3 text-right tabular-nums font-semibold">{r.actionsTotal}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-violet-600">
+                      {r.meetings}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">
+                      {r.notes}
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums font-semibold">
+                      {r.actionsTotal}
+                    </td>
                   </tr>
                 ))}
                 <tr className="bg-primary/10 font-semibold border-t-2 border-primary/20">
-                  <td className="sticky left-0 z-10 bg-primary/10 px-4 py-3 whitespace-nowrap">Total</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.calls, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.connected, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.noAnswer, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.incoming, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.shortCalls, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.reached, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.notInterested, 0)}</td>
-                  {matrix?.columnTotals.map((c, i) => <td key={i} className="px-3 py-3 text-right tabular-nums">{c || 0}</td>)}
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.whatsapp, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.emails, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.meetings, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.notes, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.actionsTotal, 0)}</td>
+                  <td className="sticky left-0 z-10 bg-primary/10 px-4 py-3 whitespace-nowrap">
+                    Total
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.calls, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.connected, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.noAnswer, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.incoming, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.shortCalls, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.reached, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.notInterested, 0)}
+                  </td>
+                  {matrix?.columnTotals.map((c, i) => (
+                    <td key={i} className="px-3 py-3 text-right tabular-nums">
+                      {c || 0}
+                    </td>
+                  ))}
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.whatsapp, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.emails, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.meetings, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.notes, 0)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums">
+                    {performanceRows.reduce((s, r) => s + r.actionsTotal, 0)}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -2566,9 +2996,7 @@ function CallsTab({
       {/* Calls by Employee */}
       {data.callsByEmployee.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">
-            Calls by Employee
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground mb-4">Calls by Employee</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-mobile">
               <thead>
@@ -2655,8 +3083,7 @@ function KPICard({
       : delta?.direction === 'down'
         ? 'text-red-500'
         : 'text-muted-foreground';
-  const deltaArrow =
-    delta?.direction === 'up' ? '↑' : delta?.direction === 'down' ? '↓' : '•';
+  const deltaArrow = delta?.direction === 'up' ? '↑' : delta?.direction === 'down' ? '↓' : '•';
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
@@ -2670,7 +3097,8 @@ function KPICard({
         <p className="text-xl font-bold text-foreground">{value}</p>
         {delta && (
           <p className={`text-[11px] font-semibold leading-tight ${deltaCls}`} title={deltaTitle}>
-            {deltaArrow} {delta.value} <span className="font-normal text-muted-foreground">vs prev.</span>
+            {deltaArrow} {delta.value}{' '}
+            <span className="font-normal text-muted-foreground">vs prev.</span>
           </p>
         )}
       </div>

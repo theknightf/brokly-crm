@@ -44,12 +44,7 @@ import BulkActionBar from './BulkActionBar';
 import ImportLeadsModal from './ImportLeadsModal';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction } from './mockLeads';
-import {
-  PIPELINE_STAGES,
-  OUTCOME_STAGES,
-  pipelineIndex,
-  ALL_REAL_STATUSES,
-} from './leadStages';
+import { PIPELINE_STAGES, OUTCOME_STAGES, pipelineIndex, ALL_REAL_STATUSES } from './leadStages';
 import { leadsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -221,7 +216,9 @@ export default function LeadsManagementScreen({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === 'n' &&
-        !e.ctrlKey && !e.metaKey && !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
         !(e.target instanceof HTMLInputElement) &&
         !(e.target instanceof HTMLTextAreaElement) &&
         !(e.target instanceof HTMLSelectElement)
@@ -239,7 +236,9 @@ export default function LeadsManagementScreen({
   const [pageSize, setPageSize] = useState(10);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [showFilters, setShowFilters] = useState(true);
-  const [viewTab, setViewTab] = useState<'overview' | 'activity' | 'units' | 'comments'>('overview');
+  const [viewTab, setViewTab] = useState<'overview' | 'activity' | 'units' | 'comments'>(
+    'overview'
+  );
   const [sortKey, setSortKey] = useState<keyof Lead>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [siteVisitProject, setSiteVisitProject] = useState<{
@@ -571,16 +570,20 @@ export default function LeadsManagementScreen({
           return (updated as any)[key] === (original as any)[key];
         });
       const saved = assignmentOnly
-        ? await leadsService.assignLead(updated.id, updated.assignedTo || null).then((row: any) => ({
-            ...updated,
-            assignedTo: row.assigned_to,
-            assignedToName: row.assigned_to ? updated.assignedToName : null,
-          }))
+        ? await leadsService
+            .assignLead(updated.id, updated.assignedTo || null)
+            .then((row: any) => ({
+              ...updated,
+              assignedTo: row.assigned_to,
+              assignedToName: row.assigned_to ? updated.assignedToName : null,
+            }))
         : await leadsService.update(updated.id, updated);
       setLeads((prev) => prev.map((l) => (l.id === updated.id ? (saved as Lead) : l)));
       setViewLead((current) => (current?.id === updated.id ? (saved as Lead) : current));
       setEditLead(null);
-      toast.success(assignmentOnly ? 'Lead reassigned successfully' : `Lead "${updated.name}" updated`);
+      toast.success(
+        assignmentOnly ? 'Lead reassigned successfully' : `Lead "${updated.name}" updated`
+      );
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update lead');
     }
@@ -871,7 +874,10 @@ export default function LeadsManagementScreen({
               }`}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap animate-rise-in" style={{ animationDelay: '80ms' }}>
+        <div
+          className="flex items-center gap-2 flex-wrap animate-rise-in"
+          style={{ animationDelay: '80ms' }}
+        >
           <button
             onClick={handleExport}
             className="btn-secondary flex items-center gap-1.5 text-sm"
@@ -891,7 +897,10 @@ export default function LeadsManagementScreen({
           {/* ── Prominent Add Lead CTA ── */}
           <div className="relative">
             {/* Animated glow ring */}
-            <span className="absolute inset-0 rounded-xl bg-primary/40 animate-ping" style={{ animationDuration: '2s' }} />
+            <span
+              className="absolute inset-0 rounded-xl bg-primary/40 animate-ping"
+              style={{ animationDuration: '2s' }}
+            />
             <button
               id="add-lead-btn"
               onClick={() => setAddModalOpen(true)}
@@ -900,14 +909,19 @@ export default function LeadsManagementScreen({
             >
               <Plus size={16} strokeWidth={2.5} />
               <span>{t('leads.add')}</span>
-              <span className="hidden sm:flex items-center justify-center ml-1 w-5 h-5 rounded-md bg-primary-foreground/20 text-primary-foreground text-[10px] font-bold tracking-wider">N</span>
+              <span className="hidden sm:flex items-center justify-center ml-1 w-5 h-5 rounded-md bg-primary-foreground/20 text-primary-foreground text-[10px] font-bold tracking-wider">
+                N
+              </span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Sticky toolbar */}
-      <div className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-rise-in" style={{ animationDelay: '140ms' }}>
+      <div
+        className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-rise-in"
+        style={{ animationDelay: '140ms' }}
+      >
         <div className="relative flex-1">
           <Search
             size={16}
@@ -1087,8 +1101,8 @@ export default function LeadsManagementScreen({
           <div className="p-6">
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 mb-4">
               <p className="text-sm text-amber-800 font-medium mb-1">
-                A lead with phone <span className="font-mono">{dupWarning.existing.phone}</span> already
-                exists.
+                A lead with phone <span className="font-mono">{dupWarning.existing.phone}</span>{' '}
+                already exists.
               </p>
               {dupWarning.existing.matches > 1 && (
                 <p className="text-xs text-amber-700">
@@ -1099,7 +1113,9 @@ export default function LeadsManagementScreen({
 
             <div className="rounded-xl border border-border overflow-hidden mb-5">
               <div className="px-4 py-3 border-b border-border bg-muted/40">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">Existing lead</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase">
+                  Existing lead
+                </p>
               </div>
               <div className="px-4 py-3 space-y-2 text-sm">
                 <div className="flex justify-between gap-3">
@@ -1112,7 +1128,9 @@ export default function LeadsManagementScreen({
                 </div>
                 <div className="flex justify-between gap-3">
                   <span className="text-muted-foreground">Created by</span>
-                  <span className="font-medium text-foreground">{dupWarning.existing.createdBy}</span>
+                  <span className="font-medium text-foreground">
+                    {dupWarning.existing.createdBy}
+                  </span>
                 </div>
                 <div className="flex justify-between gap-3">
                   <span className="text-muted-foreground">Created on</span>
@@ -1124,7 +1142,9 @@ export default function LeadsManagementScreen({
                 </div>
                 <div className="flex justify-between gap-3">
                   <span className="text-muted-foreground">Assigned to</span>
-                  <span className="font-medium text-foreground">{dupWarning.existing.assignedTo}</span>
+                  <span className="font-medium text-foreground">
+                    {dupWarning.existing.assignedTo}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1241,8 +1261,8 @@ export default function LeadsManagementScreen({
                               isActive
                                 ? 'bg-primary text-primary-foreground border-primary font-semibold'
                                 : isDone
-                                ? 'text-primary bg-primary/5 border-primary/40 hover:bg-primary/10 font-medium'
-                                : 'text-foreground bg-card border-border hover:bg-muted font-medium'
+                                  ? 'text-primary bg-primary/5 border-primary/40 hover:bg-primary/10 font-medium'
+                                  : 'text-foreground bg-card border-border hover:bg-muted font-medium'
                             }`}
                           >
                             {isActive ? (

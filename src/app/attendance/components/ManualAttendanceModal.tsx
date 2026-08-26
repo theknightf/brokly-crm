@@ -80,11 +80,15 @@ export default function ManualAttendanceModal({
       if (rec) {
         if (rec.check_in_time) {
           const d = new Date(rec.check_in_time);
-          setCheckIn(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+          setCheckIn(
+            `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+          );
         }
         if (rec.check_out_time) {
           const d = new Date(rec.check_out_time);
-          setCheckOut(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+          setCheckOut(
+            `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+          );
         }
       }
     })();
@@ -162,7 +166,12 @@ export default function ManualAttendanceModal({
 
           <div>
             <label className="label-base">Employee</label>
-            <select value={userId} onChange={(e) => setUserId(e.target.value)} className="input-base w-full" disabled={isEdit}>
+            <select
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className="input-base w-full"
+              disabled={isEdit}
+            >
               <option value="">Select employee…</option>
               {activeUsers.map((u) => (
                 <option key={u.id} value={u.id}>

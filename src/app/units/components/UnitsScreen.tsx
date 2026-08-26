@@ -608,9 +608,9 @@ export default function UnitsScreen() {
             <button onClick={() => setDeleting(null)} className="btn-secondary">
               Cancel
             </button>
-              <button onClick={confirmDelete} className="btn-danger">
-                Remove unit
-              </button>
+            <button onClick={confirmDelete} className="btn-danger">
+              Remove unit
+            </button>
           </div>
         </div>
       </Modal>
@@ -725,8 +725,8 @@ function UnitFormModal({
     <Modal
       open={open}
       onClose={onClose}
-              title={initial ? 'Edit unit' : 'Add unit'}
-              subtitle="Unit details — shown to your sales team and the calculator"
+      title={initial ? 'Edit unit' : 'Add unit'}
+      subtitle="Unit details — shown to your sales team and the calculator"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">

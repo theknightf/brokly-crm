@@ -396,7 +396,7 @@ export default function NotificationBell() {
                     ? 'Notifications blocked — allow in browser settings'
                     : pushState === 'default'
                       ? 'Enable phone notifications'
-                    : 'Enable phone notifications'}
+                      : 'Enable phone notifications'}
                 </button>
               )}
             </div>

@@ -30,13 +30,7 @@ import { usersService } from '@/lib/services/crmService';
 
 const fmt = (n: number) => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-xs font-semibold text-muted-foreground">{label}</label>
@@ -239,8 +233,13 @@ export default function PayrollTab() {
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Settings2 size={15} className="text-primary" /> Working Hours & Payroll Rules
           </h3>
-          <button onClick={saveConfig} disabled={savingConfig} className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5">
-            {savingConfig ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save settings
+          <button
+            onClick={saveConfig}
+            disabled={savingConfig}
+            className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5"
+          >
+            {savingConfig ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}{' '}
+            Save settings
           </button>
         </div>
         <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -305,7 +304,9 @@ export default function PayrollTab() {
               min={0}
               step="0.1"
               value={rules.absenceDeductionPerDay}
-              onChange={(e) => setRules({ ...rules, absenceDeductionPerDay: Number(e.target.value) })}
+              onChange={(e) =>
+                setRules({ ...rules, absenceDeductionPerDay: Number(e.target.value) })
+              }
               className="input-base text-sm"
             />
           </Field>
@@ -350,8 +351,13 @@ export default function PayrollTab() {
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
             <User size={15} className="text-primary" /> Base Salaries
           </h3>
-          <button onClick={saveSalaries} disabled={saving} className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5">
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save salaries
+          <button
+            onClick={saveSalaries}
+            disabled={saving}
+            className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save
+            salaries
           </button>
         </div>
         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -387,10 +393,23 @@ export default function PayrollTab() {
             <CalendarRange size={15} className="text-primary" /> Payroll Periods
           </h3>
           <div className="flex items-center gap-2 flex-wrap">
-            <input type="date" value={newStart} onChange={(e) => setNewStart(e.target.value)} className="input-base !w-40 text-sm" />
+            <input
+              type="date"
+              value={newStart}
+              onChange={(e) => setNewStart(e.target.value)}
+              className="input-base !w-40 text-sm"
+            />
             <span className="text-xs text-muted-foreground">→</span>
-            <input type="date" value={newEnd} onChange={(e) => setNewEnd(e.target.value)} className="input-base !w-40 text-sm" />
-            <button onClick={createPeriod} className="btn-secondary h-8 px-3 text-xs flex items-center gap-1.5">
+            <input
+              type="date"
+              value={newEnd}
+              onChange={(e) => setNewEnd(e.target.value)}
+              className="input-base !w-40 text-sm"
+            />
+            <button
+              onClick={createPeriod}
+              className="btn-secondary h-8 px-3 text-xs flex items-center gap-1.5"
+            >
               <Plus size={13} /> New period
             </button>
           </div>
@@ -419,13 +438,24 @@ export default function PayrollTab() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
                 </div>
-                <button onClick={generate} disabled={generating || selected?.status === 'finalized'} className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5">
-                  {generating ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} Generate from attendance
+                <button
+                  onClick={generate}
+                  disabled={generating || selected?.status === 'finalized'}
+                  className="btn-primary h-8 px-3 text-xs flex items-center gap-1.5"
+                >
+                  {generating ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}{' '}
+                  Generate from attendance
                 </button>
                 {selected?.status === 'draft' && entries.length > 0 && (
-                  <button onClick={finalize} className="btn-secondary h-8 px-3 text-xs flex items-center gap-1.5">
+                  <button
+                    onClick={finalize}
+                    className="btn-secondary h-8 px-3 text-xs flex items-center gap-1.5"
+                  >
                     <ShieldCheck size={13} /> Finalize period
                   </button>
                 )}
@@ -448,48 +478,100 @@ export default function PayrollTab() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-muted/30">
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Employee</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Base</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Days</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Late (min)</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Absence</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Leave</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Bonus</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Commission</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Reimbursements</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Other deductions</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Gross</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Deductions</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Net</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Status</th>
+                        <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Employee
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Base
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Days
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Late (min)
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Absence
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Leave
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Bonus
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Commission
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Reimbursements
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Other deductions
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Gross
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Deductions
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Net
+                        </th>
+                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                          Status
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {entries.map((e) => (
                         <tr key={e.id} className="hover:bg-muted/30">
-                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{e.userName || '—'}</td>
+                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">
+                            {e.userName || '—'}
+                          </td>
                           <td className="px-3 py-2 text-right tabular-nums">{fmt(e.baseSalary)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{e.attendanceDays}/{e.totalWorkingDays}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {e.attendanceDays}/{e.totalWorkingDays}
+                          </td>
                           <td className="px-3 py-2 text-right tabular-nums">{e.lateMinutes}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{e.absenceDays}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{e.leaveDays}</td>
                           <td className="px-3 py-2 text-right">
-                            <MoneyInput value={e.bonus} onSave={(v) => saveEntry(e.id, { bonus: v })} />
+                            <MoneyInput
+                              value={e.bonus}
+                              onSave={(v) => saveEntry(e.id, { bonus: v })}
+                            />
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <MoneyInput value={e.commission} onSave={(v) => saveEntry(e.id, { commission: v })} />
+                            <MoneyInput
+                              value={e.commission}
+                              onSave={(v) => saveEntry(e.id, { commission: v })}
+                            />
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <MoneyInput value={e.expenseReimbursement} onSave={(v) => saveEntry(e.id, { expenseReimbursement: v })} />
+                            <MoneyInput
+                              value={e.expenseReimbursement}
+                              onSave={(v) => saveEntry(e.id, { expenseReimbursement: v })}
+                            />
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <MoneyInput value={e.otherDeductions} onSave={(v) => saveEntry(e.id, { otherDeductions: v })} />
+                            <MoneyInput
+                              value={e.otherDeductions}
+                              onSave={(v) => saveEntry(e.id, { otherDeductions: v })}
+                            />
                           </td>
-                          <td className="px-3 py-2 text-right font-medium tabular-nums">{fmt(e.gross)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-destructive">-{fmt(e.deductionsTotal)}</td>
-                          <td className="px-3 py-2 text-right font-bold tabular-nums">{fmt(e.net)}</td>
+                          <td className="px-3 py-2 text-right font-medium tabular-nums">
+                            {fmt(e.gross)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                            -{fmt(e.deductionsTotal)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-bold tabular-nums">
+                            {fmt(e.net)}
+                          </td>
                           <td className="px-3 py-2 text-right">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${e.status === 'paid' ? 'bg-emerald-50 text-emerald-700' : e.status === 'approved' ? 'bg-sky-50 text-sky-700' : 'bg-muted text-muted-foreground'}`}>
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${e.status === 'paid' ? 'bg-emerald-50 text-emerald-700' : e.status === 'approved' ? 'bg-sky-50 text-sky-700' : 'bg-muted text-muted-foreground'}`}
+                            >
                               {e.status}
                             </span>
                           </td>
@@ -499,7 +581,9 @@ export default function PayrollTab() {
                         <td className="px-3 py-2 text-foreground">Totals</td>
                         <td className="px-3 py-2 text-right" colSpan={6}></td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmt(totals.gross)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-destructive">-{fmt(totals.deductions)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                          -{fmt(totals.deductions)}
+                        </td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmt(totals.net)}</td>
                         <td className="px-3 py-2"></td>
                       </tr>
@@ -552,7 +636,11 @@ function MoneyInput({ value, onSave }: { value: number; onSave: (v: number) => v
           >
             {busy ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
           </button>
-          <button onClick={() => setDraft(null)} className="p-1 rounded-lg text-muted-foreground hover:bg-muted" title="Cancel">
+          <button
+            onClick={() => setDraft(null)}
+            className="p-1 rounded-lg text-muted-foreground hover:bg-muted"
+            title="Cancel"
+          >
             ✕
           </button>
         </>

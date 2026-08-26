@@ -27,7 +27,10 @@ export async function GET() {
     const item = (data || []).find((r: any) => r.name === 'rotation_enabled');
     return NextResponse.json({ enabled: !!item?.is_active });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Failed to read rotation state' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Failed to read rotation state' },
+      { status: 500 }
+    );
   }
 }
 
@@ -78,6 +81,9 @@ export async function POST(request: Request) {
     if (error) throw error;
     return NextResponse.json({ enabled });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Failed to save rotation state' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Failed to save rotation state' },
+      { status: 500 }
+    );
   }
 }

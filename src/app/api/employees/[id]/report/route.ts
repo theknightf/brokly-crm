@@ -43,10 +43,7 @@ function fmtDur(sec: number): string {
 
 // GET /api/employees/[id]/report?from=YYYY-MM-DD&to=YYYY-MM-DD
 // Admin-only aggregated report for one employee.
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createServerClient();
     const {
@@ -76,78 +73,94 @@ export async function GET(
     const endISO = `${to}T23:59:59.999`;
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const [{ data: employee }, attendanceRes, leadsRes, callsRes, followRes, visitsRes, expensesRes, activityRes, dailyRes, eventsRes, auditRes] =
-      await Promise.all([
-        supabase
-          .from('user_profiles')
-          .select('id, full_name, email, role, phone, is_active, created_at')
-          .eq('id', employeeId)
-          .maybeSingle(),
-        supabase
-          .from('attendance')
-          .select('*')
-          .eq('user_id', employeeId)
-          .gte('attendance_date', from)
-          .lte('attendance_date', to)
-          .order('attendance_date', { ascending: false }),
-        supabase
-          .from('leads')
-          .select('*')
-          .or(`created_by.eq.${employeeId},assigned_to.eq.${employeeId}`)
-          .order('created_at', { ascending: false })
-          .limit(500),
-        supabase
-          .from('call_logs')
-          .select('*')
-          .eq('user_id', employeeId)
-          .gte('created_at', startISO)
-          .lte('created_at', endISO)
-          .order('created_at', { ascending: false })
-          .limit(500),
-        supabase
-          .from('follow_ups')
-          .select('*')
-          .eq('created_by', employeeId)
-          .order('created_at', { ascending: false })
-          .limit(500),
-        supabase
-          .from('site_visits')
-          .select('*')
-          .eq('user_id', employeeId)
-          .lte('check_in_at', endISO)
-          .gte('check_in_at', startISO)
-          .order('check_in_at', { ascending: false })
-          .limit(300),
-        supabase.from('expenses').select('*').eq('created_by', employeeId).order('created_at', { ascending: false }).limit(500),
-        supabase
-          .from('activity_log')
-          .select('user_id, action_type, created_at')
-          .eq('user_id', employeeId)
-          .gte('created_at', startISO)
-          .lte('created_at', endISO),
-        supabase
-          .from('user_daily_activity')
-          .select('activity_date, total_active_seconds')
-          .eq('user_id', employeeId)
-          .gte('activity_date', from)
-          .lte('activity_date', to),
-        supabase
-          .from('site_visit_events')
-          .select('*')
-          .eq('user_id', employeeId)
-          .lte('created_at', endISO)
-          .gte('created_at', startISO)
-          .order('created_at', { ascending: false })
-          .limit(500),
-        supabase
-          .from('audit_log')
-          .select('*')
-          .eq('user_id', employeeId)
-          .lte('created_at', endISO)
-          .gte('created_at', startISO)
-          .order('created_at', { ascending: false })
-          .limit(500),
-      ]);
+    const [
+      { data: employee },
+      attendanceRes,
+      leadsRes,
+      callsRes,
+      followRes,
+      visitsRes,
+      expensesRes,
+      activityRes,
+      dailyRes,
+      eventsRes,
+      auditRes,
+    ] = await Promise.all([
+      supabase
+        .from('user_profiles')
+        .select('id, full_name, email, role, phone, is_active, created_at')
+        .eq('id', employeeId)
+        .maybeSingle(),
+      supabase
+        .from('attendance')
+        .select('*')
+        .eq('user_id', employeeId)
+        .gte('attendance_date', from)
+        .lte('attendance_date', to)
+        .order('attendance_date', { ascending: false }),
+      supabase
+        .from('leads')
+        .select('*')
+        .or(`created_by.eq.${employeeId},assigned_to.eq.${employeeId}`)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('call_logs')
+        .select('*')
+        .eq('user_id', employeeId)
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('follow_ups')
+        .select('*')
+        .eq('created_by', employeeId)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('site_visits')
+        .select('*')
+        .eq('user_id', employeeId)
+        .lte('check_in_at', endISO)
+        .gte('check_in_at', startISO)
+        .order('check_in_at', { ascending: false })
+        .limit(300),
+      supabase
+        .from('expenses')
+        .select('*')
+        .eq('created_by', employeeId)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('activity_log')
+        .select('user_id, action_type, created_at')
+        .eq('user_id', employeeId)
+        .gte('created_at', startISO)
+        .lte('created_at', endISO),
+      supabase
+        .from('user_daily_activity')
+        .select('activity_date, total_active_seconds')
+        .eq('user_id', employeeId)
+        .gte('activity_date', from)
+        .lte('activity_date', to),
+      supabase
+        .from('site_visit_events')
+        .select('*')
+        .eq('user_id', employeeId)
+        .lte('created_at', endISO)
+        .gte('created_at', startISO)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('audit_log')
+        .select('*')
+        .eq('user_id', employeeId)
+        .lte('created_at', endISO)
+        .gte('created_at', startISO)
+        .order('created_at', { ascending: false })
+        .limit(500),
+    ]);
 
     if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
 
@@ -198,19 +211,27 @@ export async function GET(
         new Date(l.follow_up_due + 'T23:59:59') < new Date(todayStr + 'T00:00:00')
     ).length;
 
-    const visitsCompleted = visits.filter((v: any) => v.status === 'completed' || v.check_out_at).length;
-    const visitsTotal = visits.filter((v: any) => v.status !== 'cancelled' && v.status !== 'no_show').length;
+    const visitsCompleted = visits.filter(
+      (v: any) => v.status === 'completed' || v.check_out_at
+    ).length;
+    const visitsTotal = visits.filter(
+      (v: any) => v.status !== 'cancelled' && v.status !== 'no_show'
+    ).length;
     const visitsVerified = visits.filter(
       (v: any) => (v.verified || v.within_radius) && v.check_out_at
     ).length;
 
     const expenseTotal = expenses.reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
 
-    const workSec = attendance.reduce((s: number, r: any) => s + durationSeconds(r.check_in_time, r.check_out_time), 0);
+    const workSec = attendance.reduce(
+      (s: number, r: any) => s + durationSeconds(r.check_in_time, r.check_out_time),
+      0
+    );
     const daysWorked = attendance.length;
 
     // ---- Scoring (0-100) explained ----
-    const followupRate = totalFollowups > 0 ? Math.round((completedFollowups / totalFollowups) * 100) : 0;
+    const followupRate =
+      totalFollowups > 0 ? Math.round((completedFollowups / totalFollowups) * 100) : 0;
 
     const workHoursReq = 40;
     const hoursWorked = workSec / 3600;
@@ -223,9 +244,7 @@ export async function GET(
       leadsAssigned > 0 || leadsCreated > 0
         ? Math.min(
             10,
-            Math.round(
-              10 * Math.min(1, callsCount / Math.max(1, leadsAssigned + leadsCreated))
-            )
+            Math.round(10 * Math.min(1, callsCount / Math.max(1, leadsAssigned + leadsCreated)))
           )
         : 0;
 
@@ -235,12 +254,18 @@ export async function GET(
 
     if (overdueFollowups > 0) {
       const pts = Math.min(10, overdueFollowups * 2);
-      lost.push({ reason: `${overdueFollowups} overdue follow-up${overdueFollowups > 1 ? 's' : ''}`, points: pts });
+      lost.push({
+        reason: `${overdueFollowups} overdue follow-up${overdueFollowups > 1 ? 's' : ''}`,
+        points: pts,
+      });
       score -= pts;
     }
     if (overdueLeads > 0) {
       const pts = Math.min(10, overdueLeads * 2);
-      lost.push({ reason: `${overdueLeads} overdue lead${overdueLeads > 1 ? 's' : ''}`, points: pts });
+      lost.push({
+        reason: `${overdueLeads} overdue lead${overdueLeads > 1 ? 's' : ''}`,
+        points: pts,
+      });
       score -= pts;
     }
     if (leadsAssigned > 0 && leadsContactedCount(leads, calls) === 0) {
@@ -264,7 +289,15 @@ export async function GET(
     }
 
     const gradeFor = (s: number) =>
-      s >= 90 ? 'Excellent' : s >= 75 ? 'Good' : s >= 60 ? 'Average' : s >= 40 ? 'Needs Improvement' : 'Critical';
+      s >= 90
+        ? 'Excellent'
+        : s >= 75
+          ? 'Good'
+          : s >= 60
+            ? 'Average'
+            : s >= 40
+              ? 'Needs Improvement'
+              : 'Critical';
 
     const category_scores: Record<string, number> = {
       'Attendance & Work Hours': catAttendance,

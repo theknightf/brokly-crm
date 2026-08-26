@@ -150,7 +150,8 @@ export async function POST(request: Request) {
   let profileRow: any = null;
   const fullCols =
     'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, agent_code, admin_id, created_at';
-  const baseCols = 'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, created_at';
+  const baseCols =
+    'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, created_at';
   let { data } = await serviceClient
     .from('user_profiles')
     .select(fullCols)
@@ -236,14 +237,18 @@ export async function PATCH(request: Request) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { error: updateErr } = await serviceClient.from('user_profiles').update(payload).eq('id', targetId);
+  const { error: updateErr } = await serviceClient
+    .from('user_profiles')
+    .update(payload)
+    .eq('id', targetId);
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 400 });
   }
 
   const fullCols =
     'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, agent_code, admin_id, created_at';
-  const baseCols = 'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, created_at';
+  const baseCols =
+    'id, email, full_name, phone, role, brokerage_name, avatar_url, is_active, created_at';
   let { data } = await serviceClient
     .from('user_profiles')
     .select(fullCols)

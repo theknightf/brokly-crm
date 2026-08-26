@@ -40,7 +40,8 @@ export async function GET(request: Request) {
       .select('id, role, is_active')
       .eq('id', user.id)
       .maybeSingle();
-    if (!actor || actor.is_active === false) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!actor || actor.is_active === false)
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const isAdmin = isAdminRole(actor.role);
 
@@ -103,7 +104,10 @@ export async function GET(request: Request) {
       supabase
         .from('call_logs')
         .select('user_id, channel, duration_seconds, outcome, created_at')
-        .in('user_id', allMemberIds.length ? allMemberIds : ['00000000-0000-0000-0000-000000000000']),
+        .in(
+          'user_id',
+          allMemberIds.length ? allMemberIds : ['00000000-0000-0000-0000-000000000000']
+        ),
       supabase
         .from('expenses')
         .select('created_by, amount, expense_date')
@@ -155,7 +159,9 @@ export async function GET(request: Request) {
           (s: number, c: any) => s + Number(c.duration_seconds || 0),
           0
         ),
-        expenses: Math.round(myExpenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0) * 100) / 100,
+        expenses:
+          Math.round(myExpenses.reduce((s: number, e: any) => s + Number(e.amount || 0), 0) * 100) /
+          100,
       };
     };
 
@@ -261,7 +267,10 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .maybeSingle();
   if (!actor || actor.is_active === false || !isAdminRole(actor.role)) {
-    return NextResponse.json({ error: 'Forbidden — only Owner/Admin can rate team leaders' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Forbidden — only Owner/Admin can rate team leaders' },
+      { status: 403 }
+    );
   }
 
   const body = await request.json();

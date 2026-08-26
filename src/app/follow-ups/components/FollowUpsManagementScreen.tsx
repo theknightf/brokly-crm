@@ -890,7 +890,7 @@ export default function FollowUpsManagementScreen() {
           <p className="text-sm text-muted-foreground">
             Delete the follow-up{' '}
             <span className="font-semibold text-foreground">&quot;{deleteTarget?.title}&quot;</span>
-            ? You can't undo this.
+            ? You can&apos;t undo this.
           </p>
           <div className="flex justify-end gap-3">
             <button onClick={() => setDeleteTarget(null)} className="btn-secondary">

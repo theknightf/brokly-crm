@@ -157,9 +157,7 @@ export const leaveService = {
         .select('*, user_name:user_profiles!leave_requests_user_id_fkey(full_name)')
         .order('created_at', { ascending: false });
       if (error) return [];
-      return listRows(data, (r) =>
-        mapLeave({ ...r, full_name: embeddedName(r.user_name) })
-      );
+      return listRows(data, (r) => mapLeave({ ...r, full_name: embeddedName(r.user_name) }));
     } catch {
       return [];
     }
@@ -173,9 +171,7 @@ export const leaveService = {
         .select('*, user_name:user_profiles!leave_requests_user_id_fkey(full_name)')
         .order('start_date', { ascending: false });
       if (error) return [];
-      return listRows(data, (r) =>
-        mapLeave({ ...r, full_name: embeddedName(r.user_name) })
-      );
+      return listRows(data, (r) => mapLeave({ ...r, full_name: embeddedName(r.user_name) }));
     } catch {
       return [];
     }
@@ -405,7 +401,9 @@ export const kpiTargetsService = {
             actual = leadRows.filter((r) => after(r.updated_at, start)).length;
             break;
           case 'deals':
-            actual = leadRows.filter((r) => DONE.includes(r.crm_status) && after(r.updated_at, start)).length;
+            actual = leadRows.filter(
+              (r) => DONE.includes(r.crm_status) && after(r.updated_at, start)
+            ).length;
             break;
           case 'revenue':
             actual = leadRows
@@ -413,7 +411,8 @@ export const kpiTargetsService = {
               .reduce((s, r) => s + money(r), 0);
             break;
         }
-        const pct = t.targetValue > 0 ? Math.min(100, Math.round((actual / t.targetValue) * 100)) : 0;
+        const pct =
+          t.targetValue > 0 ? Math.min(100, Math.round((actual / t.targetValue) * 100)) : 0;
         return { ...t, actual, pct };
       });
     } catch {
@@ -633,9 +632,7 @@ export const payrollService = {
         .eq('period_id', periodId)
         .order('created_at', { ascending: true });
       if (error) return [];
-      return listRows(data, (r) =>
-        mapEntry({ ...r, full_name: embeddedName(r.user_name) })
-      );
+      return listRows(data, (r) => mapEntry({ ...r, full_name: embeddedName(r.user_name) }));
     } catch {
       return [];
     }
@@ -671,7 +668,8 @@ export const payrollService = {
     if (patch.baseSalary !== undefined) row.base_salary = patch.baseSalary;
     if (patch.bonus !== undefined) row.bonus = patch.bonus;
     if (patch.commission !== undefined) row.commission = patch.commission;
-    if (patch.expenseReimbursement !== undefined) row.expense_reimbursement = patch.expenseReimbursement;
+    if (patch.expenseReimbursement !== undefined)
+      row.expense_reimbursement = patch.expenseReimbursement;
     if (patch.otherDeductions !== undefined) row.other_deductions = patch.otherDeductions;
     if (patch.notes !== undefined) row.notes = patch.notes;
     if (patch.status !== undefined) row.status = patch.status;
@@ -724,9 +722,14 @@ export const rotationService = {
         .eq('category', 'rotation')
         .eq('name', name);
       if (existing && existing.length > 0) {
-        await supabase.from('admin_settings').update({ is_active: isActive, sort_order: order }).eq('id', existing[0].id);
+        await supabase
+          .from('admin_settings')
+          .update({ is_active: isActive, sort_order: order })
+          .eq('id', existing[0].id);
       } else {
-        await supabase.from('admin_settings').insert({ category: 'rotation', name, sort_order: order, is_active: isActive });
+        await supabase
+          .from('admin_settings')
+          .insert({ category: 'rotation', name, sort_order: order, is_active: isActive });
       }
     };
     await upsert('rotation_enabled', enabled, 0);
@@ -749,7 +752,9 @@ export const rotationService = {
     try {
       const { data, error } = await supabase
         .from('lead_rotation_log')
-        .select('*, from_user:user_profiles!lead_rotation_log_from_user_id_fkey(full_name), to_user:user_profiles!lead_rotation_log_to_user_id_fkey(full_name), lead:leads!lead_rotation_log_lead_id_fkey(name)')
+        .select(
+          '*, from_user:user_profiles!lead_rotation_log_from_user_id_fkey(full_name), to_user:user_profiles!lead_rotation_log_to_user_id_fkey(full_name), lead:leads!lead_rotation_log_lead_id_fkey(name)'
+        )
         .order('rotated_at', { ascending: false })
         .limit(100);
       if (error) return [];
@@ -782,7 +787,9 @@ export const duplicateLeadsService = {
     try {
       const { data, error } = await supabase
         .from('leads')
-        .select('id, name, phone, created_by, created_at, created_by_profile:user_profiles!leads_created_by_fkey(full_name), lead_status, assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)')
+        .select(
+          'id, name, phone, created_by, created_at, created_by_profile:user_profiles!leads_created_by_fkey(full_name), lead_status, assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)'
+        )
         .ilike('phone', `%${clean}`)
         .order('created_at', { ascending: true })
         .limit(3);
@@ -850,7 +857,9 @@ export const duplicateLeadsService = {
     try {
       const { data, error } = await supabase
         .from('duplicate_lead_attempts')
-        .select('*, matched:user_profiles...leads!duplicate_lead_attempts_matched_lead_id_fkey(name), attempted_by_profile:user_profiles!duplicate_lead_attempts_attempted_by_fkey(full_name)')
+        .select(
+          '*, matched:user_profiles...leads!duplicate_lead_attempts_matched_lead_id_fkey(name), attempted_by_profile:user_profiles!duplicate_lead_attempts_attempted_by_fkey(full_name)'
+        )
         .order('created_at', { ascending: false })
         .limit(100);
       if (error) return [];

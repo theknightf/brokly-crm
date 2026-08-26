@@ -75,10 +75,10 @@ export default function LoginForm(_props?: LoginFormProps) {
 
         {resetSent ? (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 text-center">
-              <p className="text-sm text-emerald-700 font-medium">Reset link sent!</p>
-              <p className="text-xs text-emerald-600 mt-1">
-                Check your email and open the link to reset your password.
-              </p>
+            <p className="text-sm text-emerald-700 font-medium">Reset link sent!</p>
+            <p className="text-xs text-emerald-600 mt-1">
+              Check your email and open the link to reset your password.
+            </p>
           </div>
         ) : (
           <form onSubmit={handleForgotSubmit(onForgotSubmit)} className="space-y-5" noValidate>
@@ -137,7 +137,7 @@ export default function LoginForm(_props?: LoginFormProps) {
     <div className="fade-in">
       <div className="mb-7">
         <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
-          <p className="text-sm text-muted-foreground mt-1">Log in to your Brokly workspace</p>
+        <p className="text-sm text-muted-foreground mt-1">Log in to your Brokly workspace</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>

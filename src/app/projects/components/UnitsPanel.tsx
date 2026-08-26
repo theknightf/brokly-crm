@@ -42,7 +42,16 @@ interface UnitsPanelProps {
   onClose: () => void;
 }
 
-const UNIT_TYPES = ['1 BHK', '2 BHK', '3 BHK', 'Penthouse', 'Villa', 'Townhouse', 'Studio', 'Commercial'];
+const UNIT_TYPES = [
+  '1 BHK',
+  '2 BHK',
+  '3 BHK',
+  'Penthouse',
+  'Villa',
+  'Townhouse',
+  'Studio',
+  'Commercial',
+];
 
 const emptyForm: Partial<Unit> = {
   name: '',
@@ -95,7 +104,13 @@ function UnitFormModal({
   };
 
   return (
-      <Modal open={open} onClose={onClose} title="Unit" subtitle="Add or edit a unit in this project" size="md">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Unit"
+      subtitle="Add or edit a unit in this project"
+      size="md"
+    >
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -194,12 +209,20 @@ function UnitFormModal({
             <label className="label-base">Installments per year</label>
             <select
               value={String(form.installmentFrequency || 12)}
-              onChange={(e) => setForm((f) => ({ ...f, installmentFrequency: num(e.target.value, 12) }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, installmentFrequency: num(e.target.value, 12) }))
+              }
               className="input-base appearance-none"
             >
               {[1, 2, 4, 12].map((n) => (
                 <option key={n} value={n}>
-                  {n === 12 ? 'Monthly' : n === 4 ? 'Quarterly' : n === 2 ? 'Semi-annual' : 'Annual'}
+                  {n === 12
+                    ? 'Monthly'
+                    : n === 4
+                      ? 'Quarterly'
+                      : n === 2
+                        ? 'Semi-annual'
+                        : 'Annual'}
                 </option>
               ))}
             </select>
@@ -327,11 +350,16 @@ function FileUploadRow({
           <Loader2 size={12} className="animate-spin" /> Loading files…
         </div>
       ) : files.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No files yet — add unit photos, videos, or brochures.</p>
+        <p className="text-xs text-muted-foreground">
+          No files yet — add unit photos, videos, or brochures.
+        </p>
       ) : (
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
           {files.map((f) => (
-            <div key={f.id} className="relative group rounded-lg overflow-hidden border border-border bg-muted/40 aspect-square">
+            <div
+              key={f.id}
+              className="relative group rounded-lg overflow-hidden border border-border bg-muted/40 aspect-square"
+            >
               {f.kind === 'pdf' ? (
                 <a
                   href={urls[f.id] || '#'}
@@ -446,7 +474,10 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {unit.paymentPlan && (
-            <span className="hidden sm:inline text-[11px] text-muted-foreground max-w-[180px] truncate mr-2" title={unit.paymentPlan}>
+            <span
+              className="hidden sm:inline text-[11px] text-muted-foreground max-w-[180px] truncate mr-2"
+              title={unit.paymentPlan}
+            >
               {unit.paymentPlan}
             </span>
           )}
@@ -472,7 +503,7 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
           <button
             onClick={() => setEditOpen(true)}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              title="Edit unit"
+            title="Edit unit"
           >
             <Pencil size={13} />
           </button>
@@ -480,7 +511,7 @@ function UnitRow({ unit, projectName }: { unit: Unit; projectName: string }) {
             onClick={remove}
             disabled={deleting}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-              title="Delete unit"
+            title="Delete unit"
           >
             {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={13} />}
           </button>
@@ -551,7 +582,10 @@ export default function UnitsPanel({ projectId, projectName, open, onClose }: Un
               {totalPrice > 0 && <> · {Number(totalPrice).toLocaleString('en-US')} EGP total</>}
             </span>
           </div>
-          <button onClick={() => setAddOpen(true)} className="btn-primary text-sm flex items-center gap-1.5">
+          <button
+            onClick={() => setAddOpen(true)}
+            className="btn-primary text-sm flex items-center gap-1.5"
+          >
             <Plus size={14} />
             Add unit
           </button>
@@ -565,7 +599,9 @@ export default function UnitsPanel({ projectId, projectName, open, onClose }: Un
           <div className="flex flex-col items-center justify-center py-12 text-center card-base">
             <Layers size={30} className="text-muted-foreground mb-3" />
             <p className="text-sm font-medium text-foreground">No units yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Add units to this project to keep track of what's available.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Add units to this project to keep track of what&apos;s available.
+            </p>
           </div>
         ) : (
           <div className="space-y-2">

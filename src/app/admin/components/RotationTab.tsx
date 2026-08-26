@@ -54,7 +54,9 @@ export default function RotationTab() {
     setRunning(true);
     try {
       const res = await rotationService.run();
-      toast.success(`Rotation complete: ${res.rotated} lead${res.rotated !== 1 ? 's' : ''} reassigned`);
+      toast.success(
+        `Rotation complete: ${res.rotated} lead${res.rotated !== 1 ? 's' : ''} reassigned`
+      );
       load();
     } catch (e: any) {
       toast.error(e?.message || 'Failed to run rotation');
@@ -104,11 +106,21 @@ export default function RotationTab() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={save} disabled={saving} className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save settings
+            <button
+              onClick={save}
+              disabled={saving}
+              className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+              settings
             </button>
-            <button onClick={runNow} disabled={running || !enabled} className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5 disabled:opacity-50">
-              {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Run now
+            <button
+              onClick={runNow}
+              disabled={running || !enabled}
+              className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Run
+              now
             </button>
           </div>
         </div>
@@ -141,11 +153,21 @@ export default function RotationTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Date</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Lead</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">From</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">To</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Reason</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Date
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Lead
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    From
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    To
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Reason
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

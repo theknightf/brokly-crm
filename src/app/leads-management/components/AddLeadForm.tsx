@@ -237,8 +237,13 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
         {/* Phone — the ONE required field, front and center */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="add-phone" className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+            <label
+              htmlFor="add-phone"
+              className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+            >
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+                1
+              </span>
               Phone number
               <span className="text-xs font-normal text-red-500 ml-0.5">*</span>
             </label>
@@ -259,7 +264,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           />
           {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Enter the phone number, then add the lead. Number and source are protected automatically.
+            Enter the phone number, then add the lead. Number and source are protected
+            automatically.
           </p>
         </div>
 
@@ -276,13 +282,20 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 {...register('source', { required: 'Lead source is required' })}
               >
                 {ALL_SOURCES.map((s) => (
-                  <option key={`quick-source-${s}`} value={s}>{s}</option>
+                  <option key={`quick-source-${s}`} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <ChevronDown
+                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
             </div>
             {!canEditProtectedFields && (
-              <p className="mt-1 text-[11px] text-muted-foreground">Only Admin and Owner can change it.</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Only Admin and Owner can change it.
+              </p>
             )}
             {errors.source && <p className="mt-1 text-xs text-red-500">{errors.source.message}</p>}
           </div>
@@ -597,7 +610,9 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                       }}
                       className="h-4 w-4 accent-primary"
                     />
-                    <span className="text-sm font-semibold text-foreground">Referral assignment</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      Referral assignment
+                    </span>
                   </label>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Share this lead with a second user and keep a record of who referred it.
@@ -608,17 +623,26 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                         id="add-referral-to"
                         disabled={!referralEnabled}
                         className="input-base appearance-none pr-8"
-                        {...register('referralTo', { required: referralEnabled ? 'Choose a referral recipient' : false })}
+                        {...register('referralTo', {
+                          required: referralEnabled ? 'Choose a referral recipient' : false,
+                        })}
                       >
                         <option value="">— Select second user —</option>
                         {userList
                           .filter((u) => u.id !== assignedTo)
                           .map((u) => (
-                            <option key={`add-referral-${u.id}`} value={u.id}>{u.name}</option>
+                            <option key={`add-referral-${u.id}`} value={u.id}>
+                              {u.name}
+                            </option>
                           ))}
                       </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                      {errors.referralTo && <p className="mt-1 text-xs text-red-500">{errors.referralTo.message}</p>}
+                      <ChevronDown
+                        size={14}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                      />
+                      {errors.referralTo && (
+                        <p className="mt-1 text-xs text-red-500">{errors.referralTo.message}</p>
+                      )}
                     </div>
                   )}
                 </div>

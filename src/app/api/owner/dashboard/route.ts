@@ -78,44 +78,64 @@ export async function GET(request: Request) {
   const weekAgo = localDay(-6);
   const now = new Date();
   const thisMonth = monthRange(now.getFullYear(), now.getMonth());
-  const prevMonth = monthRange(now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(), now.getMonth() === 0 ? 11 : now.getMonth() - 1);
+  const prevMonth = monthRange(
+    now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear(),
+    now.getMonth() === 0 ? 11 : now.getMonth() - 1
+  );
 
   const period = rangeParam === 'month' ? thisMonth : { from: weekAgo, to: today };
 
-  const [profilesRes, todayRes, periodRes, prevMonthRes, monthRes, expensesThisRes, expensesPrevRes, activityRes, leadsRes] =
-    await Promise.all([
-      supabase
-        .from('user_profiles')
-        .select('id, full_name, email, role, is_active, team_id')
-        .order('full_name'),
-      supabase
-        .from('attendance')
-        .select('user_id, check_in_time, check_out_time')
-        .eq('attendance_date', today),
-      supabase
-        .from('attendance')
-        .select('user_id, attendance_date, check_in_time, check_out_time')
-        .gte('attendance_date', period.from)
-        .lte('attendance_date', period.to),
-      supabase
-        .from('attendance')
-        .select('user_id, attendance_date, check_in_time, check_out_time')
-        .gte('attendance_date', prevMonth.from)
-        .lte('attendance_date', prevMonth.to),
-      supabase
-        .from('attendance')
-        .select('user_id, attendance_date, check_in_time, check_out_time')
-        .gte('attendance_date', thisMonth.from)
-        .lte('attendance_date', thisMonth.to),
-      supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', thisMonth.from).lte('expense_date', thisMonth.to),
-      supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', prevMonth.from).lte('expense_date', prevMonth.to),
-      supabase
-        .from('activity_log')
-        .select('user_id, action_type, detail, meta, entity_type, created_at')
-        .order('created_at', { ascending: false })
-        .limit(80),
-      supabase.from('leads').select('crm_status, lead_status'),
-    ]);
+  const [
+    profilesRes,
+    todayRes,
+    periodRes,
+    prevMonthRes,
+    monthRes,
+    expensesThisRes,
+    expensesPrevRes,
+    activityRes,
+    leadsRes,
+  ] = await Promise.all([
+    supabase
+      .from('user_profiles')
+      .select('id, full_name, email, role, is_active, team_id')
+      .order('full_name'),
+    supabase
+      .from('attendance')
+      .select('user_id, check_in_time, check_out_time')
+      .eq('attendance_date', today),
+    supabase
+      .from('attendance')
+      .select('user_id, attendance_date, check_in_time, check_out_time')
+      .gte('attendance_date', period.from)
+      .lte('attendance_date', period.to),
+    supabase
+      .from('attendance')
+      .select('user_id, attendance_date, check_in_time, check_out_time')
+      .gte('attendance_date', prevMonth.from)
+      .lte('attendance_date', prevMonth.to),
+    supabase
+      .from('attendance')
+      .select('user_id, attendance_date, check_in_time, check_out_time')
+      .gte('attendance_date', thisMonth.from)
+      .lte('attendance_date', thisMonth.to),
+    supabase
+      .from('expenses')
+      .select('amount, expense_date, category')
+      .gte('expense_date', thisMonth.from)
+      .lte('expense_date', thisMonth.to),
+    supabase
+      .from('expenses')
+      .select('amount, expense_date, category')
+      .gte('expense_date', prevMonth.from)
+      .lte('expense_date', prevMonth.to),
+    supabase
+      .from('activity_log')
+      .select('user_id, action_type, detail, meta, entity_type, created_at')
+      .order('created_at', { ascending: false })
+      .limit(80),
+    supabase.from('leads').select('crm_status, lead_status'),
+  ]);
 
   const leadsByStage: Record<string, number> = {};
   (leadsRes.data || []).forEach((lead: any) => {
@@ -211,7 +231,14 @@ export async function GET(request: Request) {
     let perf = '—';
     if (present > 0) {
       const score = rate * 0.6 + Math.min(100, (hours / 8) * 100) * 0.4;
-      perf = score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : score >= 40 ? 'Average' : 'Needs Attention';
+      perf =
+        score >= 80
+          ? 'Excellent'
+          : score >= 60
+            ? 'Good'
+            : score >= 40
+              ? 'Average'
+              : 'Needs Attention';
     }
     return {
       id: e.id,
@@ -276,7 +303,10 @@ export async function GET(request: Request) {
     cur.hours += durationHours(r.check_in_time, r.check_out_time);
     monthByUser[r.user_id] = cur;
   });
-  const monthWorkingDays = Math.max(1, new Set((monthRes.data || []).map((r: any) => r.attendance_date)).size);
+  const monthWorkingDays = Math.max(
+    1,
+    new Set((monthRes.data || []).map((r: any) => r.attendance_date)).size
+  );
   const monthSlots = monthWorkingDays * Math.max(1, employees.length);
   const monthPresent = Object.values(monthByUser).reduce((s, v) => s + v.present, 0);
   const monthLate = Object.values(monthByUser).reduce((s, v) => s + v.late, 0);
@@ -314,10 +344,18 @@ export async function GET(request: Request) {
     attentionNeeded: attentionList,
     performance,
     bestEmployee: bestEmployee
-      ? { id: bestEmployee.id, name: bestEmployee.name, attendanceRate: bestEmployee.attendanceRate, avgHours: bestEmployee.avgHours }
+      ? {
+          id: bestEmployee.id,
+          name: bestEmployee.name,
+          attendanceRate: bestEmployee.attendanceRate,
+          avgHours: bestEmployee.avgHours,
+        }
       : null,
     needsAttention: needsAttention.slice(0, 5),
-    mostActive: mostActive && mostActive.activity > 0 ? { id: mostActive.id, name: mostActive.name, activity: mostActive.activity } : null,
+    mostActive:
+      mostActive && mostActive.activity > 0
+        ? { id: mostActive.id, name: mostActive.name, activity: mostActive.activity }
+        : null,
     expenses: {
       totalThis,
       totalPrev,

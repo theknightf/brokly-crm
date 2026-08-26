@@ -27,10 +27,17 @@ export async function POST() {
       .eq('category', 'rotation');
     const settings = rotationSettings || [];
     const enabled = !!settings.find((s: any) => s.name === 'rotation_enabled')?.is_active;
-    const inactivityDays = Number(settings.find((s: any) => s.name === 'inactivity_days')?.sort_order ?? 7);
+    const inactivityDays = Number(
+      settings.find((s: any) => s.name === 'inactivity_days')?.sort_order ?? 7
+    );
 
     if (!enabled) {
-      return NextResponse.json({ rotated: 0, skipped: 0, enabled: false, message: 'Rotation is disabled' });
+      return NextResponse.json({
+        rotated: 0,
+        skipped: 0,
+        enabled: false,
+        message: 'Rotation is disabled',
+      });
     }
 
     // ── Eligible agents (active, non-admin) ──
@@ -55,14 +62,22 @@ export async function POST() {
       .limit(200);
 
     if (!staleLeads?.length) {
-      return NextResponse.json({ rotated: 0, skipped: 0, enabled: true, message: 'No stale leads' });
+      return NextResponse.json({
+        rotated: 0,
+        skipped: 0,
+        enabled: true,
+        message: 'No stale leads',
+      });
     }
 
     // ── Least-recently-assigned ordering ──
     const { data: recentAssignments } = await db
       .from('leads')
       .select('assigned_to')
-      .in('assigned_to', agents.map((a: any) => a.id))
+      .in(
+        'assigned_to',
+        agents.map((a: any) => a.id)
+      )
       .order('updated_at', { ascending: false })
       .limit(agents.length * 5);
     const latest = new Map<string, number>();
@@ -70,9 +85,7 @@ export async function POST() {
       if (!latest.has(r.assigned_to)) latest.set(r.assigned_to, 0);
       else latest.set(r.assigned_to, latest.get(r.assigned_to)! + 1);
     }
-    const ordered = [...agents].sort(
-      (a, b) => (latest.get(a.id) ?? 0) - (latest.get(b.id) ?? 0)
-    );
+    const ordered = [...agents].sort((a, b) => (latest.get(a.id) ?? 0) - (latest.get(b.id) ?? 0));
 
     let rotated = 0;
     let pointer = 0;

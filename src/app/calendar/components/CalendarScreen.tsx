@@ -109,9 +109,7 @@ export default function CalendarScreen() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="page-title">Calendar</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Your follow-ups and meetings
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Your follow-ups and meetings</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold bg-muted text-muted-foreground rounded-full px-3 py-1.5">

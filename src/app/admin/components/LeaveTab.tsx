@@ -2,14 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  CalendarDays,
-  Check,
-  Loader2,
-  Palmtree,
-  Send,
-  X,
-} from 'lucide-react';
+import { CalendarDays, Check, Loader2, Palmtree, Send, X } from 'lucide-react';
 import { leaveService, type LeaveRequest } from '@/lib/services/peopleOpsService';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -144,14 +137,21 @@ export default function LeaveTab() {
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Palmtree size={15} className="text-primary" /> New leave request
             </h3>
-            <button onClick={() => setShowForm(false)} className="p-1 rounded-lg text-muted-foreground hover:bg-muted">
+            <button
+              onClick={() => setShowForm(false)}
+              className="p-1 rounded-lg text-muted-foreground hover:bg-muted"
+            >
               <X size={16} />
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-muted-foreground">Type</label>
-              <select value={type} onChange={(e) => setType(e.target.value)} className="input-base text-sm">
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="input-base text-sm"
+              >
                 {TYPES.map((t) => (
                   <option key={t} value={t}>
                     {typeLabel[t]}
@@ -161,19 +161,41 @@ export default function LeaveTab() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-muted-foreground">Start</label>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-base text-sm" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="input-base text-sm"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-muted-foreground">End</label>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input-base text-sm" />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="input-base text-sm"
+              />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-muted-foreground">Reason (optional)</label>
-              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. family emergency" className="input-base text-sm" />
+              <label className="text-xs font-semibold text-muted-foreground">
+                Reason (optional)
+              </label>
+              <input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. family emergency"
+                className="input-base text-sm"
+              />
             </div>
             <div className="flex items-end">
-              <button onClick={request} disabled={submitting} className="btn-primary h-9 px-3 text-sm w-full flex items-center justify-center gap-1.5">
-                {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send request
+              <button
+                onClick={request}
+                disabled={submitting}
+                className="btn-primary h-9 px-3 text-sm w-full flex items-center justify-center gap-1.5"
+              >
+                {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}{' '}
+                Send request
               </button>
             </div>
           </div>
@@ -198,25 +220,45 @@ export default function LeaveTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Employee</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Type</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Dates</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Days</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Reason</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Status</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Actions</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Employee
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Type
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Dates
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Days
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Reason
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Status
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {requests.map((r) => (
                   <tr key={r.id} className="hover:bg-muted/30">
-                    <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{r.userName || '—'}</td>
-                    <td className="px-3 py-2 capitalize">{typeLabel[r.leaveType] || r.leaveType}</td>
+                    <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">
+                      {r.userName || '—'}
+                    </td>
+                    <td className="px-3 py-2 capitalize">
+                      {typeLabel[r.leaveType] || r.leaveType}
+                    </td>
                     <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                       {r.startDate} → {r.endDate}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{r.days}</td>
-                    <td className="px-3 py-2 text-muted-foreground max-w-[220px] truncate">{r.reason || '—'}</td>
+                    <td className="px-3 py-2 text-muted-foreground max-w-[220px] truncate">
+                      {r.reason || '—'}
+                    </td>
                     <td className="px-3 py-2">
                       <span className={badge(r.status)}>{r.status}</span>
                     </td>
@@ -228,7 +270,12 @@ export default function LeaveTab() {
                             disabled={busyId === r.id}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
                           >
-                            {busyId === r.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Approve request
+                            {busyId === r.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Check size={12} />
+                            )}{' '}
+                            Approve request
                           </button>
                           <button
                             onClick={() => decide(r.id, 'reject')}
@@ -240,16 +287,18 @@ export default function LeaveTab() {
                         </div>
                       )}
                       {r.status === 'pending' && (
-                          <button
-                            onClick={() => cancel(r.id)}
-                            disabled={busyId === r.id}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted ml-1"
-                          >
-                            Cancel request
-                          </button>
+                        <button
+                          onClick={() => cancel(r.id)}
+                          disabled={busyId === r.id}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:bg-muted ml-1"
+                        >
+                          Cancel request
+                        </button>
                       )}
                       {(r.status === 'approved' || r.status === 'rejected') && (
-                        <span className="text-xs text-muted-foreground">{r.reviewedAt ? r.reviewedAt.split('T')[0] : ''}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {r.reviewedAt ? r.reviewedAt.split('T')[0] : ''}
+                        </span>
                       )}
                     </td>
                   </tr>

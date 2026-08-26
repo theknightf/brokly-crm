@@ -34,7 +34,6 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   return (
     <nav className="mobile-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 pb-safe">
       <div className="flex items-stretch h-16 relative">
-
         {/* Left items */}
         {LEFT_ITEMS.map((item) => {
           const active = isActive(item.href);
@@ -68,10 +67,15 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
           >
             <span className="relative flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-[0_6px_24px_-4px_rgba(132,204,22,0.7)] group-active:scale-90 transition-transform duration-150">
               {/* pulse ring */}
-              <span className="absolute inset-0 rounded-full bg-primary/50 animate-ping" style={{ animationDuration: '2.5s' }} />
+              <span
+                className="absolute inset-0 rounded-full bg-primary/50 animate-ping"
+                style={{ animationDuration: '2.5s' }}
+              />
               <Plus size={26} strokeWidth={2.5} className="relative z-10" />
             </span>
-            <span className="text-[10px] font-semibold text-primary mt-1 leading-none">Add lead</span>
+            <span className="text-[10px] font-semibold text-primary mt-1 leading-none">
+              Add lead
+            </span>
           </Link>
         </div>
 
@@ -110,7 +114,6 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
           </span>
           {t('common.menu')}
         </button>
-
       </div>
     </nav>
   );

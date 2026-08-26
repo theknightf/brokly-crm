@@ -1,13 +1,6 @@
 'use client';
 
-import React, {
-  createContext,
-  useContext,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 export type ThemePref = 'light' | 'dark' | 'system';
 

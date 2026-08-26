@@ -241,11 +241,7 @@ export function CallOutcomeSheet({
           const body = await res.json().catch(() => null);
           const calls: any[] = body?.calls || body?.call_logs || [];
           const today = new Date().toDateString();
-          if (
-            calls.some(
-              (c) => c?.created_at && new Date(c.created_at).toDateString() === today
-            )
-          ) {
+          if (calls.some((c) => c?.created_at && new Date(c.created_at).toDateString() === today)) {
             setDuplicateToday(true);
           }
         } catch {
@@ -421,9 +417,7 @@ export function CallOutcomeSheet({
                 dueTime: meetingTime || '12:00',
                 agent: '',
                 agentInitials: '',
-                notes: [locationNote, meetingNotes.trim(), note.trim()]
-                  .filter(Boolean)
-                  .join(' — '),
+                notes: [locationNote, meetingNotes.trim(), note.trim()].filter(Boolean).join(' — '),
                 propertyInterest: '',
                 relationshipStatus: 'New',
               },
@@ -526,7 +520,9 @@ export function CallOutcomeSheet({
             <button
               onClick={() => setDirection('incoming')}
               className={`flex-1 h-9 rounded-lg flex items-center justify-center gap-1.5 text-xs font-semibold transition-all active:scale-[0.98] ${
-                direction === 'incoming' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground'
+                direction === 'incoming'
+                  ? 'bg-card text-primary shadow-sm'
+                  : 'text-muted-foreground'
               }`}
             >
               <ArrowDownLeft size={14} />
@@ -540,8 +536,7 @@ export function CallOutcomeSheet({
             <Loader2 size={14} className="animate-spin" />
             Loading project pitch…
           </div>
-        ) : pitch &&
-          (pitch.summary || pitch.whyBuy || pitch.sellingPoints.length > 0) ? (
+        ) : pitch && (pitch.summary || pitch.whyBuy || pitch.sellingPoints.length > 0) ? (
           <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3">
             <p className="text-xs font-bold uppercase tracking-wide text-primary mb-1.5 flex items-center gap-1.5">
               <MessageCircle size={13} />
@@ -559,7 +554,10 @@ export function CallOutcomeSheet({
             {pitch.sellingPoints.length > 0 && (
               <ul className="mt-1 space-y-1">
                 {pitch.sellingPoints.map((s, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-[13px] text-muted-foreground">
+                  <li
+                    key={i}
+                    className="flex items-start gap-1.5 text-[13px] text-muted-foreground"
+                  >
                     <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-primary" />
                     {s}
                   </li>
@@ -709,19 +707,22 @@ export function useCallOutcome() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [target, setTarget] = useState<CallItemTarget | null>(null);
 
-  const arm = useCallback((item: CallItem, channel: CallChannel, direction: Direction = 'outgoing') => {
-    pendingRef.current = { item, channel, direction };
-    // Fallback: on desktop (or when the phone dialer never triggers a
-    // visibility event) show the sheet shortly after the tap so the popup
-    // reliably appears even if the browser stays in the foreground.
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      if (pendingRef.current) {
-        setTarget(pendingRef.current);
-        pendingRef.current = null;
-      }
-    }, 1500);
-  }, []);
+  const arm = useCallback(
+    (item: CallItem, channel: CallChannel, direction: Direction = 'outgoing') => {
+      pendingRef.current = { item, channel, direction };
+      // Fallback: on desktop (or when the phone dialer never triggers a
+      // visibility event) show the sheet shortly after the tap so the popup
+      // reliably appears even if the browser stays in the foreground.
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        if (pendingRef.current) {
+          setTarget(pendingRef.current);
+          pendingRef.current = null;
+        }
+      }, 1500);
+    },
+    []
+  );
 
   const reveal = useCallback(() => {
     if (document.visibilityState !== 'visible') return;
@@ -744,14 +745,14 @@ export function useCallOutcome() {
     };
   }, [reveal]);
 
-const sheet = target ? (
-  <CallOutcomeSheet
-    item={target.item}
-    channel={target.channel}
-    direction={target.direction}
-    onClose={() => setTarget(null)}
-  />
-) : null;
+  const sheet = target ? (
+    <CallOutcomeSheet
+      item={target.item}
+      channel={target.channel}
+      direction={target.direction}
+      onClose={() => setTarget(null)}
+    />
+  ) : null;
 
-return { arm, sheet };
+  return { arm, sheet };
 }

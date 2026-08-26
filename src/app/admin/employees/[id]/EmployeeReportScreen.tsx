@@ -80,7 +80,11 @@ function pad(n: number) {
   return String(n).padStart(2, '0');
 }
 
-function periodRange(key: PeriodKey, customFrom?: string, customTo?: string): { from: string; to: string } {
+function periodRange(
+  key: PeriodKey,
+  customFrom?: string,
+  customTo?: string
+): { from: string; to: string } {
   if (key === 'custom') return { from: customFrom || '', to: customTo || '' };
   const now = new Date();
   if (key === 'today') {
@@ -91,7 +95,10 @@ function periodRange(key: PeriodKey, customFrom?: string, customTo?: string): { 
     const dow = (now.getDay() + 6) % 7;
     const a = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
     const b = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow + 6);
-    return { from: `${a.getFullYear()}-${pad(a.getMonth() + 1)}-${pad(a.getDate())}`, to: `${b.getFullYear()}-${pad(b.getMonth() + 1)}-${pad(b.getDate())}` };
+    return {
+      from: `${a.getFullYear()}-${pad(a.getMonth() + 1)}-${pad(a.getDate())}`,
+      to: `${b.getFullYear()}-${pad(b.getMonth() + 1)}-${pad(b.getDate())}`,
+    };
   }
   return {
     from: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`,
@@ -152,16 +159,23 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
     const now = new Date();
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   });
-  const [tab, setTab] = useState<'overview' | 'timeline' | 'attendance' | 'calls' | 'visits' | 'leads' | 'followups' | 'expenses'>('overview');
+  const [tab, setTab] = useState<
+    'overview' | 'timeline' | 'attendance' | 'calls' | 'visits' | 'leads' | 'followups' | 'expenses'
+  >('overview');
 
-  const { from, to } = useMemo(() => periodRange(period, customFrom, customTo), [period, customFrom, customTo]);
+  const { from, to } = useMemo(
+    () => periodRange(period, customFrom, customTo),
+    [period, customFrom, customTo]
+  );
 
   const load = useCallback(
     async (frm: string, too: string) => {
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`/api/employees/${employeeId}/report?from=${encodeURIComponent(frm)}&to=${encodeURIComponent(too)}`);
+        const res = await fetch(
+          `/api/employees/${employeeId}/report?from=${encodeURIComponent(frm)}&to=${encodeURIComponent(too)}`
+        );
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed to load report');
         setData(json);
@@ -201,7 +215,11 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
       ['Performance score', data.score],
       ['Grade', data.grade],
     ];
-    exportCSV(`employee-report-${data.employee.full_name.replace(/\s+/g, '-')}-${from}-${to}`, ['Metric', 'Value'], rows);
+    exportCSV(
+      `employee-report-${data.employee.full_name.replace(/\s+/g, '-')}-${from}-${to}`,
+      ['Metric', 'Value'],
+      rows
+    );
   };
 
   const tabs = [
@@ -232,9 +250,7 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
               {data?.employee?.full_name || 'Employee report'}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {data
-                ? `${roleLabelOf(data.employee.role)} · ${from} → ${to}`
-                : 'Loading…'}
+              {data ? `${roleLabelOf(data.employee.role)} · ${from} → ${to}` : 'Loading…'}
             </p>
           </div>
         </div>
@@ -306,7 +322,10 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Performance score</p>
-                  <p className="text-4xl font-extrabold text-foreground mt-1">{data.score}<span className="text-lg font-semibold text-muted-foreground">/100</span></p>
+                  <p className="text-4xl font-extrabold text-foreground mt-1">
+                    {data.score}
+                    <span className="text-lg font-semibold text-muted-foreground">/100</span>
+                  </p>
                 </div>
                 <span
                   className={`text-sm font-bold px-3 py-1.5 rounded-full ${
@@ -322,12 +341,22 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
               </div>
               <div className="mt-4 space-y-2">
                 {Object.entries(data.category_scores).map(([label, pts]) => {
-                  const maxVal = { 'Attendance & Work Hours': 25, Calls: 20, 'Site Visits': 15, 'Follow-up Rate': 15, 'Activity Level': 15, 'Client Contact': 10 }[label] || 15;
+                  const maxVal =
+                    {
+                      'Attendance & Work Hours': 25,
+                      Calls: 20,
+                      'Site Visits': 15,
+                      'Follow-up Rate': 15,
+                      'Activity Level': 15,
+                      'Client Contact': 10,
+                    }[label] || 15;
                   return (
                     <div key={label}>
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span className="text-muted-foreground">{label}</span>
-                        <span className="font-semibold text-foreground">{pts}/{maxVal}</span>
+                        <span className="font-semibold text-foreground">
+                          {pts}/{maxVal}
+                        </span>
                       </div>
                       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                         <div
@@ -343,23 +372,61 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
                 <div className="mt-4 pt-3 border-t border-border space-y-1.5">
                   <p className="text-xs font-semibold text-red-600 dark:text-red-400">Deductions</p>
                   {data.lost_points.map((lp, i) => (
-                    <p key={i} className="text-xs text-muted-foreground flex items-center justify-between">
+                    <p
+                      key={i}
+                      className="text-xs text-muted-foreground flex items-center justify-between"
+                    >
                       <span>{lp.reason}</span>
-                      <span className="font-semibold text-red-600 dark:text-red-400">-{lp.points}</span>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        -{lp.points}
+                      </span>
                     </p>
                   ))}
                 </div>
               )}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 flex-[2]">
-              <StatCard icon={<Users size={14} />} label="Attendance" value={data.summary.days_worked} sub={`${data.summary.work_hours_label} logged`} />
-              <StatCard icon={<PhoneCall size={14} />} label="Calls" value={data.summary.calls} sub={data.summary.call_hours_label} />
-              <StatCard icon={<MessageCircle size={14} />} label="WhatsApp" value={data.summary.whatsapp} />
-              <StatCard icon={<MapPin size={14} />} label="Site Visits" value={data.summary.site_visits} sub={`${data.summary.site_visits_completed} completed`} />
-              <StatCard icon={<Users size={14} />} label="Leads" value={data.summary.leads_created} sub={`${data.summary.leads_assigned} assigned`} />
-              <StatCard icon={<Bell size={14} />} label="Follow-ups" value={data.summary.followups} sub={`${data.summary.followups_completed} done`} />
+              <StatCard
+                icon={<Users size={14} />}
+                label="Attendance"
+                value={data.summary.days_worked}
+                sub={`${data.summary.work_hours_label} logged`}
+              />
+              <StatCard
+                icon={<PhoneCall size={14} />}
+                label="Calls"
+                value={data.summary.calls}
+                sub={data.summary.call_hours_label}
+              />
+              <StatCard
+                icon={<MessageCircle size={14} />}
+                label="WhatsApp"
+                value={data.summary.whatsapp}
+              />
+              <StatCard
+                icon={<MapPin size={14} />}
+                label="Site Visits"
+                value={data.summary.site_visits}
+                sub={`${data.summary.site_visits_completed} completed`}
+              />
+              <StatCard
+                icon={<Users size={14} />}
+                label="Leads"
+                value={data.summary.leads_created}
+                sub={`${data.summary.leads_assigned} assigned`}
+              />
+              <StatCard
+                icon={<Bell size={14} />}
+                label="Follow-ups"
+                value={data.summary.followups}
+                sub={`${data.summary.followups_completed} done`}
+              />
               <StatCard icon={<Clock size={14} />} label="Activity" value={data.summary.actions} />
-              <StatCard icon={<Wallet size={14} />} label="Expenses" value={`${data.summary.expenses_total.toLocaleString()}`} />
+              <StatCard
+                icon={<Wallet size={14} />}
+                label="Expenses"
+                value={`${data.summary.expenses_total.toLocaleString()}`}
+              />
               <StatCard
                 icon={<CheckCircle2 size={14} />}
                 label="Verified visits"
@@ -388,7 +455,11 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
             <div className="bg-card border border-border rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-foreground mb-4">Recent activity</h3>
               {data.timeline.length === 0 ? (
-                <EmptyState icon={<CalendarDays size={22} className="text-muted-foreground" />} title="No activity" description="No logged activity for this period." />
+                <EmptyState
+                  icon={<CalendarDays size={22} className="text-muted-foreground" />}
+                  title="No activity"
+                  description="No logged activity for this period."
+                />
               ) : (
                 <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                   {data.timeline.slice(0, 30).map((ev, i) => (
@@ -397,9 +468,15 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-foreground">{ev.label}</p>
-                          <span className="text-[11px] text-muted-foreground flex-shrink-0">{fmtDateTime(ev.at)}</span>
+                          <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                            {fmtDateTime(ev.at)}
+                          </span>
                         </div>
-                        {ev.detail ? <p className="text-xs text-muted-foreground truncate mt-0.5">{ev.detail}</p> : null}
+                        {ev.detail ? (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {ev.detail}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -429,7 +506,13 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
 
 function TimelineTab({ items }: { items: any[] }) {
   if (!items.length)
-    return <EmptyState icon={<CalendarDays size={22} className="text-muted-foreground" />} title="No activity" description="Nothing logged for this period." />;
+    return (
+      <EmptyState
+        icon={<CalendarDays size={22} className="text-muted-foreground" />}
+        title="No activity"
+        description="Nothing logged for this period."
+      />
+    );
   return (
     <div className="bg-card border border-border rounded-2xl p-5">
       <div className="space-y-3">
@@ -439,9 +522,13 @@ function TimelineTab({ items }: { items: any[] }) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-foreground">{ev.label}</p>
-                <span className="text-[11px] text-muted-foreground flex-shrink-0">{fmtDateTime(ev.at)}</span>
+                <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                  {fmtDateTime(ev.at)}
+                </span>
               </div>
-              {ev.detail ? <p className="text-xs text-muted-foreground truncate mt-0.5">{ev.detail}</p> : null}
+              {ev.detail ? (
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{ev.detail}</p>
+              ) : null}
             </div>
           </div>
         ))}
@@ -452,7 +539,13 @@ function TimelineTab({ items }: { items: any[] }) {
 
 function AttendanceTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
-    return <EmptyState icon={<CalendarDays size={22} className="text-muted-foreground" />} title="No attendance" description="No check-ins logged for this period." />;
+    return (
+      <EmptyState
+        icon={<CalendarDays size={22} className="text-muted-foreground" />}
+        title="No attendance"
+        description="No check-ins logged for this period."
+      />
+    );
   return (
     <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
@@ -469,7 +562,13 @@ function AttendanceTabC({ rows }: { rows: any[] }) {
           {rows.map((r, i) => {
             const secs =
               r.check_in_time && r.check_out_time
-                ? Math.max(0, Math.round((new Date(r.check_out_time).getTime() - new Date(r.check_in_time).getTime()) / 1000))
+                ? Math.max(
+                    0,
+                    Math.round(
+                      (new Date(r.check_out_time).getTime() - new Date(r.check_in_time).getTime()) /
+                        1000
+                    )
+                  )
                 : 0;
             const h = Math.floor(secs / 3600);
             const m = Math.round((secs % 3600) / 60);
@@ -480,7 +579,9 @@ function AttendanceTabC({ rows }: { rows: any[] }) {
                 <td className="px-4 py-3 text-muted-foreground">{fmtTime(r.check_out_time)}</td>
                 <td className="px-4 py-3">{secs ? `${h}h ${m}m` : '—'}</td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {r.check_in_lat != null ? `${r.check_in_lat.toFixed(4)}, ${r.check_in_lng?.toFixed(4) ?? ''}` : '—'}
+                  {r.check_in_lat != null
+                    ? `${r.check_in_lat.toFixed(4)}, ${r.check_in_lng?.toFixed(4) ?? ''}`
+                    : '—'}
                 </td>
               </tr>
             );
@@ -493,7 +594,13 @@ function AttendanceTabC({ rows }: { rows: any[] }) {
 
 function CallsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
-    return <EmptyState icon={<PhoneCall size={22} className="text-muted-foreground" />} title="No calls" description="No calls or WhatsApp logged for this period." />;
+    return (
+      <EmptyState
+        icon={<PhoneCall size={22} className="text-muted-foreground" />}
+        title="No calls"
+        description="No calls or WhatsApp logged for this period."
+      />
+    );
   return (
     <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
@@ -511,13 +618,19 @@ function CallsTabC({ rows }: { rows: any[] }) {
             <tr key={c.id || i} className="bg-card">
               <td className="px-4 py-3 text-muted-foreground">{fmtDateTime(c.created_at)}</td>
               <td className="px-4 py-3">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${c.channel === 'WhatsApp' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300'}`}>
+                <span
+                  className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${c.channel === 'WhatsApp' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300'}`}
+                >
                   {c.channel === 'WhatsApp' ? <MessageCircle size={11} /> : <PhoneCall size={11} />}
                   {c.channel || 'Call'}
                 </span>
               </td>
-              <td className="px-4 py-3 text-foreground">{c.contact_name || c.contact_phone || '—'}</td>
-              <td className="px-4 py-3 text-muted-foreground">{c.duration_seconds ? `${Math.round(Number(c.duration_seconds) / 60)} min` : '—'}</td>
+              <td className="px-4 py-3 text-foreground">
+                {c.contact_name || c.contact_phone || '—'}
+              </td>
+              <td className="px-4 py-3 text-muted-foreground">
+                {c.duration_seconds ? `${Math.round(Number(c.duration_seconds) / 60)} min` : '—'}
+              </td>
               <td className="px-4 py-3 text-muted-foreground">{c.outcome || '—'}</td>
             </tr>
           ))}
@@ -529,7 +642,13 @@ function CallsTabC({ rows }: { rows: any[] }) {
 
 function VisitsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
-    return <EmptyState icon={<MapPin size={22} className="text-muted-foreground" />} title="No site visits" description="No site visits recorded for this period." />;
+    return (
+      <EmptyState
+        icon={<MapPin size={22} className="text-muted-foreground" />}
+        title="No site visits"
+        description="No site visits recorded for this period."
+      />
+    );
   return (
     <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
@@ -544,20 +663,41 @@ function VisitsTabC({ rows }: { rows: any[] }) {
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((v, i) => {
-            const secs = v.check_in_at && v.check_out_at ? Math.max(0, Math.round((new Date(v.check_out_at).getTime() - new Date(v.check_in_at).getTime()) / 1000)) : 0;
+            const secs =
+              v.check_in_at && v.check_out_at
+                ? Math.max(
+                    0,
+                    Math.round(
+                      (new Date(v.check_out_at).getTime() - new Date(v.check_in_at).getTime()) /
+                        1000
+                    )
+                  )
+                : 0;
             const h = Math.floor(secs / 3600);
             const m = Math.round((secs % 3600) / 60);
             return (
               <tr key={v.id || i} className="bg-card">
                 <td className="px-4 py-3 text-muted-foreground">{fmtDateTime(v.check_in_at)}</td>
-                <td className="px-4 py-3 text-foreground">{v.project_name || v.lead_name || '—'}</td>
+                <td className="px-4 py-3 text-foreground">
+                  {v.project_name || v.lead_name || '—'}
+                </td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${v.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : v.status === 'in_progress' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-muted text-muted-foreground'}`}>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${v.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : v.status === 'in_progress' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-muted text-muted-foreground'}`}
+                  >
                     {v.status || 'in_progress'}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{secs ? `${h}h ${m}m` : '—'}</td>
-                <td className="px-4 py-3">{v.verified || v.within_radius ? <CheckCircle2 size={15} className="text-emerald-600" /> : v.check_out_at ? <XCircle size={15} className="text-red-500" /> : '—'}</td>
+                <td className="px-4 py-3">
+                  {v.verified || v.within_radius ? (
+                    <CheckCircle2 size={15} className="text-emerald-600" />
+                  ) : v.check_out_at ? (
+                    <XCircle size={15} className="text-red-500" />
+                  ) : (
+                    '—'
+                  )}
+                </td>
               </tr>
             );
           })}
@@ -569,7 +709,13 @@ function VisitsTabC({ rows }: { rows: any[] }) {
 
 function LeadsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
-    return <EmptyState icon={<Users size={22} className="text-muted-foreground" />} title="No leads" description="No leads associated with this employee for the period." />;
+    return (
+      <EmptyState
+        icon={<Users size={22} className="text-muted-foreground" />}
+        title="No leads"
+        description="No leads associated with this employee for the period."
+      />
+    );
   return (
     <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
@@ -587,7 +733,9 @@ function LeadsTabC({ rows }: { rows: any[] }) {
               <td className="px-4 py-3 text-muted-foreground">{fmtDateTime(l.created_at)}</td>
               <td className="px-4 py-3 font-medium text-foreground">{l.name || '—'}</td>
               <td className="px-4 py-3 text-muted-foreground">{l.phone || '—'}</td>
-              <td className="px-4 py-3 text-muted-foreground">{l.crm_status || l.lead_status || '—'}</td>
+              <td className="px-4 py-3 text-muted-foreground">
+                {l.crm_status || l.lead_status || '—'}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -598,7 +746,13 @@ function LeadsTabC({ rows }: { rows: any[] }) {
 
 function FollowupsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
-    return <EmptyState icon={<Bell size={22} className="text-muted-foreground" />} title="No follow-ups" description="No follow-ups scheduled for this period." />;
+    return (
+      <EmptyState
+        icon={<Bell size={22} className="text-muted-foreground" />}
+        title="No follow-ups"
+        description="No follow-ups scheduled for this period."
+      />
+    );
   return (
     <div className="bg-card border border-border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
@@ -618,9 +772,13 @@ function FollowupsTabC({ rows }: { rows: any[] }) {
               <td className="px-4 py-3 font-medium text-foreground">{f.title || '—'}</td>
               <td className="px-4 py-3 text-muted-foreground">{f.follow_up_type || '—'}</td>
               <td className="px-4 py-3">
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{f.follow_up_status || '—'}</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {f.follow_up_status || '—'}
+                </span>
               </td>
-              <td className="px-4 py-3 text-muted-foreground">{f.completed_at ? fmtDateTime(f.completed_at) : '—'}</td>
+              <td className="px-4 py-3 text-muted-foreground">
+                {f.completed_at ? fmtDateTime(f.completed_at) : '—'}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -632,7 +790,13 @@ function FollowupsTabC({ rows }: { rows: any[] }) {
 function ExpensesTabC({ rows }: { rows: any[] }) {
   const total = rows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   if (!rows.length)
-    return <EmptyState icon={<Wallet size={22} className="text-muted-foreground" />} title="No expenses" description="No expenses recorded by this employee." />;
+    return (
+      <EmptyState
+        icon={<Wallet size={22} className="text-muted-foreground" />}
+        title="No expenses"
+        description="No expenses recorded by this employee."
+      />
+    );
   return (
     <div className="bg-card border border-border rounded-2xl">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -652,10 +816,14 @@ function ExpensesTabC({ rows }: { rows: any[] }) {
           <tbody className="divide-y divide-border">
             {rows.map((e, i) => (
               <tr key={e.id || i} className="bg-card">
-                <td className="px-4 py-3 text-muted-foreground">{e.expense_date || fmtDateTime(e.created_at)}</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {e.expense_date || fmtDateTime(e.created_at)}
+                </td>
                 <td className="px-4 py-3 font-medium text-foreground">{e.title || '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">{e.category || 'Other'}</td>
-                <td className="px-4 py-3 font-semibold text-foreground">{Number(e.amount || 0).toLocaleString()}</td>
+                <td className="px-4 py-3 font-semibold text-foreground">
+                  {Number(e.amount || 0).toLocaleString()}
+                </td>
               </tr>
             ))}
           </tbody>

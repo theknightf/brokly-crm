@@ -4,7 +4,14 @@ import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-const METRICS = ['daily_calls', 'daily_followups', 'daily_meetings', 'leads_worked', 'deals', 'revenue'];
+const METRICS = [
+  'daily_calls',
+  'daily_followups',
+  'daily_meetings',
+  'leads_worked',
+  'deals',
+  'revenue',
+];
 
 /** GET /api/kpi-targets → list KPI targets */
 export async function GET() {
@@ -12,11 +19,18 @@ export async function GET() {
   const auth = await requireAdmin(db);
   if (!auth.ok) return auth.response;
   try {
-    const { data, error } = await db.from('kpi_targets').select('*').order('period_type').order('metric');
+    const { data, error } = await db
+      .from('kpi_targets')
+      .select('*')
+      .order('period_type')
+      .order('metric');
     if (error) throw error;
     return NextResponse.json({ targets: data || [] });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Failed to load KPI targets' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Failed to load KPI targets' },
+      { status: 500 }
+    );
   }
 }
 
@@ -55,7 +69,10 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Failed to save KPI target' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Failed to save KPI target' },
+      { status: 500 }
+    );
   }
 }
 
@@ -74,6 +91,9 @@ export async function DELETE(request: Request) {
     if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Failed to delete KPI target' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Failed to delete KPI target' },
+      { status: 500 }
+    );
   }
 }

@@ -62,9 +62,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ project: null, pitch: null });
     }
 
-    let query = supabase
-      .from('projects')
-      .select('*, developers(id, name)');
+    let query = supabase.from('projects').select('*, developers(id, name)');
 
     if (projectId) {
       query = query.eq('id', projectId).limit(1);

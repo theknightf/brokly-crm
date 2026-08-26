@@ -12,16 +12,13 @@ export interface Actor {
 }
 
 export type AuthResult<T> =
-  | { ok: true; actor: T; response?: never }
-  | { ok: false; response: NextResponse; actor?: never };
+  { ok: true; actor: T; response?: never } | { ok: false; response: NextResponse; actor?: never };
 
 /**
  * Authenticate the request and load the acting user's profile.
  * Deactivated users are rejected so deactivation takes effect immediately.
  */
-export async function requireAuth(
-  db: ServerClient
-): Promise<AuthResult<Actor>> {
+export async function requireAuth(db: ServerClient): Promise<AuthResult<Actor>> {
   const {
     data: { user },
   } = await db.auth.getUser();
@@ -37,15 +34,16 @@ export async function requireAuth(
     return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   if (actor.is_active === false) {
-    return { ok: false, response: NextResponse.json({ error: 'Account disabled' }, { status: 403 }) };
+    return {
+      ok: false,
+      response: NextResponse.json({ error: 'Account disabled' }, { status: 403 }),
+    };
   }
   return { ok: true, actor };
 }
 
 /** Authenticate + require an admin/owner role. */
-export async function requireAdmin(
-  db: ServerClient
-): Promise<AuthResult<Actor>> {
+export async function requireAdmin(db: ServerClient): Promise<AuthResult<Actor>> {
   const result = await requireAuth(db);
   if (!result.ok) return result;
   if (!isAdminRole(result.actor.role)) {
@@ -55,9 +53,7 @@ export async function requireAdmin(
 }
 
 /** Authenticate + require permission to manage users (owner/admin). */
-export async function requireUserManager(
-  db: ServerClient
-): Promise<AuthResult<Actor>> {
+export async function requireUserManager(db: ServerClient): Promise<AuthResult<Actor>> {
   const result = await requireAuth(db);
   if (!result.ok) return result;
   if (!canManageUsers(result.actor.role)) {

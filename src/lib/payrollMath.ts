@@ -66,7 +66,8 @@ export function computePayrollEntry(
     (Number(input.expenseReimbursement) || 0) +
     overtimePay;
 
-  const deductionsTotal = attendanceDeduction + lateDeduction + (Number(input.otherDeductions) || 0);
+  const deductionsTotal =
+    attendanceDeduction + lateDeduction + (Number(input.otherDeductions) || 0);
   const net = gross - deductionsTotal;
 
   return {

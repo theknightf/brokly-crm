@@ -183,13 +183,13 @@ export default function CallLogsTab() {
             onChange={(e) => setVerification(e.target.value)}
           >
             <option value="">All verifications</option>
-            {(['Incoming Call', 'Successful', 'Short Call', 'No Answer'] as VerificationCategory[]).map(
-              (v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              )
-            )}
+            {(
+              ['Incoming Call', 'Successful', 'Short Call', 'No Answer'] as VerificationCategory[]
+            ).map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
           </select>
           <Filter
             size={13}
@@ -257,7 +257,7 @@ export default function CallLogsTab() {
                         )}
                       </div>
                     </td>
-<td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center">
                       {(() => {
                         const v = verifyCall(l);
                         return (
@@ -276,9 +276,9 @@ export default function CallLogsTab() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                          outcomeClass(l.outcome || '')
-                        }`}
+                        className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold ${outcomeClass(
+                          l.outcome || ''
+                        )}`}
                       >
                         {l.outcome || '—'}
                       </span>

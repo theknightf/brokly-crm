@@ -31,10 +31,7 @@ function toDate(value: unknown): string {
 }
 
 // PATCH /api/expenses/:id
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const actor = await requireAdmin(supabase);
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -82,10 +79,7 @@ export async function PATCH(
 }
 
 // DELETE /api/expenses/:id
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const actor = await requireAdmin(supabase);
   if (!actor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

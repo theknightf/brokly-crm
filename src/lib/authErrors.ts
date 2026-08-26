@@ -38,10 +38,7 @@ export function normalizeAuthError(err: unknown): string {
   }
 
   // Configuration sanity — prefer telling the admin over a cryptic network error.
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return 'Authentication is not configured. Contact your administrator.';
   }
 

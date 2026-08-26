@@ -309,7 +309,7 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Pick a lead to keep this follow-up linked. We won't create a duplicate lead.
+                Pick a lead to keep this follow-up linked. We won&apos;t create a duplicate lead.
               </p>
             )}
 

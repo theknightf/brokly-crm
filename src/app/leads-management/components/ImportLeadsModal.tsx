@@ -369,9 +369,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   {unmappedColumns.length} column{unmappedColumns.length !== 1 ? 's' : ''} will be
                   skipped — map them below to preserve their data
                 </p>
-                <p className="text-xs mt-0.5 text-sky-700/80">
-                  {unmappedColumns.join(' · ')}
-                </p>
+                <p className="text-xs mt-0.5 text-sky-700/80">{unmappedColumns.join(' · ')}</p>
               </div>
             </div>
           )}
@@ -446,7 +444,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                       <td className="table-td text-muted-foreground">{data.date || '—'}</td>
                       <td className="table-td text-muted-foreground">{data.developer || '—'}</td>
                       <td className="table-td text-muted-foreground">{data.unit || '—'}</td>
-                      <td className="table-td text-muted-foreground">{data.interestLevel || '—'}</td>
+                      <td className="table-td text-muted-foreground">
+                        {data.interestLevel || '—'}
+                      </td>
                       <td className="table-td">
                         {data.reasons.length > 0 ? (
                           <span className="text-xs text-red-500 flex items-center gap-1">
@@ -588,7 +588,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                 className="btn-primary flex items-center gap-1.5 min-w-[140px] justify-center disabled:opacity-50"
               >
                 {importing ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                {importing ? 'Importing…' : `Import ${importableCount} lead${importableCount !== 1 ? 's' : ''}`}
+                {importing
+                  ? 'Importing…'
+                  : `Import ${importableCount} lead${importableCount !== 1 ? 's' : ''}`}
               </button>
             )}
           </div>

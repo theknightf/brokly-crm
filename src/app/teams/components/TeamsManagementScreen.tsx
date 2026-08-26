@@ -141,7 +141,7 @@ function TeamFormModal({
       <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-md p-6 fade-in">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-semibold text-foreground">
-              {initial ? 'Edit team' : 'Add new team'}
+            {initial ? 'Edit team' : 'Add new team'}
           </h3>
           <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">
             <X size={16} />
@@ -187,7 +187,7 @@ function TeamFormModal({
             className="btn-primary flex-1 flex items-center justify-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              {initial ? 'Save changes' : 'Add new team'}
+            {initial ? 'Save changes' : 'Add new team'}
           </button>
         </div>
       </div>
@@ -276,8 +276,8 @@ function AddMemberModal({
                   {usersLoading
                     ? 'Loading users…'
                     : available.length === 0
-                    ? 'No available users'
-                    : 'Choose a user…'}
+                      ? 'No available users'
+                      : 'Choose a user…'}
                 </option>
                 {!usersLoading &&
                   available.map((u) => (
@@ -341,7 +341,7 @@ function AddMemberModal({
             className="btn-primary flex-1 flex items-center justify-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-              Add member
+            Add member
           </button>
         </div>
       </div>
@@ -444,13 +444,7 @@ function StarRating({
   );
 }
 
-function PerformancePanel({
-  team,
-  canRate,
-}: {
-  team: Team;
-  canRate: boolean;
-}) {
+function PerformancePanel({ team, canRate }: { team: Team; canRate: boolean }) {
   const [data, setData] = useState<TeamPerformance | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<'30' | 'all'>('all');
@@ -458,21 +452,25 @@ function PerformancePanel({
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async (rng: string) => {
-    setLoading(true);
-    try {
-      const from = rng === '30' ? new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0] : '';
-      const { teams } = await teamsService.getPerformance(from || undefined, undefined);
-      const mine = (teams as TeamPerformance[]).find((t) => t.id === team.id) || null;
-      setData(mine);
-      setRating(mine?.leaderRating?.rating || 0);
-      setComment(mine?.leaderRating?.comment || '');
-    } catch {
-      // keep previous data
-    } finally {
-      setLoading(false);
-    }
-  }, [team.id]);
+  const load = useCallback(
+    async (rng: string) => {
+      setLoading(true);
+      try {
+        const from =
+          rng === '30' ? new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0] : '';
+        const { teams } = await teamsService.getPerformance(from || undefined, undefined);
+        const mine = (teams as TeamPerformance[]).find((t) => t.id === team.id) || null;
+        setData(mine);
+        setRating(mine?.leaderRating?.rating || 0);
+        setComment(mine?.leaderRating?.comment || '');
+      } catch {
+        // keep previous data
+      } finally {
+        setLoading(false);
+      }
+    },
+    [team.id]
+  );
 
   useEffect(() => {
     load(range);
@@ -637,7 +635,9 @@ function PerformancePanel({
                   </div>
                   <div>
                     <p className="text-[11px] text-muted-foreground">Revenue</p>
-                    <p className="text-sm font-bold tabular-nums">{fmtMoney(data.leader.revenue)}</p>
+                    <p className="text-sm font-bold tabular-nums">
+                      {fmtMoney(data.leader.revenue)}
+                    </p>
                   </div>
                 </div>
               )}
@@ -673,7 +673,11 @@ function PerformancePanel({
                       disabled={saving || !rating || !data.leaderId}
                       className="btn-primary mt-3 flex items-center gap-1.5 text-sm disabled:opacity-50"
                     >
-                      {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                      {saving ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Check size={13} />
+                      )}
                       Save rating
                     </button>
                   </>
@@ -739,7 +743,7 @@ function TeamDetailPanel({
             className="btn-primary flex items-center gap-1.5 text-xs px-3 py-1.5"
           >
             <UserPlus size={13} />
-              Add member
+            Add member
           </button>
         )}
       </div>

@@ -17,7 +17,12 @@ interface Template {
 interface TemplateEditorProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: { subjectEn: string; bodyEn: string; subjectAr: string; bodyAr: string }) => Promise<void>;
+  onSave: (data: {
+    subjectEn: string;
+    bodyEn: string;
+    subjectAr: string;
+    bodyAr: string;
+  }) => Promise<void>;
   initial?: Template;
 }
 
@@ -84,9 +89,7 @@ function TemplateEditor({ open, onClose, onSave, initial }: TemplateEditorProps)
             { label: 'Body (Arabic)', value: bodyAr, set: setBodyAr, ar: true },
           ].map((f) => (
             <div key={f.label}>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                {f.label}
-              </label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{f.label}</label>
               {f.label.toLowerCase().includes('subject') ? (
                 <input
                   type="text"
@@ -169,7 +172,12 @@ export default function EmailTemplatesTab() {
     load();
   }, []);
 
-  const handleSave = async (data: { subjectEn: string; bodyEn: string; subjectAr: string; bodyAr: string }) => {
+  const handleSave = async (data: {
+    subjectEn: string;
+    bodyEn: string;
+    subjectAr: string;
+    bodyAr: string;
+  }) => {
     const color = JSON.stringify(data);
     try {
       if (editor.initial?.id) {
@@ -208,7 +216,8 @@ export default function EmailTemplatesTab() {
         <div>
           <h2 className="text-base font-semibold text-foreground">Email Templates</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Reusable subject + body pairs (English &amp; Arabic) used by automated and manual emails.
+            Reusable subject + body pairs (English &amp; Arabic) used by automated and manual
+            emails.
           </p>
         </div>
         <button
@@ -233,7 +242,10 @@ export default function EmailTemplatesTab() {
           <p className="text-xs text-muted-foreground mb-4">
             Create a template for onboarding, follow-ups, or lead notifications.
           </p>
-          <button onClick={() => setEditor({ open: true })} className="btn-primary text-sm flex items-center gap-2">
+          <button
+            onClick={() => setEditor({ open: true })}
+            className="btn-primary text-sm flex items-center gap-2"
+          >
             <Plus size={14} />
             Create Template
           </button>
@@ -241,7 +253,10 @@ export default function EmailTemplatesTab() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {templates.map((t) => (
-            <div key={t.id} className="bg-card border border-border rounded-xl p-4 flex flex-col gap-2">
+            <div
+              key={t.id}
+              className="bg-card border border-border rounded-xl p-4 flex flex-col gap-2"
+            >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -272,13 +287,24 @@ export default function EmailTemplatesTab() {
                 </div>
               </div>
               {(t.bodyEn || t.bodyAr) && (
-                <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed" dir={t.bodyAr ? 'rtl' : 'ltr'}>
+                <p
+                  className="text-xs text-muted-foreground line-clamp-3 leading-relaxed"
+                  dir={t.bodyAr ? 'rtl' : 'ltr'}
+                >
                   {t.bodyAr || t.bodyEn}
                 </p>
               )}
               <div className="flex items-center gap-2 mt-auto pt-1">
-                {t.bodyAr && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">AR</span>}
-                {t.bodyEn && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">EN</span>}
+                {t.bodyAr && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                    AR
+                  </span>
+                )}
+                {t.bodyEn && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
+                    EN
+                  </span>
+                )}
               </div>
             </div>
           ))}

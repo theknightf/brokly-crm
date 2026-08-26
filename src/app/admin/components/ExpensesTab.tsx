@@ -182,7 +182,9 @@ function ExpenseModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Amount (EGP)</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Amount (EGP)
+              </label>
               <input
                 type="number"
                 inputMode="decimal"
@@ -391,9 +393,7 @@ export default function ExpensesTab() {
       toast.error('No expenses to export');
       return;
     }
-    const rows = [...filtered].sort((a, b) =>
-      a.expense_date > b.expense_date ? -1 : 1
-    );
+    const rows = [...filtered].sort((a, b) => (a.expense_date > b.expense_date ? -1 : 1));
     exportPDF(
       'Expenses Report',
       `Office & branch running costs · ${fmtDate(from)} → ${fmtDate(to)}${category !== 'All' ? ` · ${category}` : ''}`,
@@ -500,7 +500,9 @@ export default function ExpensesTab() {
             <TrendingUp size={16} className="text-emerald-600" />
           </div>
           <p className="text-xl font-bold text-foreground truncate">{topCategory}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Top category · {formatCurrency(topValue)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Top category · {formatCurrency(topValue)}
+          </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
           <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center mb-2">
@@ -544,7 +546,10 @@ export default function ExpensesTab() {
           ))}
         </select>
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <input
             type="text"
             value={search}
@@ -608,13 +613,12 @@ export default function ExpensesTab() {
             <p className="text-xs text-muted-foreground mb-4 max-w-sm">
               The <code className="font-mono text-xs">expenses</code> table has not been created in
               Supabase yet. Run{' '}
-              <code className="font-mono text-xs text-primary">supabase/apply_missing_tables.sql</code>{' '}
+              <code className="font-mono text-xs text-primary">
+                supabase/apply_missing_tables.sql
+              </code>{' '}
               or the expenses migration in the Supabase SQL Editor, then refresh.
             </p>
-            <button
-              onClick={load}
-              className="btn-secondary text-sm flex items-center gap-2"
-            >
+            <button onClick={load} className="btn-secondary text-sm flex items-center gap-2">
               <RefreshCw size={14} />
               Refresh
             </button>
@@ -677,15 +681,14 @@ export default function ExpensesTab() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-foreground tabular-nums">
-                      {formatCurrency(e.amount)} <span className="text-xs text-muted-foreground font-normal">EGP</span>
+                      {formatCurrency(e.amount)}{' '}
+                      <span className="text-xs text-muted-foreground font-normal">EGP</span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{fmtDate(e.expense_date)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() =>
-                            setModal({ open: true, isEdit: true, expense: e })
-                          }
+                          onClick={() => setModal({ open: true, isEdit: true, expense: e })}
                           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                           title="Edit"
                         >

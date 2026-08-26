@@ -50,9 +50,7 @@ export default function GettingStarted() {
         <h2 className="text-lg font-semibold text-foreground font-display">
           {t('dashboard.startHere')}
         </h2>
-        <p className="text-sm text-muted-foreground mt-0.5 mb-4">
-          {t('dashboard.startHereDesc')}
-        </p>
+        <p className="text-sm text-muted-foreground mt-0.5 mb-4">{t('dashboard.startHereDesc')}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {STEPS.map((step, i) => (

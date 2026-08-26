@@ -112,7 +112,11 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json(
-      { error: error.message.includes('does not exist') ? 'Expenses are not initialized yet' : error.message },
+      {
+        error: error.message.includes('does not exist')
+          ? 'Expenses are not initialized yet'
+          : error.message,
+      },
       { status: 500 }
     );
   }

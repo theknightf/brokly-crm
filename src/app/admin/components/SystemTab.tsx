@@ -55,9 +55,7 @@ function mask(value?: string | null, visible = 8): string {
 function StatusDot({ ok, unknown }: { ok: boolean; unknown?: boolean }) {
   if (unknown) return <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />;
   return (
-    <span
-      className={`w-2 h-2 rounded-full inline-block ${ok ? 'bg-emerald-500' : 'bg-red-500'}`}
-    />
+    <span className={`w-2 h-2 rounded-full inline-block ${ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
   );
 }
 
@@ -93,7 +91,9 @@ export default function SystemTab() {
         const fmt = (b?: number) => (b ? `${(b / 1024 / 1024).toFixed(1)} MB` : '?');
         storage = `${fmt(est.usage)} used / ${fmt(est.quota)} quota`;
       }
-    } catch {}
+    } catch {
+      storage = '—';
+    }
     const conn = nav.connection;
     setRuntime({
       Platform: nav.userAgentData?.platform || navigator.platform || '—',
@@ -167,7 +167,9 @@ export default function SystemTab() {
       try {
         await fetch('/api/tech/health', { cache: 'no-store' });
         samples.push(Math.round(performance.now() - t0));
-      } catch {}
+      } catch {
+        /* probe failure: skip sample */
+      }
     }
     setPings(samples);
     setPinging(false);
@@ -273,7 +275,11 @@ export default function SystemTab() {
           {/* Connectivity probe */}
           <Section title="Connectivity" icon={<Gauge size={13} />}>
             <div className="flex flex-wrap items-center gap-4">
-              <button onClick={runPing} disabled={pinging} className="btn-secondary text-sm flex items-center gap-2">
+              <button
+                onClick={runPing}
+                disabled={pinging}
+                className="btn-secondary text-sm flex items-center gap-2"
+              >
                 {pinging ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
                 Ping API ×3
               </button>
@@ -300,9 +306,20 @@ export default function SystemTab() {
           <Section title="Configuration" icon={<ShieldCheck size={13} />}>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <Row k="Supabase host" v={report.env.supabaseHost || '— not set —'} mono />
-              <Row k="Service-role key" v={report.env.serviceRoleKeyConfigured ? mask('configured', 10) : '— missing —'} mono />
+              <Row
+                k="Service-role key"
+                v={report.env.serviceRoleKeyConfigured ? mask('configured', 10) : '— missing —'}
+                mono
+              />
               <Row k="Site URL" v={mask(report.env.siteUrl)} mono />
-              <Row k="Session storage" v={`${auth.hasSbCookie ? 'cookie' : ''}${auth.hasSbCookie && auth.hasLocalKeys ? ' + ' : ''}${auth.hasLocalKeys ? 'localStorage' : ''}` || 'none found'} mono />
+              <Row
+                k="Session storage"
+                v={
+                  `${auth.hasSbCookie ? 'cookie' : ''}${auth.hasSbCookie && auth.hasLocalKeys ? ' + ' : ''}${auth.hasLocalKeys ? 'localStorage' : ''}` ||
+                  'none found'
+                }
+                mono
+              />
             </dl>
           </Section>
 
@@ -310,9 +327,14 @@ export default function SystemTab() {
           <Section title="Database tables" icon={<Database size={13} />}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {Object.entries(report.counts).map(([table, count]) => (
-                <div key={table} className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2">
+                <div
+                  key={table}
+                  className="flex items-center justify-between bg-muted/40 rounded-lg px-3 py-2"
+                >
                   <span className="text-xs text-muted-foreground truncate">{table}</span>
-                  <span className={`text-sm font-mono font-semibold ${count === null ? 'text-destructive' : 'text-foreground'}`}>
+                  <span
+                    className={`text-sm font-mono font-semibold ${count === null ? 'text-destructive' : 'text-foreground'}`}
+                  >
                     {count === null ? 'N/A' : count.toLocaleString()}
                   </span>
                 </div>
@@ -332,7 +354,13 @@ export default function SystemTab() {
                 <span className="text-muted-foreground">
                   All expected tables present
                   {report.schema.missingTables.length > 0 && (
-                    <> — missing: <span className="font-mono text-destructive">{report.schema.missingTables.join(', ')}</span></>
+                    <>
+                      {' '}
+                      — missing:{' '}
+                      <span className="font-mono text-destructive">
+                        {report.schema.missingTables.join(', ')}
+                      </span>
+                    </>
                   )}
                 </span>
               </li>
@@ -345,7 +373,13 @@ export default function SystemTab() {
                 <span className="text-muted-foreground">
                   user_profiles columns complete
                   {report.schema.missingColumns.length > 0 && (
-                    <> — missing: <span className="font-mono text-destructive">{report.schema.missingColumns.join(', ')}</span></>
+                    <>
+                      {' '}
+                      — missing:{' '}
+                      <span className="font-mono text-destructive">
+                        {report.schema.missingColumns.join(', ')}
+                      </span>
+                    </>
                   )}
                 </span>
               </li>
@@ -371,7 +405,10 @@ export default function SystemTab() {
             icon={<AlertTriangle size={13} />}
             action={
               logs.length > 0 ? (
-                <button onClick={() => setLogs([])} className="btn-ghost text-xs text-muted-foreground">
+                <button
+                  onClick={() => setLogs([])}
+                  className="btn-ghost text-xs text-muted-foreground"
+                >
                   Clear
                 </button>
               ) : undefined
@@ -392,14 +429,16 @@ export default function SystemTab() {
                         l.kind === 'error'
                           ? 'text-red-500'
                           : l.kind === 'rejection'
-                          ? 'text-amber-500'
-                          : 'text-sky-500'
+                            ? 'text-amber-500'
+                            : 'text-sky-500'
                       }
                     >
                       [{l.kind}]
                     </span>{' '}
                     <span className="text-foreground break-all">{l.message}</span>
-                    {l.detail && <div className="text-muted-foreground/70 mt-0.5 break-all">{l.detail}</div>}
+                    {l.detail && (
+                      <div className="text-muted-foreground/70 mt-0.5 break-all">{l.detail}</div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -471,17 +510,7 @@ function Section({
   );
 }
 
-function Row({
-  k,
-  v,
-  mono,
-  small,
-}: {
-  k: string;
-  v: string;
-  mono?: boolean;
-  small?: boolean;
-}) {
+function Row({ k, v, mono, small }: { k: string; v: string; mono?: boolean; small?: boolean }) {
   return (
     <>
       <dt className="text-muted-foreground">{k}</dt>

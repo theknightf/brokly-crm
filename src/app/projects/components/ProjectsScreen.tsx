@@ -692,13 +692,13 @@ function ProjectDetailsModal({
 
         <div className="px-6 py-4 border-t border-border flex items-center gap-2 justify-end flex-wrap">
           <button onClick={onEdit} className="btn-secondary flex items-center gap-1.5 text-sm">
-              <Pencil size={14} /> Edit project
-            </button>
-            <button onClick={onVisit} className="btn-secondary flex items-center gap-1.5 text-sm">
-              <MapPin size={14} /> Site Visit
-            </button>
-            <button onClick={onUnits} className="btn-primary flex items-center gap-1.5 text-sm">
-              <Layers size={14} /> View units &amp; media
+            <Pencil size={14} /> Edit project
+          </button>
+          <button onClick={onVisit} className="btn-secondary flex items-center gap-1.5 text-sm">
+            <MapPin size={14} /> Site Visit
+          </button>
+          <button onClick={onUnits} className="btn-primary flex items-center gap-1.5 text-sm">
+            <Layers size={14} /> View units &amp; media
           </button>
         </div>
       </div>
@@ -1222,8 +1222,8 @@ export default function ProjectsScreen() {
                 onClick={handleDelete}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"
               >
-              Remove project
-            </button>
+                Remove project
+              </button>
             </div>
           </div>
         </div>

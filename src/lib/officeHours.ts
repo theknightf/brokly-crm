@@ -40,12 +40,15 @@ export function formatMinutes(total: number): string {
 }
 
 export function buildOfficeHours(
-  wh: {
-    start?: string | null;
-    end?: string | null;
-    lateGraceMinutes?: number | null;
-    flexibleHours?: boolean | null;
-  } | null | undefined
+  wh:
+    | {
+        start?: string | null;
+        end?: string | null;
+        lateGraceMinutes?: number | null;
+        flexibleHours?: boolean | null;
+      }
+    | null
+    | undefined
 ): OfficeHoursConfig {
   const start = wh?.start || DEFAULT_START;
   const end = wh?.end || DEFAULT_END;
@@ -81,9 +84,9 @@ export function buildOfficeHours(
  * browser). Falls back to the default office hours on any failure so callers
  * never need to handle errors.
  */
-export async function loadOfficeHours(
-  supabase: { from: (table: string) => any }
-): Promise<OfficeHoursConfig> {
+export async function loadOfficeHours(supabase: {
+  from: (table: string) => any;
+}): Promise<OfficeHoursConfig> {
   try {
     const { data } = await supabase
       .from('company_settings')

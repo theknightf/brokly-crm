@@ -415,9 +415,7 @@ export const leadsService = {
       .select('*')
       .single();
     if (error) {
-      throw new Error(
-        describeLeadWriteError(error, 'status update')
-      );
+      throw new Error(describeLeadWriteError(error, 'status update'));
     }
     invalidateCache();
     await followUpsService.syncFromLead(data);
@@ -2669,7 +2667,8 @@ export const usersService = {
 
 function rowToUserProfile(row: any) {
   const admin = Array.isArray(row.admin) ? row.admin[0] : row.admin;
-  const fullName = typeof row.full_name === 'string' ? row.full_name : row.full_name?.full_name || '';
+  const fullName =
+    typeof row.full_name === 'string' ? row.full_name : row.full_name?.full_name || '';
   return {
     id: row.id,
     email: row.email,
@@ -2863,7 +2862,9 @@ export const reportsService = {
     if (filters.source) params.set('source', filters.source);
     if (filters.stage) params.set('stage', filters.stage);
     const qs = params.toString();
-    const res = await fetch(`/api/reports/calls-matrix${qs ? `?${qs}` : ''}`, { cache: 'no-store' });
+    const res = await fetch(`/api/reports/calls-matrix${qs ? `?${qs}` : ''}`, {
+      cache: 'no-store',
+    });
     if (!res.ok) {
       const err: any = new Error(`Failed to load calls matrix (${res.status})`);
       err.status = res.status;

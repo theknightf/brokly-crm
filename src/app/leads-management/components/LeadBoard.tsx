@@ -1,6 +1,14 @@
 'use client';
 import React from 'react';
-import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Building2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Phone,
+  MessageCircle,
+  Pencil,
+  MapPin,
+  Building2,
+} from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
@@ -124,7 +132,9 @@ function BoardCard({
         >
           <ChevronLeft size={14} />
         </button>
-        <span className="flex-1 text-center text-[10px] text-muted-foreground select-none">move stage</span>
+        <span className="flex-1 text-center text-[10px] text-muted-foreground select-none">
+          move stage
+        </span>
         <button
           disabled={!next}
           onClick={(e) => {
@@ -153,7 +163,10 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange }: Lea
           ? leads.filter((l) => (l.status || 'Fresh Leads') === col.stage)
           : leads.filter((l) => !PIPELINE_STAGES.includes(l.status || 'Fresh Leads'));
         return (
-          <div key={col.key} className="w-[272px] flex-shrink-0 flex flex-col max-h-[calc(100vh-260px)]">
+          <div
+            key={col.key}
+            className="w-[272px] flex-shrink-0 flex flex-col max-h-[calc(100vh-260px)]"
+          >
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border mb-2 sticky top-0 z-10">
               {col.stage ? (
                 <StatusBadge status={col.stage} showDot />
@@ -175,7 +188,12 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange }: Lea
               ) : (
                 colLeads.map((lead, i) => (
                   <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
-                    <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} />
+                    <BoardCard
+                      lead={lead}
+                      onView={onView}
+                      onEdit={onEdit}
+                      onStatusChange={onStatusChange}
+                    />
                   </div>
                 ))
               )}

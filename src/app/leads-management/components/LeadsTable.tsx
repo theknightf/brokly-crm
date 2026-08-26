@@ -17,11 +17,7 @@ import {
 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
-import {
-  PIPELINE_STAGES,
-  OUTCOME_STAGES,
-  nextPipelineStage,
-} from './leadStages';
+import { PIPELINE_STAGES, OUTCOME_STAGES, nextPipelineStage } from './leadStages';
 import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 
@@ -302,7 +298,9 @@ export default function LeadsTable({
                     onStatusChange={onStatusChange}
                   />
                   <button
-                    onClick={() => next != null && next !== lead.status && onStatusChange(lead.id, next)}
+                    onClick={() =>
+                      next != null && next !== lead.status && onStatusChange(lead.id, next)
+                    }
                     disabled={!next || next === lead.status}
                     className="h-10 px-3 rounded-xl bg-primary text-primary-foreground flex items-center gap-1 text-xs font-bold disabled:opacity-40 active:scale-95 transition-transform shadow-sm"
                     aria-label="Advance status"

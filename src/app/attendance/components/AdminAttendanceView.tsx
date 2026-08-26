@@ -168,9 +168,10 @@ export default function AdminAttendanceView() {
     try {
       const [reportRes, teamsList] = await Promise.all([
         fetch(`/api/attendance/report?from=${from}&to=${to}`, { cache: 'no-store' }),
-        teamsService.getAll().then((rows) =>
-          rows.map((x) => ({ id: x.id, name: x.name }))
-        ).catch(() => [] as TeamOption[]),
+        teamsService
+          .getAll()
+          .then((rows) => rows.map((x) => ({ id: x.id, name: x.name })))
+          .catch(() => [] as TeamOption[]),
       ]);
       if (!reportRes.ok) throw new Error('Failed to load attendance data');
       const data = await reportRes.json();
@@ -208,7 +209,10 @@ export default function AdminAttendanceView() {
 
   // Per-user aggregation for the period.
   const rows = useMemo(() => {
-    const daysInRange = Math.max(1, Math.floor((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1);
+    const daysInRange = Math.max(
+      1,
+      Math.floor((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1
+    );
     const out = activeUsers.map((u) => {
       const recs = recordByUser[u.id] || [];
       let present = 0;
@@ -231,7 +235,9 @@ export default function AdminAttendanceView() {
       });
       const todayRec = recs.find((r) => r.attendance_date === todayLocal());
       if (todayRec?.check_in_time && !todayRec.check_out_time) lastStatus = 'checked-out';
-      else if (todayRec?.check_in_time) lastStatus = minutesOfDay(todayRec.check_in_time) > officeCfg.toleranceMinutes ? 'late' : 'present';
+      else if (todayRec?.check_in_time)
+        lastStatus =
+          minutesOfDay(todayRec.check_in_time) > officeCfg.toleranceMinutes ? 'late' : 'present';
       else if (todayRec) lastStatus = 'not-checked-in';
       else if (isSingleDay) lastStatus = 'absent';
       const absent = Math.max(0, daysInRange - present);
@@ -269,7 +275,17 @@ export default function AdminAttendanceView() {
     const avgHours = rows.length ? totalSec / 3600 / rows.length : 0;
     const totalOvertime = rows.reduce((s, r) => s + r.overtimeMin, 0);
     const presentSlots = rows.reduce((s, r) => s + r.present, 0);
-    const expectedSlots = Math.max(1, activeUsers.length) * Math.max(1, isSingleDay ? 1 : Math.max(1, Math.floor((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1));
+    const expectedSlots =
+      Math.max(1, activeUsers.length) *
+      Math.max(
+        1,
+        isSingleDay
+          ? 1
+          : Math.max(
+              1,
+              Math.floor((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1
+            )
+      );
     const attendanceRate = expectedSlots ? Math.round((presentSlots / expectedSlots) * 100) : 0;
     return {
       present,
@@ -286,9 +302,19 @@ export default function AdminAttendanceView() {
   const filteredRows = useMemo(() => {
     const q = search.toLowerCase();
     return rows.filter((r) => {
-      if (q && !r.user.full_name.toLowerCase().includes(q) && !r.user.email.toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !r.user.full_name.toLowerCase().includes(q) &&
+        !r.user.email.toLowerCase().includes(q)
+      )
+        return false;
       if (teamFilter !== 'all' && r.user.team_id !== teamFilter) return false;
-      if (statusFilter !== 'all' && r.lastStatus !== statusFilter && !(statusFilter === 'present' && r.lastStatus === 'present')) return false;
+      if (
+        statusFilter !== 'all' &&
+        r.lastStatus !== statusFilter &&
+        !(statusFilter === 'present' && r.lastStatus === 'present')
+      )
+        return false;
       return true;
     });
   }, [rows, search, teamFilter, statusFilter]);
@@ -311,12 +337,26 @@ export default function AdminAttendanceView() {
 
   // ── Reports ──────────────────────────────────────────────────────────
   const dailyReport = () => {
-    const headers = ['Employee', 'Status', 'Check In', 'Check Out', 'Working Hours', 'Late (min)', 'Overtime (min)'];
+    const headers = [
+      'Employee',
+      'Status',
+      'Check In',
+      'Check Out',
+      'Working Hours',
+      'Late (min)',
+      'Overtime (min)',
+    ];
     const rowsData = filteredRows.map((r) => [
       r.user.full_name || r.user.email,
       STATUS_LABELS[r.lastStatus] || r.lastStatus,
-      fmtTime(recordByUser[r.user.id]?.find((x) => x.attendance_date === todayLocal())?.check_in_time ?? null),
-      fmtTime(recordByUser[r.user.id]?.find((x) => x.attendance_date === todayLocal())?.check_out_time ?? null),
+      fmtTime(
+        recordByUser[r.user.id]?.find((x) => x.attendance_date === todayLocal())?.check_in_time ??
+          null
+      ),
+      fmtTime(
+        recordByUser[r.user.id]?.find((x) => x.attendance_date === todayLocal())?.check_out_time ??
+          null
+      ),
       fmtDuration(r.totalSec),
       String(r.late),
       String(r.overtimeMin),
@@ -337,10 +377,22 @@ export default function AdminAttendanceView() {
   };
 
   const monthlyReport = () => {
-    const headers = ['Employee', 'Working Days', 'Present', 'Absent', 'Late Days', 'Leave Days', 'Total Hours', 'Avg Hours', 'Overtime (min)'];
+    const headers = [
+      'Employee',
+      'Working Days',
+      'Present',
+      'Absent',
+      'Late Days',
+      'Leave Days',
+      'Total Hours',
+      'Avg Hours',
+      'Overtime (min)',
+    ];
     const rowsData = filteredRows.map((r) => [
       r.user.full_name || r.user.email,
-      String(Math.max(1, Math.floor((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1)),
+      String(
+        Math.max(1, Math.floor((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1)
+      ),
       String(r.present),
       String(r.absent),
       String(r.late),
@@ -354,7 +406,10 @@ export default function AdminAttendanceView() {
       `${from} → ${to} · Generated ${new Date().toLocaleString()}`,
       [
         { label: 'Attendance Rate', value: `${summary.attendanceRate}%` },
-        { label: 'Total Hours', value: summary.avgHours ? (summary.avgHours * summary.totalEmployees).toFixed(1) : '0' },
+        {
+          label: 'Total Hours',
+          value: summary.avgHours ? (summary.avgHours * summary.totalEmployees).toFixed(1) : '0',
+        },
         { label: 'Employees', value: String(summary.totalEmployees) },
       ],
       [{ caption: 'Monthly Report', headers, rows: rowsData }],
@@ -371,14 +426,23 @@ export default function AdminAttendanceView() {
       fmtTime(r.check_in_time),
       fmtTime(r.check_out_time),
       fmtDuration(durationSeconds(r.check_in_time, r.check_out_time)),
-      r.check_in_time ? (minutesOfDay(r.check_in_time) > officeCfg.toleranceMinutes ? 'Late' : 'Present') : 'Absent',
+      r.check_in_time
+        ? minutesOfDay(r.check_in_time) > officeCfg.toleranceMinutes
+          ? 'Late'
+          : 'Present'
+        : 'Absent',
     ]);
     exportPDF(
       `Attendance Report — ${user.full_name || user.email}`,
       `${from} → ${to} · Generated ${new Date().toLocaleString()}`,
       [
         { label: 'Days Present', value: String(recs.filter((r) => r.check_in_time).length) },
-        { label: 'Total Hours', value: fmtDuration(recs.reduce((s, r) => s + durationSeconds(r.check_in_time, r.check_out_time), 0)) },
+        {
+          label: 'Total Hours',
+          value: fmtDuration(
+            recs.reduce((s, r) => s + durationSeconds(r.check_in_time, r.check_out_time), 0)
+          ),
+        },
       ],
       [{ caption: 'Employee Attendance', headers, rows: rowsData }],
       `attendance-${user.full_name || 'employee'}`
@@ -399,15 +463,22 @@ export default function AdminAttendanceView() {
           <div>
             <h1 className="text-xl font-bold text-foreground">Attendance</h1>
             <p className="text-sm text-muted-foreground">
-              Office hours {officeCfg.start}–{officeCfg.end}. Arriving after {formatMinutes(officeCfg.toleranceMinutes)} counts as late.
+              Office hours {officeCfg.start}–{officeCfg.end}. Arriving after{' '}
+              {formatMinutes(officeCfg.toleranceMinutes)} counts as late.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={dailyReport} className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5">
+          <button
+            onClick={dailyReport}
+            className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5"
+          >
             <Printer size={14} /> Daily report
           </button>
-          <button onClick={monthlyReport} className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5">
+          <button
+            onClick={monthlyReport}
+            className="btn-secondary h-9 px-3 text-sm flex items-center gap-1.5"
+          >
             <Download size={14} /> Monthly report
           </button>
           <button
@@ -422,18 +493,22 @@ export default function AdminAttendanceView() {
       {/* Range selector */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1 bg-muted rounded-lg p-1 flex-wrap">
-          {([
-            ['today', 'Today'],
-            ['yesterday', 'Yesterday'],
-            ['week', 'This Week'],
-            ['month', 'This Month'],
-            ['custom', 'Custom'],
-          ] as [RangeKey, string][]).map(([key, label]) => (
+          {(
+            [
+              ['today', 'Today'],
+              ['yesterday', 'Yesterday'],
+              ['week', 'This Week'],
+              ['month', 'This Month'],
+              ['custom', 'Custom'],
+            ] as [RangeKey, string][]
+          ).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setRange(key)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                range === key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                range === key
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {label}
@@ -442,12 +517,26 @@ export default function AdminAttendanceView() {
         </div>
         {range === 'custom' && (
           <div className="flex items-center gap-2">
-            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="input-base text-sm" />
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="input-base text-sm"
+            />
             <span className="text-muted-foreground text-sm">→</span>
-            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="input-base text-sm" />
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="input-base text-sm"
+            />
           </div>
         )}
-        <button onClick={() => setReloadTick((t) => t + 1)} className="btn-ghost p-2" title="Refresh">
+        <button
+          onClick={() => setReloadTick((t) => t + 1)}
+          className="btn-ghost p-2"
+          title="Refresh"
+        >
           <RefreshCw size={15} />
         </button>
       </div>
@@ -455,12 +544,42 @@ export default function AdminAttendanceView() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {[
-          { label: 'Present Today', value: summary.present, color: 'text-teal', icon: <CheckCircle2 size={16} className="text-teal" /> },
-          { label: 'Absent Today', value: summary.absentToday, color: 'text-clay', icon: <XCircle size={16} className="text-clay" /> },
-          { label: 'Late Today', value: summary.late, color: 'text-gold-dark', icon: <AlertTriangle size={16} className="text-gold-dark" /> },
-          { label: 'Avg Working Hours', value: `${summary.avgHours.toFixed(1)}h`, color: 'text-foreground', icon: <Clock size={16} className="text-muted-foreground" /> },
-          { label: 'Total Overtime', value: fmtDuration(summary.totalOvertime * 60), color: 'text-dusk', icon: <Timer size={16} className="text-dusk" /> },
-          { label: 'Attendance Rate', value: `${summary.attendanceRate}%`, color: 'text-primary', icon: <Users size={16} className="text-primary" /> },
+          {
+            label: 'Present Today',
+            value: summary.present,
+            color: 'text-teal',
+            icon: <CheckCircle2 size={16} className="text-teal" />,
+          },
+          {
+            label: 'Absent Today',
+            value: summary.absentToday,
+            color: 'text-clay',
+            icon: <XCircle size={16} className="text-clay" />,
+          },
+          {
+            label: 'Late Today',
+            value: summary.late,
+            color: 'text-gold-dark',
+            icon: <AlertTriangle size={16} className="text-gold-dark" />,
+          },
+          {
+            label: 'Avg Working Hours',
+            value: `${summary.avgHours.toFixed(1)}h`,
+            color: 'text-foreground',
+            icon: <Clock size={16} className="text-muted-foreground" />,
+          },
+          {
+            label: 'Total Overtime',
+            value: fmtDuration(summary.totalOvertime * 60),
+            color: 'text-dusk',
+            icon: <Timer size={16} className="text-dusk" />,
+          },
+          {
+            label: 'Attendance Rate',
+            value: `${summary.attendanceRate}%`,
+            color: 'text-primary',
+            icon: <Users size={16} className="text-primary" />,
+          },
         ].map((s) => (
           <div key={s.label} className="bg-card border border-border rounded-xl px-4 py-3">
             <div className="flex items-center justify-between">
@@ -475,7 +594,10 @@ export default function AdminAttendanceView() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <input
             type="text"
             value={search}
@@ -484,7 +606,11 @@ export default function AdminAttendanceView() {
             className="input-base w-full pl-9 text-sm"
           />
         </div>
-        <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} className="input-base text-sm">
+        <select
+          value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          className="input-base text-sm"
+        >
           <option value="all">All teams</option>
           {teams.map((t) => (
             <option key={t.id} value={t.id}>
@@ -492,7 +618,11 @@ export default function AdminAttendanceView() {
             </option>
           ))}
         </select>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input-base text-sm">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="input-base text-sm"
+        >
           <option value="all">All statuses</option>
           {Object.entries(STATUS_LABELS).map(([k, v]) => (
             <option key={k} value={k}>
@@ -512,9 +642,16 @@ export default function AdminAttendanceView() {
           <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
             <CalendarCheck2 size={20} className="text-muted-foreground" />
           </div>
-          <p className="text-sm font-medium text-foreground mb-1">No attendance data available yet.</p>
-          <p className="text-xs text-muted-foreground mb-4">No records match the current filters.</p>
-          <button onClick={() => setManualOpen(true)} className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5 mx-auto">
+          <p className="text-sm font-medium text-foreground mb-1">
+            No attendance data available yet.
+          </p>
+          <p className="text-xs text-muted-foreground mb-4">
+            No records match the current filters.
+          </p>
+          <button
+            onClick={() => setManualOpen(true)}
+            className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5 mx-auto"
+          >
             <Plus size={14} /> Add Manual Attendance
           </button>
         </div>
@@ -525,19 +662,37 @@ export default function AdminAttendanceView() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Employee</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Check In</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Check Out</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Working Hours</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Late</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Overtime</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-40">Actions</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Employee
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Check In
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Check Out
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Working Hours
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Late
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Overtime
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-40">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredRows.map((r) => {
-                  const todayRec = recordByUser[r.user.id]?.find((x) => x.attendance_date === todayLocal());
+                  const todayRec = recordByUser[r.user.id]?.find(
+                    (x) => x.attendance_date === todayLocal()
+                  );
                   const badge = roleBadgeOf(r.user.role);
                   return (
                     <tr key={r.user.id} className="hover:bg-muted/30 transition-colors">
@@ -554,7 +709,9 @@ export default function AdminAttendanceView() {
                             </span>
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{r.user.full_name || '—'}</p>
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {r.user.full_name || '—'}
+                            </p>
                             <p className="text-xs text-muted-foreground truncate">
                               {badge.label}
                               {r.user.team_id ? ' · Team member' : ''}
@@ -563,24 +720,57 @@ export default function AdminAttendanceView() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(r.lastStatus)}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(r.lastStatus)}`}
+                        >
                           {STATUS_LABELS[r.lastStatus] || r.lastStatus}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-foreground">{fmtTime(todayRec?.check_in_time ?? null)}</td>
-                      <td className="px-4 py-3 text-sm text-foreground">{fmtTime(todayRec?.check_out_time ?? null)}</td>
-                      <td className="px-4 py-3 text-sm text-foreground">{fmtDuration(r.totalSec)}</td>
-                      <td className="px-4 py-3 text-sm">{r.late > 0 ? <span className="text-gold-dark font-medium">{r.late}d</span> : <span className="text-muted-foreground">—</span>}</td>
-                      <td className="px-4 py-3 text-sm">{r.overtimeMin > 0 ? <span className="text-dusk font-medium">{fmtDuration(r.overtimeMin * 60)}</span> : <span className="text-muted-foreground">—</span>}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">
+                        {fmtTime(todayRec?.check_in_time ?? null)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-foreground">
+                        {fmtTime(todayRec?.check_out_time ?? null)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-foreground">
+                        {fmtDuration(r.totalSec)}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {r.late > 0 ? (
+                          <span className="text-gold-dark font-medium">{r.late}d</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {r.overtimeMin > 0 ? (
+                          <span className="text-dusk font-medium">
+                            {fmtDuration(r.overtimeMin * 60)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => employeeReport(r.user)} className="btn-ghost p-1.5" title="View report">
+                          <button
+                            onClick={() => employeeReport(r.user)}
+                            className="btn-ghost p-1.5"
+                            title="View report"
+                          >
                             <Eye size={14} className="text-muted-foreground" />
                           </button>
-                          <button onClick={() => showEditModal(r.user)} className="btn-ghost p-1.5" title="Edit attendance">
+                          <button
+                            onClick={() => showEditModal(r.user)}
+                            className="btn-ghost p-1.5"
+                            title="Edit attendance"
+                          >
                             <Pencil size={14} className="text-muted-foreground" />
                           </button>
-                          {isSingleDay && todayRec && !todayRec.check_out_time && todayRec.check_in_time ? (
+                          {isSingleDay &&
+                          todayRec &&
+                          !todayRec.check_out_time &&
+                          todayRec.check_in_time ? (
                             <button
                               onClick={() => handleQuickAction('checkout', r.user)}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted"
@@ -607,7 +797,9 @@ export default function AdminAttendanceView() {
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
             {filteredRows.map((r) => {
-              const todayRec = recordByUser[r.user.id]?.find((x) => x.attendance_date === todayLocal());
+              const todayRec = recordByUser[r.user.id]?.find(
+                (x) => x.attendance_date === todayLocal()
+              );
               const badge = roleBadgeOf(r.user.role);
               return (
                 <div key={r.user.id} className="bg-card border border-border rounded-2xl p-4">
@@ -624,49 +816,80 @@ export default function AdminAttendanceView() {
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{r.user.full_name || '—'}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {r.user.full_name || '—'}
+                        </p>
                         <p className="text-xs text-muted-foreground truncate">{badge.label}</p>
                       </div>
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${statusBadge(r.lastStatus)}`}>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${statusBadge(r.lastStatus)}`}
+                    >
                       {STATUS_LABELS[r.lastStatus] || r.lastStatus}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-muted/50 rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Check In</p>
-                      <p className="text-sm font-medium text-foreground mt-0.5">{fmtTime(todayRec?.check_in_time ?? null)}</p>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Check Out</p>
-                      <p className="text-sm font-medium text-foreground mt-0.5">{fmtTime(todayRec?.check_out_time ?? null)}</p>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Working Hours</p>
-                      <p className="text-sm font-medium text-foreground mt-0.5">{fmtDuration(r.totalSec)}</p>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg px-3 py-2">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Late / Overtime</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                        Check In
+                      </p>
                       <p className="text-sm font-medium text-foreground mt-0.5">
-                        {r.late > 0 ? `${r.late}d late` : '—'} · {r.overtimeMin > 0 ? fmtDuration(r.overtimeMin * 60) : '—'}
+                        {fmtTime(todayRec?.check_in_time ?? null)}
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                        Check Out
+                      </p>
+                      <p className="text-sm font-medium text-foreground mt-0.5">
+                        {fmtTime(todayRec?.check_out_time ?? null)}
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                        Working Hours
+                      </p>
+                      <p className="text-sm font-medium text-foreground mt-0.5">
+                        {fmtDuration(r.totalSec)}
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                        Late / Overtime
+                      </p>
+                      <p className="text-sm font-medium text-foreground mt-0.5">
+                        {r.late > 0 ? `${r.late}d late` : '—'} ·{' '}
+                        {r.overtimeMin > 0 ? fmtDuration(r.overtimeMin * 60) : '—'}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 mt-3">
-                    <button onClick={() => employeeReport(r.user)} className="btn-secondary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5">
+                    <button
+                      onClick={() => employeeReport(r.user)}
+                      className="btn-secondary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5"
+                    >
                       <Eye size={13} /> View
                     </button>
-                    <button onClick={() => showEditModal(r.user)} className="btn-secondary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5">
+                    <button
+                      onClick={() => showEditModal(r.user)}
+                      className="btn-secondary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5"
+                    >
                       <Pencil size={13} /> Edit attendance
                     </button>
                     {isSingleDay && !todayRec?.check_in_time ? (
-                      <button onClick={() => handleQuickAction('checkin', r.user)} className="btn-primary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => handleQuickAction('checkin', r.user)}
+                        className="btn-primary h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5"
+                      >
                         <LogIn size={13} /> Check In
                       </button>
                     ) : isSingleDay && todayRec?.check_in_time && !todayRec.check_out_time ? (
-                      <button onClick={() => handleQuickAction('checkout', r.user)} className="h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-600 text-white">
+                      <button
+                        onClick={() => handleQuickAction('checkout', r.user)}
+                        className="h-9 px-3 text-xs flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-600 text-white"
+                      >
                         <LogOut size={13} /> Check Out
                       </button>
                     ) : null}

@@ -296,7 +296,10 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               </span>
               <span className="text-sm font-semibold text-foreground">Contact Information</span>
             </span>
-            <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
+            <ChevronDown
+              size={15}
+              className="text-muted-foreground transition-transform group-open:rotate-180"
+            />
           </summary>
           <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
@@ -384,7 +387,10 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                 Classification &amp; Assignment
               </span>
             </span>
-            <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
+            <ChevronDown
+              size={15}
+              className="text-muted-foreground transition-transform group-open:rotate-180"
+            />
           </summary>
           <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -502,160 +508,165 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                 <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
                   3
                 </span>
-                <span className="text-sm font-semibold text-foreground">Unit &amp; Payment Plan</span>
+                <span className="text-sm font-semibold text-foreground">
+                  Unit &amp; Payment Plan
+                </span>
               </span>
-              <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
+              <ChevronDown
+                size={15}
+                className="text-muted-foreground transition-transform group-open:rotate-180"
+              />
             </summary>
             <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label-base">Project</label>
-              <select
-                className={selectClass}
-                {...register('project')}
-                onChange={(e) => {
-                  setValue('project', e.target.value);
-                  setValue('unitId', '');
-                  const proj = projects.find((p) => p.name === e.target.value);
-                  if (proj) setValue('developer', proj.developerName || lead.developer || '');
-                }}
-              >
-                <option value="">No project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-base flex items-center gap-1.5">
-                Unit
-                {loadingUnits && (
-                  <Loader2 size={12} className="animate-spin text-muted-foreground" />
-                )}
-              </label>
-              <select
-                className={selectClass}
-                value={selectedUnitId}
-                onChange={(e) => handleUnitSelect(e.target.value)}
-                disabled={!selectedProject || projectUnits.length === 0}
-              >
-                <option value="">
-                  {!selectedProject
-                    ? 'Select a project first'
-                    : projectUnits.length === 0
-                      ? 'No units in this project'
-                      : 'Select a unit'}
-                </option>
-                {projectUnits.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} — {money(u.area)} m² — EGP {money(u.price).toLocaleString()}
-                  </option>
-                ))}
-              </select>
-              {selectedUnitId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const unit = projectUnits.find((u) => u.id === selectedUnitId);
-                    if (unit) handleUnitSelect(unit.id);
+              <div>
+                <label className="label-base">Project</label>
+                <select
+                  className={selectClass}
+                  {...register('project')}
+                  onChange={(e) => {
+                    setValue('project', e.target.value);
+                    setValue('unitId', '');
+                    const proj = projects.find((p) => p.name === e.target.value);
+                    if (proj) setValue('developer', proj.developerName || lead.developer || '');
                   }}
-                  className="mt-1.5 text-[11px] text-primary flex items-center gap-1 hover:underline"
                 >
-                  <RefreshCw size={10} /> Refill from unit
-                </button>
-              )}
-            </div>
-            <div>
-              <label className="label-base">Total price (EGP)</label>
-              <input type="number" min="0" className="input-base" {...register('totalPrice')} />
-            </div>
-            <div>
-              <label className="label-base">
-                Down payment (EGP)
-                <span className="ml-2 text-xs font-medium text-primary">{plan.downPct}%</span>
-              </label>
-              <input type="number" min="0" className="input-base" {...register('downPayment')} />
-            </div>
-            <div>
-              <label className="label-base">Installment count</label>
-              <input
-                type="number"
-                min="0"
-                className="input-base"
-                {...register('installmentCount')}
-              />
-            </div>
-            <div>
-              <label className="label-base">Installment frequency</label>
-              <select className={selectClass} {...register('installmentFrequency')}>
-                <option value={12}>Monthly</option>
-                <option value={4}>Quarterly</option>
-                <option value={2}>Semi-annual</option>
-                <option value={1}>Annual</option>
-              </select>
-            </div>
-            <div>
-              <label className="label-base">Reservation amount (EGP)</label>
-              <input
-                type="number"
-                min="0"
-                className="input-base"
-                {...register('reservationAmount')}
-              />
-            </div>
-            <div>
-              <label className="label-base">Maintenance fees (EGP)</label>
-              <input
-                type="number"
-                min="0"
-                className="input-base"
-                {...register('maintenanceFees')}
-              />
-            </div>
-            <div>
-              <label className="label-base">Payment start date</label>
-              <input type="date" className="input-base" {...register('paymentStartDate')} />
-            </div>
-            <div>
-              <label className="label-base">Payment status</label>
-              <select className={selectClass} {...register('paymentStatus')}>
-                {PAYMENT_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
+                  <option value="">No project</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label-base flex items-center gap-1.5">
+                  Unit
+                  {loadingUnits && (
+                    <Loader2 size={12} className="animate-spin text-muted-foreground" />
+                  )}
+                </label>
+                <select
+                  className={selectClass}
+                  value={selectedUnitId}
+                  onChange={(e) => handleUnitSelect(e.target.value)}
+                  disabled={!selectedProject || projectUnits.length === 0}
+                >
+                  <option value="">
+                    {!selectedProject
+                      ? 'Select a project first'
+                      : projectUnits.length === 0
+                        ? 'No units in this project'
+                        : 'Select a unit'}
                   </option>
-                ))}
-              </select>
+                  {projectUnits.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} — {money(u.area)} m² — EGP {money(u.price).toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+                {selectedUnitId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const unit = projectUnits.find((u) => u.id === selectedUnitId);
+                      if (unit) handleUnitSelect(unit.id);
+                    }}
+                    className="mt-1.5 text-[11px] text-primary flex items-center gap-1 hover:underline"
+                  >
+                    <RefreshCw size={10} /> Refill from unit
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="label-base">Total price (EGP)</label>
+                <input type="number" min="0" className="input-base" {...register('totalPrice')} />
+              </div>
+              <div>
+                <label className="label-base">
+                  Down payment (EGP)
+                  <span className="ml-2 text-xs font-medium text-primary">{plan.downPct}%</span>
+                </label>
+                <input type="number" min="0" className="input-base" {...register('downPayment')} />
+              </div>
+              <div>
+                <label className="label-base">Installment count</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input-base"
+                  {...register('installmentCount')}
+                />
+              </div>
+              <div>
+                <label className="label-base">Installment frequency</label>
+                <select className={selectClass} {...register('installmentFrequency')}>
+                  <option value={12}>Monthly</option>
+                  <option value={4}>Quarterly</option>
+                  <option value={2}>Semi-annual</option>
+                  <option value={1}>Annual</option>
+                </select>
+              </div>
+              <div>
+                <label className="label-base">Reservation amount (EGP)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input-base"
+                  {...register('reservationAmount')}
+                />
+              </div>
+              <div>
+                <label className="label-base">Maintenance fees (EGP)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input-base"
+                  {...register('maintenanceFees')}
+                />
+              </div>
+              <div>
+                <label className="label-base">Payment start date</label>
+                <input type="date" className="input-base" {...register('paymentStartDate')} />
+              </div>
+              <div>
+                <label className="label-base">Payment status</label>
+                <select className={selectClass} {...register('paymentStatus')}>
+                  {PAYMENT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
 
-          {/* Live plan summary */}
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Remaining</p>
-              <p className="text-sm font-semibold tabular-nums">
-                EGP {formatNumber(Math.round(plan.remaining))}
-              </p>
+            {/* Live plan summary */}
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-muted/50 rounded-xl p-3">
+                <p className="text-[11px] text-muted-foreground">Remaining</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  EGP {formatNumber(Math.round(plan.remaining))}
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-xl p-3">
+                <p className="text-[11px] text-muted-foreground">Installment</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  EGP {formatNumber(Math.round(plan.installment))}
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-xl p-3">
+                <p className="text-[11px] text-muted-foreground">Down %</p>
+                <p className="text-sm font-semibold tabular-nums">{plan.downPct}%</p>
+              </div>
+              <div className="bg-muted/50 rounded-xl p-3">
+                <p className="text-[11px] text-muted-foreground">Per year</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {money(installmentCount) > 0
+                    ? `${Math.round((12 / money(installmentFrequency)) * 100) / 100} installments`
+                    : '—'}
+                </p>
+              </div>
             </div>
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Installment</p>
-              <p className="text-sm font-semibold tabular-nums">
-                EGP {formatNumber(Math.round(plan.installment))}
-              </p>
-            </div>
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Down %</p>
-              <p className="text-sm font-semibold tabular-nums">{plan.downPct}%</p>
-            </div>
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Per year</p>
-              <p className="text-sm font-semibold tabular-nums">
-                {money(installmentCount) > 0
-                  ? `${Math.round((12 / money(installmentFrequency)) * 100) / 100} installments`
-                  : '—'}
-              </p>
-            </div>
-          </div>
           </details>
         )}
 

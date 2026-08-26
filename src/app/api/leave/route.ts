@@ -26,7 +26,10 @@ export async function GET(request: Request) {
 
     const { data, error } = await query;
     if (error) throw error;
-    const rows = (data || []).map((r: any) => ({ ...r, user_name: r.user_name?.[0]?.full_name || '' }));
+    const rows = (data || []).map((r: any) => ({
+      ...r,
+      user_name: r.user_name?.[0]?.full_name || '',
+    }));
     return NextResponse.json({ leave: rows });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to load leave' }, { status: 500 });
@@ -88,6 +91,9 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ leave: data }, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Failed to create leave request' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Failed to create leave request' },
+      { status: 500 }
+    );
   }
 }

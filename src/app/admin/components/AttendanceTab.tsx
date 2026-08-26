@@ -297,7 +297,8 @@ export default function AttendanceTab() {
           <div>
             <h2 className="text-base font-semibold text-foreground">Attendance</h2>
             <p className="text-xs text-muted-foreground">
-              Office hours {officeCfg.start} – {officeCfg.end} · Arrival after {formatMinutes(officeCfg.toleranceMinutes)} = Late · GPS check-ins are radius-verified
+              Office hours {officeCfg.start} – {officeCfg.end} · Arrival after{' '}
+              {formatMinutes(officeCfg.toleranceMinutes)} = Late · GPS check-ins are radius-verified
             </p>
           </div>
         </div>
@@ -412,7 +413,8 @@ export default function AttendanceTab() {
                 const checkIn = formatTime(rec?.check_in_time ?? null);
                 const checkOut = formatTime(rec?.check_out_time ?? null);
                 const minutes = localMinutes(rec?.check_in_time ?? null);
-                const status = minutes < 0 ? null : minutes <= officeCfg.toleranceMinutes ? 'on-time' : 'late';
+                const status =
+                  minutes < 0 ? null : minutes <= officeCfg.toleranceMinutes ? 'on-time' : 'late';
                 const initials = user.full_name
                   ? user.full_name
                       .split(' ')

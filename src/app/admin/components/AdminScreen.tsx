@@ -163,7 +163,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
     key: 'tasks',
     label: 'Tasks',
     icon: <ClipboardList size={16} />,
-    description: 'Assign to-dos to a role — they appear on each user\'s dashboard',
+    description: "Assign to-dos to a role — they appear on each user's dashboard",
   },
   {
     key: 'rotation',
@@ -598,8 +598,7 @@ export default function AdminScreen() {
 
   const canUsers = canManageUsers(profile?.role);
   const techOnly = isTechOnlyRole(profile?.role);
-  const visibleTabs = TAB_ORDER
-    .map((key) => TABS.find((tab) => tab.key === key))
+  const visibleTabs = TAB_ORDER.map((key) => TABS.find((tab) => tab.key === key))
     .filter((tab): tab is (typeof TABS)[number] => Boolean(tab))
     .filter((t) => (techOnly ? t.key === 'system' : true))
     .filter((t) => t.key !== 'users' || canUsers);
@@ -627,9 +626,7 @@ export default function AdminScreen() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground tracking-tight">{t('admin.title')}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t('admin.subtitle')}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('admin.subtitle')}</p>
           </div>
         </div>
       </div>
@@ -703,49 +700,97 @@ export default function AdminScreen() {
                 ).filter((i) => i.active).length;
             return (
               <React.Fragment key={tab.key}>
-              {(visibleTabs.indexOf(tab) === 0 || navGroup(visibleTabs[visibleTabs.indexOf(tab) - 1].key) !== navGroup(tab.key)) && (
-                <p className="col-span-2 md:col-span-1 px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70 first:pt-1">
-                  {navGroup(tab.key)}
-                </p>
-              )}
-              <button
-                onClick={() => setActiveTab(tab.key)}
-                className={`group flex w-full items-center gap-3 px-3 py-3 rounded-2xl text-left transition-all duration-200 ${activeTab === tab.key ? 'bg-primary text-primary-foreground shadow-[0_8px_24px_-12px_rgba(132,204,22,0.9)] scale-[1.01]' : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5'}`}
-              >
-                <span className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${activeTab === tab.key ? 'text-primary-foreground' : 'text-primary'}`}>{tab.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-sm font-semibold truncate ${activeTab === tab.key ? 'text-primary-foreground' : 'text-foreground'}`}
-                  >
-                    {tabLabel(tab.key, tab.label)}
+                {(visibleTabs.indexOf(tab) === 0 ||
+                  navGroup(visibleTabs[visibleTabs.indexOf(tab) - 1].key) !==
+                    navGroup(tab.key)) && (
+                  <p className="col-span-2 md:col-span-1 px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70 first:pt-1">
+                    {navGroup(tab.key)}
                   </p>
-                  {isUsers ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Manage access</p>
-                  ) : isAttendance ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Office check-ins</p>
-                  ) : isActivity ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Sessions & usage</p>
-                  ) : isProductivity ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Leaderboard & ranking</p>
-                  ) : isPayroll ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Salaries & periods</p>
-                  ) : isLeave ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Leave requests</p>
-                  ) : isKpi ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Daily & monthly goals</p>
-                  ) : isTasks ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Role-assigned to-dos</p>
-                  ) : isRotation ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Auto-reassign inactive leads</p>
-                  ) : isSystem ? (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Live diagnostics</p>
-                  ) : (
-                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>
-                      {active}/{count} active
+                )}
+                <button
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`group flex w-full items-center gap-3 px-3 py-3 rounded-2xl text-left transition-all duration-200 ${activeTab === tab.key ? 'bg-primary text-primary-foreground shadow-[0_8px_24px_-12px_rgba(132,204,22,0.9)] scale-[1.01]' : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5'}`}
+                >
+                  <span
+                    className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${activeTab === tab.key ? 'text-primary-foreground' : 'text-primary'}`}
+                  >
+                    {tab.icon}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-sm font-semibold truncate ${activeTab === tab.key ? 'text-primary-foreground' : 'text-foreground'}`}
+                    >
+                      {tabLabel(tab.key, tab.label)}
                     </p>
-                  )}
-                </div>
-              </button>
+                    {isUsers ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Manage access
+                      </p>
+                    ) : isAttendance ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Office check-ins
+                      </p>
+                    ) : isActivity ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Sessions & usage
+                      </p>
+                    ) : isProductivity ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Leaderboard & ranking
+                      </p>
+                    ) : isPayroll ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Salaries & periods
+                      </p>
+                    ) : isLeave ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Leave requests
+                      </p>
+                    ) : isKpi ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Daily & monthly goals
+                      </p>
+                    ) : isTasks ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Role-assigned to-dos
+                      </p>
+                    ) : isRotation ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Auto-reassign inactive leads
+                      </p>
+                    ) : isSystem ? (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        Live diagnostics
+                      </p>
+                    ) : (
+                      <p
+                        className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}
+                      >
+                        {active}/{count} active
+                      </p>
+                    )}
+                  </div>
+                </button>
               </React.Fragment>
             );
           })}

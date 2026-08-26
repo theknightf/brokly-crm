@@ -16,7 +16,9 @@ export const dynamic = 'force-dynamic';
 const TZ = 'Africa/Cairo';
 
 function minutesOf(hhmm: string): number {
-  const [h, m] = String(hhmm || '00:00').split(':').map(Number);
+  const [h, m] = String(hhmm || '00:00')
+    .split(':')
+    .map(Number);
   return (h || 0) * 60 + (m || 0);
 }
 
@@ -51,7 +53,11 @@ export async function POST(request: Request) {
     const end = period.period_end as string;
 
     // ── Config ──
-    const { data: whRow } = await db.from('company_settings').select('value').eq('key', 'workingHours').maybeSingle();
+    const { data: whRow } = await db
+      .from('company_settings')
+      .select('value')
+      .eq('key', 'workingHours')
+      .maybeSingle();
     const wh = whRow?.value || {};
     const workingStart = wh.start || '12:00';
     const workingEnd = wh.end || '20:00';
@@ -59,7 +65,11 @@ export async function POST(request: Request) {
     const grace = Number(wh.lateGraceMinutes ?? 30);
     const workdaysSet = new Set<number>((wh.workdays ?? [0, 1, 2, 3, 4, 5, 6]).map(Number));
 
-    const { data: rulesRow } = await db.from('company_settings').select('value').eq('key', 'payrollRules').maybeSingle();
+    const { data: rulesRow } = await db
+      .from('company_settings')
+      .select('value')
+      .eq('key', 'payrollRules')
+      .maybeSingle();
     const rules = rulesRow?.value || {};
 
     // ── Working-day list inside the period ──
@@ -80,7 +90,9 @@ export async function POST(request: Request) {
       .from('user_profiles')
       .select('id, full_name, base_salary, employment_status')
       .eq('is_active', true);
-    const activeEmployees = (employees || []).filter((u: any) => u.employment_status !== 'inactive');
+    const activeEmployees = (employees || []).filter(
+      (u: any) => u.employment_status !== 'inactive'
+    );
 
     // ── Attendance rows in range ──
     const { data: attendance } = await db
@@ -99,18 +111,22 @@ export async function POST(request: Request) {
 
     // ── Commission: Won deals per user in range (only when a rate is set) ──
     const commissionRate = Number(rules.commissionRate ?? 0);
-    const wonRes = commissionRate > 0
-      ? await db
-          .from('leads')
-          .select('assigned_to, budget_min')
-          .in('lead_status', ['Done Deal', 'Won'])
-          .gte('updated_at', start + 'T00:00:00')
-          .lte('updated_at', end + 'T23:59:59')
-      : null;
+    const wonRes =
+      commissionRate > 0
+        ? await db
+            .from('leads')
+            .select('assigned_to, budget_min')
+            .in('lead_status', ['Done Deal', 'Won'])
+            .gte('updated_at', start + 'T00:00:00')
+            .lte('updated_at', end + 'T23:59:59')
+        : null;
     const { data: wonLeads } = wonRes ?? { data: [] };
 
     // ── Existing entries (preserve manual amounts) ──
-    const { data: existingRows } = await db.from('payroll_entries').select('*').eq('period_id', periodId);
+    const { data: existingRows } = await db
+      .from('payroll_entries')
+      .select('*')
+      .eq('period_id', periodId);
     const existing = new Map<string, any>((existingRows || []).map((r: any) => [r.user_id, r]));
 
     const perUserAttendance = new Map<string, any[]>();
@@ -152,7 +168,9 @@ export async function POST(request: Request) {
             ? new Date(r.check_out_time).toLocaleString('en-US', { timeZone: TZ })
             : null;
           const required = Math.max(0, endMin - startMin);
-          const outMin = outLocal ? new Date(outLocal).getHours() * 60 + new Date(outLocal).getMinutes() : inMin;
+          const outMin = outLocal
+            ? new Date(outLocal).getHours() * 60 + new Date(outLocal).getMinutes()
+            : inMin;
           const worked = Math.max(0, outMin - inMin);
           const deficit = Math.max(0, required - worked);
           const l = Math.max(0, deficit - grace);
@@ -202,7 +220,9 @@ export async function POST(request: Request) {
       let commission = Number(prior?.commission ?? 0);
       if (commissionRate > 0 && commission === 0) {
         const won = (wonLeads || []).filter((l: any) => l.assigned_to === emp.id);
-        commission = round2(won.reduce((s: number, l: any) => s + Number(l.budget_min || 0), 0) * commissionRate);
+        commission = round2(
+          won.reduce((s: number, l: any) => s + Number(l.budget_min || 0), 0) * commissionRate
+        );
       }
 
       const expenseReimbursement = Number(prior?.expense_reimbursement ?? 0);
@@ -265,12 +285,17 @@ export async function POST(request: Request) {
     }
 
     if (entries.length) {
-      const { error } = await db.from('payroll_entries').upsert(entries, { onConflict: 'period_id,user_id' });
+      const { error } = await db
+        .from('payroll_entries')
+        .upsert(entries, { onConflict: 'period_id,user_id' });
       if (error) throw error;
     }
 
     return NextResponse.json({ generated: entries.length, totalWorkingDays });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Failed to generate payroll' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Failed to generate payroll' },
+      { status: 500 }
+    );
   }
 }

@@ -33,7 +33,14 @@ interface FollowUp {
   dueTime?: string;
 }
 
-const DEFAULT_FILTERS: Filters = { agent: '', status: 'any', priority: 'any', date: 'any', from: '', to: '' };
+const DEFAULT_FILTERS: Filters = {
+  agent: '',
+  status: 'any',
+  priority: 'any',
+  date: 'any',
+  from: '',
+  to: '',
+};
 
 const TABS: { key: string; labelKey: string; preset: Filters }[] = [
   { key: 'all', labelKey: 'workspace.all', preset: { ...DEFAULT_FILTERS } },
@@ -50,7 +57,14 @@ const TABS: { key: string; labelKey: string; preset: Filters }[] = [
   {
     key: 'tomorrow',
     labelKey: 'workspace.tomorrow',
-    preset: { agent: '', status: 'notCompleted', priority: 'any', date: 'tomorrow', from: '', to: '' },
+    preset: {
+      agent: '',
+      status: 'notCompleted',
+      priority: 'any',
+      date: 'tomorrow',
+      from: '',
+      to: '',
+    },
   },
   {
     key: 'uncompleted',
@@ -73,12 +87,11 @@ function dueMeta(due: string): { label: string; cls: string } {
 export default function WorkspaceScreen() {
   const { t } = useLanguage();
   const { profile } = useAuth();
-  const isSales = profile?.role === 'agent' || profile?.role === 'senior_agent' || profile?.role === 'telecaller';
+  const isSales =
+    profile?.role === 'agent' || profile?.role === 'senior_agent' || profile?.role === 'telecaller';
   // Sales users jump straight to "Today" — their daily work list.
   const defaultTab = isSales ? 'today' : 'all';
-  const [filters, setFilters] = useState<Filters>(
-    isSales ? TABS[1].preset : DEFAULT_FILTERS
-  );
+  const [filters, setFilters] = useState<Filters>(isSales ? TABS[1].preset : DEFAULT_FILTERS);
   const [draft, setDraft] = useState<Filters>(filters);
   const [tab, setTab] = useState(defaultTab);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -112,9 +125,9 @@ export default function WorkspaceScreen() {
       }
 
       setAgents(
-        Array.from(
-          new Set(all.map((x) => (x.agent || '').trim()).filter(Boolean))
-        ).sort((a, b) => a.localeCompare(b))
+        Array.from(new Set(all.map((x) => (x.agent || '').trim()).filter(Boolean))).sort((a, b) =>
+          a.localeCompare(b)
+        )
       );
 
       list = [...list].sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1));
@@ -301,68 +314,68 @@ export default function WorkspaceScreen() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] table-mobile">
               <thead className="bg-muted/40 border-b border-border">
-              <tr>
-                <th className="table-th">{t('workspace.name')}</th>
-                <th className="table-th">{t('workspace.dueDate')}</th>
-                <th className="table-th">{t('workspace.status')}</th>
-                <th className="table-th">{t('workspace.priority')}</th>
-                <th className="table-th">{t('workspace.doneCol')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {items.map((item) => {
-                const due = dueMeta(item.dueDate);
-                return (
-                  <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="table-td">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-foreground truncate">
-                          {item.contactName || item.title || 'Unnamed'}
-                        </p>
-                        {item.propertyInterest && (
-                          <p className="text-xs text-muted-foreground truncate max-w-[220px]">
-                            {item.propertyInterest}
+                <tr>
+                  <th className="table-th">{t('workspace.name')}</th>
+                  <th className="table-th">{t('workspace.dueDate')}</th>
+                  <th className="table-th">{t('workspace.status')}</th>
+                  <th className="table-th">{t('workspace.priority')}</th>
+                  <th className="table-th">{t('workspace.doneCol')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {items.map((item) => {
+                  const due = dueMeta(item.dueDate);
+                  return (
+                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="table-td">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground truncate">
+                            {item.contactName || item.title || 'Unnamed'}
                           </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="table-td">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold ${due.cls}`}
-                      >
-                        <CalendarClock size={11} />
-                        {due.label}
-                        {item.dueTime ? ` · ${item.dueTime}` : ''}
-                      </span>
-                    </td>
-                    <td className="table-td">
-                      <span
-                        className={`inline-flex px-2 py-1 rounded-full text-[11px] font-semibold ${statusColor(item.status)}`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="table-td">
-                      <span
-                        className={`inline-flex px-2 py-1 rounded-full text-[11px] font-semibold ${
-                          item.priority === 'High'
-                            ? 'bg-red-50 text-red-600'
-                            : item.priority === 'Medium'
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {item.priority}
-                      </span>
-                    </td>
-                    <td className="table-td">
-                      <CompletionIndicator item={item} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                          {item.propertyInterest && (
+                            <p className="text-xs text-muted-foreground truncate max-w-[220px]">
+                              {item.propertyInterest}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="table-td">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold ${due.cls}`}
+                        >
+                          <CalendarClock size={11} />
+                          {due.label}
+                          {item.dueTime ? ` · ${item.dueTime}` : ''}
+                        </span>
+                      </td>
+                      <td className="table-td">
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-[11px] font-semibold ${statusColor(item.status)}`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="table-td">
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-[11px] font-semibold ${
+                            item.priority === 'High'
+                              ? 'bg-red-50 text-red-600'
+                              : item.priority === 'Medium'
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {item.priority}
+                        </span>
+                      </td>
+                      <td className="table-td">
+                        <CompletionIndicator item={item} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

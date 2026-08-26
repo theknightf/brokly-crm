@@ -275,8 +275,7 @@ function RotationToggle({ profile }: { profile: any }) {
       <div>
         <h3 className="text-sm font-semibold text-foreground">Lead Rotation</h3>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Turn this on to share new leads automatically among your sales team,
-          one at a time.
+          Turn this on to share new leads automatically among your sales team, one at a time.
         </p>
       </div>
       {loading ? (

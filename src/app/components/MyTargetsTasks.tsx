@@ -12,7 +12,12 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { kpiTargetsService, tasksService, type KpiProgress, type TaskItem } from '@/lib/services/peopleOpsService';
+import {
+  kpiTargetsService,
+  tasksService,
+  type KpiProgress,
+  type TaskItem,
+} from '@/lib/services/peopleOpsService';
 
 const METRIC_UNIT: Record<string, string> = {
   daily_calls: 'calls',
@@ -131,9 +136,9 @@ export default function MyTargetsTasks() {
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="font-semibold text-foreground truncate">{k.label}</span>
                   <span className="text-muted-foreground tabular-nums whitespace-nowrap ml-2">
-                      {k.actual.toLocaleString()} / {k.targetValue.toLocaleString()}{' '}
-                      {METRIC_UNIT[k.metric] || ''}
-                    </span>
+                    {k.actual.toLocaleString()} / {k.targetValue.toLocaleString()}{' '}
+                    {METRIC_UNIT[k.metric] || ''}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
@@ -208,7 +213,9 @@ export default function MyTargetsTasks() {
                       {t.title}
                     </p>
                     {t.description && (
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{t.description}</p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {t.description}
+                      </p>
                     )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <span

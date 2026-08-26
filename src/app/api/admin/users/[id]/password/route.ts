@@ -10,10 +10,7 @@ export const dynamic = 'force-dynamic';
  * Securely sets a new password for an existing user using the service-role
  * admin API. Passwords are never logged, returned, or stored in plaintext.
  */
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!id) return NextResponse.json({ error: 'User id is required' }, { status: 400 });
 
@@ -39,10 +36,7 @@ export async function PATCH(
   const confirmPassword = String(body?.confirmPassword || '');
   if (!password) return NextResponse.json({ error: 'New password is required' }, { status: 400 });
   if (password.length < 8) {
-    return NextResponse.json(
-      { error: 'Password must be at least 8 characters' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
   }
   if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(password)) {
     return NextResponse.json(

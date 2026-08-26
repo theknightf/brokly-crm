@@ -30,8 +30,12 @@ export async function GET(request: Request) {
   const stageParam = url.searchParams.get('stage');
 
   const hasRange = !!fromParam && !!toParam;
-  const rangeStart = hasRange ? new Date(`${fromParam}T00:00:00`).getTime() : Number.NEGATIVE_INFINITY;
-  const rangeEnd = hasRange ? new Date(`${toParam}T23:59:59.999`).getTime() : Number.POSITIVE_INFINITY;
+  const rangeStart = hasRange
+    ? new Date(`${fromParam}T00:00:00`).getTime()
+    : Number.NEGATIVE_INFINITY;
+  const rangeEnd = hasRange
+    ? new Date(`${toParam}T23:59:59.999`).getTime()
+    : Number.POSITIVE_INFINITY;
   const inRange = (iso: string | null | undefined): boolean => {
     if (!iso) return !hasRange;
     const ts = new Date(iso).getTime();
@@ -40,16 +44,30 @@ export async function GET(request: Request) {
   };
 
   // Fetch leads with all filter-relevant columns + profiles/teams for team derivation
-  const [leadsRes, profilesRes, teamsRes, membershipsRes, callsRes, activityRes] = await Promise.all([
-    supabase.from('leads').select('id, crm_status, lead_status, source, project, team, created_at, assigned_to, created_by'),
-    supabase.from('user_profiles').select('id, full_name, email, team_id'),
-    supabase.from('teams').select('id, name, leader_id'),
-    supabase.from('team_memberships').select('team_id, user_id, is_leader'),
-    supabase.from('call_logs').select('user_id, entity_id, channel, direction, duration_seconds, outcome, created_at'),
-    supabase.from('activity_log').select('user_id, action_type, meta, created_at'),
-  ]);
+  const [leadsRes, profilesRes, teamsRes, membershipsRes, callsRes, activityRes] =
+    await Promise.all([
+      supabase
+        .from('leads')
+        .select(
+          'id, crm_status, lead_status, source, project, team, created_at, assigned_to, created_by'
+        ),
+      supabase.from('user_profiles').select('id, full_name, email, team_id'),
+      supabase.from('teams').select('id, name, leader_id'),
+      supabase.from('team_memberships').select('team_id, user_id, is_leader'),
+      supabase
+        .from('call_logs')
+        .select('user_id, entity_id, channel, direction, duration_seconds, outcome, created_at'),
+      supabase.from('activity_log').select('user_id, action_type, meta, created_at'),
+    ]);
 
-  if (leadsRes.error || profilesRes.error || teamsRes.error || membershipsRes.error || callsRes.error || activityRes.error) {
+  if (
+    leadsRes.error ||
+    profilesRes.error ||
+    teamsRes.error ||
+    membershipsRes.error ||
+    callsRes.error ||
+    activityRes.error
+  ) {
     const msg =
       leadsRes.error?.message ||
       profilesRes.error?.message ||
@@ -95,7 +113,9 @@ export async function GET(request: Request) {
 
   // Team Leader filter: show only leads assigned to members of the leader's team
   if (teamLeaderParam) {
-    const leaderTeams = teams.filter((t: any) => t.leader_id === teamLeaderParam).map((t: any) => t.id);
+    const leaderTeams = teams
+      .filter((t: any) => t.leader_id === teamLeaderParam)
+      .map((t: any) => t.id);
     // Also include memberships where is_leader true
     const leaderMembershipTeams = memberships
       .filter((m: any) => m.user_id === teamLeaderParam && m.is_leader)
@@ -105,7 +125,9 @@ export async function GET(request: Request) {
       leads = [];
     } else {
       const memberIds = new Set(
-        memberships.filter((m: any) => allLeaderTeamIds.includes(m.team_id)).map((m: any) => m.user_id)
+        memberships
+          .filter((m: any) => allLeaderTeamIds.includes(m.team_id))
+          .map((m: any) => m.user_id)
       );
       // Also include users whose profile team_id is in leader teams
       profiles.forEach((p: any) => {
@@ -117,7 +139,10 @@ export async function GET(request: Request) {
 
   // Project / Campaign / Source / Stage filters
   if (projectParam) leads = leads.filter((l: any) => (l.project || '') === projectParam);
-  if (campaignParam) leads = leads.filter((l: any) => (l.source || '') === campaignParam || (l.team || '') === campaignParam);
+  if (campaignParam)
+    leads = leads.filter(
+      (l: any) => (l.source || '') === campaignParam || (l.team || '') === campaignParam
+    );
   if (sourceParam) leads = leads.filter((l: any) => (l.source || '') === sourceParam);
 
   // Stage filter — applied AFTER computing allowed lead ids so the actions/calls
@@ -145,7 +170,10 @@ export async function GET(request: Request) {
     (c: any) =>
       visibleAgentIds.has(c.user_id) &&
       inRange(c.created_at) &&
-      (!c.entity_id || c.entity_type !== 'lead' || allowedLeadIds.size === 0 || allowedLeadIds.has(String(c.entity_id)))
+      (!c.entity_id ||
+        c.entity_type !== 'lead' ||
+        allowedLeadIds.size === 0 ||
+        allowedLeadIds.has(String(c.entity_id)))
   );
   const scopedActivity = allActivity.filter(
     (a: any) => visibleAgentIds.has(a.user_id) && inRange(a.created_at)
@@ -153,12 +181,29 @@ export async function GET(request: Request) {
 
   // Build Agent × Stage matrix from the fully-filtered leads
   const ALL_STATUSES = [
-    'Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Interested','Not Interested',
-    'Cancellation','Done Deal','Duplicate Leads','Wrong Number','Data Rotation','Closed Number','No Answer',
-    'No Answer At All','Low Budget','Reschedule Meeting','Reservation',
+    'Fresh Leads',
+    'Cold Calls',
+    'Pending Leads',
+    'Following Up',
+    'Meeting',
+    'Interested',
+    'Not Interested',
+    'Cancellation',
+    'Done Deal',
+    'Duplicate Leads',
+    'Wrong Number',
+    'Data Rotation',
+    'Closed Number',
+    'No Answer',
+    'No Answer At All',
+    'Low Budget',
+    'Reschedule Meeting',
+    'Reservation',
   ];
 
-  const stagesInData = Array.from(new Set(stageFilteredLeads.map((l: any) => l.crm_status || l.lead_status || 'Fresh Leads')));
+  const stagesInData = Array.from(
+    new Set(stageFilteredLeads.map((l: any) => l.crm_status || l.lead_status || 'Fresh Leads'))
+  );
   const stages = stagesInData.sort((a: any, b: any) => {
     const ia = ALL_STATUSES.indexOf(a as string);
     const ib = ALL_STATUSES.indexOf(b as string);
@@ -200,7 +245,9 @@ export async function GET(request: Request) {
     })
     .sort((a, b) => b.total - a.total);
 
-  const columnTotals = displayStages.map((_, idx) => rows.reduce((sum, r) => sum + r.counts[idx], 0));
+  const columnTotals = displayStages.map((_, idx) =>
+    rows.reduce((sum, r) => sum + r.counts[idx], 0)
+  );
   const grandTotal = columnTotals.reduce((sum, v) => sum + v, 0);
 
   // ── Per-agent performance: calls outcomes + actions (from real DB tables) ──
@@ -233,9 +280,21 @@ export async function GET(request: Request) {
   const ensurePerf = (uid: string) => {
     if (!perfByAgentId.has(uid)) {
       perfByAgentId.set(uid, {
-        calls: 0, connected: 0, noAnswer: 0, incoming: 0, shortCalls: 0, durationSeconds: 0,
-        reached: 0, notInterested: 0, callbacks: 0, whatsapp: 0, emails: 0, meetings: 0,
-        notes: 0, actionsTotal: 0, byAction: {},
+        calls: 0,
+        connected: 0,
+        noAnswer: 0,
+        incoming: 0,
+        shortCalls: 0,
+        durationSeconds: 0,
+        reached: 0,
+        notInterested: 0,
+        callbacks: 0,
+        whatsapp: 0,
+        emails: 0,
+        meetings: 0,
+        notes: 0,
+        actionsTotal: 0,
+        byAction: {},
       });
     }
     return perfByAgentId.get(uid)!;
@@ -246,10 +305,7 @@ export async function GET(request: Request) {
     const dur = Number(c.duration_seconds) || 0;
     p.calls++;
     p.durationSeconds += dur;
-    if (
-      SUCCESS_OUTCOMES.includes(c.outcome) ||
-      dur >= 60
-    ) {
+    if (SUCCESS_OUTCOMES.includes(c.outcome) || dur >= 60) {
       p.connected++;
     }
     if (NO_ANSWER_OUTCOMES.includes(c.outcome)) p.noAnswer++;
@@ -257,7 +313,7 @@ export async function GET(request: Request) {
     if (c.outcome === 'Reached') p.reached++;
     if (c.outcome === 'Not Interested') p.notInterested++;
     if (c.outcome === 'Call back later') p.callbacks++;
-    if ((dur > 0 && dur < 60) && !SUCCESS_OUTCOMES.includes(c.outcome)) p.shortCalls++;
+    if (dur > 0 && dur < 60 && !SUCCESS_OUTCOMES.includes(c.outcome)) p.shortCalls++;
     const ch = (c.channel || '').toLowerCase();
     if (ch === 'whatsapp') p.whatsapp++;
     else if (ch === 'email') p.emails++;
@@ -276,26 +332,46 @@ export async function GET(request: Request) {
     if (t.toLowerCase().includes('note')) p.notes++;
   }
 
-  const performance = agents.map((agentName) => {
-    const prof = profiles.find((x: any) => x.full_name === agentName || x.email === agentName);
-    const uid = prof?.id || '';
-    const base = perfByAgentId.get(uid) || {
-      calls: 0, connected: 0, noAnswer: 0, incoming: 0, shortCalls: 0, durationSeconds: 0,
-      reached: 0, notInterested: 0, callbacks: 0, whatsapp: 0, emails: 0, meetings: 0,
-      notes: 0, actionsTotal: 0, byAction: {},
-    };
-    return {
-      agent: agentName,
-      userId: uid,
-      ...base,
-      reachPct: base.calls ? Math.round((base.connected / base.calls) * 100) : 0,
-    };
-  }).sort((a, b) => b.calls - a.calls);
+  const performance = agents
+    .map((agentName) => {
+      const prof = profiles.find((x: any) => x.full_name === agentName || x.email === agentName);
+      const uid = prof?.id || '';
+      const base = perfByAgentId.get(uid) || {
+        calls: 0,
+        connected: 0,
+        noAnswer: 0,
+        incoming: 0,
+        shortCalls: 0,
+        durationSeconds: 0,
+        reached: 0,
+        notInterested: 0,
+        callbacks: 0,
+        whatsapp: 0,
+        emails: 0,
+        meetings: 0,
+        notes: 0,
+        actionsTotal: 0,
+        byAction: {},
+      };
+      return {
+        agent: agentName,
+        userId: uid,
+        ...base,
+        reachPct: base.calls ? Math.round((base.connected / base.calls) * 100) : 0,
+      };
+    })
+    .sort((a, b) => b.calls - a.calls);
 
   // Filter options for UI
-  const allLeadsForOptions = hasRange ? (leadsRes.data || []).filter((l: any) => inRange(l.created_at)) : (leadsRes.data || []);
-  const projectOptions = Array.from(new Set((allLeadsForOptions as any[]).map((l: any) => l.project).filter(Boolean))).sort();
-  const sourceOptions = Array.from(new Set((allLeadsForOptions as any[]).map((l: any) => l.source).filter(Boolean))).sort();
+  const allLeadsForOptions = hasRange
+    ? (leadsRes.data || []).filter((l: any) => inRange(l.created_at))
+    : leadsRes.data || [];
+  const projectOptions = Array.from(
+    new Set((allLeadsForOptions as any[]).map((l: any) => l.project).filter(Boolean))
+  ).sort();
+  const sourceOptions = Array.from(
+    new Set((allLeadsForOptions as any[]).map((l: any) => l.source).filter(Boolean))
+  ).sort();
 
   return NextResponse.json({
     stages: displayStages,
@@ -311,7 +387,12 @@ export async function GET(request: Request) {
         .filter((t: any) => t.leader_id)
         .map((t: any) => {
           const p = profiles.find((x: any) => x.id === t.leader_id);
-          return { id: t.leader_id, name: p?.full_name || 'Unknown', teamId: t.id, teamName: t.name };
+          return {
+            id: t.leader_id,
+            name: p?.full_name || 'Unknown',
+            teamId: t.id,
+            teamName: t.name,
+          };
         }),
       stages: ALL_STATUSES,
     },

@@ -35,9 +35,12 @@ export async function POST(request: Request) {
   if (!body?.key) return NextResponse.json({ error: 'key is required' }, { status: 400 });
 
   try {
-    const { error } = await db
-      .from('company_settings')
-      .upsert({ key: body.key, value: body.value ?? {}, updated_by: auth.actor.id, updated_at: new Date().toISOString() });
+    const { error } = await db.from('company_settings').upsert({
+      key: body.key,
+      value: body.value ?? {},
+      updated_by: auth.actor.id,
+      updated_at: new Date().toISOString(),
+    });
     if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (err: any) {

@@ -385,7 +385,9 @@ export async function parseLeadFile(
       const lower = assignedNameRaw.toLowerCase().trim();
       const match =
         (users || []).find((u) => u.name.toLowerCase().trim() === lower) ||
-        (users || []).find((u) => u.name.toLowerCase().includes(lower) || lower.includes(u.name.toLowerCase()));
+        (users || []).find(
+          (u) => u.name.toLowerCase().includes(lower) || lower.includes(u.name.toLowerCase())
+        );
       if (match) {
         assignedId = match.id;
         assignedName = match.name;

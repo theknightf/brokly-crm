@@ -541,7 +541,8 @@ export default function LocationsScreen() {
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-foreground">Check in to a site visit</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Add an optional lead and project, capture the location, and confirm you're on site.
+                Add an optional lead and project, capture the location, and confirm you&apos;re on
+                site.
               </p>
             </div>
             <button

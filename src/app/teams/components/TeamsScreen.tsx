@@ -583,7 +583,7 @@ export default function TeamsScreen() {
                   Closed
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">
-                    Conversion
+                  Conversion
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden xl:table-cell">
                   Revenue

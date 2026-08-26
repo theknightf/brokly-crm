@@ -56,7 +56,8 @@ async function getWorkLocation(supabase: any): Promise<WorkLocation> {
       const parsed = JSON.parse(data.color);
       const lat = parseFloat(parsed.lat);
       const lng = parseFloat(parsed.lng);
-      const radiusM = parseFloat(parsed.radius_m ?? parsed.radiusM) || DEFAULT_WORK_LOCATION.radiusM;
+      const radiusM =
+        parseFloat(parsed.radius_m ?? parsed.radiusM) || DEFAULT_WORK_LOCATION.radiusM;
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         return { lat, lng, radiusM, label: parsed.label || 'Work location' };
       }
@@ -86,7 +87,9 @@ async function enforceRadius(
   supabase: any,
   lat: number | null,
   lng: number | null
-): Promise<{ ok: true } | { ok: false; status: number; error: string; distanceM?: number; radiusM?: number }> {
+): Promise<
+  { ok: true } | { ok: false; status: number; error: string; distanceM?: number; radiusM?: number }
+> {
   // Manual (no GPS) check-ins cannot be radius-validated.
   if (lat == null || lng == null) return { ok: true };
   const loc = await getWorkLocation(supabase);
@@ -129,7 +132,11 @@ export async function POST(request: Request) {
     const radiusResult = await enforceRadius(supabase, lat, lng);
     if (!radiusResult.ok) {
       return NextResponse.json(
-        { error: radiusResult.error, distanceM: radiusResult.distanceM, radiusM: radiusResult.radiusM },
+        {
+          error: radiusResult.error,
+          distanceM: radiusResult.distanceM,
+          radiusM: radiusResult.radiusM,
+        },
         { status: radiusResult.status }
       );
     }
@@ -228,8 +235,7 @@ export async function GET(request: Request) {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const from = url.searchParams.get('from') || `${year}-${month}-01`;
   const to =
-    url.searchParams.get('to') ||
-    `${year}-${month}-${String(now.getDate()).padStart(2, '0')}`;
+    url.searchParams.get('to') || `${year}-${month}-${String(now.getDate()).padStart(2, '0')}`;
 
   const { data, error } = await supabase
     .from('attendance')

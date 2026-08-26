@@ -106,7 +106,7 @@ export default function CustomersScreen() {
             <UserCheck size={22} className="text-primary" />
             Customers
           </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Customers who have won a deal</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Customers who have won a deal</p>
         </div>
         <button
           onClick={loadCustomers}

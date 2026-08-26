@@ -66,9 +66,7 @@ const EXPECTED_USER_PROFILE_COLUMNS = [
 
 async function countTable(client: any, table: string): Promise<number | null> {
   try {
-    const { count, error } = await client
-      .from(table)
-      .select('*', { count: 'exact', head: true });
+    const { count, error } = await client.from(table).select('*', { count: 'exact', head: true });
     if (error) return null;
     return count ?? 0;
   } catch {
@@ -142,7 +140,7 @@ export async function GET() {
       .from('user_sessions')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true);
-    report.sessions.active = error ? null : count ?? 0;
+    report.sessions.active = error ? null : (count ?? 0);
   } catch {
     report.sessions.active = null;
   }

@@ -91,7 +91,11 @@ export default function KpiTargetsTab() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-muted-foreground">Metric</label>
-            <select value={metric} onChange={(e) => setMetric(e.target.value)} className="input-base text-sm">
+            <select
+              value={metric}
+              onChange={(e) => setMetric(e.target.value)}
+              className="input-base text-sm"
+            >
               {Object.keys(METRIC_META).map((k) => (
                 <option key={k} value={k}>
                   {METRIC_META[k].label} ({METRIC_META[k].periodType})
@@ -124,8 +128,13 @@ export default function KpiTargetsTab() {
             </select>
           </div>
           <div className="flex items-end">
-            <button onClick={save} disabled={saving} className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save target
+            <button
+              onClick={save}
+              disabled={saving}
+              className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save
+              target
             </button>
           </div>
         </div>
@@ -143,11 +152,13 @@ export default function KpiTargetsTab() {
         ) : loadError ? (
           <div className="flex flex-col items-center gap-2 text-center py-10 px-4">
             <TriangleAlert size={20} className="text-clay" />
-            <p className="text-sm font-semibold text-foreground">KPI targets aren't set up yet</p>
+            <p className="text-sm font-semibold text-foreground">
+              KPI targets aren&apos;t set up yet
+            </p>
             <p className="text-xs text-muted-foreground max-w-sm">
               The <code className="font-mono">kpi_targets</code> table is missing from the database.
-              Apply the pending Supabase migrations (e.g. <code className="font-mono">supabase db push</code>) to
-              create it.
+              Apply the pending Supabase migrations (e.g.{' '}
+              <code className="font-mono">supabase db push</code>) to create it.
             </p>
             <button onClick={load} className="btn-secondary text-xs mt-1">
               Retry
@@ -162,11 +173,21 @@ export default function KpiTargetsTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Metric</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">For</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Period</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Target</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Actions</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Metric
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    For
+                  </th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Period
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Target
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -192,7 +213,11 @@ export default function KpiTargetsTab() {
                         className="p-1.5 rounded-lg text-red-600 hover:bg-red-50"
                         title="Remove target"
                       >
-                        {deletingId === t.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        {deletingId === t.id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={14} />
+                        )}
                       </button>
                     </td>
                   </tr>

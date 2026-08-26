@@ -192,7 +192,10 @@ export const dictionaries: Dict = {
   'leads.list': { en: 'List', ar: 'قائمة' },
   'leads.board': { en: 'Board', ar: 'لوحة' },
   'admin.title': { en: 'Admin Command Center', ar: 'مركز إدارة النظام' },
-  'admin.subtitle': { en: 'Manage CRM configuration — no code changes needed', ar: 'أدر إعدادات النظام بدون الحاجة لتعديل الكود' },
+  'admin.subtitle': {
+    en: 'Manage CRM configuration — no code changes needed',
+    ar: 'أدر إعدادات النظام بدون الحاجة لتعديل الكود',
+  },
   'admin.people': { en: 'People & performance', ar: 'الفريق والأداء' },
   'admin.operations': { en: 'Operations', ar: 'العمليات' },
   'admin.crmSetup': { en: 'CRM setup', ar: 'إعدادات إدارة العملاء' },

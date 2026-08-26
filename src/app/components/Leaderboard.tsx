@@ -70,7 +70,11 @@ function RankBadge({ rank }: { rank: number }) {
         3
       </div>
     );
-  return <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">{rank}</div>;
+  return (
+    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-muted-foreground">
+      {rank}
+    </div>
+  );
 }
 
 export default function Leaderboard() {
@@ -119,10 +123,14 @@ export default function Leaderboard() {
               Team Leaderboard
             </h2>
             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Circle size={8} className="text-emerald-500 fill-emerald-500" /> {onlineCount} online now
+              <Circle size={8} className="text-emerald-500 fill-emerald-500" /> {onlineCount} online
+              now
             </p>
           </div>
-          <ChevronDown size={15} className={`text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            size={15}
+            className={`text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}
+          />
         </button>
         {expanded && (
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
@@ -131,7 +139,9 @@ export default function Leaderboard() {
                 key={p.key}
                 onClick={() => setPeriod(p.key)}
                 className={`px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                  period === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  period === p.key
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {p.label}
@@ -141,58 +151,78 @@ export default function Leaderboard() {
         )}
       </div>
 
-      {expanded && <div id="owner-leaderboard-content">
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={26} className="animate-spin text-primary" />
-        </div>
-      ) : error ? (
-        <div className="text-center py-10">
-          <p className="text-sm text-muted-foreground mb-3">Couldn’t load the leaderboard.</p>
-          <button onClick={load} className="btn-secondary text-sm inline-flex items-center gap-1.5">
-            <RefreshCw size={14} /> Retry
-          </button>
-        </div>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-10">No team activity yet.</p>
-      ) : (
-        <ul className="space-y-1">
-          {rows.map((row) => {
-            const s = statOf(row, period);
-            const top = row.rank <= 3;
-            return (
-              <li
-                key={row.user_id}
-                className={`flex items-center gap-1.5 p-1.5 rounded-xl border transition-colors ${
-                  top ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/30'
-                }`}
+      {expanded && (
+        <div id="owner-leaderboard-content">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={26} className="animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-10">
+              <p className="text-sm text-muted-foreground mb-3">Couldn’t load the leaderboard.</p>
+              <button
+                onClick={load}
+                className="btn-secondary text-sm inline-flex items-center gap-1.5"
               >
-                <div className="scale-90 origin-left"><RankBadge rank={row.rank} /></div>
-                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-primary">{initials(row.full_name || row.email)}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-semibold text-foreground truncate">{row.full_name || row.email}</p>
-                    {row.online && <Circle size={7} className="text-emerald-500 fill-emerald-500 flex-shrink-0" />}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">{ROLE_LABEL[row.role] || row.role}</p>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 text-center">
-                  <Metric label="Leads" value={s.leads} />
-                  <Metric label="Calls" value={s.calls} />
-                  <Metric label="Actions" value={s.actions} />
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Zap size={12} className="text-primary" />
-                  <span className="text-sm font-bold text-foreground tabular-nums">{row.score}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                <RefreshCw size={14} /> Retry
+              </button>
+            </div>
+          ) : rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-10">No team activity yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {rows.map((row) => {
+                const s = statOf(row, period);
+                const top = row.rank <= 3;
+                return (
+                  <li
+                    key={row.user_id}
+                    className={`flex items-center gap-1.5 p-1.5 rounded-xl border transition-colors ${
+                      top ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/30'
+                    }`}
+                  >
+                    <div className="scale-90 origin-left">
+                      <RankBadge rank={row.rank} />
+                    </div>
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-primary">
+                        {initials(row.full_name || row.email)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold text-foreground truncate">
+                          {row.full_name || row.email}
+                        </p>
+                        {row.online && (
+                          <Circle
+                            size={7}
+                            className="text-emerald-500 fill-emerald-500 flex-shrink-0"
+                          />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {ROLE_LABEL[row.role] || row.role}
+                      </p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2 text-center">
+                      <Metric label="Leads" value={s.leads} />
+                      <Metric label="Calls" value={s.calls} />
+                      <Metric label="Actions" value={s.actions} />
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Zap size={12} className="text-primary" />
+                      <span className="text-sm font-bold text-foreground tabular-nums">
+                        {row.score}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
-      </div>}
     </div>
   );
 }

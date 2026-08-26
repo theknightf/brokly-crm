@@ -14,12 +14,7 @@ export interface CallLogShape {
 }
 
 export type VerificationCategory =
-  | 'Incoming Call'
-  | 'Call'
-  | 'Short Call'
-  | 'Successful'
-  | 'Site Visit'
-  | 'No Answer';
+  'Incoming Call' | 'Call' | 'Short Call' | 'Successful' | 'Site Visit' | 'No Answer';
 
 export interface VerificationResult {
   category: VerificationCategory;

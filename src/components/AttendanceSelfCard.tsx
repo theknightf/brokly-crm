@@ -112,7 +112,13 @@ export default function AttendanceSelfCard() {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">
-          {loading ? 'Checking…' : checkedOut ? 'Checked out' : checkedIn ? 'Checked in' : 'Attendance'}
+          {loading
+            ? 'Checking…'
+            : checkedOut
+              ? 'Checked out'
+              : checkedIn
+                ? 'Checked in'
+                : 'Attendance'}
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
           {checkedIn ? (
@@ -124,7 +130,9 @@ export default function AttendanceSelfCard() {
                 </span>
               ) : null}
               {checkedOut ? (
-                <span className="ml-2 text-muted-foreground">· Out {fmt(today?.check_out_time)}</span>
+                <span className="ml-2 text-muted-foreground">
+                  · Out {fmt(today?.check_out_time)}
+                </span>
               ) : null}
             </>
           ) : (
@@ -146,7 +154,13 @@ export default function AttendanceSelfCard() {
             : 'bg-primary text-primary-foreground hover:bg-primary/90'
         }`}
       >
-        {busy ? <Loader2 size={14} className="animate-spin" /> : checkedIn && !checkedOut ? <LogOut size={14} /> : <LogIn size={14} />}
+        {busy ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : checkedIn && !checkedOut ? (
+          <LogOut size={14} />
+        ) : (
+          <LogIn size={14} />
+        )}
         {checkedIn && !checkedOut ? 'Check out' : 'Check in'}
       </button>
     </div>

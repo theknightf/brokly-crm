@@ -246,10 +246,7 @@ function roleClassOf(role?: string): 'sales' | 'management' | 'admin' {
   return 'admin';
 }
 
-export function reorderNavForRole(
-  role?: string,
-  base: NavGroup[] = navGroups
-): NavGroup[] {
+export function reorderNavForRole(role?: string, base: NavGroup[] = navGroups): NavGroup[] {
   const cls = roleClassOf(role);
   if (cls === 'admin') return base;
   const priorities = ROLE_ITEM_PRIORITY[cls] || {};
@@ -375,19 +372,19 @@ function SidebarContent({
           }))
           .filter((group) => group.items.length > 0)
           .map((group) => (
-               <div key={`group-${group.titleKey}`}>
-               {!collapsed && (
-                 <>
-                   <p className="px-3 mb-0.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                     {t(group.titleKey)}
-                   </p>
-                   {group.descriptionKey && (
-                     <p className="px-3 mb-1.5 text-[11px] leading-tight text-muted-foreground/70">
-                       {t(group.descriptionKey)}
-                     </p>
-                   )}
-                 </>
-               )}
+            <div key={`group-${group.titleKey}`}>
+              {!collapsed && (
+                <>
+                  <p className="px-3 mb-0.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t(group.titleKey)}
+                  </p>
+                  {group.descriptionKey && (
+                    <p className="px-3 mb-1.5 text-[11px] leading-tight text-muted-foreground/70">
+                      {t(group.descriptionKey)}
+                    </p>
+                  )}
+                </>
+              )}
               <ul className="space-y-0.5">
                 {group.items.map((item) => (
                   <li key={item.id}>

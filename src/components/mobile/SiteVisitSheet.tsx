@@ -65,7 +65,14 @@ interface LeadOption extends LeadRef {
 
 type GeoState = { lat: number; lng: number; error: '' } | { error: string };
 
-const OUTCOMES = ['Interested', 'Not Interested', 'Site Visit Done', 'Won Deal', 'Need Follow-up', 'No Show'];
+const OUTCOMES = [
+  'Interested',
+  'Not Interested',
+  'Site Visit Done',
+  'Won Deal',
+  'Need Follow-up',
+  'No Show',
+];
 
 function fmtTime(iso?: string | null): string {
   if (!iso) return '—';
@@ -116,10 +123,9 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
   const loadOpenVisit = useCallback(async (pid: string) => {
     if (!pid) return;
     try {
-      const res = await fetch(
-        `/api/site-visits?project_id=${encodeURIComponent(pid)}&open=1`,
-        { cache: 'no-store' }
-      );
+      const res = await fetch(`/api/site-visits?project_id=${encodeURIComponent(pid)}&open=1`, {
+        cache: 'no-store',
+      });
       const json = await res.json();
       const visits = (json.visits || []) as any[];
       if (visits[0]) setOpenVisit(visits[0]);
@@ -141,12 +147,12 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
     }
     setLeadLoading(true);
     try {
-      const res = await fetch(`/api/site-visits?lead_query=${encodeURIComponent(q.trim())}&lead_search=1`);
+      const res = await fetch(
+        `/api/site-visits?lead_query=${encodeURIComponent(q.trim())}&lead_search=1`
+      );
       const json = await res.json();
       const list = (json?.leads || []) as any[];
-      setLeadOptions(
-        list.map((l) => ({ id: l.id, name: l.name || '—', phone: l.phone || '' }))
-      );
+      setLeadOptions(list.map((l) => ({ id: l.id, name: l.name || '—', phone: l.phone || '' })));
       setShowLeadPicker(true);
     } catch {
       setLeadOptions([]);
@@ -191,7 +197,12 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
   const distanceInfo =
     hasGeo && project?.latitude != null && project.longitude != null
       ? (() => {
-          const km = haversineKm(latitude as number, longitude as number, project.latitude!, project.longitude!);
+          const km = haversineKm(
+            latitude as number,
+            longitude as number,
+            project.latitude!,
+            project.longitude!
+          );
           const radiusM = project.radiusM ?? 300;
           return { km, radiusM, within: km * 1000 <= radiusM };
         })()
@@ -281,10 +292,15 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground">
-                {isScheduled ? 'Scheduled visit' : openVisit ? 'Site visit in progress' : 'Site Visit'}
+                {isScheduled
+                  ? 'Scheduled visit'
+                  : openVisit
+                    ? 'Site visit in progress'
+                    : 'Site Visit'}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {project?.name || (selectedLead?.name ? `Lead: ${selectedLead.name}` : 'Select a lead first')}
+                {project?.name ||
+                  (selectedLead?.name ? `Lead: ${selectedLead.name}` : 'Select a lead first')}
               </p>
             </div>
           </div>
@@ -309,8 +325,12 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                       <UserIcon size={14} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-medium text-foreground truncate">{selectedLead.name}</span>
-                      <span className="block text-xs text-muted-foreground">{selectedLead.phone}</span>
+                      <span className="block text-sm font-medium text-foreground truncate">
+                        {selectedLead.name}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {selectedLead.phone}
+                      </span>
                     </span>
                   </div>
                   <button
@@ -323,7 +343,10 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
               ) : (
                 <div>
                   <div className="relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Search
+                      size={14}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
                     <input
                       value={leadQuery}
                       onChange={(e) => setLeadQuery(e.target.value)}
@@ -331,7 +354,10 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                       className="input-base w-full pl-9 h-10 text-sm"
                     />
                     {leadLoading && (
-                      <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary" />
+                      <Loader2
+                        size={14}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary"
+                      />
                     )}
                   </div>
                   {showLeadPicker && (
@@ -351,8 +377,12 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                           >
                             <UserIcon size={13} className="text-muted-foreground flex-shrink-0" />
                             <span className="min-w-0">
-                              <span className="block text-sm text-foreground truncate">{l.name}</span>
-                              <span className="block text-[11px] text-muted-foreground">{l.phone}</span>
+                              <span className="block text-sm text-foreground truncate">
+                                {l.name}
+                              </span>
+                              <span className="block text-[11px] text-muted-foreground">
+                                {l.phone}
+                              </span>
                             </span>
                           </button>
                         ))
@@ -384,9 +414,13 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
               </span>
               <div className="min-w-0 text-sm">
                 <p className="font-semibold text-foreground">
-                  {isScheduled ? 'Scheduled' : `In progress since ${fmtTime(openVisit.check_in_at)}`}
+                  {isScheduled
+                    ? 'Scheduled'
+                    : `In progress since ${fmtTime(openVisit.check_in_at)}`}
                 </p>
-                <p className={`mt-0.5 text-xs ${verified ? 'text-emerald-700' : isScheduled ? 'text-sky-700' : 'text-amber-700'}`}>
+                <p
+                  className={`mt-0.5 text-xs ${verified ? 'text-emerald-700' : isScheduled ? 'text-sky-700' : 'text-amber-700'}`}
+                >
                   {isScheduled
                     ? `Scheduled${openVisit.lead_name ? ` for ${openVisit.lead_name}` : ''}${openVisit.visit_type && openVisit.visit_type !== 'In-person' ? ` · ${openVisit.visit_type}` : ''}${openVisit.check_in_at ? ` · ${new Date(openVisit.check_in_at).toLocaleString()}` : ''}`
                     : verified
@@ -410,7 +444,11 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                 disabled={locating}
                 className="w-full h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.98] transition-transform disabled:opacity-60"
               >
-                {locating ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
+                {locating ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Navigation size={16} />
+                )}
                 {geo ? 'Retry location' : 'Use my location'}
               </button>
               {locating && (
@@ -428,7 +466,8 @@ export function SiteVisitSheet({ project, lead, onClose, onChanged }: SiteVisitS
                 <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs text-muted-foreground">
-                      {(geo as { lat: number }).lat.toFixed(5)},{(geo as { lng: number }).lng.toFixed(5)}
+                      {(geo as { lat: number }).lat.toFixed(5)},
+                      {(geo as { lng: number }).lng.toFixed(5)}
                     </span>
                     <span className="text-[11px] text-emerald-600 flex items-center gap-1">
                       <CheckCircle2 size={12} /> Captured

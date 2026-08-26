@@ -405,10 +405,10 @@ export default function BulkActionBar({
                   onDelete();
                   setConfirmDelete(false);
                 }}
-                  className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold hover:bg-red-400 transition-colors"
-                >
-                  Remove
-                </button>
+                className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold hover:bg-red-400 transition-colors"
+              >
+                Remove
+              </button>
               <button
                 onClick={() => setConfirmDelete(false)}
                 className="text-xs text-background/60 hover:text-background transition-colors"
@@ -487,8 +487,8 @@ export default function BulkActionBar({
                 <p className="text-[11px] text-muted-foreground mt-1.5">
                   You can use{' '}
                   <code className="bg-muted px-1 py-0.5 rounded">{'{customer_name}'}</code> or{' '}
-                  <code className="bg-muted px-1 py-0.5 rounded">{'{phone}'}</code> — they are filled
-                  in for each lead.
+                  <code className="bg-muted px-1 py-0.5 rounded">{'{phone}'}</code> — they are
+                  filled in for each lead.
                 </p>
               </div>
 
@@ -515,9 +515,7 @@ export default function BulkActionBar({
                   className="btn-primary flex items-center gap-2"
                 >
                   {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  {sending
-                    ? 'Sending…'
-                    : `Send messages`}
+                  {sending ? 'Sending…' : `Send messages`}
                 </button>
               </div>
             </div>
@@ -533,9 +531,7 @@ export default function BulkActionBar({
             if (!assigning) setAssignModalOpen(false);
           }}
           title="Assign leads to your team"
-          subtitle={`${selectedLeads.length} selected lead${
-            selectedLeads.length !== 1 ? 's' : ''
-          }`}
+          subtitle={`${selectedLeads.length} selected lead${selectedLeads.length !== 1 ? 's' : ''}`}
           size="sm"
         >
           <div className="p-6 space-y-4">
@@ -578,9 +574,9 @@ export default function BulkActionBar({
                       <span className="truncate">{u.name}</span>
                       {checked && (
                         <span className="ml-auto text-xs text-primary font-semibold flex-shrink-0">
-                       {distByUserId.get(u.id) ?? 0} lead
-                         {(distByUserId.get(u.id) ?? 0) !== 1 ? 's' : ''}
-                         </span>
+                          {distByUserId.get(u.id) ?? 0} lead
+                          {(distByUserId.get(u.id) ?? 0) !== 1 ? 's' : ''}
+                        </span>
                       )}
                     </button>
                   );
@@ -639,7 +635,7 @@ export default function BulkActionBar({
                     setAssignModalOpen(false);
                     setSelectedUserIds(new Set());
                   } catch (err: any) {
-                     setAssignError(err?.message || 'Couldn’t assign leads — nothing was changed');
+                    setAssignError(err?.message || 'Couldn’t assign leads — nothing was changed');
                   } finally {
                     setAssigning(false);
                   }
@@ -648,9 +644,7 @@ export default function BulkActionBar({
                 className="btn-primary flex items-center gap-2"
               >
                 {assigning && <Loader2 size={14} className="animate-spin" />}
-                {assigning
-                  ? 'Assigning…'
-                  : `Assign leads`}
+                {assigning ? 'Assigning…' : `Assign leads`}
               </button>
             </div>
           </div>

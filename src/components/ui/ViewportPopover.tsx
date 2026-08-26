@@ -1,11 +1,5 @@
 'use client';
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 export type PopoverAlign = 'start' | 'center' | 'end';
@@ -194,7 +188,10 @@ export default function ViewportPopover({
           aria-hidden="true"
         />
         <div className="absolute inset-x-0 bottom-0 bg-card rounded-t-2xl shadow-modal max-h-[85dvh] flex flex-col overflow-hidden slide-up-enter">
-          <div className="pt-3 pb-1.5 flex justify-center flex-shrink-0 cursor-pointer" onPointerDown={onClose}>
+          <div
+            className="pt-3 pb-1.5 flex justify-center flex-shrink-0 cursor-pointer"
+            onPointerDown={onClose}
+          >
             <div className="w-10 h-1.5 rounded-full bg-muted" />
           </div>
           <div className={`overflow-y-auto flex-1 ${className}`}>{children}</div>

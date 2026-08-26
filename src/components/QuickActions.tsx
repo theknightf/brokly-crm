@@ -2,14 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import {
-  Plus,
-  CalendarClock,
-  CalendarCheck2,
-  MapPin,
-  Users,
-  ChevronUp,
-} from 'lucide-react';
+import { Plus, CalendarClock, CalendarCheck2, MapPin, Users, ChevronUp } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface QuickAction {
@@ -58,7 +51,8 @@ export default function QuickActions() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Hide the FAB on the leads-management page (the page already has a prominent button)
-  const onLeadsPage = pathname === '/leads-management' || pathname?.startsWith('/leads-management/');
+  const onLeadsPage =
+    pathname === '/leads-management' || pathname?.startsWith('/leads-management/');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,7 +82,9 @@ export default function QuickActions() {
                 onClick={() => run(action.href)}
                 className="flex items-center gap-2.5 self-end pr-4 pl-3 py-2 rounded-full bg-card border border-border shadow-lg text-sm font-medium text-foreground hover:border-primary/50 transition-all active:scale-95"
               >
-                <span className={`w-8 h-8 rounded-full flex items-center justify-center ${action.tint} flex-shrink-0`}>
+                <span
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${action.tint} flex-shrink-0`}
+                >
                   {action.icon}
                 </span>
                 {t(action.labelKey)}
@@ -117,7 +113,10 @@ export default function QuickActions() {
             aria-label={t('quick.addLead')}
           >
             {/* pulse ring */}
-            <span className="absolute inset-0 rounded-full bg-primary/40 animate-ping" style={{ animationDuration: '2s' }} />
+            <span
+              className="absolute inset-0 rounded-full bg-primary/40 animate-ping"
+              style={{ animationDuration: '2s' }}
+            />
             <Plus size={22} strokeWidth={2.5} className="relative z-10 flex-shrink-0" />
             <span className="relative z-10 hidden lg:inline">Add lead</span>
           </button>
@@ -125,12 +124,7 @@ export default function QuickActions() {
       </div>
 
       {/* More actions sheet (when menu is open) — backdrop */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-30"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
+      {menuOpen && <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />}
     </>
   );
 }

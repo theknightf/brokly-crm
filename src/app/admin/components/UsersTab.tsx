@@ -100,7 +100,8 @@ function UserModal({
     if (!fullName.trim()) e.fullName = 'Full name is required';
     if (showTeamLeaderSection && teamLeaderId) {
       const leader = leaders.find((l) => l.id === teamLeaderId);
-      if (leader && !leader.teamId) e.teamLeaderId = 'Selected team leader has no team. Assign a team to this leader first.';
+      if (leader && !leader.teamId)
+        e.teamLeaderId = 'Selected team leader has no team. Assign a team to this leader first.';
     }
     return e;
   };
@@ -223,7 +224,9 @@ function UserModal({
           {showTeamLeaderSection && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Team Leader</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Team Leader
+                </label>
                 <div className="relative">
                   <select
                     value={teamLeaderId}
@@ -248,7 +251,9 @@ function UserModal({
                 {errors.teamLeaderId && (
                   <p className="text-xs text-destructive mt-1">{errors.teamLeaderId}</p>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">Assigning a leader automatically assigns their team.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assigning a leader automatically assigns their team.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Team</label>
@@ -367,9 +372,7 @@ function ChangePasswordModal({
           </div>
           <div>
             <h3 className="text-base font-semibold text-foreground">Change Password</h3>
-            <p className="text-sm text-muted-foreground truncate">
-              {user.fullName || user.email}
-            </p>
+            <p className="text-sm text-muted-foreground truncate">{user.fullName || user.email}</p>
           </div>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
@@ -485,7 +488,9 @@ function CreateUserModal({
     if (showTeamLeaderSection && teamLeaderId) {
       const leader = leaders.find((l) => l.id === teamLeaderId);
       if (leader && !leader.teamId) {
-        setErrors({ teamLeaderId: 'Selected team leader has no team. Assign a team to this leader first.' });
+        setErrors({
+          teamLeaderId: 'Selected team leader has no team. Assign a team to this leader first.',
+        });
         return;
       }
     }
@@ -661,7 +666,9 @@ function CreateUserModal({
           {showTeamLeaderSection && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Team Leader</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Team Leader
+                </label>
                 <div className="relative">
                   <select
                     value={teamLeaderId}
@@ -686,7 +693,9 @@ function CreateUserModal({
                 {errors.teamLeaderId && (
                   <p className="text-xs text-destructive mt-1">{errors.teamLeaderId}</p>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">Select a leader to auto-assign their team.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Select a leader to auto-assign their team.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Team</label>
@@ -722,7 +731,9 @@ function CreateUserModal({
 export default function UsersTab() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [admins, setAdmins] = useState<UserProfile[]>([]);
-  const [teams, setTeams] = useState<{ id: string; name: string; leaderId: string | null; leaderName: string | null }[]>([]);
+  const [teams, setTeams] = useState<
+    { id: string; name: string; leaderId: string | null; leaderName: string | null }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -765,7 +776,14 @@ export default function UsersTab() {
       ]);
       setUsers(usersData as UserProfile[]);
       setAdmins(adminsData as UserProfile[]);
-      setTeams(teamsData as { id: string; name: string; leaderId: string | null; leaderName: string | null }[]);
+      setTeams(
+        teamsData as {
+          id: string;
+          name: string;
+          leaderId: string | null;
+          leaderName: string | null;
+        }[]
+      );
     } catch {
       toast.error('Failed to load users');
     } finally {
@@ -774,7 +792,10 @@ export default function UsersTab() {
   };
 
   const leaders = useMemo(() => {
-    const byId = new Map<string, { id: string; name: string; teamId: string | null; teamName: string }>();
+    const byId = new Map<
+      string,
+      { id: string; name: string; teamId: string | null; teamName: string }
+    >();
     for (const t of teams) {
       if (t.leaderId) {
         const u = users.find((x) => x.id === t.leaderId);
@@ -802,16 +823,14 @@ export default function UsersTab() {
       (u.agentCode || '').toLowerCase().includes(search.toLowerCase());
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
     const matchStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' ? u.isActive : !u.isActive);
+      statusFilter === 'all' || (statusFilter === 'active' ? u.isActive : !u.isActive);
     return matchSearch && matchRole && matchStatus;
   });
 
   const handleEdit = (user: UserProfile) => setModalState({ open: true, user });
   const handleDeletePrompt = (user: UserProfile) =>
     setDeleteState({ open: true, id: user.id, name: user.fullName || user.email });
-  const handlePasswordPrompt = (user: UserProfile) =>
-    setPasswordState({ open: true, user });
+  const handlePasswordPrompt = (user: UserProfile) => setPasswordState({ open: true, user });
 
   const handleToggleActive = async (user: UserProfile) => {
     const newActive = !user.isActive;
@@ -845,7 +864,9 @@ export default function UsersTab() {
         } else if (!nextTeamId && prevTeamId) {
           try {
             await teamsService.removeMember(prevTeamId, modalState.user.id);
-          } catch {}
+          } catch {
+            /* keep UI consistent even if un-assign fails */
+          }
         }
         await loadData();
         toast.success('User updated successfully');
@@ -872,7 +893,9 @@ export default function UsersTab() {
   const handleChangePassword = async (newPassword: string) => {
     if (!passwordState.user?.id) return;
     await usersService.changePassword(passwordState.user.id, newPassword, newPassword);
-    toast.success(`Password updated for ${passwordState.user.fullName || passwordState.user.email}`);
+    toast.success(
+      `Password updated for ${passwordState.user.fullName || passwordState.user.email}`
+    );
   };
 
   const handleCreateUser = async (data: {

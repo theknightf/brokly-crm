@@ -50,30 +50,40 @@ export async function GET(request: Request) {
   const inDateRange = (date: string | null | undefined): boolean =>
     !hasRange || (!!date && date >= fromParam && date <= toParam);
 
-  const [leadsRes, followUpsRes, customersRes, teamRes, callsRes, membershipsRes, teamsRes, expensesRes, ratingsRes, profilesRes] =
-    await Promise.all([
-      supabase
-        .from('leads')
-        .select(
-          'crm_status, lead_status, source, property_type, budget_max, created_at, agent, assigned_to, created_by'
-        ),
-      supabase
-        .from('follow_ups')
-        .select('follow_up_status, follow_up_type, priority, due_date, created_at'),
-      supabase.from('leads').select('budget_max, created_at').eq('lead_status', 'Won'),
-      supabase
-        .from('team_members')
-        .select('name, closed_deals, assigned_leads, total_revenue, conversion_rate')
-        .eq('member_status', 'Active'),
-      supabase
-        .from('call_logs')
-        .select('user_id, channel, duration_seconds, outcome, direction, created_at'),
-      supabase.from('team_memberships').select('team_id, user_id, is_leader'),
-      supabase.from('teams').select('id, name, leader_id, description'),
-      supabase.from('expenses').select('created_by, amount, expense_date'),
-      supabase.from('team_leader_ratings').select('*'),
-      supabase.from('user_profiles').select('id, full_name, email, role, team_id, is_active'),
-    ]);
+  const [
+    leadsRes,
+    followUpsRes,
+    customersRes,
+    teamRes,
+    callsRes,
+    membershipsRes,
+    teamsRes,
+    expensesRes,
+    ratingsRes,
+    profilesRes,
+  ] = await Promise.all([
+    supabase
+      .from('leads')
+      .select(
+        'crm_status, lead_status, source, property_type, budget_max, created_at, agent, assigned_to, created_by'
+      ),
+    supabase
+      .from('follow_ups')
+      .select('follow_up_status, follow_up_type, priority, due_date, created_at'),
+    supabase.from('leads').select('budget_max, created_at').eq('lead_status', 'Won'),
+    supabase
+      .from('team_members')
+      .select('name, closed_deals, assigned_leads, total_revenue, conversion_rate')
+      .eq('member_status', 'Active'),
+    supabase
+      .from('call_logs')
+      .select('user_id, channel, duration_seconds, outcome, direction, created_at'),
+    supabase.from('team_memberships').select('team_id, user_id, is_leader'),
+    supabase.from('teams').select('id, name, leader_id, description'),
+    supabase.from('expenses').select('created_by, amount, expense_date'),
+    supabase.from('team_leader_ratings').select('*'),
+    supabase.from('user_profiles').select('id, full_name, email, role, team_id, is_active'),
+  ]);
 
   if (
     [
@@ -203,8 +213,10 @@ export async function GET(request: Request) {
     const e = callsByEmployee[uid];
     e.calls++;
     e.totalDurationSeconds += Number(c.duration_seconds) || 0;
-    if (['Reached', 'Interested', 'Site Visit', 'Won Deal', 'Customer Replied'].includes(c.outcome) ||
-        (Number(c.duration_seconds) || 0) >= 60) {
+    if (
+      ['Reached', 'Interested', 'Site Visit', 'Won Deal', 'Customer Replied'].includes(c.outcome) ||
+      (Number(c.duration_seconds) || 0) >= 60
+    ) {
       e.connected++;
     }
     if (['No Answer', 'No Answer At All', 'Busy', 'Wrong Number', 'No Reply'].includes(c.outcome)) {
@@ -298,14 +310,28 @@ export async function GET(request: Request) {
   profiles.forEach((p: any) => {
     if (isAdmin || visibleTeams.some((t: any) => t.id === p.team_id)) visibleProfileIds.add(p.id);
   });
-  const terminalStages = new Set(['Done Deal', 'Not Interested', 'Cancellation', 'Wrong Number', 'No Answer', 'No Answer At All', 'Closed Number', 'Low Budget', 'Data Rotation']);
+  const terminalStages = new Set([
+    'Done Deal',
+    'Not Interested',
+    'Cancellation',
+    'Wrong Number',
+    'No Answer',
+    'No Answer At All',
+    'Closed Number',
+    'Low Budget',
+    'Data Rotation',
+  ]);
   const teamAgentPerformance = profiles
     .filter((p: any) => p.is_active !== false && visibleProfileIds.has(p.id))
     .map((p: any) => {
       const mine = leads.filter((l: any) => l.assigned_to === p.id || l.created_by === p.id);
       const stageOf = (l: any) => l.crm_status || l.lead_status || 'Fresh Leads';
-      const newCount = mine.filter((l: any) => stageOf(l) === 'Fresh Leads' || stageOf(l) === 'New').length;
-      const pendingCount = mine.filter((l: any) => !terminalStages.has(stageOf(l)) && !['Fresh Leads', 'New'].includes(stageOf(l))).length;
+      const newCount = mine.filter(
+        (l: any) => stageOf(l) === 'Fresh Leads' || stageOf(l) === 'New'
+      ).length;
+      const pendingCount = mine.filter(
+        (l: any) => !terminalStages.has(stageOf(l)) && !['Fresh Leads', 'New'].includes(stageOf(l))
+      ).length;
       return {
         id: p.id,
         name: p.full_name || p.email,
@@ -320,15 +346,20 @@ export async function GET(request: Request) {
     .sort((a, b) => b.totalLeads - a.totalLeads);
 
   const leadStageByAgent = Array.from(
-    leads.reduce((groups: Map<string, { stage: string; agent: string; count: number }>, lead: any) => {
-      const stage = lead.crm_status || lead.lead_status || 'Fresh Leads';
-      const agent = profiles.find((profile: any) => profile.id === lead.assigned_to)?.full_name || lead.agent || 'Unassigned';
-      const key = `${stage}::${agent}`;
-      const current = groups.get(key);
-      groups.set(key, current || { stage, agent, count: 0 });
-      groups.get(key)!.count += 1;
-      return groups;
-    }, new Map()).values()
+    leads
+      .reduce((groups: Map<string, { stage: string; agent: string; count: number }>, lead: any) => {
+        const stage = lead.crm_status || lead.lead_status || 'Fresh Leads';
+        const agent =
+          profiles.find((profile: any) => profile.id === lead.assigned_to)?.full_name ||
+          lead.agent ||
+          'Unassigned';
+        const key = `${stage}::${agent}`;
+        const current = groups.get(key);
+        groups.set(key, current || { stage, agent, count: 0 });
+        groups.get(key)!.count += 1;
+        return groups;
+      }, new Map())
+      .values()
   ).sort((a, b) => b.count - a.count);
 
   // Attach leader names.

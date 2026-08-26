@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     await supabase.from('admin_settings').delete().in('id', dropIds);
   }
 
-  if ((!rows || rows.length === 0) || (sent === 0 && failed === 0)) {
+  if (!rows || rows.length === 0 || (sent === 0 && failed === 0)) {
     return NextResponse.json({ ok: false, reason: 'no_subscription', sent });
   }
   return NextResponse.json({ ok: failed === 0, sent });

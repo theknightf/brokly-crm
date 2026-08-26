@@ -185,9 +185,7 @@ export default function DealStatusModal({
             <span className="font-medium text-foreground truncate">
               {lead.name || 'Unnamed lead'}
             </span>
-            <span className="text-xs text-muted-foreground flex-shrink-0">
-              {lead.phone || ''}
-            </span>
+            <span className="text-xs text-muted-foreground flex-shrink-0">{lead.phone || ''}</span>
           </div>
           {leadSearchOpen && (
             <div className="relative">

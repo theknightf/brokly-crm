@@ -164,8 +164,16 @@ export async function POST(request: Request) {
     .eq('attendance_date', attendanceDate)
     .maybeSingle();
 
-  const effectiveCheckIn = checkInTime ?? existing?.check_in_time ?? (action === 'checkout' ? existing?.check_in_time : now);
-  const effectiveCheckOut = action === 'checkout' ? (checkOutTime ?? now) : action === 'edit' ? (checkOutTime ?? existing?.check_out_time ?? null) : checkOutTime ?? existing?.check_out_time ?? null;
+  const effectiveCheckIn =
+    checkInTime ??
+    existing?.check_in_time ??
+    (action === 'checkout' ? existing?.check_in_time : now);
+  const effectiveCheckOut =
+    action === 'checkout'
+      ? (checkOutTime ?? now)
+      : action === 'edit'
+        ? (checkOutTime ?? existing?.check_out_time ?? null)
+        : (checkOutTime ?? existing?.check_out_time ?? null);
 
   if (action === 'checkout' && !existing?.check_in_time) {
     return NextResponse.json(
@@ -211,7 +219,8 @@ export async function POST(request: Request) {
   // ── Accountability: record the manual action ─────────────────────────
   const oldCheckIn = existing?.check_in_time || null;
   const oldCheckOut = existing?.check_out_time || null;
-  const auditAction = action === 'edit' ? 'edited' : action === 'checkout' ? 'checked_out' : 'checked_in';
+  const auditAction =
+    action === 'edit' ? 'edited' : action === 'checkout' ? 'checked_out' : 'checked_in';
   const description = reason
     ? `Manual attendance ${auditAction} for ${targetUser.full_name} on ${attendanceDate} — ${reason}`
     : `Manual attendance ${auditAction} for ${targetUser.full_name} on ${attendanceDate}`;

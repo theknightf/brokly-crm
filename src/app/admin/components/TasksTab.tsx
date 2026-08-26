@@ -108,7 +108,9 @@ export default function TasksTab() {
             />
           </div>
           <div className="flex flex-col gap-1 md:col-span-2">
-            <label className="text-xs font-semibold text-muted-foreground">Details (optional)</label>
+            <label className="text-xs font-semibold text-muted-foreground">
+              Details (optional)
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -118,7 +120,11 @@ export default function TasksTab() {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-muted-foreground">For</label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} className="input-base text-sm">
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="input-base text-sm"
+            >
               {TARGET_ROLE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -158,7 +164,8 @@ export default function TasksTab() {
             disabled={saving}
             className="btn-primary h-9 px-3 text-sm flex items-center gap-1.5"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Assign task
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Assign
+            task
           </button>
         </div>
       </div>
@@ -179,7 +186,10 @@ export default function TasksTab() {
         ) : (
           <div className="divide-y divide-border">
             {tasks.map((t) => (
-              <div key={t.id} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+              <div
+                key={t.id}
+                className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground truncate">{t.title}</p>
                   {t.description && (
@@ -205,7 +215,11 @@ export default function TasksTab() {
                   className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 flex-shrink-0"
                   title="Remove task"
                 >
-                  {deletingId === t.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  {deletingId === t.id ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
                 </button>
               </div>
             ))}

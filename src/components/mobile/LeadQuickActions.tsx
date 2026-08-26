@@ -14,7 +14,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { leadCommentsService } from '@/lib/services/crmService';
 import { QuickNoteSheet } from './QuickNoteSheet';
-import { useCallOutcome, CallChannel, CallOutcomeSheet, Direction, CallItem } from './CallOutcomeSheet';
+import {
+  useCallOutcome,
+  CallChannel,
+  CallOutcomeSheet,
+  Direction,
+  CallItem,
+} from './CallOutcomeSheet';
 
 interface LeadQuickActionsProps {
   lead: { id: string; name: string; phone?: string; project?: string };
