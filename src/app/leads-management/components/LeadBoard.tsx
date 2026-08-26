@@ -1,11 +1,12 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
   Phone,
   MessageCircle,
   Pencil,
+  Trash2,
   MapPin,
   Building2,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ interface LeadBoardProps {
   onView: (lead: Lead) => void;
   onEdit: (lead: Lead) => void;
   onStatusChange: (id: string, status: LeadStatus) => void;
+  onDelete?: (id: string) => void;
 }
 
 const formatBudget = (min?: number, max?: number) => {
@@ -33,11 +35,13 @@ function BoardCard({
   onView,
   onEdit,
   onStatusChange,
+  onRequestDelete,
 }: {
   lead: Lead;
   onView: (lead: Lead) => void;
   onEdit: (lead: Lead) => void;
   onStatusChange: (id: string, status: LeadStatus) => void;
+  onRequestDelete?: (id: string) => void;
 }) {
   const inPipeline = pipelineIndex(lead.status) >= 0;
   const prev = inPipeline ? prevPipelineStage(lead.status) : undefined;
@@ -69,6 +73,18 @@ function BoardCard({
         >
           <Pencil size={13} />
         </button>
+        {onRequestDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRequestDelete(lead.id);
+            }}
+            className="w-7 h-7 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Delete lead"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -151,56 +167,96 @@ function BoardCard({
   );
 }
 
-export default function LeadBoard({ leads, onView, onEdit, onStatusChange }: LeadBoardProps) {
+export default function LeadBoard({
+  leads,
+  onView,
+  onEdit,
+  onStatusChange,
+  onDelete,
+}: LeadBoardProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const columns: { key: string; label: string; stage?: LeadStatus }[] = [
     ...PIPELINE_STAGES.map((s) => ({ key: s, label: s, stage: s })),
     { key: '__other__', label: 'Outcomes' },
   ];
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
-      {columns.map((col) => {
-        const colLeads = col.stage
-          ? leads.filter((l) => (l.status || 'Fresh Leads') === col.stage)
-          : leads.filter((l) => !PIPELINE_STAGES.includes(l.status || 'Fresh Leads'));
-        return (
-          <div
-            key={col.key}
-            className="w-[272px] flex-shrink-0 flex flex-col max-h-[calc(100vh-260px)]"
-          >
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border mb-2 sticky top-0 z-10">
-              {col.stage ? (
-                <StatusBadge status={col.stage} showDot />
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  <span className="w-2.5 h-2.5 rounded-full bg-clay-soft" />
-                  {col.label}
+    <>
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
+        {columns.map((col) => {
+          const colLeads = col.stage
+            ? leads.filter((l) => (l.status || 'Fresh Leads') === col.stage)
+            : leads.filter((l) => !PIPELINE_STAGES.includes(l.status || 'Fresh Leads'));
+          return (
+            <div
+              key={col.key}
+              className="w-[272px] flex-shrink-0 flex flex-col max-h-[calc(100vh-260px)]"
+            >
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border mb-2 sticky top-0 z-10">
+                {col.stage ? (
+                  <StatusBadge status={col.stage} showDot />
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-clay-soft" />
+                    {col.label}
+                  </span>
+                )}
+                <span className="ml-auto text-xs font-bold text-muted-foreground bg-muted rounded-full px-2 py-0.5 tabular-nums">
+                  {colLeads.length}
                 </span>
-              )}
-              <span className="ml-auto text-xs font-bold text-muted-foreground bg-muted rounded-full px-2 py-0.5 tabular-nums">
-                {colLeads.length}
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {colLeads.length === 0 ? (
-                <div className="border border-dashed border-border rounded-2xl py-10 text-center text-xs text-muted-foreground">
-                  Drop leads here
-                </div>
-              ) : (
-                colLeads.map((lead, i) => (
-                  <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
-                    <BoardCard
-                      lead={lead}
-                      onView={onView}
-                      onEdit={onEdit}
-                      onStatusChange={onStatusChange}
-                    />
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                {colLeads.length === 0 ? (
+                  <div className="border border-dashed border-border rounded-2xl py-10 text-center text-xs text-muted-foreground">
+                    Drop leads here
                   </div>
-                ))
-              )}
+                ) : (
+                  colLeads.map((lead, i) => (
+                    <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
+                      <BoardCard
+                        lead={lead}
+                        onView={onView}
+                        onEdit={onEdit}
+                        onStatusChange={onStatusChange}
+                        onRequestDelete={onDelete ? setDeletingId : undefined}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {deletingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
+            onClick={() => setDeletingId(null)}
+          />
+          <div className="relative bg-card border border-border rounded-2xl shadow-modal p-6 max-w-sm w-full fade-in">
+            <h3 className="text-base font-semibold text-foreground mb-2">Delete this lead?</h3>
+            <p className="text-sm text-muted-foreground mb-5">
+              This action cannot be undone. The lead and all associated follow-ups will be
+              permanently removed.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDeletingId(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (onDelete) onDelete(deletingId);
+                  setDeletingId(null);
+                }}
+                className="btn-danger"
+              >
+                Delete Lead
+              </button>
             </div>
           </div>
-        );
-      })}
-    </div>
+        </div>
+      )}
+    </>
   );
 }

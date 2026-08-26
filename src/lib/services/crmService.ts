@@ -460,15 +460,25 @@ export const leadsService = {
 
   async delete(id: string) {
     const supabase = createClient();
-    const { error } = await supabase.from('leads').delete().eq('id', id);
+    const { error, count } = await supabase.from('leads').delete({ count: 'exact' }).eq('id', id);
     if (error) throw error;
+    if (count === 0) {
+      throw new Error(
+        'Could not delete this lead. You may not have permission, or it was already removed.'
+      );
+    }
     invalidateCache();
   },
 
   async bulkDelete(ids: string[]) {
     const supabase = createClient();
-    const { error } = await supabase.from('leads').delete().in('id', ids);
+    const { error, count } = await supabase.from('leads').delete({ count: 'exact' }).in('id', ids);
     if (error) throw error;
+    if (count === 0) {
+      throw new Error(
+        'Could not delete the selected leads. You may not have permission, or they were already removed.'
+      );
+    }
     invalidateCache();
   },
 
