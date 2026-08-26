@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 const ALLOWED_ROLES = [
   'admin',
   'owner',
+  'it_manager',
   'broker',
   'branch_manager',
   'team_leader',
@@ -39,9 +40,10 @@ export async function POST(request: Request) {
 
   // Privileged roles require an acting owner — same rule as PATCH and the
   // prevent_privilege_escalation database guard.
-  if ((role === 'owner' || role === 'admin') && guard.actor.role !== 'owner') {
+  const isPrivileged = role === 'owner' || role === 'admin' || role === 'it_manager';
+  if (isPrivileged && guard.actor.role !== 'owner') {
     return NextResponse.json(
-      { error: `Only an owner can create an ${role}` },
+      { error: `Only an owner can create an ${role.replace('_', ' ')}` },
       { status: 403 }
     );
   }

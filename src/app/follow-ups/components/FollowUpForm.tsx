@@ -10,7 +10,6 @@ import {
   ALL_FOLLOW_UP_TYPES,
   ALL_PRIORITIES,
 } from './mockFollowUps';
-import { getActiveAgentNames } from '@/app/teams/components/mockTeamMembers';
 import { leadsService, teamsService } from '@/lib/services/crmService';
 import { Link2, Search, Loader2, UserCircle2 } from 'lucide-react';
 
@@ -31,7 +30,7 @@ interface LeadResult {
 }
 
 export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFormProps) {
-  const [agentList, setAgentList] = useState<string[]>(() => getActiveAgentNames());
+  const [agentList, setAgentList] = useState<string[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -41,18 +40,18 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
   }, []);
 
   useEffect(() => {
-    const refresh = () => setAgentList(getActiveAgentNames());
-    window.addEventListener('team-members-updated', refresh);
-    // Prefer the real user list; fall back to the in-memory team members only
-    // when the API/database is unavailable.
+    let cancelled = false;
     teamsService
       .getAssignableUsers()
       .then((users: { id: string; name: string }[]) => {
+        if (cancelled) return;
         const names = (users || []).map((u) => u.name).filter(Boolean);
-        if (names.length > 0) setAgentList(names);
+        setAgentList(names);
       })
       .catch(() => {});
-    return () => window.removeEventListener('team-members-updated', refresh);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [form, setForm] = useState({

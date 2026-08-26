@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { isAdminRole, canViewTeams } from '@/lib/roles';
+import { isAdminRole, canViewTeams, isTechRole } from '@/lib/roles';
 
 interface NavItem {
   id: string;
@@ -328,6 +328,7 @@ function SidebarContent({
   const { t } = useLanguage();
 
   const isAdminOrOwner = isAdminRole(profile?.role);
+  const canOpenAdmin = isAdminOrOwner || isTechRole(profile?.role);
   const canWatchTeams = canViewTeams(profile?.role);
   const displayName =
     profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
@@ -368,7 +369,7 @@ function SidebarContent({
             ...group,
             items: group.items.filter(
               (item) =>
-                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses')) &&
+                (canOpenAdmin || (item.id !== 'nav-admin' && item.id !== 'nav-expenses')) &&
                 (canWatchTeams || item.id !== 'nav-teams')
             ),
           }))

@@ -5,9 +5,20 @@
 export const ADMIN_ROLES = ['owner', 'admin'];
 export const USER_MANAGEMENT_ROLES = ['owner', 'admin'];
 export const TEAM_LEAD_ROLE = 'team_leader';
+export const IT_MANAGER_ROLE = 'it_manager';
 
 export function isAdminRole(role?: string | null): boolean {
   return !!role && ADMIN_ROLES.includes(role);
+}
+
+/** Who may open the technical diagnostics dashboard (owner included). */
+export function isTechRole(role?: string | null): boolean {
+  return !!role && (role === IT_MANAGER_ROLE || role === 'owner');
+}
+
+/** IT managers only see the System tab — no CRM/HR tabs. */
+export function isTechOnlyRole(role?: string | null): boolean {
+  return role === IT_MANAGER_ROLE;
 }
 
 export function canManageUsers(role?: string | null): boolean {

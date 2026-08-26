@@ -27,11 +27,12 @@ import {
   Palmtree,
   Target,
   Repeat,
+  Cpu,
 } from 'lucide-react';
 import { adminSettingsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { isAdminRole, canManageUsers } from '@/lib/roles';
+import { isAdminRole, canManageUsers, isTechRole, isTechOnlyRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import UsersTab from './UsersTab';
 import AttendanceTab from './AttendanceTab';
@@ -44,8 +45,10 @@ import LeaveTab from './LeaveTab';
 import KpiTargetsTab from './KpiTargetsTab';
 import TasksTab from './TasksTab';
 import RotationTab from './RotationTab';
+import SystemTab from './SystemTab';
 
 type TabKey =
+  | 'system'
   | 'leadSources'
   | 'pipelineStages'
   | 'areas'
@@ -168,10 +171,17 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
     icon: <Repeat size={16} />,
     description: 'Auto-reassign inactive leads to available agents',
   },
+  {
+    key: 'system',
+    label: 'System',
+    icon: <Cpu size={16} />,
+    description: 'Technical diagnostics: database, schema, sessions & runtime health',
+  },
 ];
 
 // Keep the most frequently used admin workflows at the top of the rail.
 const TAB_ORDER: TabKey[] = [
+  'system',
   'users',
   'attendance',
   'productivity',
@@ -354,6 +364,7 @@ export default function AdminScreen() {
     Record<
       Exclude<
         TabKey,
+        | 'system'
         | 'users'
         | 'attendance'
         | 'activity'
@@ -401,6 +412,12 @@ export default function AdminScreen() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!authLoading && isTechOnlyRole(profile?.role) && activeTab !== 'system') {
+      setActiveTab('system');
+    }
+  }, [authLoading, profile?.role, activeTab]);
+
   const loadSettings = async () => {
     setLoading(true);
     try {
@@ -428,6 +445,7 @@ export default function AdminScreen() {
   };
 
   const isPanelTab =
+    activeTab === 'system' ||
     activeTab === 'users' ||
     activeTab === 'attendance' ||
     activeTab === 'activity' ||
@@ -443,6 +461,7 @@ export default function AdminScreen() {
     ? settings[
         activeTab as Exclude<
           TabKey,
+          | 'system'
           | 'users'
           | 'attendance'
           | 'activity'
@@ -561,7 +580,8 @@ export default function AdminScreen() {
   }
 
   const isAdminOrOwner = isAdminRole(profile?.role);
-  if (!isAdminOrOwner) {
+  const isTechUser = isTechRole(profile?.role);
+  if (!isAdminOrOwner && !isTechUser) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-background gap-3 p-8">
         <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -577,11 +597,16 @@ export default function AdminScreen() {
   }
 
   const canUsers = canManageUsers(profile?.role);
+  const techOnly = isTechOnlyRole(profile?.role);
   const visibleTabs = TAB_ORDER
     .map((key) => TABS.find((tab) => tab.key === key))
     .filter((tab): tab is (typeof TABS)[number] => Boolean(tab))
+    .filter((t) => (techOnly ? t.key === 'system' : true))
     .filter((t) => t.key !== 'users' || canUsers);
   const navGroup = (key: TabKey) => {
+    if (key === 'system') {
+      return 'System';
+    }
     if (['users', 'attendance', 'productivity', 'activity', 'callLogs'].includes(key)) {
       return t('admin.people');
     }
@@ -622,12 +647,14 @@ export default function AdminScreen() {
             const isKpi = tab.key === 'kpiTargets';
             const isTasks = tab.key === 'tasks';
             const isRotation = tab.key === 'rotation';
+            const isSystem = tab.key === 'system';
             const isSpecial =
               isUsers ||
               isAttendance ||
               isActivity ||
               isProductivity ||
               isCallLogs ||
+              isSystem ||
               tab.key === 'emailTemplates' ||
               isPayroll ||
               isLeave ||
@@ -640,6 +667,7 @@ export default function AdminScreen() {
                   settings[
                     tab.key as Exclude<
                       TabKey,
+                      | 'system'
                       | 'users'
                       | 'attendance'
                       | 'activity'
@@ -659,6 +687,7 @@ export default function AdminScreen() {
                   settings[
                     tab.key as Exclude<
                       TabKey,
+                      | 'system'
                       | 'users'
                       | 'attendance'
                       | 'activity'
@@ -708,6 +737,8 @@ export default function AdminScreen() {
                     <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Role-assigned to-dos</p>
                   ) : isRotation ? (
                     <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Auto-reassign inactive leads</p>
+                  ) : isSystem ? (
+                    <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>Live diagnostics</p>
                   ) : (
                     <p className={`text-xs ${activeTab === tab.key ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>
                       {active}/{count} active
@@ -723,6 +754,8 @@ export default function AdminScreen() {
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {activeTab === 'users' && canUsers ? (
             <UsersTab />
+          ) : activeTab === 'system' && isTechUser ? (
+            <SystemTab />
           ) : activeTab === 'attendance' ? (
             <AttendanceTab />
           ) : activeTab === 'activity' ? (
