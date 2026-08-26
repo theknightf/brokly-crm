@@ -459,25 +459,35 @@ export const leadsService = {
   },
 
   async delete(id: string) {
-    const supabase = createClient();
-    const { error, count } = await supabase.from('leads').delete({ count: 'exact' }).eq('id', id);
-    if (error) throw error;
-    if (count === 0) {
-      throw new Error(
-        'Could not delete this lead. You may not have permission, or it was already removed.'
-      );
+    const res = await fetch(`/api/leads/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      let message = 'Failed to delete lead';
+      try {
+        const data = await res.json();
+        if (data?.error) message = data.error;
+      } catch {
+        /* ignore parse errors */
+      }
+      throw new Error(message);
     }
     invalidateCache();
   },
 
   async bulkDelete(ids: string[]) {
-    const supabase = createClient();
-    const { error, count } = await supabase.from('leads').delete({ count: 'exact' }).in('id', ids);
-    if (error) throw error;
-    if (count === 0) {
-      throw new Error(
-        'Could not delete the selected leads. You may not have permission, or they were already removed.'
-      );
+    const res = await fetch('/api/leads/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) {
+      let message = 'Failed to delete leads';
+      try {
+        const data = await res.json();
+        if (data?.error) message = data.error;
+      } catch {
+        /* ignore parse errors */
+      }
+      throw new Error(message);
     }
     invalidateCache();
   },
