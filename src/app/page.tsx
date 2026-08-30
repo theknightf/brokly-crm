@@ -14,6 +14,7 @@ const RecentActivity = dynamic(() => import('./components/RecentActivity'));
 const MobileTodayFollowUps = dynamic(() => import('./components/MobileTodayFollowUps'));
 const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
 const GettingStarted = dynamic(() => import('./components/GettingStarted'));
+const UnifiedMasterDashboard = dynamic(() => import('./components/UnifiedMasterDashboard'));
 
 export default function DashboardPage() {
   const { profile, loading } = useAuth();
@@ -30,10 +31,12 @@ export default function DashboardPage() {
     );
   }
 
-  if (profile?.role === 'owner') {
+  // Unified Executive Dashboard: identical for Admin & Owner per spec (ADMIN_OWNER)
+  const isUnified = profile?.role === 'owner' || profile?.role === 'admin';
+  if (isUnified) {
     return (
       <AppLayout>
-        <OwnerDashboard />
+        <UnifiedMasterDashboard />
       </AppLayout>
     );
   }
