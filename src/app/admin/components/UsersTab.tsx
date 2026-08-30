@@ -12,6 +12,8 @@ import {
   ToggleRight,
   KeyRound,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { usersService, teamsService } from '@/lib/services/crmService';
 import { validateCreateUser } from '@/lib/userValidation';
@@ -333,6 +335,8 @@ function ChangePasswordModal({
 }) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -385,33 +389,53 @@ function ChangePasswordModal({
             <label className="block text-sm font-medium text-foreground mb-1.5">
               New Password *
             </label>
-            <input
-              type="password"
-              value={password}
-              autoFocus
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setErrors((p) => ({ ...p, password: '' }));
-              }}
-              placeholder="Min 8 chars, upper, lower, number"
-              className="input-base w-full"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                autoFocus
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setErrors((p) => ({ ...p, password: '' }));
+                }}
+                placeholder="Min 8 chars, upper, lower, number"
+                className="input-base w-full pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">
               Confirm New Password *
             </label>
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => {
-                setConfirm(e.target.value);
-                setErrors((p) => ({ ...p, confirm: '' }));
-              }}
-              placeholder="Repeat the new password"
-              className="input-base w-full"
-            />
+            <div className="relative">
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                value={confirm}
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  setErrors((p) => ({ ...p, confirm: '' }));
+                }}
+                placeholder="Repeat the new password"
+                className="input-base w-full pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showConfirm ? 'Hide password' : 'Show password'}
+              >
+                {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             {errors.confirm && <p className="text-xs text-destructive mt-1">{errors.confirm}</p>}
           </div>
         </div>
@@ -456,6 +480,7 @@ function CreateUserModal({
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('agent');
   const [code, setCode] = useState('');
   const [adminId, setAdminId] = useState('');
@@ -571,16 +596,26 @@ function CreateUserModal({
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Password *</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setErrors((p) => ({ ...p, password: '' }));
-              }}
-              placeholder="Min 8 chars with upper, lower, and number"
-              className="input-base w-full"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setErrors((p) => ({ ...p, password: '' }));
+                }}
+                placeholder="Min 8 chars with upper, lower, and number"
+                className="input-base w-full pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             {errors.password && <p className="text-xs text-destructive mt-1">{errors.password}</p>}
             <p className="text-xs text-muted-foreground mt-1">
               Must be at least 8 characters, include uppercase, lowercase, and a number.
