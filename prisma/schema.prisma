@@ -1,0 +1,305 @@
+// ============================================================
+// Brokly CRM — Prisma Schema (Enterprise Owner-Grade)
+// Deliverable 1: Database Schema
+// Supports Supabase Postgres (provider: postgresql)
+// Covers spec: User, Lead, CallLog, FollowUpTask, Attendance,
+// Evaluation, PayrollDeduction, Notification
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------
+enum UserRole {
+  OWNER
+  OWNER_ADMIN // spec unified role — maps to owner + admin
+  ADMIN
+  SALES
+  broker
+  branch_manager
+  senior_agent
+  agent
+  telecaller
+  team_leader
+}
+
+enum LeadStage {
+  New_Fresh       @map("New Fresh")
+  New_Cold        @map("New Cold")
+  Leads_Pending   @map("Leads Pending")
+  Calls_Answer    @map("Calls Answer")
+  No_Answer       @map("No Answer")
+  Cancel          @map("Cancel")
+  D_Deal          @map("D.Deal")
+  // Legacy pipeline (kept for migration compatibility)
+  Fresh_Leads
+  Cold_Calls
+  Pending_Leads
+  Following_Up
+  Meeting
+  Interested
+  Reservation
+  Done_Deal
+  Not_Interested
+  Wrong_Number
+  Duplicate_Leads
+  Data_Rotation
+}
+
+enum CallOutcome {
+  NOT_INTERESTED
+  INTERESTED
+  FOLLOW_UP
+  D_DEAL
+  No_Answer
+  Wrong_Number
+  Reached
+  Interested
+  Site_Visit
+  Won_Deal
+  Cancel
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  OVERDUE
+  CANCELLED
+  In_Progress
+}
+
+// ------------------------------------------------------------
+// Models
+// ------------------------------------------------------------
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   // full_name in Supabase user_profiles
+  email        String   @unique
+  phone        String?  @default("")
+  role         UserRole @default(SALES)
+  baseSalary   Decimal  @default(0) @map("base_salary") @db.Decimal(12,2)
+  targetKPIs   Json?    @map("target_kpis") // { dailyCalls, weeklyDeals, etc. }
+  isActive     Boolean  @default(true) @map("is_active")
+  teamId       String?  @map("team_id") @db.Uuid
+  hireDate     DateTime? @map("hire_date") @db.Date
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  leadsAssigned   Lead[]           @relation("AssignedLeads")
+  leadsCreated    Lead[]           @relation("CreatedLeads")
+  callLogs        CallLog[]
+  followUpTasks   FollowUpTask[]
+  attendances     Attendance[]
+  evaluationsGiven Evaluation[]    @relation("Evaluator")
+  evaluationsReceived Evaluation[] @relation("Employee")
+  payrollDeductions PayrollDeduction[]
+  notifications   Notification[]
+  payrollEntries  PayrollEntry[]
+
+  @@map("user_profiles")
+}
+
+model Lead {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  phone            String
+  phoneNormalized  String?  @map("phone_normalized") // generated: regexp_replace(phone,'\\D','','g')
+  email            String?  @default("")
+  emailNormalized  String?  @map("email_normalized") // generated: lower(trim(email))
+  stage            LeadStage @default(New_Fresh) @map("crm_status")
+  leadStatus       String?  @map("lead_status") // legacy
+  assignedToUserId String?  @map("assigned_to") @db.Uuid
+  assignedTo       User?    @relation("AssignedLeads", fields: [assignedToUserId], references: [id])
+  createdById      String?  @map("created_by") @db.Uuid
+  createdBy        User?    @relation("CreatedLeads", fields: [createdById], references: [id])
+  source           String?  @default("")
+  location         String?  @default("")
+  project          String?  @default("")
+  developer        String?  @default("")
+  notes            String?  @default("")
+  budgetMin        Decimal? @map("budget_min") @db.Decimal(12,2)
+  budgetMax        Decimal? @map("budget_max") @db.Decimal(12,2)
+  lastActivityAt   DateTime? @map("last_activity_at") @db.Timestamptz
+  followUpDue      DateTime? @map("follow_up_due") @db.Date
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  callLogs        CallLog[]
+  followUpTasks   FollowUpTask[]
+  comments        LeadComment[]
+
+  @@unique([phoneNormalized], map: "idx_leads_phone_normalized_unique")
+  @@unique([emailNormalized], map: "idx_leads_email_normalized_unique")
+  @@index([assignedToUserId])
+  @@index([stage])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+model CallLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId          String?  @map("lead_id") @db.Uuid
+  lead            Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  entityType      String   @default("lead") @map("entity_type")
+  entityId        String?  @map("entity_id")
+  contactName     String?  @map("contact_name")
+  contactPhone    String?  @map("contact_phone")
+  channel         String?  @default("Call")
+  direction       String?  @default("outgoing")
+  durationSeconds Int      @map("duration_seconds") // <30 forced NOT_INTERESTED, >2700 flagged
+  outcome         CallOutcome
+  notes           String?  @default("")
+  isValid         Boolean  @default(true) @map("is_valid") // false if <30s
+  isFlagged       Boolean  @default(false) @map("is_flagged") // true if >45min
+  flagReason      String?  @map("flag_reason") @default("")
+  projectName     String?  @map("project_name")
+  clientRef       String?  @unique @map("client_ref")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  followUpTask    FollowUpTask?
+
+  @@index([userId, createdAt])
+  @@index([leadId])
+  @@index([isFlagged])
+  @@map("call_logs")
+}
+
+model FollowUpTask {
+  id         String         @id @default(uuid()) @db.Uuid
+  callLogId  String?        @unique @map("call_log_id") @db.Uuid
+  callLog    CallLog?       @relation(fields: [callLogId], references: [id], onDelete: SetNull)
+  userId     String         @map("user_id") @db.Uuid
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId     String?        @map("lead_id") @db.Uuid
+  lead       Lead?          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  scheduledAt DateTime      @map("scheduled_at") @db.Timestamptz // followUpDateTime mandatory if FOLLOW_UP
+  status     FollowUpStatus @default(PENDING)
+  notes      String?        @default("")
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([userId, scheduledAt])
+  @@index([leadId])
+  @@index([status])
+  @@map("follow_up_tasks")
+}
+
+model Attendance {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkIn      DateTime? @map("check_in_time") @db.Timestamptz
+  checkOut     DateTime? @map("check_out_time") @db.Timestamptz
+  attendanceDate DateTime @map("attendance_date") @db.Date
+  delayMinutes Int       @default(0) @map("delay_minutes") // computed from officeHours.grace
+  isLate       Boolean   @default(false) @map("is_late")
+  lateReason   String?   @map("late_reason") @default("")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([userId, attendanceDate])
+  @@index([userId])
+  @@index([attendanceDate])
+  @@map("attendance")
+}
+
+model Evaluation {
+  id               String   @id @default(uuid()) @db.Uuid
+  employeeId       String   @map("employee_id") @db.Uuid
+  employee         User     @relation("Employee", fields: [employeeId], references: [id], onDelete: Cascade)
+  evaluatorId      String?  @map("evaluator_id") @db.Uuid
+  evaluator        User?    @relation("Evaluator", fields: [evaluatorId], references: [id], onDelete: SetNull)
+  dressCodeRating  Int      @map("dress_code_rating") // 1-5; >=3 pass
+  notes            String?  @default("")
+  behavioralFlags  String[] @default([]) @map("behavioral_flags")
+  date             DateTime @db.Date
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([employeeId, date, evaluatorId])
+  @@index([employeeId, date])
+  @@index([evaluatorId])
+  @@map("evaluations")
+}
+
+model PayrollDeduction {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceRef     String   @map("source_ref") // attendance_tardiness | dress_code | low_kpi
+  reason        String
+  amount        Decimal  @db.Decimal(12,2)
+  monthYear     String   @map("month_year") // YYYY-MM
+  isApplied     Boolean  @default(false) @map("is_applied")
+  payrollEntryId String? @map("payroll_entry_id") @db.Uuid
+  payrollEntry  PayrollEntry? @relation(fields: [payrollEntryId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  notifications Notification[]
+
+  @@index([userId, monthYear])
+  @@index([isApplied])
+  @@map("payroll_deductions")
+}
+
+model Notification {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deductionId   String?  @map("deduction_id") @db.Uuid
+  deduction     PayrollDeduction? @relation(fields: [deductionId], references: [id], onDelete: SetNull)
+  title         String
+  message       String
+  amount        Decimal? @default(0) @db.Decimal(12,2)
+  reason        String?  @default("")
+  referenceLink String?  @map("reference_link") @default("/dashboard?tab=payroll")
+  channel       String   @default("in_app") // in_app | push | email | slack
+  isRead        Boolean  @default(false) @map("is_read")
+  readAt        DateTime? @map("read_at") @db.Timestamptz
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+// ------------------------------------------------------------
+// Supporting (existing HR / pipeline) models — kept for FK integrity
+// ------------------------------------------------------------
+model LeadComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  leadId    String   @map("lead_id") @db.Uuid
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId    String?  @map("user_id") @db.Uuid
+  content   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  @@map("lead_comments")
+}
+
+model PayrollEntry {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodId        String   @map("period_id") @db.Uuid
+  baseSalary      Decimal  @map("base_salary") @db.Decimal(12,2)
+  bonus           Decimal  @default(0) @db.Decimal(12,2)
+  gross           Decimal  @default(0) @db.Decimal(12,2)
+  deductionsTotal Decimal  @default(0) @map("deductions_total") @db.Decimal(12,2)
+  net             Decimal  @default(0) @db.Decimal(12,2)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  deductions PayrollDeduction[]
+
+  @@map("payroll_entries")
+}

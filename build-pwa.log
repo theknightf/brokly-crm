@@ -1,0 +1,63 @@
+
+> realtyflow@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.18
+   - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 20.3s
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/20) ...
+   Generating static pages (5/20) 
+   Generating static pages (10/20) 
+   Generating static pages (15/20) 
+ ✓ Generating static pages (20/20)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    1.57 kB         267 kB
+├ ○ /_not-found                            179 B         103 kB
+├ ○ /admin                               20.5 kB         301 kB
+├ ƒ /api/admin/activity                    179 B         103 kB
+├ ƒ /api/admin/analytics                   179 B         103 kB
+├ ƒ /api/admin/reports                     179 B         103 kB
+├ ƒ /api/admin/users                       179 B         103 kB
+├ ƒ /api/attendance                        179 B         103 kB
+├ ƒ /api/attendance/report                 179 B         103 kB
+├ ƒ /api/auth/heartbeat                    179 B         103 kB
+├ ƒ /api/auth/session                      179 B         103 kB
+├ ƒ /api/call-log                          179 B         103 kB
+├ ƒ /api/notifications                     179 B         103 kB
+├ ƒ /api/performance                       179 B         103 kB
+├ ƒ /api/push/send                         179 B         103 kB
+├ ƒ /api/push/subscribe                    179 B         103 kB
+├ ƒ /api/reports/activity                  179 B         103 kB
+├ ƒ /api/reports/summary                   179 B         103 kB
+├ ƒ /api/workspace/follow-ups              179 B         103 kB
+├ ƒ /auth/callback                         179 B         103 kB
+├ ○ /calculator                          3.18 kB         269 kB
+├ ○ /customers                           4.53 kB         190 kB
+├ ○ /follow-ups                          8.49 kB         280 kB
+├ ○ /leads-management                    16.7 kB         308 kB
+├ ○ /manifest.webmanifest                  179 B         103 kB
+├ ○ /projects                            3.96 kB         285 kB
+├ ○ /reports                              120 kB         305 kB
+├ ○ /settings                            7.05 kB         187 kB
+├ ○ /sign-up-login                       5.74 kB         196 kB
+├ ○ /teams                               7.89 kB         193 kB
+└ ○ /workspace                           3.43 kB         284 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/1255-eae4096fb21f1304.js        46 kB
+  ├ chunks/4bd1b696-100b9d70ed4e49c1.js  54.2 kB
+  └ other shared chunks (total)          2.33 kB
+
+
+ƒ Middleware                               93 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,0 +1,70 @@
+
+> realtyflow@0.1.0 start
+> next start -p 4028
+
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:4028
+   - Network:      http://26.240.141.39:4028
+
+ ✓ Starting...
+ ✓ Ready in 1497ms
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+    at ed (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47068)
+    at async ef (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:48025)
+    at async ee (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47452)
+    at async c (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26418)
+    at async (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26681) {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+    at ed (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47068)
+    at async ef (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:48025)
+    at async ee (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47452)
+    at async c (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26418)
+    at async (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26681) {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+    at ed (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47068)
+    at async ef (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:48025)
+    at async ee (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47452)
+    at async c (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26418)
+    at async (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26681) {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+    at ed (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47068)
+    at async ef (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:48025)
+    at async ee (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47452)
+    at async c (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26418)
+    at async (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26681) {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+    at ed (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47068)
+    at async ef (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:48025)
+    at async ee (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47452)
+    at async c (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26418)
+    at async (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26681) {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+    at ed (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47068)
+    at async ef (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:48025)
+    at async ee (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:23:47452)
+    at async c (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26418)
+    at async (C:\Users\Pc\Desktop\realtyflow-main\.next\server\src\middleware.js:36:26681) {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
