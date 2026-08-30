@@ -1,18 +1,21 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing, MapPin } from 'lucide-react';
+import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing, MapPin, AlertTriangle, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 
 export interface AppNotification {
   id: string;
-  type: 'assignment' | 'reminder' | 'task' | 'action';
+  type: 'assignment' | 'reminder' | 'task' | 'action' | 'deduction';
   title: string;
   text: string;
   entityType: string;
   entityId: string;
   createdAt: string;
+  referenceLink?: string;
+  amount?: number;
 }
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -214,7 +217,35 @@ export default function NotificationBell() {
         });
       }
 
-      // 3) Field actions: today's minutes/site-visit log for this user so the
+      // 3) Deduction alerts (instant dispatcher) — from notifications table
+      try {
+        const resDed = await fetch('/api/notifications/my-alerts?limit=20', { cache: 'no-store' });
+        if (resDed.ok) {
+          const j = await resDed.json();
+          for (const n of j.notifications || []) {
+            list.push({
+              id: `ded-${n.id}`,
+              type: 'deduction',
+              title: n.title || 'Deduction Alert / إشعار خصم',
+              text: `${n.reason || n.message || ''} • ${n.amount ? `${n.amount} EGP` : ''}`.trim(),
+              entityType: 'deduction',
+              entityId: n.deduction_id || n.id,
+              createdAt: n.created_at,
+              referenceLink: n.reference_link || `/dashboard?tab=payroll`,
+              amount: Number(n.amount || 0),
+            });
+          }
+          // real-time toast for new unread deductions
+          const newDeds = (j.notifications || []).filter((n: any) => !n.is_read && new Date(n.created_at).getTime() > new Date(lastReadRef.current || '2000-01-01').getTime());
+          if (newDeds.length > 0) {
+            for (const d of newDeds.slice(0, 2)) {
+              toast.error(`${d.title}: ${d.reason || d.message} (${d.amount} EGP)`, { duration: 6000 });
+            }
+          }
+        }
+      } catch {}
+
+      // 4) Field actions: today's minutes/site-visit log for this user so the
       //    bell doubles as a lightweight activity feed (e.g. "Started a site visit").
       const { data: mySiteVisits } = await client
         .from('site_visits')
@@ -327,7 +358,9 @@ export default function NotificationBell() {
   };
 
   const iconFor = (type: string) =>
-    type === 'assignment' ? (
+    type === 'deduction' ? (
+      <Wallet size={16} className="text-red-500 flex-shrink-0" />
+    ) : type === 'assignment' ? (
       <UserPlus size={16} className="text-primary flex-shrink-0" />
     ) : type === 'task' || type === 'action' ? (
       <MapPin size={16} className="text-violet-500 flex-shrink-0" />
@@ -413,18 +446,20 @@ export default function NotificationBell() {
               ) : (
                 items.map((n) => {
                   const unread = n.createdAt > lastReadRef.current;
+                  const href = n.type === 'deduction' ? (n.referenceLink || '/dashboard') : n.entityType === 'lead' ? `/leads-management?leadId=${n.entityId}` : n.entityType === 'follow_up' ? `/leads-management` : '/';
                   return (
                     <li
                       key={n.id}
-                      className={`px-4 py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors ${unread ? 'bg-secondary/30' : ''}`}
+                      onClick={() => { if (href && href !== '/') window.location.href = href; }}
+                      className={`px-4 py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer ${unread ? 'bg-secondary/30' : ''} ${n.type==='deduction' ? 'border-l-2 border-l-red-500' : ''}`}
                     >
                       <div className="flex items-start gap-2.5">
                         {iconFor(n.type)}
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm text-foreground">{n.title}</p>
+                          <p className="text-sm text-foreground">{n.title} {n.amount ? <span className="text-red-600 font-bold">{n.amount} EGP</span> : null}</p>
                           <p className="text-xs text-muted-foreground truncate">{n.text}</p>
                           <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-                            {timeAgo(n.createdAt)}
+                            {timeAgo(n.createdAt)} {n.referenceLink ? '· View →' : ''}
                           </p>
                         </div>
                       </div>

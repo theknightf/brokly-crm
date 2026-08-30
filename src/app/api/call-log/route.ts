@@ -109,19 +109,89 @@ export async function POST(request: Request) {
     }
   }
 
-  const row = {
+  // ---- Anti-fraud validation per spec ----
+  let dur = Math.max(0, Math.floor(Number(duration_seconds) || 0));
+  let finalOutcome = (outcome || '').trim();
+  let isValid = true;
+  let isFlagged = false;
+  let flagReason = '';
+
+  // Anti-overlap: prevent concurrent active timer for same agent (2 min window)
+  const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const { data: recentCall } = await supabase
+    .from('call_logs')
+    .select('id, created_at')
+    .eq('user_id', user.id)
+    .gte('created_at', twoMinAgo)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  // Only block if client_ref not provided (timer overlap, not retry)
+  if (recentCall && !client_ref && entity_id && recentCall) {
+    // Allow if different lead, but flag same-lead rapid overlap
+    const { data: sameLead } = await supabase
+      .from('call_logs')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('entity_id', entity_id || '')
+      .gte('created_at', twoMinAgo)
+      .limit(1)
+      .maybeSingle();
+    if (sameLead) {
+      return NextResponse.json({ error: 'Concurrent call detected: please finish the active call before starting a new one for the same lead.' }, { status: 429 });
+    }
+  }
+
+  if (dur < 30) {
+    finalOutcome = 'NOT_INTERESTED';
+    isValid = false;
+    if (['INTERESTED','FOLLOW_UP','D.DEAL','Done Deal','Interested'].includes(finalOutcome || outcome || '')) {
+      flagReason = 'Forced NOT_INTERESTED for <30s call';
+    }
+  } else {
+    if (dur > 45 * 60) {
+      isFlagged = true;
+      flagReason = 'Duration >45 min — flagged for supervisor review';
+    }
+    if (notes && notes.trim().length > 0 && notes.trim().length < 20) {
+      return NextResponse.json({ error: 'Call summary notes must be at least 20 characters for calls >=30s' }, { status: 400 });
+    }
+    if (!notes || notes.trim().length < 20) {
+      // Require notes for >=30s per spec, but allow empty if outcome is NOT_INTERESTED auto? Enforce.
+      if (finalOutcome !== 'NOT_INTERESTED' && finalOutcome !== 'No Answer') {
+        return NextResponse.json({ error: 'Call summary notes (min 20 chars) required for calls >=30s' }, { status: 400 });
+      }
+    }
+    if (finalOutcome === 'FOLLOW_UP') {
+      const followUpAt = (body as any).followUpDateTime || (body as any).follow_up_at || (body as any).scheduledAt;
+      if (!followUpAt) return NextResponse.json({ error: 'followUpDateTime required when outcome is FOLLOW_UP' }, { status: 400 });
+      if (!notes || notes.trim().length < 20) return NextResponse.json({ error: 'Notes (min 20 chars) required for FOLLOW_UP' }, { status: 400 });
+    }
+  }
+
+  // Resolve lead_id for FK
+  let leadId: string | null = null;
+  if (entity_type === 'lead' && entity_id) {
+    try { leadId = entity_id; } catch {}
+  }
+
+  const row: any = {
     user_id: user.id,
     entity_type: entity_type || 'lead',
     entity_id: entity_id || '',
+    lead_id: leadId,
     contact_name: contact_name || '',
     contact_phone: contact_phone || '',
     channel: ch,
     direction: direction || 'outgoing',
-    duration_seconds: Math.max(0, Math.floor(Number(duration_seconds) || 0)),
-    outcome: outcome || '',
+    duration_seconds: dur,
+    outcome: finalOutcome,
     notes: notes || '',
     client_ref: ref,
     project_name: projectName,
+    is_valid: isValid,
+    is_flagged: isFlagged,
+    flag_reason: flagReason,
   };
 
   // Call outcomes that map to a CRM pipeline stage are synced back onto the

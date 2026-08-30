@@ -249,11 +249,23 @@ export default function CallLogsTab() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
-                        <span className="font-medium text-foreground">{l.contact_name || '—'}</span>
+                        {l.entity_type === 'lead' && (l as any).entity_id ? (
+                          <a href={`/leads-management?leadId=${(l as any).entity_id}`} className="font-medium text-violet-600 hover:text-violet-700 hover:underline">
+                            {l.contact_name || '—'}
+                          </a>
+                        ) : (
+                          <span className="font-medium text-foreground">{l.contact_name || '—'}</span>
+                        )}
                         {l.contact_phone && (
-                          <span className="text-xs text-muted-foreground" dir="ltr">
+                          <a href={`tel:${l.contact_phone}`} className="text-xs text-muted-foreground hover:text-foreground" dir="ltr">
                             {l.contact_phone}
-                          </span>
+                          </a>
+                        )}
+                        {(l as any).is_flagged && (
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full w-fit mt-1">⚑ Flagged: {(l as any).flag_reason || 'Review'}</span>
+                        )}
+                        {(l as any).is_valid === false && (
+                          <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full w-fit mt-1">Invalid (&lt;30s) — not counted in KPI</span>
                         )}
                       </div>
                     </td>
