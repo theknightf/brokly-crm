@@ -39,7 +39,9 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
     setLoading(true); setError('');
     const r = computeRange();
     try {
-      const res = await fetch(`/api/employees/${employeeId}/profile-360?from=${r.from}&to=${r.to}`, { cache: 'no-store' });
+      // Prefer owner-enriched endpoint (includes deductions + payroll net), fallback to direct
+      let res = await fetch(`/api/owner/employee-360/${employeeId}?from=${r.from}&to=${r.to}`, { cache: 'no-store' });
+      if (!res.ok) res = await fetch(`/api/employees/${employeeId}/profile-360?from=${r.from}&to=${r.to}`, { cache: 'no-store' });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Failed');
       setData(j);
@@ -146,6 +148,38 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
           }
         </div>
       </div>
+
+      {/* Deductions & Payroll (owner enrichment) */}
+      {(data as any).deductions && (data as any).payroll && (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3"><FileText size={14}/> Payroll & Deductions</h3>
+          <div className="grid grid-cols-3 gap-3 text-center mb-3">
+            <div><p className="text-xs text-muted-foreground">Base Salary</p><p className="text-sm font-bold">{(data as any).payroll.baseSalary ?? '—'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="text-sm font-bold text-red-600">{(data as any).payroll.totalDeductions ?? 0}</p></div>
+            <div><p className="text-xs text-muted-foreground">Net Payout</p><p className="text-sm font-bold text-emerald-600">{(data as any).payroll.netPayout ?? '—'}</p></div>
+          </div>
+          {(data as any).deductions.length > 0 ? (
+            <div className="space-y-1 max-h-[180px] overflow-auto">
+              {(data as any).deductions.map((d: any) => (
+                <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-200 text-xs">
+                  <span className="font-medium text-red-800">{d.reason} <span className="text-muted-foreground">· {d.source_ref}</span></span>
+                  <span className="font-bold">{d.amount} · {d.month_year} {d.is_applied ? '✓' : '○'}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-xs text-muted-foreground text-center py-2">No deductions this period.</p>}
+          {(data as any).notifications?.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold mb-1">Notifications sent</p>
+              <div className="space-y-1">
+                {(data as any).notifications.slice(0,5).map((n:any)=>(
+                  <div key={n.id} className="text-xs p-2 rounded bg-amber-50 border border-amber-200">{n.title} · {n.message} {n.is_read ? '✓ Read' : '○ Unread'}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Timeline */}
       <div className="bg-card border border-border rounded-xl p-4">

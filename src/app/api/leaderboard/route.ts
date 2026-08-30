@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { loadOfficeHours } from '@/lib/officeHours';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +76,7 @@ export async function GET(request: Request) {
     if (!users) return NextResponse.json({ period: periodParam, range, users: [] });
 
     const userIds = users.map((u: any) => u.id);
+    const office = await loadOfficeHours(db as any).catch(() => ({ toleranceMinutes: 12 * 60 + 30 } as any));
 
     const [attendanceRes, callsRes, evalRes] = await Promise.all([
       db.from('attendance').select('user_id, attendance_date, check_in_time').gte('attendance_date', range.start).lte('attendance_date', range.end),
@@ -106,12 +108,12 @@ export async function GET(request: Request) {
     const ranked = users.map((u: any) => {
       const att = attByUser.get(u.id) || [];
       const present = att.length;
-      // Late if check_in_time > 12:30 local (matches attendance report tolerance)
+      // Late using officeHours tolerance (respects company_settings)
       const late = att.filter((a: any) => {
         if (!a.check_in_time) return false;
         const t = new Date(a.check_in_time);
         const minutes = t.getUTCHours() * 60 + t.getUTCMinutes();
-        return minutes > 12 * 60 + 30;
+        return minutes > (office.toleranceMinutes ?? 12 * 60 + 30);
       }).length;
 
       const userCalls = callsByUser.get(u.id) || [];
