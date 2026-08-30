@@ -37,10 +37,24 @@ export default function LogCallModal({ lead, onClose, onDone }: LogCallModalProp
   const [followUp, setFollowUp] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const durationSec = Math.max(0, Math.floor(Number(durationMin || 0) * 60));
+  const isShort = durationSec > 0 && durationSec < 30;
+  const isLong = durationSec > 45 * 60;
+  const needsNotes = durationSec >= 30;
+
   const handleSave = async () => {
     if (saving) return;
+    if (needsNotes && notes.trim().length < 20) {
+      toast.error('Calls ≥30s require a summary note (min 20 chars)');
+      return;
+    }
+    if (isShort && outcome !== 'Not Interested') {
+      toast.error('Calls <30s are forced to NOT_INTERESTED');
+      return;
+    }
     setSaving(true);
     try {
+      const finalOutcome = isShort ? 'NOT_INTERESTED' : outcome;
       const res = await fetch('/api/call-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,16 +65,21 @@ export default function LogCallModal({ lead, onClose, onDone }: LogCallModalProp
           contact_phone: lead.phone || '',
           channel,
           direction,
-          outcome,
+          outcome: finalOutcome,
           notes: notes.trim() || '',
-          duration_seconds: Math.max(0, Math.floor(Number(durationMin || 0) * 60)),
+          duration_seconds: durationSec,
+          is_flagged: isLong,
+          followUpDateTime: followUp || undefined,
         }),
       });
-      if (!res.ok) throw new Error('Failed to log the call');
-      if (followUp) {
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || 'Failed to log the call');
+      }
+      if (followUp && finalOutcome === 'FOLLOW_UP') {
         await leadsService.scheduleFollowUp(lead.id, followUp).catch(() => {});
       }
-      toast.success('Call logged');
+      toast.success(isShort ? 'Call logged as NOT_INTERESTED (<30s)' : isLong ? 'Call logged & flagged for review (>45m)' : 'Call logged');
       onDone();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to log the call');
@@ -111,18 +130,21 @@ export default function LogCallModal({ lead, onClose, onDone }: LogCallModalProp
             </div>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="label-base">Call result</span>
+            <span className="label-base">Call result {isShort && <span className="text-destructive text-[11px]">· &lt;30s → NOT_INTERESTED only</span>}</span>
             <select
-              value={outcome}
+              value={isShort ? 'Not Interested' : outcome}
               onChange={(e) => setOutcome(e.target.value)}
               className="input-base"
+              disabled={isShort}
             >
               {OUTCOMES.map((o) => (
-                <option key={o} value={o}>
+                <option key={o} value={o} disabled={isShort && o !== 'Not Interested'}>
                   {o}
                 </option>
               ))}
             </select>
+            {isShort && <span className="text-xs text-destructive">Calls &lt;30s auto-forced to NOT_INTERESTED and excluded from KPI</span>}
+            {isLong && <span className="text-xs text-amber-600">Calls &gt;45m will be flagged for supervisor review</span>}
           </label>
           <label className="flex flex-col gap-1">
             <span className="label-base">

@@ -203,9 +203,15 @@ export default function CallLogsScreen() {
                     {CHANNEL_ICON[c.channel || 'Call'] || <Phone size={14} />}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">
-                      {c.contact_name || c.contact_phone || 'Unknown contact'}
-                    </p>
+                    {c.entity_type === 'lead' && c.entity_id ? (
+                      <a href={`/leads-management?lead=${c.entity_id}`} className="text-sm font-semibold text-violet-600 hover:text-violet-700 hover:underline truncate block">
+                        {c.contact_name || c.contact_phone || 'Unknown contact'}
+                      </a>
+                    ) : (
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {c.contact_name || c.contact_phone || 'Unknown contact'}
+                      </p>
+                    )}
                     <p className="text-[11px] text-muted-foreground truncate">
                       {[c.channel || 'Call', c.contact_phone].filter(Boolean).join(' · ') || '—'}
                     </p>

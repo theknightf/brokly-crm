@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { loadOfficeHours } from '@/lib/officeHours';
 
 export const dynamic = 'force-dynamic';
 
@@ -182,6 +183,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, action, attendance: data });
     }
 
+    // Compute delayMinutes / isLate via officeHours (for payroll deductions)
+    let delayMinutes = 0; let isLate = false;
+    try {
+      const office = await loadOfficeHours(supabase as any);
+      const t = new Date(now);
+      const mins = t.getUTCHours()*60 + t.getUTCMinutes();
+      const tol = office.toleranceMinutes ?? (office.startMinutes + (office.graceMinutes||30));
+      delayMinutes = Math.max(0, mins - tol);
+      isLate = mins > tol;
+    } catch {}
     const { data, error } = await supabase
       .from('attendance')
       .upsert(
@@ -192,6 +203,8 @@ export async function POST(request: Request) {
           check_in_lat: lat,
           check_in_lng: lng,
           source: lat != null ? 'gps' : 'manual',
+          delay_minutes: delayMinutes,
+          is_late: isLate,
         },
         { onConflict: 'user_id,attendance_date' }
       )
