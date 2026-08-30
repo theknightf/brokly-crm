@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  ExternalLink,
 } from 'lucide-react';
 import { usersService, teamsService } from '@/lib/services/crmService';
 import { validateCreateUser } from '@/lib/userValidation';
@@ -1137,6 +1138,13 @@ export default function UsersTab() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <a
+                          href={`/admin/employees/${user.id}/360`}
+                          className="p-1.5 rounded-lg hover:bg-violet-100 text-muted-foreground hover:text-violet-600 transition-colors inline-flex"
+                          title="View 360 Profile"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
                         <button
                           onClick={() => handlePasswordPrompt(user)}
                           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-primary transition-colors"

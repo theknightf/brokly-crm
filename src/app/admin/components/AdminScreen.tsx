@@ -27,6 +27,8 @@ import {
   Palmtree,
   Target,
   Repeat,
+  Shirt,
+  BarChart3,
 } from 'lucide-react';
 import { adminSettingsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,6 +46,8 @@ import LeaveTab from './LeaveTab';
 import KpiTargetsTab from './KpiTargetsTab';
 import TasksTab from './TasksTab';
 import RotationTab from './RotationTab';
+import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
+import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
 
 type TabKey =
   | 'leadSources'
@@ -55,6 +59,7 @@ type TabKey =
   | 'attendance'
   | 'activity'
   | 'productivity'
+  | 'performance360'
   | 'callLogs'
   | 'emailTemplates'
   | 'payroll'
@@ -127,6 +132,12 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
     description: 'Action-based ranking for sales, telesales & the whole team',
   },
   {
+    key: 'performance360',
+    label: 'Performance 360',
+    icon: <BarChart3 size={16} />,
+    description: 'Weighted 40/30/30 scoring: Calls + Attendance + Dress Code — Owner 360 view',
+  },
+  {
     key: 'callLogs',
     label: 'Call Logs',
     icon: <PhoneCall size={16} />,
@@ -175,6 +186,7 @@ const TAB_ORDER: TabKey[] = [
   'users',
   'attendance',
   'productivity',
+  'performance360',
   'activity',
   'callLogs',
   'tasks',
@@ -432,6 +444,7 @@ export default function AdminScreen() {
     activeTab === 'attendance' ||
     activeTab === 'activity' ||
     activeTab === 'productivity' ||
+    activeTab === 'performance360' ||
     activeTab === 'callLogs' ||
     activeTab === 'emailTemplates' ||
     activeTab === 'payroll' ||
@@ -447,6 +460,7 @@ export default function AdminScreen() {
           | 'attendance'
           | 'activity'
           | 'productivity'
+          | 'performance360'
           | 'callLogs'
           | 'payroll'
           | 'leave'
@@ -729,6 +743,11 @@ export default function AdminScreen() {
             <ActivityDashboard />
           ) : activeTab === 'productivity' ? (
             <ProductivityDashboard />
+          ) : activeTab === 'performance360' ? (
+            <div className="space-y-6">
+              <DressCodeEvaluationForm />
+              <WeightedLeaderboard />
+            </div>
           ) : activeTab === 'callLogs' ? (
             <CallLogsTab />
           ) : activeTab === 'emailTemplates' ? (

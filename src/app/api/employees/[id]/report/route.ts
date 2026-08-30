@@ -76,7 +76,7 @@ export async function GET(
     const endISO = `${to}T23:59:59.999`;
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const [{ data: employee }, attendanceRes, leadsRes, callsRes, followRes, visitsRes, expensesRes, activityRes, dailyRes, eventsRes, auditRes] =
+    const [{ data: employee }, attendanceRes, leadsRes, callsRes, followRes, visitsRes, expensesRes, activityRes, dailyRes, eventsRes, auditRes, evalRes] =
       await Promise.all([
         supabase
           .from('user_profiles')
@@ -147,6 +147,13 @@ export async function GET(
           .gte('created_at', startISO)
           .order('created_at', { ascending: false })
           .limit(500),
+        supabase
+          .from('evaluations')
+          .select('*, evaluator:user_profiles!evaluations_evaluator_id_fkey(full_name)')
+          .eq('employee_id', employeeId)
+          .gte('date', from)
+          .lte('date', to)
+          .order('date', { ascending: false }),
       ]);
 
     if (!employee) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
@@ -161,6 +168,7 @@ export async function GET(
     const daily = dailyRes.error ? [] : dailyRes.data || [];
     const events = eventsRes.error ? [] : eventsRes.data || [];
     const audit = auditRes.error ? [] : auditRes.data || [];
+    const evaluations = (evalRes as any)?.data || [];
 
     const activeSeconds = daily.reduce((s: number, r: any) => s + (r.total_active_seconds || 0), 0);
     const actions = activity.length;
@@ -266,6 +274,11 @@ export async function GET(
     const gradeFor = (s: number) =>
       s >= 90 ? 'Excellent' : s >= 75 ? 'Good' : s >= 60 ? 'Average' : s >= 40 ? 'Needs Improvement' : 'Critical';
 
+    // Dress code 0-100 for 360 weighting
+    const avgDressRating = evaluations.length > 0 ? evaluations.reduce((s: number, e: any) => s + e.dress_code_rating, 0) / evaluations.length : null;
+    const dressScore = avgDressRating != null ? Math.round((avgDressRating / 5) * 100) : 0;
+    const dressPassRate = evaluations.length > 0 ? Math.round((evaluations.filter((e: any) => e.dress_code_rating >= 3).length / evaluations.length) * 100) : 0;
+
     const category_scores: Record<string, number> = {
       'Attendance & Work Hours': catAttendance,
       Calls: catCalls,
@@ -273,6 +286,7 @@ export async function GET(
       'Follow-up Rate': catFollowup,
       'Activity Level': catActivity,
       'Client Contact': catContact,
+      'Dress Code': dressScore,
     };
 
     // ---- Timeline (chronological, merged) ----
@@ -291,6 +305,14 @@ export async function GET(
         type: 'site_visit',
         label: `Site visit ${v.status || ''}`.trim(),
         detail: v.project_name || v.lead_name || '',
+      })
+    );
+    evaluations.forEach((e: any) =>
+      timeline.push({
+        at: e.date + 'T12:00:00',
+        type: 'evaluation',
+        label: `Dress Code ${e.dress_code_rating}/5`,
+        detail: e.notes || (e.behavioral_flags || []).join(', '),
       })
     );
     followups.forEach((f: any) =>
@@ -355,6 +377,9 @@ export async function GET(
         site_visits_completed: visitsCompleted,
         site_visits_verified: visitsVerified,
         expenses_total: Math.round(expenseTotal * 100) / 100,
+        avg_dress_rating: avgDressRating ? Math.round(avgDressRating * 10) / 10 : null,
+        dress_pass_rate: dressPassRate,
+        dress_evaluations: evaluations.length,
       },
       score,
       grade: gradeFor(score),
@@ -366,6 +391,7 @@ export async function GET(
       followups,
       visits,
       expenses,
+      evaluations,
       timeline,
     });
   } catch (e: unknown) {
