@@ -2991,6 +2991,19 @@ export const reportsService = {
     if (!res.ok) throw new Error(`Failed to load attendance report (${res.status})`);
     return res.json();
   },
+
+  async getGoalsSummary(from: string, to: string) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const res = await fetch(`/api/reports/goals-summary?${params.toString()}`, { cache: 'no-store' });
+    if (!res.ok) {
+      const err: any = new Error(`Failed to load goals summary (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  },
 };
 
 async function fetchReportsSummary(from?: string, to?: string) {

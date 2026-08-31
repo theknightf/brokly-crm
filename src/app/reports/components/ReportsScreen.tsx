@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -406,6 +406,8 @@ export default function ReportsScreen() {
   );
   const [extrasLoading, setExtrasLoading] = useState(false);
   const [extrasAdmin, setExtrasAdmin] = useState(true);
+  const [goalsData, setGoalsData] = useState<{ agentGoals: any[]; targetDeals: number } | null>(null);
+  const [goalsLoading, setGoalsLoading] = useState(false);
   // Start at the chooser so every report, including Lead Stages, is discoverable.
   const [view, setView] = useState<'landing' | TabKey>('landing');
   const [userFilter, setUserFilter] = useState<string>('all');
@@ -413,6 +415,7 @@ export default function ReportsScreen() {
   useEffect(() => {
     loadReports(from, to);
     loadExtras(from, to);
+    loadGoals(from, to);
     companySettingsService
       .getWorkingHours()
       .then((w: WorkingHours) => setOfficeCfg(buildOfficeHours(w)))
@@ -466,12 +469,25 @@ export default function ReportsScreen() {
     }
   };
 
+  const loadGoals = async (f: string, t: string) => {
+    setGoalsLoading(true);
+    try {
+      const res = await reportsService.getGoalsSummary(f, t);
+      setGoalsData(res);
+    } catch {
+      setGoalsData(null);
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
+
   const applyRange = (f: string, t: string, preset: RangePreset) => {
     setFrom(f);
     setTo(t);
     setRangePreset(preset);
     loadReports(f, t);
     loadExtras(f, t);
+    loadGoals(f, t);
   };
 
   const leadsByStatusData = data
@@ -2187,6 +2203,14 @@ function CallsTab({
   from: string;
   to: string;
 }) {
+  const [goalsData, setGoalsData] = useState<{agentGoals:any[];targetDeals:number}|null>(null);
+  const [goalsLoading, setGoalsLoading] = useState(false);
+  const refreshGoals = useCallback(() => {
+    setGoalsLoading(true);
+    fetch(`/api/reports/goals-summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, {cache:'no-store'}).then(r=>r.json()).then(j=>setGoalsData(j)).catch(()=>setGoalsData(null)).finally(()=>setGoalsLoading(false));
+  }, [from,to]);
+  useEffect(() => { refreshGoals(); }, [refreshGoals]);
+
   // Fallback matrix from already-fetched summary (used when new endpoint is unavailable or for instant first paint)
   const fallbackMatrix = useMemo(() => {
     const scoped = selectedUserName
@@ -2480,88 +2504,117 @@ function CallsTab({
         )}
       </div>
 
-      {/* Per-agent performance: stages + statuses + actions (real DB data) */}
-      {performanceRows.length > 0 && (
+      {/* Goals — Standardized Lead Lifecycle Stages per Agent (refactored) */}
+      {(() => {
+        const filteredGoals = (() => {
+          if (!goalsData?.agentGoals) return [];
+          if (selectedUserId) return goalsData.agentGoals.filter((g:any)=> g.agentId===selectedUserId);
+          return goalsData.agentGoals;
+        })();
+        const totals = filteredGoals.reduce((acc:any, g:any)=>({
+          newFresh: acc.newFresh + (g.stages?.newFresh||0),
+          newCold: acc.newCold + (g.stages?.newCold||0),
+          pending: acc.pending + (g.stages?.pending||0),
+          callsAnswer: acc.callsAnswer + (g.stages?.callsAnswer||0),
+          noAnswer: acc.noAnswer + (g.stages?.noAnswer||0),
+          cancel: acc.cancel + (g.stages?.cancel||0),
+          doneDeal: acc.doneDeal + (g.stages?.doneDeal||0),
+          totalCalls: acc.totalCalls + (g.totalCalls||0),
+        }), { newFresh:0,newCold:0,pending:0,callsAnswer:0,noAnswer:0,cancel:0,doneDeal:0,totalCalls:0 });
+        return (
         <div className="bg-card border border-border rounded-xl p-5">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-foreground">Per-Agent Performance</h2>
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2"><Target size={14} className="text-primary"/> Goals — Lead Lifecycle by Agent</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Calls, outcomes, lead stages and actions per agent · respects the filters above
+                Standardized stages per agent · {from} → {to} · {filteredGoals.length} agents · Target {goalsData?.targetDeals ?? 15} deals
               </p>
             </div>
+            <button onClick={refreshGoals} className="btn-ghost p-1.5 rounded-lg border border-border" title="Refresh goals"><RefreshCw size={14} className={goalsLoading ? 'animate-spin' : ''}/></button>
           </div>
-          <div className="overflow-x-auto -mx-5 px-5">
-            <table className="w-full text-sm min-w-[1100px]">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th rowSpan={2} className="sticky left-0 z-10 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground border-r border-border/50">Agent</th>
-                  <th colSpan={7} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Calls &amp; Status</th>
-                  <th colSpan={displayStages.length} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Lead Stages</th>
-                  <th colSpan={5} className="text-center px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground border-b border-border/50">Actions</th>
-                </tr>
-                <tr className="border-b border-border">
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">Calls</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-600 whitespace-nowrap">Connected</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">No ans.</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">Incom.</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-amber-600 whitespace-nowrap">Short</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-emerald-700 whitespace-nowrap">Reached</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-red-500 whitespace-nowrap">Not int.</th>
-                  {displayStages.map((s) => (
-                    <th key={s} className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">{s}</th>
-                  ))}
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-primary whitespace-nowrap">WhatsApp</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-sky-600 whitespace-nowrap">Email</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-violet-600 whitespace-nowrap">Meetings</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground whitespace-nowrap">Notes</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-foreground whitespace-nowrap">Total act.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {performanceRows.map((r) => (
-                  <tr key={r.agent} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="sticky left-0 z-10 bg-card px-4 py-3 font-medium text-foreground whitespace-nowrap border-r border-border/50">{r.agent}</td>
-                    <td className="px-3 py-3 text-right tabular-nums font-bold">{r.calls}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-emerald-600">{r.connected}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{r.noAnswer}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-sky-600">{r.incoming}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-amber-600">{r.shortCalls}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-emerald-700">{r.reached}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-red-500">{r.notInterested}</td>
-                    {displayStages.map((s, i) => {
-                      const stageIdx = displayStages.indexOf(s);
-                      const v = matrix?.rows.find((m) => m.agent === r.agent)?.counts[stageIdx] ?? 0;
-                      return <td key={s} className="px-3 py-3 text-right tabular-nums text-muted-foreground">{v}</td>;
-                    })}
-                    <td className="px-3 py-3 text-right tabular-nums text-primary">{r.whatsapp}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-sky-600">{r.emails}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-violet-600">{r.meetings}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{r.notes}</td>
-                    <td className="px-3 py-3 text-right tabular-nums font-semibold">{r.actionsTotal}</td>
+          {goalsLoading ? (
+            <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-primary"/></div>
+          ) : filteredGoals.length===0 ? (
+            <div className="py-12 text-center">
+              <p className="text-sm font-medium text-foreground">No goals data for selected period</p>
+              <p className="text-xs text-muted-foreground mt-1">Try adjusting date range or clear filters</p>
+              {selectedUserId && <p className="text-xs text-muted-foreground mt-2">Filtered by agent</p>}
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-5 px-5">
+              <table className="w-full text-sm min-w-[1100px]">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="sticky left-0 z-10 bg-muted/30 text-left px-4 py-3 text-xs font-semibold text-muted-foreground border-r border-border/50 min-w-[180px]">Agent</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap">New Fresh</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-sky-700 whitespace-nowrap">New Cold</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-amber-700 whitespace-nowrap">Leads Pending</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-violet-700 whitespace-nowrap">Calls Answer</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap">No Answer</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-red-600 whitespace-nowrap">Cancel</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-emerald-800 whitespace-nowrap">D.Deal</th>
+                    <th className="text-right px-3 py-3 text-xs font-semibold text-foreground whitespace-nowrap">Total Calls</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary whitespace-nowrap min-w-[180px]">Target &amp; Goal Progress</th>
                   </tr>
-                ))}
-                <tr className="bg-primary/10 font-semibold border-t-2 border-primary/20">
-                  <td className="sticky left-0 z-10 bg-primary/10 px-4 py-3 whitespace-nowrap">Total</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.calls, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.connected, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.noAnswer, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.incoming, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.shortCalls, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.reached, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.notInterested, 0)}</td>
-                  {matrix?.columnTotals.map((c, i) => <td key={i} className="px-3 py-3 text-right tabular-nums">{c || 0}</td>)}
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.whatsapp, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.emails, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.meetings, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.notes, 0)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{performanceRows.reduce((s, r) => s + r.actionsTotal, 0)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredGoals.map((g:any)=>(
+                    <tr key={g.agentId} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="sticky left-0 z-10 bg-card px-4 py-3 border-r border-border/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold overflow-hidden flex-shrink-0">
+                            {g.avatarUrl ? <img src={g.avatarUrl} alt={g.agentName} className="w-full h-full object-cover"/> : (g.agentName||'??').split(' ').map((p:string)=>p[0]).join('').slice(0,2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate max-w-[140px]">{g.agentName}</p>
+                            <p className="text-xs text-muted-foreground capitalize truncate">{g.role?.replace('_',' ')||'agent'}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums font-medium text-emerald-700">{g.stages.newFresh}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-sky-700">{g.stages.newCold}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-amber-700">{g.stages.pending}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-violet-700">{g.stages.callsAnswer}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-600">{g.stages.noAnswer}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-red-600">{g.stages.cancel}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-bold text-emerald-800">{g.stages.doneDeal}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-semibold">{g.totalCalls}</td>
+                      <td className="px-4 py-3 min-w-[180px]">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs text-muted-foreground">{g.stages.doneDeal} / {g.targetDeals} deals</span>
+                          <span className="text-xs font-bold text-primary">{g.goalProgress.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full transition-all" style={{ width: `${Math.min(100, g.goalProgress)}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-primary/10 font-semibold border-t-2 border-primary/20">
+                    <td className="sticky left-0 z-10 bg-primary/10 px-4 py-3 whitespace-nowrap">Total</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-emerald-700">{totals.newFresh}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-sky-700">{totals.newCold}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-amber-700">{totals.pending}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-violet-700">{totals.callsAnswer}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-slate-600">{totals.noAnswer}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-red-600">{totals.cancel}</td>
+                    <td className="px-3 py-3 text-right tabular-nums font-bold text-emerald-800">{totals.doneDeal}</td>
+                    <td className="px-3 py-3 text-right tabular-nums font-bold">{totals.totalCalls}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.min(100, totals.doneDeal/(goalsData?.targetDeals||15)*100)}%` }} /></div>
+                        <span className="text-xs font-bold">{(totals.doneDeal/(goalsData?.targetDeals||15)*100).toFixed(1)}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-3">Source: <code className="bg-muted px-1 py-0.5 rounded">GET /api/reports/goals-summary?from=&to=</code> · Lead stages standardized + verified calls + kpi_targets.deals</p>
         </div>
-      )}
+        );
+      })()}
 
       {/* Calls by Employee */}
       {data.callsByEmployee.length > 0 && (

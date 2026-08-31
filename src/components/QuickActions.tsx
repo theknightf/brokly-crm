@@ -57,9 +57,8 @@ export default function QuickActions() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Hide the FAB on the leads-management page and on the main dashboard to prevent covering the D.Deal card
+  // Hide the FAB on the leads-management page (the page already has a prominent button)
   const onLeadsPage = pathname === '/leads-management' || pathname?.startsWith('/leads-management/');
-  const onDashboard = pathname === '/' ;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -74,7 +73,7 @@ export default function QuickActions() {
     router.push(href);
   };
 
-  if (onLeadsPage || onDashboard) return null;
+  if (onLeadsPage) return null;
 
   return (
     <>
