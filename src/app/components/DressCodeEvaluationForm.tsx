@@ -62,33 +62,34 @@ export default function DressCodeEvaluationForm() {
   return (
     <div className="bg-card border border-border rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-lime-50 flex items-center justify-center"><Shirt size={16} className="text-lime-600"/></div>
+        <div className="bg-zinc-800 border border-zinc-700 text-lime-400 p-2 rounded-xl"><Shirt size={16} /></div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">Daily Dress Code Evaluation</h3>
-          <p className="text-xs text-muted-foreground">Admin input â†’ feeds Leaderboard (30%) & Owner 360 in real-time</p>
+          <p className="text-xs text-muted-foreground">Admin input → feeds Leaderboard (30%) & Owner 360 in real-time</p>
         </div>
+      </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5">Employee *</label>
-          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="input-base w-full">
+          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all">
             <option value="">Select employeeâ€¦</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} Â· {e.role}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1"><Calendar size={12}/> Date *</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} className="input-base w-full" />
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all" />
         </div>
       </div>
 
       <div className="mt-4">
-        <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating (1â€“5) *</label>
+        <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating (1–5) *</label>
         <div className="flex items-center gap-2">
           {[1,2,3,4,5].map(n => (
-            <button key={n} type="button" onClick={() => setRating(n)} className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${rating===n ? 'border-lime-500 bg-lime-500 text-white shadow' : 'border-border bg-muted/30 text-muted-foreground hover:border-lime-300'}`}>
-              <span className="flex">{Array.from({length:n}).map((_,i)=><Star key={i} size={12} className={rating===n? 'fill-white':'fill-amber-400 text-amber-400'}/>)}</span>
+            <button key={n} type="button" onClick={() => setRating(n)} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${rating===n ? 'bg-lime-500/15 border-2 border-lime-400 text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-800/80 border border-zinc-700 text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200'}`}>
+              <span className="flex">{Array.from({length:n}).map((_,i)=><Star key={i} size={12} className={rating===n? 'fill-lime-400 text-lime-400':'fill-amber-400 text-amber-400'}/>)}</span>
               {n}
             </button>
           ))}
@@ -98,11 +99,11 @@ export default function DressCodeEvaluationForm() {
 
       <div className="mt-4">
         <label className="block text-xs font-medium text-foreground mb-1.5">Behavioral Flags (comma separated)</label>
-        <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="input-base w-full text-sm" />
+        <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm" />
       </div>
       <div className="mt-3">
         <label className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observationâ€¦" rows={2} className="input-base w-full text-sm resize-none" />
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observationâ€¦" rows={2} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm resize-none" />
       </div>
 
       <button onClick={submit} disabled={submitting || !employeeId} className="btn-primary w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50">
