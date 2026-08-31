@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, TrendingUp, Calendar, Users, BarChart3, ExternalLink, Loader2, RefreshCw, Bell, Zap, Filter, ArrowRight, Target, ShoppingBag, PhoneOff, XCircle, CheckCircle, Flame, Snowflake, Pause, LayoutGrid, List, Search, RotateCw } from 'lucide-react';
 import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
@@ -106,7 +106,7 @@ export default function UnifiedMasterDashboard() {
     } catch (e:any) { toast.error(e.message); } finally { setRotating(false); }
   };
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-primary"/></div>;
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-lime-500"/></div>;
   if (error) return <div className="text-center py-10"><p className="text-sm text-destructive mb-3">{error}</p><button onClick={load} className="btn-secondary text-sm flex items-center gap-1 mx-auto"><RefreshCw size={14}/> Retry</button></div>;
   if (!data) return null;
 
@@ -134,8 +134,8 @@ export default function UnifiedMasterDashboard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setRange('week')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='week' ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Week</button>
-          <button onClick={() => setRange('month')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='month' ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Month</button>
+          <button onClick={() => setRange('week')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='week' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Week</button>
+          <button onClick={() => setRange('month')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='month' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Month</button>
           <button onClick={load} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-2 rounded-xl transition-colors"><RefreshCw size={14}/></button>
         </div>
       </div>
@@ -144,14 +144,14 @@ export default function UnifiedMasterDashboard() {
       <div className="bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-2xl p-1.5 flex gap-1.5">
         <button
           onClick={() => setMode('sales')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-lime-500 text-zinc-950 font-bold shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
         >
           <Users size={16}/> Sales & Team Performance
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='sales' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.leaderboard.length}</span>
         </button>
         <button
           onClick={() => setMode('leads')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-lime-500 text-zinc-950 font-bold shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
         >
           <Target size={16}/> Leads Pipeline & Data Hub
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.summary?.totalLeads ?? 0}</span>
@@ -225,8 +225,8 @@ export default function UnifiedMasterDashboard() {
                       <td className="text-center">{r.scores.callScore}</td>
                       <td className="text-center">{r.scores.attendanceScore}</td>
                       <td className="text-center">{r.scores.dressScore}</td>
-                      <td className="text-center font-extrabold text-lime-700">{r.totalScore}</td>
-                      <td className="text-right px-4"><a href={`/admin/employees/${r.id}/360`} className="text-lime-700 hover:underline inline-flex items-center gap-1 text-xs">360 <ExternalLink size={12}/></a></td>
+                      <td className="text-center font-extrabold text-lime-700 dark:text-lime-400">{r.totalScore}</td>
+                      <td className="text-right px-4"><a href={`/admin/employees/${r.id}/360`} className="text-lime-700 dark:text-lime-400 hover:underline inline-flex items-center gap-1 text-xs">360 <ExternalLink size={12}/></a></td>
                     </tr>
                   ))}
                 </tbody>
@@ -250,17 +250,17 @@ export default function UnifiedMasterDashboard() {
               }
             </div>
             <div className="bg-card border border-border rounded-xl p-4">
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Bell size={14} className="text-lime-700"/> Instant Alerts (NotificationLog) — {data.notifications.unread} unread</h3>
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Bell size={14} className="text-lime-700 dark:text-lime-400"/> Instant Alerts (NotificationLog) — {data.notifications.unread} unread</h3>
               {data.notifications.recent.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No alerts.</p>
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.notifications.recent.map((n:any)=>(
-                    <div key={n.id} className={`p-2 rounded-lg border text-xs ${n.is_read ? 'bg-muted/30 border-border' : 'bg-lime-50 border-lime-200'}`}>
+                    <div key={n.id} className={`p-2 rounded-lg border text-xs ${n.is_read ? 'bg-muted/30 border-border' : 'bg-lime-50 dark:bg-lime-500/10 border-lime-200 dark:border-lime-500/30'}`}>
                       <p className="font-semibold">{n.title}</p><p className="text-muted-foreground line-clamp-2">{n.message}</p><p className="text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString()} {n.is_read ? '· Read' : '· Unread'}</p>
                     </div>
                   ))}
                 </div>
               }
-              <a href="/admin?tab=payroll" className="text-xs text-lime-700 hover:underline mt-2 inline-block">View payroll →</a>
+              <a href="/admin?tab=payroll" className="text-xs text-lime-700 dark:text-lime-400 hover:underline mt-2 inline-block">View payroll →</a>
             </div>
           </div>
         </>
@@ -280,7 +280,7 @@ export default function UnifiedMasterDashboard() {
             </div>
             <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
               <div><p className="text-xs text-muted-foreground">Data Rotation</p><p className="text-sm font-bold">Round-robin</p></div>
-              <button onClick={handleRotate} disabled={rotating} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50">{rotating ? <Loader2 size={12} className="animate-spin"/> : <RotateCw size={12}/>} Rotate Data</button>
+              <button onClick={handleRotate} disabled={rotating} className="bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold rounded-xl transition-all shadow-sm hover:shadow-[0_0_16px_rgba(163,230,53,0.3)] text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50">{rotating ? <Loader2 size={12} className="animate-spin text-zinc-950"/> : <RotateCw size={12} className="text-zinc-950"/>} Rotate Data</button>
             </div>
           </div>
 
@@ -291,7 +291,7 @@ export default function UnifiedMasterDashboard() {
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"/>
                 <input value={pipelineSearch} onChange={e=>setPipelineSearch(e.target.value)} placeholder="Search leads..." className="input-base pl-8 h-9 text-sm w-full"/>
               </div>
-              {stageFilter && <span className="text-xs bg-lime-500 text-white px-2 py-1 rounded-full flex items-center gap-1">Stage: {stageFilter} <button onClick={()=>setStageFilter(null)} className="hover:bg-white/20 rounded-full p-0.5"><XCircle size={10}/></button></span>}
+              {stageFilter && <span className="text-xs bg-lime-500 text-zinc-950 font-semibold px-2 py-1 rounded-full flex items-center gap-1">Stage: {stageFilter} <button onClick={()=>setStageFilter(null)} className="hover:bg-white/20 rounded-full p-0.5"><XCircle size={10} className="text-zinc-950"/></button></span>}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex bg-muted rounded-lg p-1">
@@ -304,8 +304,8 @@ export default function UnifiedMasterDashboard() {
 
           {/* Pipeline content */}
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
-            {pipelineLoading ? <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-lime-700"/></div>
-            : filteredLeads.length===0 ? <div className="text-center py-12 text-sm text-muted-foreground">No leads {stageFilter ? `for stage "${stageFilter}"` : ''} {pipelineSearch ? `matching "${pipelineSearch}"` : ''}. <button onClick={()=>{setStageFilter(null); setPipelineSearch('');}} className="text-lime-700 underline">Clear filters</button></div>
+            {pipelineLoading ? <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-lime-700 dark:text-lime-400"/></div>
+            : filteredLeads.length===0 ? <div className="text-center py-12 text-sm text-muted-foreground">No leads {stageFilter ? `for stage "${stageFilter}"` : ''} {pipelineSearch ? `matching "${pipelineSearch}"` : ''}. <button onClick={()=>{setStageFilter(null); setPipelineSearch('');}} className="text-lime-700 dark:text-lime-400 underline">Clear filters</button></div>
             : pipelineView==='table' ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -313,11 +313,11 @@ export default function UnifiedMasterDashboard() {
                   <tbody className="divide-y divide-border">
                     {filteredLeads.slice(0,50).map((l:any)=>(
                       <tr key={l.id} className="hover:bg-muted/20">
-                        <td className="px-4 py-2"><a href={`/leads/${l.id}`} className="font-medium text-lime-700 hover:underline">{l.name || 'Lead'}</a><span className="ml-2 text-xs text-muted-foreground">{l.source||''}</span></td>
+                        <td className="px-4 py-2"><a href={`/leads/${l.id}`} className="font-medium text-lime-700 dark:text-lime-400 hover:underline">{l.name || 'Lead'}</a><span className="ml-2 text-xs text-muted-foreground">{l.source||''}</span></td>
                         <td className="px-2 py-2 font-mono text-xs">{l.phone||'—'}</td>
                         <td className="text-center"><span className="text-xs bg-muted px-2 py-0.5 rounded-full">{l.crm_status || l.lead_status||'—'}</span></td>
                         <td className="text-center text-xs">{l.assigned_to_profile?.full_name || l.assigned_to || 'Unassigned'}</td>
-                        <td className="text-right px-4"><a href={`/leads/${l.id}`} className="text-xs text-lime-700 hover:underline">Profile →</a></td>
+                        <td className="text-right px-4"><a href={`/leads/${l.id}`} className="text-xs text-lime-700 dark:text-lime-400 hover:underline">Profile →</a></td>
                       </tr>
                     ))}
                   </tbody>
@@ -326,11 +326,11 @@ export default function UnifiedMasterDashboard() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-3">
                 {filteredLeads.slice(0,24).map((l:any)=>(
-                  <a key={l.id} href={`/leads/${l.id}`} className="block bg-card border border-border rounded-xl p-3 hover:border-lime-200 hover:shadow-sm transition-all">
+                  <a key={l.id} href={`/leads/${l.id}`} className="block bg-card border border-border rounded-xl p-3 hover:border-lime-400 dark:hover:border-lime-500/40 hover:shadow-sm hover:shadow-[0_0_12px_rgba(163,230,53,0.1)] transition-all">
                     <p className="font-semibold text-sm truncate">{l.name || 'Lead'}</p>
                     <p className="text-xs text-muted-foreground">{l.phone} · {l.source||'—'}</p>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs bg-lime-50 border border-lime-200 px-2 py-0.5 rounded-full">{l.crm_status || l.lead_status}</span>
+                      <span className="text-xs bg-lime-50 dark:bg-lime-500/10 border border-lime-200 dark:border-lime-500/20 text-lime-700 dark:text-lime-400 px-2 py-0.5 rounded-full">{l.crm_status || l.lead_status}</span>
                       <span className="text-xs text-muted-foreground">{l.assigned_to ? 'Assigned' : 'Unassigned'}</span>
                     </div>
                   </a>
