@@ -87,7 +87,7 @@ export default function DressCodeEvaluationForm() {
         <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating (1â€“5) *</label>
         <div className="flex items-center gap-2">
           {[1,2,3,4,5].map(n => (
-            <button key={n} type="button" onClick={() => setRating(n)} className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${rating===n ? 'border-violet-500 bg-lime-500 text-white shadow' : 'border-border bg-muted/30 text-muted-foreground hover:border-violet-300'}`}>
+            <button key={n} type="button" onClick={() => setRating(n)} className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${rating===n ? 'border-lime-500 bg-lime-500 text-white shadow' : 'border-border bg-muted/30 text-muted-foreground hover:border-lime-300'}`}>
               <span className="flex">{Array.from({length:n}).map((_,i)=><Star key={i} size={12} className={rating===n? 'fill-white':'fill-amber-400 text-amber-400'}/>)}</span>
               {n}
             </button>

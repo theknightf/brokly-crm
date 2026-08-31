@@ -72,7 +72,7 @@ export default function WeightedLeaderboard() {
       : users.length===0 ? <p className="text-sm text-muted-foreground text-center py-12">No data for this period.</p>
       : <div className="divide-y divide-border">
           {users.map(u => (
-            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3 flex items-center gap-3 hover:bg-lime-50/50 transition-colors cursor-pointer ${u.rank<=3 ? 'bg-gradient-to-r from-violet-50/50 to-transparent' : ''}`}>
+            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3 flex items-center gap-3 hover:bg-lime-50/50 transition-colors cursor-pointer ${u.rank<=3 ? 'bg-gradient-to-r from-lime-50/50 to-transparent' : ''}`}>
               <RankIcon rank={u.rank}/>
               <div className="w-8 h-8 rounded-full bg-lime-50 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-lime-700">{(u.full_name||u.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</span></div>
               <div className="min-w-0 flex-1">
