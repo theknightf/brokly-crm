@@ -4,7 +4,6 @@ import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, Tren
 import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
 import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
 import OwnerQuickActionsBar from '@/app/components/OwnerQuickActionsBar';
-import LeadStageCardsBar, { LEAD_STAGE_META, type StageKey } from '@/app/components/LeadStageCardsBar';
 import { toast } from 'sonner';
 
 interface UnifiedData {
@@ -17,8 +16,15 @@ interface UnifiedData {
 type DashboardMode = 'sales' | 'leads';
 type PipelineView = 'kanban' | 'table';
 
-// Stage meta now in LeadStageCardsBar (dark-mode-first)
-const STAGE_META = LEAD_STAGE_META;
+const STAGE_META: Record<string, { label: string; icon: any; color: string; bg: string; border: string; stageKeys: string[] }> = {
+  newFresh: { label: 'New Fresh', icon: Flame, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', stageKeys: ['Fresh Leads','New Fresh'] },
+  newCold: { label: 'New Cold', icon: Snowflake, color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-200', stageKeys: ['Cold Calls','New Cold'] },
+  leadsPending: { label: 'Leads Pending', icon: Pause, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', stageKeys: ['Pending Leads','Leads Pending','Following Up'] },
+  callsAnswer: { label: 'Calls Answer', icon: Phone, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200', stageKeys: ['Calls Answer','Calls Answered','Meeting','Interested'] },
+  noAnswer: { label: 'No Answer', icon: PhoneOff, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200', stageKeys: ['No Answer','No Answer At All'] },
+  cancel: { label: 'Cancel', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', stageKeys: ['Cancel','Cancellation'] },
+  doneDeal: { label: 'D.Deal', icon: CheckCircle, color: 'text-emerald-700', bg: 'bg-emerald-100', border: 'border-emerald-300', stageKeys: ['Done Deal','D.Deal'] },
+};
 
 export default function UnifiedMasterDashboard() {
   const [range, setRange] = useState<'week'|'month'>('week');
@@ -71,8 +77,8 @@ export default function UnifiedMasterDashboard() {
 
   const scrollToLeaderboard = () => leaderboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const handleStageClick = (key: StageKey) => {
-    const meta = STAGE_META[key as StageKey];
+  const handleStageClick = (key: string) => {
+    const meta = STAGE_META[key];
     if (!meta) return;
     // toggle: if same stageKeys[0] already active, clear
     const target = meta.stageKeys[0];
@@ -135,26 +141,52 @@ export default function UnifiedMasterDashboard() {
         </div>
       </div>
 
-      {/* Dual-Mode Toggle — Brokly standard (lime active) */}
-      <div className="sticky top-2 z-20 bg-white dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-1.5 shadow-sm flex gap-1.5">
+      {/* Dual-Mode Toggle — sticky Segmented Control */}
+      <div className="sticky top-2 z-20 bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-1.5 shadow-sm flex gap-1.5">
         <button
           onClick={() => setMode('sales')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${mode==='sales' ? 'bg-lime-500 text-zinc-950 shadow' : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${mode==='sales' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
         >
           <Users size={16}/> 👥 Sales & Team Performance
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${mode==='sales' ? 'bg-zinc-900/10' : 'bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600'}`}>{data.leaderboard.length}</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded-full ${mode==='sales' ? 'bg-white/20' : 'bg-muted'}`}>{data.leaderboard.length}</span>
         </button>
         <button
           onClick={() => setMode('leads')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${mode==='leads' ? 'bg-lime-500 text-zinc-950 shadow' : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${mode==='leads' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
         >
           <Target size={16}/> 🎯 Leads Pipeline & Data Hub
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${mode==='leads' ? 'bg-zinc-900/10' : 'bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600'}`}>{data.summary?.totalLeads ?? 0}</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded-full ${mode==='leads' ? 'bg-white/20' : 'bg-muted'}`}>{data.summary?.totalLeads ?? 0}</span>
         </button>
       </div>
 
-      {/* Lead Stage KPI Bar — dark-mode-first via dedicated component */}
-      <LeadStageCardsBar stats={stageStats as any} activeStage={stageFilter as any} onSelect={(k)=>handleStageClick(k)} onReset={()=>setStageFilter(null)} />
+      {/* Interactive Lead Stage KPI Cards — globally accessible, highlight on Leads mode */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold flex items-center gap-2"><BarChart3 size={14} className="text-violet-600"/> Lead Stage KPI Cards — 1-Click Filter</h3>
+          {stageFilter && <button onClick={() => setStageFilter(null)} className="text-xs bg-muted hover:bg-muted/80 px-3 py-1 rounded-full flex items-center gap-1"><Filter size={12}/> Reset filter <span className="font-semibold">{stageFilter}</span></button>}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+          {Object.entries(STAGE_META).map(([key, meta]) => {
+            const stat = (stageStats as any)[key] || { count: 0, percentage: '0%' };
+            const isActive = stageFilter === meta.stageKeys[0];
+            const isDoneDeal = key === 'doneDeal';
+            return (
+              <button
+                key={key}
+                onClick={() => handleStageClick(key)}
+                className={`text-left rounded-2xl border-2 p-3 transition-all hover:scale-[1.02] hover:shadow-md active:scale-[0.98] ${isActive ? 'border-violet-500 bg-violet-600 text-white shadow-lg' : `${meta.bg} ${meta.border} hover:border-violet-300`}`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-2 ${isActive ? 'bg-white/20 text-white' : 'bg-white shadow-sm '+meta.color}`}><meta.icon size={14}/></div>
+                <p className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-foreground'}`}>{meta.label}</p>
+                <p className={`text-xl font-extrabold ${isActive ? 'text-white' : 'text-foreground'}`}>{stat.count}</p>
+                <p className={`text-xs ${isActive ? 'text-white/80' : 'text-muted-foreground'}`}>{stat.percentage} {isDoneDeal && stat.revenue ? `· ${Number(stat.revenue).toLocaleString()} EGP` : ''}</p>
+                <p className={`text-[11px] mt-1 flex items-center gap-1 ${isActive ? 'text-white/90' : 'text-violet-600'}`}>Filter <ArrowRight size={10}/></p>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">Click any card to instantly filter the pipeline table/Kanban below. <span className="font-mono bg-muted px-1 py-0.5 rounded">GET /api/dashboard/unified-master.leadStageStats</span></p>
+      </div>
 
       {mode === 'sales' ? (
         <>
@@ -339,6 +371,8 @@ export default function UnifiedMasterDashboard() {
           </div>
         </>
       )}
+
+      <p className="text-xs text-center text-muted-foreground">Single unified endpoint <code className="bg-muted px-1 py-0.5 rounded">GET /api/dashboard/unified-master</code> · modes <code>sales|leads</code> · interactive stage cards → Kanban/Table filter · `leadStageStats` + `teamPerformance` + `payrollDeductionsSummary`</p>
     </div>
   );
 }

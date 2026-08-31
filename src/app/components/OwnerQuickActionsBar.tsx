@@ -74,23 +74,22 @@ export default function OwnerQuickActionsBar({ onLeaderboard }: Props) {
 
   return (
     <>
-      {/* Brokly Design System — dark-mode-first Quick Actions Bar */}
-      <div className="sticky top-0 z-30 -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden bg-white dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800/80 shadow-sm">
-        <div className="px-4 py-4">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700/50"><Star size={13} className="text-zinc-500 dark:text-zinc-400 fill-zinc-400/20"/></div>
-            <p className="text-xs font-semibold tracking-widest uppercase text-zinc-400">Executive Quick Actions</p>
-            <span className="text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700/50">1-Click • Owner & Admin</span>
-            <span className="hidden sm:inline text-xs text-zinc-400 ml-auto">Every button executes instantly</span>
+      {/* 1-Click Quick Actions Bar — Owner-Grade (single source of truth for Admin & Owner) */}
+      <div className="sticky top-0 z-30 -mx-4 sm:mx-0 sm:rounded-2xl overflow-hidden border y-0 sm:border border-border bg-gradient-to-r from-violet-600 via-indigo-600 to-violet-700 text-white shadow-lg">
+        <div className="px-3 sm:px-4 py-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center"><Star size={14} className="text-white fill-white/30"/></div>
+            <h2 className="text-sm font-bold tracking-tight">Executive Quick Actions</h2>
+            <span className="text-xs font-medium bg-white/20 px-2 py-0.5 rounded-full">1-Click • Owner & Admin</span>
+            <span className="hidden sm:inline text-xs opacity-80 ml-auto">Every button executes instantly — no extra steps</span>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
-            {/* Primary — Evaluate Dress Code (lime accent) */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
             <button
               onClick={() => setEvalOpen(true)}
-              className="group flex items-center gap-3 bg-zinc-950 dark:bg-zinc-900 border border-lime-500/30 hover:border-lime-400/50 hover:bg-zinc-900 text-white rounded-xl p-3 font-semibold text-sm transition-all active:scale-[0.98] shadow-sm"
+              className="group flex items-center gap-2.5 bg-white text-violet-700 rounded-xl px-3 py-2.5 font-semibold text-sm hover:bg-violet-50 active:scale-95 transition-all shadow-sm"
             >
-              <span className="w-9 h-9 rounded-lg bg-zinc-800/80 p-2 flex items-center justify-center border border-lime-500/20 flex-shrink-0 group-hover:scale-105 transition-transform"><Star size={16} className="text-lime-400 fill-lime-400/30"/></span>
-              <span className="text-left leading-tight">Evaluate<br/><span className="text-xs font-normal text-zinc-400">Dress Code</span></span>
+              <span className="w-8 h-8 rounded-lg bg-amber-400 flex items-center justify-center text-white shadow flex-shrink-0 group-hover:scale-110 transition-transform"><Star size={16} className="fill-white"/></span>
+              <span className="text-left leading-tight">Evaluate<br/><span className="text-xs font-normal opacity-70">Dress Code</span></span>
             </button>
 
             <button
@@ -98,40 +97,40 @@ export default function OwnerQuickActionsBar({ onLeaderboard }: Props) {
                 if (onLeaderboard) onLeaderboard();
                 else setLeaderboardOpen(true);
               }}
-              className="group flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/50 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl p-3 font-medium text-sm transition-all active:scale-[0.98]"
+              className="group flex items-center gap-2.5 bg-white/10 backdrop-blur border border-white/20 rounded-xl px-3 py-2.5 font-semibold text-sm hover:bg-white hover:text-violet-700 active:scale-95 transition-all"
             >
-              <span className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 p-2 flex items-center justify-center border border-zinc-200 dark:border-zinc-700/30 flex-shrink-0"><BarChart3 size={16} className="text-violet-500"/></span>
-              <span className="text-left leading-tight">Leaderboard<br/><span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">View → Rankings</span></span>
+              <span className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-400 group-hover:text-white transition-colors"><BarChart3 size={16}/></span>
+              <span className="text-left leading-tight">Leaderboard<br/><span className="text-xs font-normal opacity-80 group-hover:text-violet-600">View → Rankings</span></span>
             </button>
 
             <button
               onClick={handleRotate}
               disabled={rotateLoading}
-              className="group flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/50 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl p-3 font-medium text-sm transition-all active:scale-[0.98] disabled:opacity-60"
+              className="group flex items-center gap-2.5 bg-white/10 backdrop-blur border border-white/20 rounded-xl px-3 py-2.5 font-semibold text-sm hover:bg-white hover:text-violet-700 active:scale-95 transition-all disabled:opacity-60"
             >
-              <span className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 p-2 flex items-center justify-center border border-zinc-200 dark:border-zinc-700/30 flex-shrink-0">
-                {rotateLoading ? <Loader2 size={16} className="animate-spin text-emerald-500"/> : <RefreshCw size={16} className="text-emerald-500"/>}
+              <span className="w-8 h-8 rounded-lg bg-emerald-400 flex items-center justify-center text-white shadow flex-shrink-0">
+                {rotateLoading ? <Loader2 size={16} className="animate-spin"/> : <RefreshCw size={16}/>}
               </span>
-              <span className="text-left leading-tight">{rotateLoading ? 'Rotating…' : 'Rotate Data'}<br/><span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">Round-robin 1-click</span></span>
+              <span className="text-left leading-tight">{rotateLoading ? 'Rotating…' : 'Rotate Data'}<br/><span className="text-xs font-normal opacity-80 group-hover:text-violet-600">Round-robin 1-click</span></span>
             </button>
 
             <button
               onClick={() => setFlaggedOpen(true)}
-              className="group flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/50 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl p-3 font-medium text-sm transition-all active:scale-[0.98]"
+              className="group flex items-center gap-2.5 bg-white/10 backdrop-blur border border-white/20 rounded-xl px-3 py-2.5 font-semibold text-sm hover:bg-white hover:text-violet-700 active:scale-95 transition-all"
             >
-              <span className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 p-2 flex items-center justify-center border border-zinc-200 dark:border-zinc-700/30 flex-shrink-0"><AlertTriangle size={16} className="text-amber-500"/></span>
-              <span className="text-left leading-tight">Flagged Calls<br/><span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">Review → Approve</span></span>
+              <span className="w-8 h-8 rounded-lg bg-amber-400 flex items-center justify-center text-white shadow flex-shrink-0"><AlertTriangle size={16}/></span>
+              <span className="text-left leading-tight">Flagged Calls<br/><span className="text-xs font-normal opacity-80 group-hover:text-violet-600">Review → Approve</span></span>
             </button>
 
             <button
               onClick={() => setDeductionsOpen(true)}
-              className="group flex items-center gap-3 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/50 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-xl p-3 font-medium text-sm transition-all active:scale-[0.98] col-span-2 lg:col-span-1"
+              className="group flex items-center gap-2.5 bg-white/10 backdrop-blur border border-white/20 rounded-xl px-3 py-2.5 font-semibold text-sm hover:bg-white hover:text-violet-700 active:scale-95 transition-all col-span-2 lg:col-span-1"
             >
-              <span className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 p-2 flex items-center justify-center border border-zinc-200 dark:border-zinc-700/30 flex-shrink-0"><Banknote size={16} className="text-rose-500"/></span>
-              <span className="text-left leading-tight">Deductions<br/><span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">Payroll Summary</span></span>
+              <span className="w-8 h-8 rounded-lg bg-rose-400 flex items-center justify-center text-white shadow flex-shrink-0"><Banknote size={16}/></span>
+              <span className="text-left leading-tight">Deductions<br/><span className="text-xs font-normal opacity-80 group-hover:text-violet-600">Payroll Summary</span></span>
             </button>
           </div>
-          <p className="text-[11px] text-zinc-400 mt-3 hidden sm:block">Press <kbd className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 rounded text-xs">E</kbd> Evaluate · <kbd className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 rounded">R</kbd> Rotate · <kbd className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 rounded">F</kbd> Flagged</p>
+          <p className="text-[11px] opacity-70 mt-2 hidden sm:block">Keyboard: Press <kbd className="bg-white/20 px-1 py-0.5 rounded text-xs">E</kbd> Evaluate · <kbd className="bg-white/20 px-1 py-0.5 rounded">R</kbd> Rotate · <kbd className="bg-white/20 px-1 py-0.5 rounded">F</kbd> Flagged</p>
         </div>
       </div>
 
