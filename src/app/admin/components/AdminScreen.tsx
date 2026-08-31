@@ -370,6 +370,7 @@ export default function AdminScreen() {
         | 'attendance'
         | 'activity'
         | 'productivity'
+        | 'performance360'
         | 'callLogs'
         | 'payroll'
         | 'leave'
@@ -636,11 +637,13 @@ export default function AdminScreen() {
             const isKpi = tab.key === 'kpiTargets';
             const isTasks = tab.key === 'tasks';
             const isRotation = tab.key === 'rotation';
+            const isPerformance360 = tab.key === 'performance360';
             const isSpecial =
               isUsers ||
               isAttendance ||
               isActivity ||
               isProductivity ||
+              isPerformance360 ||
               isCallLogs ||
               tab.key === 'emailTemplates' ||
               isPayroll ||
@@ -658,6 +661,7 @@ export default function AdminScreen() {
                       | 'attendance'
                       | 'activity'
                       | 'productivity'
+                      | 'performance360'
                       | 'callLogs'
                       | 'payroll'
                       | 'leave'
@@ -677,6 +681,7 @@ export default function AdminScreen() {
                       | 'attendance'
                       | 'activity'
                       | 'productivity'
+                      | 'performance360'
                       | 'callLogs'
                       | 'payroll'
                       | 'leave'
