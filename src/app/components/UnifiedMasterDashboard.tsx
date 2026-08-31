@@ -4,6 +4,7 @@ import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, Tren
 import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
 import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
 import OwnerQuickActionsBar from '@/app/components/OwnerQuickActionsBar';
+import LeadStageCardsBar from '@/app/components/LeadStageCardsBar';
 import { toast } from 'sonner';
 
 interface UnifiedData {
@@ -77,17 +78,21 @@ export default function UnifiedMasterDashboard() {
 
   const scrollToLeaderboard = () => leaderboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+  const activeStageKeyForBar = (() => {
+    if (!stageFilter) return null;
+    for (const [k, v] of Object.entries(STAGE_META)) if ((v as any).stageKeys.includes(stageFilter)) return k;
+    return null;
+  })();
+
   const handleStageClick = (key: string) => {
-    const meta = STAGE_META[key];
+    const meta = (STAGE_META as any)[key];
     if (!meta) return;
-    // toggle: if same stageKeys[0] already active, clear
     const target = meta.stageKeys[0];
     const isActive = stageFilter === target;
     const next = isActive ? null : target;
     setStageFilter(next);
-    // scroll to pipeline table
     setTimeout(() => pipelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
-    if (next) toast.success(`Filtered: ${meta.label}`, { description: `${data?.leadStageStats?.[key]?.count ?? 0} leads` });
+    if (next) toast.success(`Filtered: ${meta.label}`, { description: `${(data?.leadStageStats as any)?.[key]?.count ?? 0} leads` });
   };
 
   const handleRotate = async () => {
@@ -141,50 +146,31 @@ export default function UnifiedMasterDashboard() {
         </div>
       </div>
 
-      {/* Dual-Mode Toggle — sticky Segmented Control */}
-      <div className="sticky top-2 z-20 bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-1.5 shadow-sm flex gap-1.5">
+      {/* Dual-Mode Toggle — sleek minimalist segmented control */}
+      <div className="sticky top-2 z-20 bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-1.5 shadow-sm flex gap-1.5">
         <button
           onClick={() => setMode('sales')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${mode==='sales' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all border ${mode==='sales' ? 'bg-zinc-800 text-zinc-100 shadow-sm border-zinc-700/60' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border-transparent'}`}
         >
-          <Users size={16}/> 👥 Sales & Team Performance
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${mode==='sales' ? 'bg-white/20' : 'bg-muted'}`}>{data.leaderboard.length}</span>
+          <Users size={16}/> Sales & Team Performance
+          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-lime-500/20 text-lime-400">{data.leaderboard.length}</span>
         </button>
         <button
           onClick={() => setMode('leads')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${mode==='leads' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all border ${mode==='leads' ? 'bg-zinc-800 text-zinc-100 shadow-sm border-zinc-700/60' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border-transparent'}`}
         >
-          <Target size={16}/> 🎯 Leads Pipeline & Data Hub
-          <span className={`text-xs px-1.5 py-0.5 rounded-full ${mode==='leads' ? 'bg-white/20' : 'bg-muted'}`}>{data.summary?.totalLeads ?? 0}</span>
+          <Target size={16}/> Leads Pipeline & Data Hub
+          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-lime-500/20 text-lime-400">{data.summary?.totalLeads ?? 0}</span>
         </button>
       </div>
 
-      {/* Interactive Lead Stage KPI Cards — globally accessible, highlight on Leads mode */}
-      <div className="space-y-2">
+      {/* Lead Stages Grid — responsive, enterprise card styling */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold flex items-center gap-2"><BarChart3 size={14} className="text-violet-600"/> Lead Stage KPI Cards — 1-Click Filter</h3>
-          {stageFilter && <button onClick={() => setStageFilter(null)} className="text-xs bg-muted hover:bg-muted/80 px-3 py-1 rounded-full flex items-center gap-1"><Filter size={12}/> Reset filter <span className="font-semibold">{stageFilter}</span></button>}
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2"><BarChart3 size={14} className="text-violet-600"/> Lead Stages — 1-Click Filter</h3>
+          {stageFilter && <button onClick={() => setStageFilter(null)} className="text-xs bg-zinc-800 text-zinc-100 border border-zinc-700/60 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-zinc-700"><Filter size={12}/> Reset <span className="font-semibold">{stageFilter}</span></button>}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-          {Object.entries(STAGE_META).map(([key, meta]) => {
-            const stat = (stageStats as any)[key] || { count: 0, percentage: '0%' };
-            const isActive = stageFilter === meta.stageKeys[0];
-            const isDoneDeal = key === 'doneDeal';
-            return (
-              <button
-                key={key}
-                onClick={() => handleStageClick(key)}
-                className={`text-left rounded-2xl border-2 p-3 transition-all hover:scale-[1.02] hover:shadow-md active:scale-[0.98] ${isActive ? 'border-violet-500 bg-violet-600 text-white shadow-lg' : `${meta.bg} ${meta.border} hover:border-violet-300`}`}
-              >
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-2 ${isActive ? 'bg-white/20 text-white' : 'bg-white shadow-sm '+meta.color}`}><meta.icon size={14}/></div>
-                <p className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-foreground'}`}>{meta.label}</p>
-                <p className={`text-xl font-extrabold ${isActive ? 'text-white' : 'text-foreground'}`}>{stat.count}</p>
-                <p className={`text-xs ${isActive ? 'text-white/80' : 'text-muted-foreground'}`}>{stat.percentage} {isDoneDeal && stat.revenue ? `· ${Number(stat.revenue).toLocaleString()} EGP` : ''}</p>
-                <p className={`text-[11px] mt-1 flex items-center gap-1 ${isActive ? 'text-white/90' : 'text-violet-600'}`}>Filter <ArrowRight size={10}/></p>
-              </button>
-            );
-          })}
-        </div>
+        <LeadStageCardsBar stats={stageStats as any} activeStageKey={activeStageKeyForBar} onStageClick={handleStageClick} />
         <p className="text-xs text-muted-foreground">Click any card to instantly filter the pipeline table/Kanban below. <span className="font-mono bg-muted px-1 py-0.5 rounded">GET /api/dashboard/unified-master.leadStageStats</span></p>
       </div>
 
