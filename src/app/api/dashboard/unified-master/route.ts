@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', thisMonth.from).lte('expense_date', thisMonth.to),
     supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', prevMonth.from).lte('expense_date', prevMonth.to),
     supabase.from('activity_log').select('user_id, action_type, detail, created_at').order('created_at', { ascending: false }).limit(80),
-    supabase.from('leads').select('crm_status, lead_status, assigned_to'),
+    supabase.from('leads').select('crm_status, lead_status, assigned_to, source, total_price, final_price, budget_min, budget_max, created_at, updated_at'),
     supabase.from('call_logs').select('user_id, outcome, is_valid, created_at, duration_seconds').gte('created_at', `${period.from}T00:00:00`).lte('created_at', `${period.to}T23:59:59.999`),
     supabase.from('evaluations').select('employee_id, dress_code_rating, date').gte('date', period.from).lte('date', period.to),
     supabase.from('payroll_deductions').select('id, user_id, reason, amount, month_year, is_applied, source_ref, created_at').order('created_at', { ascending: false }).limit(50),
@@ -153,11 +153,48 @@ export async function GET(request: Request) {
   const categories = Object.entries(byCategory).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
 
   const leadsByStage: Record<string, number> = {};
+  const leadSources: Record<string, number> = {};
+  let doneDealRevenue = 0;
   (leadsRes.data || []).forEach((l: any) => {
     const s = String(l.crm_status || l.lead_status || 'Unknown');
     leadsByStage[s] = (leadsByStage[s] || 0) + 1;
+    const src = String(l.source || 'Unknown');
+    leadSources[src] = (leadSources[src] || 0) + 1;
+    const isDone = /done deal|d\.deal|won/i.test(s);
+    if (isDone) doneDealRevenue += Number(l.final_price || l.total_price || 0);
   });
-  const leadSummary = { total: (leadsRes.data || []).length, byStage: Object.entries(leadsByStage).map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count) };
+  const leadSummary = { total: (leadsRes.data || []).length, byStage: Object.entries(leadsByStage).map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count), bySource: Object.entries(leadSources).map(([source, count]) => ({ source, count })).sort((a,b)=>b.count-a.count), doneDealRevenue };
+
+  // 7-stage KPI mapping per spec: New Fresh, New Cold, Leads Pending, Calls Answer, No Answer, Cancel, D.Deal
+  function mapStage(s: string): keyof typeof stageCounts {
+    const t = s.toLowerCase().trim();
+    if (t.includes('fresh') || t === 'new fresh') return 'newFresh';
+    if (t.includes('cold') || t === 'new cold') return 'newCold';
+    if (t.includes('pending') || t.includes('following')) return 'leadsPending';
+    if (t.includes('calls answer') || t.includes('calls answered') || t === 'meeting' || t === 'interested') return 'callsAnswer';
+    if (t.includes('no answer')) return 'noAnswer';
+    if (t.includes('cancel') || t.includes('cancellation')) return 'cancel';
+    if (t.includes('done deal') || t.includes('d.deal') || t === 'won' || t.includes('reservation')) return 'doneDeal';
+    // fallback heuristics
+    if (t === 'fresh leads') return 'newFresh';
+    if (t === 'cold calls') return 'newCold';
+    if (t === 'pending leads') return 'leadsPending';
+    if (t === 'no answer at all' || t === 'closed number' || t === 'wrong number') return 'noAnswer';
+    if (t === 'not interested' || t === 'low budget') return 'cancel';
+    return 'leadsPending';
+  }
+  const stageCounts: Record<'newFresh'|'newCold'|'leadsPending'|'callsAnswer'|'noAnswer'|'cancel'|'doneDeal', number> = { newFresh:0, newCold:0, leadsPending:0, callsAnswer:0, noAnswer:0, cancel:0, doneDeal:0 };
+  (leadsRes.data || []).forEach((l:any)=>{ const k = mapStage(String(l.crm_status||l.lead_status||'')); stageCounts[k]++; });
+  const totalLeadsForPct = Math.max(1, leadSummary.total);
+  const leadStageStats = {
+    newFresh: { count: stageCounts.newFresh, percentage: `${Math.round(stageCounts.newFresh/totalLeadsForPct*100)}%` },
+    newCold: { count: stageCounts.newCold, percentage: `${Math.round(stageCounts.newCold/totalLeadsForPct*100)}%` },
+    leadsPending: { count: stageCounts.leadsPending, percentage: `${Math.round(stageCounts.leadsPending/totalLeadsForPct*100)}%` },
+    callsAnswer: { count: stageCounts.callsAnswer, percentage: `${Math.round(stageCounts.callsAnswer/totalLeadsForPct*100)}%` },
+    noAnswer: { count: stageCounts.noAnswer, percentage: `${Math.round(stageCounts.noAnswer/totalLeadsForPct*100)}%` },
+    cancel: { count: stageCounts.cancel, percentage: `${Math.round(stageCounts.cancel/totalLeadsForPct*100)}%` },
+    doneDeal: { count: stageCounts.doneDeal, revenue: doneDealRevenue, percentage: `${Math.round(stageCounts.doneDeal/totalLeadsForPct*100)}%` },
+  };
 
   const profilesById: Record<string, string> = {};
   profiles.forEach((p: any) => (profilesById[p.id] = p.full_name || p.email));
@@ -167,6 +204,22 @@ export async function GET(request: Request) {
   const recentDeductions = deductionsRes.data || [];
   const recentNotifications = notificationsRes.data || [];
   const pendingDeductions = recentDeductions.filter((d: any) => !d.is_applied).length;
+  const totalDeductionAmount = recentDeductions.reduce((s:number,d:any)=>s+Number(d.amount||0),0);
+  const conversionRate = leadSummary.total ? Math.round((stageCounts.doneDeal/leadSummary.total)*1000)/10 : 0;
+
+  const teamPerformance = {
+    totalEmployees, presentToday, absentToday, lateToday,
+    avgHours: Math.round(avgHours*10)/10, totalHours: Math.round(totalHours*10)/10,
+    attendanceRate: Math.round((Object.values(periodByUser).reduce((s,v)=>s+v.present,0)/Math.max(1, workingDays*totalEmployees))*100),
+    leaderboardTop3: leaderboard.slice(0,3),
+    avgScore: leaderboard.length ? Math.round(leaderboard.reduce((s:any,r:any)=>s+r.totalScore,0)/leaderboard.length) : 0,
+  };
+  const payrollDeductionsSummary = {
+    pending: pendingDeductions, total: recentDeductions.length,
+    totalAmount: Math.round(totalDeductionAmount*100)/100,
+    applied: recentDeductions.filter((d:any)=>d.is_applied).length,
+    recent: recentDeductions.slice(0,5),
+  };
 
   return NextResponse.json({
     generated_at: new Date().toISOString(),
@@ -181,10 +234,16 @@ export async function GET(request: Request) {
       expensesThisMonth: totalThis, expensesPrevMonth: totalPrev, expensesChangePct: changePct,
       totalLeads: leadSummary.total,
       pendingDeductions,
+      conversionRate,
+      doneDealRevenue,
     },
     attendanceOverview: { present: presentToday, absent: absentToday, late: lateToday, leave: 0 },
     leaderboard, // weighted 40/30/30
     leadSummary,
+    leadStageStats,
+    teamPerformance,
+    payrollDeductionsSummary,
+    conversionMetrics: { total: leadSummary.total, doneDeal: stageCounts.doneDeal, conversionRate, revenue: doneDealRevenue },
     expenses: { totalThis, totalPrev, changePct, categories },
     timeline,
     deductions: { recent: recentDeductions, pending: pendingDeductions, total: recentDeductions.length },
