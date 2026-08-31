@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useEffect, useState } from 'react';
 import { Shirt, Star, Loader2, Check, AlertCircle, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
@@ -48,7 +48,7 @@ export default function DressCodeEvaluationForm() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Failed');
-      toast.success('Dress code evaluation saved — Leaderboard updated');
+      toast.success('Dress code evaluation saved â€” Leaderboard updated');
       setNotes(''); setFlags('');
     } catch (e: any) {
       toast.error(e.message || 'Failed to submit');
@@ -62,10 +62,10 @@ export default function DressCodeEvaluationForm() {
   return (
     <div className="bg-card border border-border rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center"><Shirt size={16} className="text-violet-600"/></div>
+        <div className="w-8 h-8 rounded-lg bg-lime-50 flex items-center justify-center"><Shirt size={16} className="text-lime-600"/></div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">Daily Dress Code Evaluation</h3>
-          <p className="text-xs text-muted-foreground">Admin input → feeds Leaderboard (30%) & Owner 360 in real-time</p>
+          <p className="text-xs text-muted-foreground">Admin input â†’ feeds Leaderboard (30%) & Owner 360 in real-time</p>
         </div>
       </div>
 
@@ -73,8 +73,8 @@ export default function DressCodeEvaluationForm() {
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5">Employee *</label>
           <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="input-base w-full">
-            <option value="">Select employee…</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} · {e.role}</option>)}
+            <option value="">Select employeeâ€¦</option>
+            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} Â· {e.role}</option>)}
           </select>
         </div>
         <div>
@@ -84,16 +84,16 @@ export default function DressCodeEvaluationForm() {
       </div>
 
       <div className="mt-4">
-        <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating (1–5) *</label>
+        <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating (1â€“5) *</label>
         <div className="flex items-center gap-2">
           {[1,2,3,4,5].map(n => (
-            <button key={n} type="button" onClick={() => setRating(n)} className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${rating===n ? 'border-violet-500 bg-violet-500 text-white shadow' : 'border-border bg-muted/30 text-muted-foreground hover:border-violet-300'}`}>
+            <button key={n} type="button" onClick={() => setRating(n)} className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${rating===n ? 'border-violet-500 bg-lime-500 text-white shadow' : 'border-border bg-muted/30 text-muted-foreground hover:border-violet-300'}`}>
               <span className="flex">{Array.from({length:n}).map((_,i)=><Star key={i} size={12} className={rating===n? 'fill-white':'fill-amber-400 text-amber-400'}/>)}</span>
               {n}
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">{rating<=2 ? 'Needs improvement' : rating===3 ? 'Acceptable' : rating===4 ? 'Good' : 'Exemplary'} · {Math.round(rating/5*100)}% → DressScore</p>
+        <p className="text-xs text-muted-foreground mt-1">{rating<=2 ? 'Needs improvement' : rating===3 ? 'Acceptable' : rating===4 ? 'Good' : 'Exemplary'} Â· {Math.round(rating/5*100)}% â†’ DressScore</p>
       </div>
 
       <div className="mt-4">
@@ -102,13 +102,13 @@ export default function DressCodeEvaluationForm() {
       </div>
       <div className="mt-3">
         <label className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="input-base w-full text-sm resize-none" />
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observationâ€¦" rows={2} className="input-base w-full text-sm resize-none" />
       </div>
 
       <button onClick={submit} disabled={submitting || !employeeId} className="btn-primary w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50">
         {submitting ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>} Submit Evaluation
       </button>
-      <p className="text-[11px] text-muted-foreground text-center mt-2">Writes to <code>evaluations</code> → <code>activity_log</code> → Leaderboard & 360 profile update instantly</p>
+      <p className="text-[11px] text-muted-foreground text-center mt-2">Writes to <code>evaluations</code> â†’ <code>activity_log</code> â†’ Leaderboard & 360 profile update instantly</p>
     </div>
   );
 }

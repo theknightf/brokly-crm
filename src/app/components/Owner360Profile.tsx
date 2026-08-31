@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useCallback, useEffect, useState } from 'react';
 import { User, Phone, Clock, Shirt, TrendingUp, Calendar, Award, Activity, Timer, FileText, ChevronDown, Loader2, Download } from 'lucide-react';
 
@@ -50,7 +50,7 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-violet-600"/></div>;
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-lime-600"/></div>;
   if (error) return <div className="text-center py-8 text-sm text-destructive">{error}</div>;
   if (!data) return null;
 
@@ -62,11 +62,11 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
       {/* Header */}
       <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white font-bold">{employee.full_name.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-lime-500 to-lime-600 flex items-center justify-center text-white font-bold">{employee.full_name.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
           <div>
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">{employee.full_name} <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{employee.role}</span> {employee.is_active ? '' : <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Inactive</span>}</h2>
-            <p className="text-xs text-muted-foreground">{employee.email} {employee.phone ? `· ${employee.phone}` : ''}</p>
-            <p className="text-xs font-mono text-muted-foreground">{data.from} → {data.to} · {scores.formula}</p>
+            <p className="text-xs text-muted-foreground">{employee.email} {employee.phone ? `Â· ${employee.phone}` : ''}</p>
+            <p className="text-xs font-mono text-muted-foreground">{data.from} â†’ {data.to} Â· {scores.formula}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -96,16 +96,16 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
             <div><p className="text-xs opacity-70 flex items-center gap-1 justify-center"><Clock size={12}/> Attend 30%</p><p className="text-xl font-bold">{scores.attendanceScore}</p></div>
             <div><p className="text-xs opacity-70 flex items-center gap-1 justify-center"><Shirt size={12}/> Dress 30%</p><p className="text-xl font-bold">{scores.dressScore}</p></div>
           </div>
-          <p className="text-xs mt-2 opacity-70">{scores.totalScore} = {scores.callScore}×0.4 + {scores.attendanceScore}×0.3 + {scores.dressScore}×0.3</p>
+          <p className="text-xs mt-2 opacity-70">{scores.totalScore} = {scores.callScore}Ã—0.4 + {scores.attendanceScore}Ã—0.3 + {scores.dressScore}Ã—0.3</p>
         </div>
       </div>
 
       {/* KPI Scorecards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Attendance', value: `${summary.days_worked}/${summary.total_days}`, sub: `${summary.late_days} late · ${summary.work_hours_label}`, icon: Calendar, color: 'text-sky-600 bg-sky-50' },
+          { label: 'Attendance', value: `${summary.days_worked}/${summary.total_days}`, sub: `${summary.late_days} late Â· ${summary.work_hours_label}`, icon: Calendar, color: 'text-sky-600 bg-sky-50' },
           { label: 'Calls', value: summary.totalCalls, sub: `${summary.convertedLeads} converted`, icon: Phone, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'Dress Code', value: summary.avg_dress_rating != null ? `${summary.avg_dress_rating}/5` : '—', sub: `${summary.evaluations_count} evals · ${summary.dress_pass_rate}% pass`, icon: Shirt, color: 'text-violet-600 bg-violet-50' },
+          { label: 'Dress Code', value: summary.avg_dress_rating != null ? `${summary.avg_dress_rating}/5` : 'â€”', sub: `${summary.evaluations_count} evals Â· ${summary.dress_pass_rate}% pass`, icon: Shirt, color: 'text-lime-600 bg-lime-50' },
           { label: 'Active Hours', value: summary.active_hours_label, sub: `${summary.actions} actions`, icon: Activity, color: 'text-amber-600 bg-amber-50' },
           { label: 'Work Hours', value: summary.work_hours_label, sub: `${summary.days_worked} days`, icon: Timer, color: 'text-slate-600 bg-slate-50' },
           { label: 'Grade', value: scores.grade, sub: `${scores.totalScore}/100`, icon: Award, color: 'text-indigo-600 bg-indigo-50' },
@@ -122,26 +122,26 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
       {/* Category bars + Evaluations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3"><TrendingUp size={14} className="text-violet-600"/> Category Breakdown</h3>
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3"><TrendingUp size={14} className="text-lime-600"/> Category Breakdown</h3>
           {Object.entries(category_scores).map(([k,v]) => (
             <div key={k} className="flex items-center gap-3 mb-2">
               <span className="text-xs text-muted-foreground w-32 truncate">{k}</span>
-              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-violet-500" style={{ width: `${v}%` }} /></div>
+              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-lime-500" style={{ width: `${v}%` }} /></div>
               <span className="text-xs font-bold w-8 text-right">{v}</span>
             </div>
           ))}
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3"><Shirt size={14} className="text-violet-600"/> Dress Code History ({evaluations.length})</h3>
+          <h3 className="text-sm font-semibold flex items-center gap-2 mb-3"><Shirt size={14} className="text-lime-600"/> Dress Code History ({evaluations.length})</h3>
           {evaluations.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No evaluations in this period.</p>
           : <div className="space-y-2 max-h-[220px] overflow-auto">
               {evaluations.map((e:any)=> (
                 <div key={e.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border">
                   <div>
-                    <p className="text-sm font-medium">{e.date} · <span className={e.dress_code_rating>=4 ? 'text-emerald-600' : e.dress_code_rating>=3 ? 'text-amber-600' : 'text-red-600'}>{e.dress_code_rating}/5</span> {e.evaluator?.full_name ? `by ${e.evaluator.full_name}`:''}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[260px]">{e.notes || (e.behavioral_flags||[]).join(', ') || '—'}</p>
+                    <p className="text-sm font-medium">{e.date} Â· <span className={e.dress_code_rating>=4 ? 'text-emerald-600' : e.dress_code_rating>=3 ? 'text-amber-600' : 'text-red-600'}>{e.dress_code_rating}/5</span> {e.evaluator?.full_name ? `by ${e.evaluator.full_name}`:''}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[260px]">{e.notes || (e.behavioral_flags||[]).join(', ') || 'â€”'}</p>
                   </div>
-                  <div className="text-xs font-mono">{e.dress_code_rating>=3 ? '✓ Pass' : '✗ Fail'}</div>
+                  <div className="text-xs font-mono">{e.dress_code_rating>=3 ? 'âœ“ Pass' : 'âœ— Fail'}</div>
                 </div>
               ))}
             </div>
@@ -154,16 +154,16 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
         <div className="bg-card border border-border rounded-xl p-4">
           <h3 className="text-sm font-semibold flex items-center gap-2 mb-3"><FileText size={14}/> Payroll & Deductions</h3>
           <div className="grid grid-cols-3 gap-3 text-center mb-3">
-            <div><p className="text-xs text-muted-foreground">Base Salary</p><p className="text-sm font-bold">{(data as any).payroll.baseSalary ?? '—'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Base Salary</p><p className="text-sm font-bold">{(data as any).payroll.baseSalary ?? 'â€”'}</p></div>
             <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="text-sm font-bold text-red-600">{(data as any).payroll.totalDeductions ?? 0}</p></div>
-            <div><p className="text-xs text-muted-foreground">Net Payout</p><p className="text-sm font-bold text-emerald-600">{(data as any).payroll.netPayout ?? '—'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Net Payout</p><p className="text-sm font-bold text-emerald-600">{(data as any).payroll.netPayout ?? 'â€”'}</p></div>
           </div>
           {(data as any).deductions.length > 0 ? (
             <div className="space-y-1 max-h-[180px] overflow-auto">
               {(data as any).deductions.map((d: any) => (
                 <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-200 text-xs">
-                  <span className="font-medium text-red-800">{d.reason} <span className="text-muted-foreground">· {d.source_ref}</span></span>
-                  <span className="font-bold">{d.amount} · {d.month_year} {d.is_applied ? '✓' : '○'}</span>
+                  <span className="font-medium text-red-800">{d.reason} <span className="text-muted-foreground">Â· {d.source_ref}</span></span>
+                  <span className="font-bold">{d.amount} Â· {d.month_year} {d.is_applied ? 'âœ“' : 'â—‹'}</span>
                 </div>
               ))}
             </div>
@@ -173,7 +173,7 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
               <p className="text-xs font-semibold mb-1">Notifications sent</p>
               <div className="space-y-1">
                 {(data as any).notifications.slice(0,5).map((n:any)=>(
-                  <div key={n.id} className="text-xs p-2 rounded bg-amber-50 border border-amber-200">{n.title} · {n.message} {n.is_read ? '✓ Read' : '○ Unread'}</div>
+                  <div key={n.id} className="text-xs p-2 rounded bg-amber-50 border border-amber-200">{n.title} Â· {n.message} {n.is_read ? 'âœ“ Read' : 'â—‹ Unread'}</div>
                 ))}
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
           {data.timeline.slice(0,80).map((t:any,i:number)=> (
             <div key={i} className="flex gap-3 text-xs py-1.5 border-b border-border/50 last:border-0">
               <span className="text-muted-foreground font-mono whitespace-nowrap">{String(t.at).slice(0,16).replace('T',' ')}</span>
-              <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${t.type==='evaluation'?'bg-violet-100 text-violet-700': t.type==='call'?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-700'}`}>{t.type}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${t.type==='evaluation'?'bg-lime-50 text-lime-700': t.type==='call'?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-700'}`}>{t.type}</span>
               <span className="font-medium truncate">{t.label}</span>
               <span className="text-muted-foreground truncate hidden sm:inline">{t.detail}</span>
             </div>

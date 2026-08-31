@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Trophy, Loader2, RefreshCw, Phone, Clock, Shirt, TrendingUp, Crown, Medal, Award } from 'lucide-react';
 
@@ -51,10 +51,10 @@ export default function WeightedLeaderboard() {
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <div className="p-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow"><Trophy size={16} className="text-white"/></div>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-lime-500 to-lime-600 flex items-center justify-center shadow"><Trophy size={16} className="text-white"/></div>
           <div>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">Performance Leaderboard <span className="text-xs font-normal text-muted-foreground hidden sm:inline">· Weighted 40/30/30</span></h2>
-            <p className="text-xs text-muted-foreground font-mono">{range ? `${range.start} → ${range.end}` : ''} · Total = Call×0.40 + Att×0.30 + Dress×0.30</p>
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-1.5">Performance Leaderboard <span className="text-xs font-normal text-muted-foreground hidden sm:inline">Â· Weighted 40/30/30</span></h2>
+            <p className="text-xs text-muted-foreground font-mono">{range ? `${range.start} â†’ ${range.end}` : ''} Â· Total = CallÃ—0.40 + AttÃ—0.30 + DressÃ—0.30</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -67,25 +67,25 @@ export default function WeightedLeaderboard() {
         </div>
       </div>
 
-      {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-violet-600"/></div>
-      : error ? <div className="text-center py-10"><p className="text-sm text-muted-foreground mb-3">Couldn’t load leaderboard.</p><button onClick={load} className="btn-secondary text-sm">Retry</button></div>
+      {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-lime-600"/></div>
+      : error ? <div className="text-center py-10"><p className="text-sm text-muted-foreground mb-3">Couldnâ€™t load leaderboard.</p><button onClick={load} className="btn-secondary text-sm">Retry</button></div>
       : users.length===0 ? <p className="text-sm text-muted-foreground text-center py-12">No data for this period.</p>
       : <div className="divide-y divide-border">
           {users.map(u => (
-            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3 flex items-center gap-3 hover:bg-violet-50/50 transition-colors cursor-pointer ${u.rank<=3 ? 'bg-gradient-to-r from-violet-50/50 to-transparent' : ''}`}>
+            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3 flex items-center gap-3 hover:bg-lime-50/50 transition-colors cursor-pointer ${u.rank<=3 ? 'bg-gradient-to-r from-violet-50/50 to-transparent' : ''}`}>
               <RankIcon rank={u.rank}/>
-              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-violet-700">{(u.full_name||u.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</span></div>
+              <div className="w-8 h-8 rounded-full bg-lime-50 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-lime-700">{(u.full_name||u.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</span></div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1">{u.full_name || u.email} <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${u.rank===1 ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>{u.role}</span> <span className="text-[11px] text-violet-600 hidden sm:inline">360 →</span></p>
+                <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1">{u.full_name || u.email} <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${u.rank===1 ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>{u.role}</span> <span className="text-[11px] text-lime-600 hidden sm:inline">360 â†’</span></p>
                 <div className="flex gap-3 mt-1">
                   <ScoreBar label="Call 40%" value={u.scores.callScore} icon={<Phone size={10} className="text-emerald-500"/>} color="bg-emerald-500"/>
                   <ScoreBar label="Attend 30%" value={u.scores.attendanceScore} icon={<Clock size={10} className="text-sky-500"/>} color="bg-sky-500"/>
-                  <ScoreBar label="Dress 30%" value={u.scores.dressScore} icon={<Shirt size={10} className="text-violet-500"/>} color="bg-violet-500"/>
+                  <ScoreBar label="Dress 30%" value={u.scores.dressScore} icon={<Shirt size={10} className="text-lime-500"/>} color="bg-lime-500"/>
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="flex items-center gap-1 justify-end"><TrendingUp size={12} className="text-violet-600"/><span className="text-lg font-extrabold text-foreground">{u.totalScore}</span><span className="text-xs text-muted-foreground">/100</span></div>
-                <p className="text-[11px] text-muted-foreground">{u.metrics.totalCalls} calls · {u.metrics.presentDays}/{u.metrics.totalDays} days · {u.metrics.avgDressRating!=null ? `${u.metrics.avgDressRating}/5` : 'no rating'}</p>
+                <div className="flex items-center gap-1 justify-end"><TrendingUp size={12} className="text-lime-600"/><span className="text-lg font-extrabold text-foreground">{u.totalScore}</span><span className="text-xs text-muted-foreground">/100</span></div>
+                <p className="text-[11px] text-muted-foreground">{u.metrics.totalCalls} calls Â· {u.metrics.presentDays}/{u.metrics.totalDays} days Â· {u.metrics.avgDressRating!=null ? `${u.metrics.avgDressRating}/5` : 'no rating'}</p>
               </div>
             </a>
           ))}

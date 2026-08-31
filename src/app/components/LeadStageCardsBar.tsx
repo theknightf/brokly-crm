@@ -22,7 +22,7 @@ const STAGES: { key: keyof LeadStageStats; label: string; icon: any; badge: stri
   { key: 'newFresh', label: 'New Fresh', icon: Flame, badge: 'bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' },
   { key: 'newCold', label: 'New Cold', icon: Snowflake, badge: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' },
   { key: 'leadsPending', label: 'Leads Pending', icon: Pause, badge: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' },
-  { key: 'callsAnswer', label: 'Calls Answer', icon: Phone, badge: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' },
+  { key: 'callsAnswer', label: 'Calls Answer', icon: Phone, badge: 'bg-lime-50 dark:bg-lime-500/10 text-lime-700 dark:text-lime-400' },
   { key: 'noAnswer', label: 'No Answer', icon: PhoneOff, badge: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400' },
   { key: 'cancel', label: 'Cancel', icon: XCircle, badge: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' },
   { key: 'doneDeal', label: 'D.Deal', icon: CheckCircle, badge: 'bg-lime-50 dark:bg-lime-500/10 text-lime-600 dark:text-lime-400' },
