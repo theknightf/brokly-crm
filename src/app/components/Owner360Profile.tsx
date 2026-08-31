@@ -65,8 +65,8 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-lime-500 to-lime-600 flex items-center justify-center text-white font-bold">{employee.full_name.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
           <div>
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">{employee.full_name} <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{employee.role}</span> {employee.is_active ? '' : <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Inactive</span>}</h2>
-            <p className="text-xs text-muted-foreground">{employee.email} {employee.phone ? `Â· ${employee.phone}` : ''}</p>
-            <p className="text-xs font-mono text-muted-foreground">{data.from} â†’ {data.to} Â· {scores.formula}</p>
+            <p className="text-xs text-muted-foreground">{employee.email} {employee.phone ? `· ${employee.phone}` : ''}</p>
+            <p className="text-xs font-mono text-muted-foreground">{data.from} → {data.to} · {scores.formula}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -103,9 +103,9 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
       {/* KPI Scorecards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Attendance', value: `${summary.days_worked}/${summary.total_days}`, sub: `${summary.late_days} late Â· ${summary.work_hours_label}`, icon: Calendar, color: 'text-sky-600 bg-sky-50' },
+          { label: 'Attendance', value: `${summary.days_worked}/${summary.total_days}`, sub: `${summary.late_days} late · ${summary.work_hours_label}`, icon: Calendar, color: 'text-sky-600 bg-sky-50' },
           { label: 'Calls', value: summary.totalCalls, sub: `${summary.convertedLeads} converted`, icon: Phone, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'Dress Code', value: summary.avg_dress_rating != null ? `${summary.avg_dress_rating}/5` : 'â€”', sub: `${summary.evaluations_count} evals Â· ${summary.dress_pass_rate}% pass`, icon: Shirt, color: 'text-lime-600 bg-lime-50' },
+          { label: 'Dress Code', value: summary.avg_dress_rating != null ? `${summary.avg_dress_rating}/5` : '—', sub: `${summary.evaluations_count} evals · ${summary.dress_pass_rate}% pass`, icon: Shirt, color: 'text-lime-600 bg-lime-50' },
           { label: 'Active Hours', value: summary.active_hours_label, sub: `${summary.actions} actions`, icon: Activity, color: 'text-amber-600 bg-amber-50' },
           { label: 'Work Hours', value: summary.work_hours_label, sub: `${summary.days_worked} days`, icon: Timer, color: 'text-slate-600 bg-slate-50' },
           { label: 'Grade', value: scores.grade, sub: `${scores.totalScore}/100`, icon: Award, color: 'text-indigo-600 bg-indigo-50' },
@@ -138,10 +138,10 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
               {evaluations.map((e:any)=> (
                 <div key={e.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border">
                   <div>
-                    <p className="text-sm font-medium">{e.date} Â· <span className={e.dress_code_rating>=4 ? 'text-emerald-600' : e.dress_code_rating>=3 ? 'text-amber-600' : 'text-red-600'}>{e.dress_code_rating}/5</span> {e.evaluator?.full_name ? `by ${e.evaluator.full_name}`:''}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[260px]">{e.notes || (e.behavioral_flags||[]).join(', ') || 'â€”'}</p>
+                    <p className="text-sm font-medium">{e.date} · <span className={e.dress_code_rating>=4 ? 'text-emerald-600' : e.dress_code_rating>=3 ? 'text-amber-600' : 'text-red-600'}>{e.dress_code_rating}/5</span> {e.evaluator?.full_name ? `by ${e.evaluator.full_name}`:''}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[260px]">{e.notes || (e.behavioral_flags||[]).join(', ') || '—'}</p>
                   </div>
-                  <div className="text-xs font-mono">{e.dress_code_rating>=3 ? 'âœ“ Pass' : 'âœ— Fail'}</div>
+                  <div className="text-xs font-mono">{e.dress_code_rating>=3 ? '✓ Pass' : '✗ Fail'}</div>
                 </div>
               ))}
             </div>
@@ -154,16 +154,16 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
         <div className="bg-card border border-border rounded-xl p-4">
           <h3 className="text-sm font-semibold flex items-center gap-2 mb-3"><FileText size={14}/> Payroll & Deductions</h3>
           <div className="grid grid-cols-3 gap-3 text-center mb-3">
-            <div><p className="text-xs text-muted-foreground">Base Salary</p><p className="text-sm font-bold">{(data as any).payroll.baseSalary ?? 'â€”'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Base Salary</p><p className="text-sm font-bold">{(data as any).payroll.baseSalary ?? '—'}</p></div>
             <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="text-sm font-bold text-red-600">{(data as any).payroll.totalDeductions ?? 0}</p></div>
-            <div><p className="text-xs text-muted-foreground">Net Payout</p><p className="text-sm font-bold text-emerald-600">{(data as any).payroll.netPayout ?? 'â€”'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Net Payout</p><p className="text-sm font-bold text-emerald-600">{(data as any).payroll.netPayout ?? '—'}</p></div>
           </div>
           {(data as any).deductions.length > 0 ? (
             <div className="space-y-1 max-h-[180px] overflow-auto">
               {(data as any).deductions.map((d: any) => (
                 <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-200 text-xs">
-                  <span className="font-medium text-red-800">{d.reason} <span className="text-muted-foreground">Â· {d.source_ref}</span></span>
-                  <span className="font-bold">{d.amount} Â· {d.month_year} {d.is_applied ? 'âœ“' : 'â—‹'}</span>
+                  <span className="font-medium text-red-800">{d.reason} <span className="text-muted-foreground">· {d.source_ref}</span></span>
+                  <span className="font-bold">{d.amount} · {d.month_year} {d.is_applied ? '✓' : '✗'}</span>
                 </div>
               ))}
             </div>
@@ -173,7 +173,7 @@ export default function Owner360Profile({ employeeId, initialFrom, initialTo }: 
               <p className="text-xs font-semibold mb-1">Notifications sent</p>
               <div className="space-y-1">
                 {(data as any).notifications.slice(0,5).map((n:any)=>(
-                  <div key={n.id} className="text-xs p-2 rounded bg-amber-50 border border-amber-200">{n.title} Â· {n.message} {n.is_read ? 'âœ“ Read' : 'â—‹ Unread'}</div>
+                  <div key={n.id} className="text-xs p-2 rounded bg-amber-50 border border-amber-200">{n.title} · {n.message} {n.is_read ? '✓ Read' : '✗ Unread'}</div>
                 ))}
               </div>
             </div>

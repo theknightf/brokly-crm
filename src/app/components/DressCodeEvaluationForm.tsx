@@ -48,7 +48,7 @@ export default function DressCodeEvaluationForm() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Failed');
-      toast.success('Dress code evaluation saved â€” Leaderboard updated');
+      toast.success('Dress code evaluation saved — Leaderboard updated');
       setNotes(''); setFlags('');
     } catch (e: any) {
       toast.error(e.message || 'Failed to submit');
@@ -74,8 +74,8 @@ export default function DressCodeEvaluationForm() {
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5">Employee *</label>
           <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all">
-            <option value="">Select employeeâ€¦</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} Â· {e.role}</option>)}
+            <option value="">Select employee…</option>
+            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} · {e.role}</option>)}
           </select>
         </div>
         <div>
@@ -94,7 +94,7 @@ export default function DressCodeEvaluationForm() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">{rating<=2 ? 'Needs improvement' : rating===3 ? 'Acceptable' : rating===4 ? 'Good' : 'Exemplary'} Â· {Math.round(rating/5*100)}% â†’ DressScore</p>
+        <p className="text-xs text-muted-foreground mt-1">{rating<=2 ? 'Needs improvement' : rating===3 ? 'Acceptable' : rating===4 ? 'Good' : 'Exemplary'} · {Math.round(rating/5*100)}% → DressScore</p>
       </div>
 
       <div className="mt-4">
@@ -103,13 +103,13 @@ export default function DressCodeEvaluationForm() {
       </div>
       <div className="mt-3">
         <label className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observationâ€¦" rows={2} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm resize-none" />
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm resize-none" />
       </div>
 
       <button onClick={submit} disabled={submitting || !employeeId} className="btn-primary w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50">
         {submitting ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>} Submit Evaluation
       </button>
-      <p className="text-[11px] text-muted-foreground text-center mt-2">Writes to <code>evaluations</code> â†’ <code>activity_log</code> â†’ Leaderboard & 360 profile update instantly</p>
+      <p className="text-[11px] text-muted-foreground text-center mt-2">Writes to <code>evaluations</code> → <code>activity_log</code> → Leaderboard & 360 profile update instantly</p>
     </div>
   );
 }

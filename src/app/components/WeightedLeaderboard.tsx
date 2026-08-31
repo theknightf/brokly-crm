@@ -69,7 +69,7 @@ export default function WeightedLeaderboard() {
       </div>
 
       {loading ? <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-lime-600"/></div>
-      : error ? <div className="text-center py-10"><p className="text-sm text-muted-foreground mb-3">Couldnâ€™t load leaderboard.</p><button onClick={load} className="btn-secondary text-sm">Retry</button></div>
+      : error ? <div className="text-center py-10"><p className="text-sm text-muted-foreground mb-3">Couldn’t load leaderboard.</p><button onClick={load} className="btn-secondary text-sm">Retry</button></div>
       : users.length===0 ? <p className="text-sm text-muted-foreground text-center py-12">No data for this period.</p>
       : <div className="divide-y divide-border">
           {users.map(u => (
@@ -86,7 +86,7 @@ export default function WeightedLeaderboard() {
               </div>
               <div className="text-right flex-shrink-0">
                 <div className="flex items-center gap-1 justify-end"><TrendingUp size={12} className="text-lime-400"/><span className="text-sm font-bold text-lime-400">{u.totalScore}</span><span className="text-xs text-zinc-400">/100</span></div>
-                <p className="text-[11px] text-muted-foreground">{u.metrics.totalCalls} calls Â· {u.metrics.presentDays}/{u.metrics.totalDays} days Â· {u.metrics.avgDressRating!=null ? `${u.metrics.avgDressRating}/5` : 'no rating'}</p>
+                <p className="text-[11px] text-muted-foreground">{u.metrics.totalCalls} calls · {u.metrics.presentDays}/{u.metrics.totalDays} days · {u.metrics.avgDressRating!=null ? `${u.metrics.avgDressRating}/5` : 'no rating'}</p>
               </div>
             </a>
           ))}

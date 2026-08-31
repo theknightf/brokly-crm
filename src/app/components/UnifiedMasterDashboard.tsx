@@ -130,7 +130,7 @@ export default function UnifiedMasterDashboard() {
           <div className="w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white flex items-center justify-center shadow"><ShieldCheck size={18} className="text-white dark:text-zinc-900"/></div>
           <div>
             <h1 className="text-zinc-900 dark:text-white font-bold text-xl">Executive Master Dashboard</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm">Identical for <span className="font-semibold text-zinc-900 dark:text-white">Admin</span> & <span className="font-semibold text-zinc-900 dark:text-white">Owner</span> Â· {data.period?.from} â†’ {data.period?.to} Â· {data.leadSummary?.total ?? 0} leads</p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm">Identical for <span className="font-semibold text-zinc-900 dark:text-white">Admin</span> & <span className="font-semibold text-zinc-900 dark:text-white">Owner</span><span className="mx-1 text-zinc-400">•</span>{data.period?.from} → {data.period?.to}<span className="mx-1 text-zinc-400">•</span>{data.leadSummary?.total ?? 0} leads</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ export default function UnifiedMasterDashboard() {
         </div>
       </div>
 
-      {/* View Switcher Toggle â€” Sales & Team Performance vs Leads Pipeline & Data Hub */}
+      {/* View Switcher Toggle — Sales & Team Performance vs Leads Pipeline & Data Hub */}
       <div className="bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-2xl p-1.5 flex gap-1.5">
         <button
           onClick={() => setMode('sales')}
@@ -158,16 +158,16 @@ export default function UnifiedMasterDashboard() {
         </button>
       </div>
 
-      {/* Lead Stages Grid â€” directly below tabs per spec hierarchy */}
+      {/* Lead Stages Grid — directly below tabs per spec hierarchy */}
       <LeadStageCardsBar stats={stageStats as any} activeStageKey={activeStageKeyForBar} onStageClick={handleStageClick} />
 
       {mode === 'sales' ? (
         <>
-          {/* Executive Overview â€” Sales */}
+          {/* Executive Overview — Sales */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             {[
               { label: 'Total Employees', value: data.summary.totalEmployees, icon: Users, color: 'text-slate-700 bg-slate-100' },
-              { label: 'Present Today', value: data.summary.presentToday, sub: `${data.summary.absentToday} absent Â· ${data.summary.lateToday} late`, icon: Calendar, color: 'text-emerald-600 bg-emerald-50' },
+              { label: 'Present Today', value: data.summary.presentToday, sub: `${data.summary.absentToday} absent · ${data.summary.lateToday} late`, icon: Calendar, color: 'text-emerald-600 bg-emerald-50' },
               { label: 'Avg Hours', value: `${data.summary.avgHours}h`, sub: `${data.summary.totalHours}h total`, icon: Clock, color: 'text-sky-600 bg-sky-50' },
               { label: 'Attendance Rate', value: `${data.summary.attendanceRate}%`, icon: BarChart3, color: 'text-indigo-600 bg-indigo-50' },
               { label: 'Expenses', value: `${data.expenses.totalThis}`, sub: `${data.expenses.changePct>=0?'+':''}${data.expenses.changePct}%`, icon: Banknote, color: 'text-amber-600 bg-amber-50' },
@@ -185,7 +185,7 @@ export default function UnifiedMasterDashboard() {
           {/* Sales KPIs + Conversion */}
           {data.conversionMetrics && (
             <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2"><ShoppingBag size={16} className="text-emerald-600"/><h3 className="text-sm font-bold">Sales Performance KPIs â†” Lead Analytics</h3></div>
+              <div className="flex items-center gap-2"><ShoppingBag size={16} className="text-emerald-600"/><h3 className="text-sm font-bold">Sales Performance KPIs ↔ Lead Analytics</h3></div>
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300">
                   Conversion: <strong className="text-lime-400">{data.conversionMetrics.conversionRate}%</strong>
@@ -209,7 +209,7 @@ export default function UnifiedMasterDashboard() {
           {/* Live Leaderboard table for 360 drill-down */}
           <div id="leaderboard-table" className="bg-card border border-border rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Live Leaderboard (Unified) â€” 40% Valid Calls Â· 30% Attendance Â· 30% Dress</h3>
+              <h3 className="text-sm font-bold flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Live Leaderboard (Unified) — 40% Valid Calls · 30% Attendance · 30% Dress</h3>
               <span className="text-xs text-muted-foreground">{data.leaderboard.length} ranked</span>
             </div>
             <div className="overflow-x-auto">
@@ -221,7 +221,7 @@ export default function UnifiedMasterDashboard() {
                   {data.leaderboard.slice(0,10).map((r: any) => (
                     <tr key={r.id} className="hover:bg-muted/20">
                       <td className="px-4 py-2 font-bold">{r.rank}</td>
-                      <td className="px-2 py-2"><span className="font-medium">{r.name}</span> <span className="text-xs text-muted-foreground">Â· {r.role}</span></td>
+                      <td className="px-2 py-2"><span className="font-medium">{r.name}</span> <span className="text-xs text-muted-foreground">· {r.role}</span></td>
                       <td className="text-center">{r.scores.callScore}</td>
                       <td className="text-center">{r.scores.attendanceScore}</td>
                       <td className="text-center">{r.scores.dressScore}</td>
@@ -242,7 +242,7 @@ export default function UnifiedMasterDashboard() {
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.deductions.recent.map((d:any)=>(
                     <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-200 text-xs">
-                      <div><p className="font-semibold text-red-800">{d.reason}</p><p className="text-muted-foreground">{d.source_ref} Â· {d.month_year}</p></div>
+                      <div><p className="font-semibold text-red-800">{d.reason}</p><p className="text-muted-foreground">{d.source_ref} · {d.month_year}</p></div>
                       <div className="text-right"><p className="font-bold">-{d.amount}</p><p className={d.is_applied ? 'text-emerald-600' : 'text-amber-600'}>{d.is_applied ? 'Applied' : 'Pending'}</p></div>
                     </div>
                   ))}
@@ -250,17 +250,17 @@ export default function UnifiedMasterDashboard() {
               }
             </div>
             <div className="bg-card border border-border rounded-xl p-4">
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Bell size={14} className="text-lime-700"/> Instant Alerts (NotificationLog) â€” {data.notifications.unread} unread</h3>
+              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Bell size={14} className="text-lime-700"/> Instant Alerts (NotificationLog) — {data.notifications.unread} unread</h3>
               {data.notifications.recent.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No alerts.</p>
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.notifications.recent.map((n:any)=>(
                     <div key={n.id} className={`p-2 rounded-lg border text-xs ${n.is_read ? 'bg-muted/30 border-border' : 'bg-lime-50 border-lime-200'}`}>
-                      <p className="font-semibold">{n.title}</p><p className="text-muted-foreground line-clamp-2">{n.message}</p><p className="text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString()} {n.is_read ? 'Â· Read' : 'Â· Unread'}</p>
+                      <p className="font-semibold">{n.title}</p><p className="text-muted-foreground line-clamp-2">{n.message}</p><p className="text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString()} {n.is_read ? '· Read' : '· Unread'}</p>
                     </div>
                   ))}
                 </div>
               }
-              <a href="/admin?tab=payroll" className="text-xs text-lime-700 hover:underline mt-2 inline-block">View payroll â†’</a>
+              <a href="/admin?tab=payroll" className="text-xs text-lime-700 hover:underline mt-2 inline-block">View payroll →</a>
             </div>
           </div>
         </>
@@ -275,7 +275,7 @@ export default function UnifiedMasterDashboard() {
               </div>
             </div>
             <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
-              <div><p className="text-xs text-muted-foreground">Conversion</p><p className="text-sm font-bold">{data.conversionMetrics?.conversionRate ?? 0}% Â· {data.conversionMetrics?.doneDeal ?? 0} won</p></div>
+              <div><p className="text-xs text-muted-foreground">Conversion</p><p className="text-sm font-bold">{data.conversionMetrics?.conversionRate ?? 0}% · {data.conversionMetrics?.doneDeal ?? 0} won</p></div>
               <span className="text-xs bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">{Number(data.conversionMetrics?.revenue||0).toLocaleString()} EGP</span>
             </div>
             <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
@@ -314,10 +314,10 @@ export default function UnifiedMasterDashboard() {
                     {filteredLeads.slice(0,50).map((l:any)=>(
                       <tr key={l.id} className="hover:bg-muted/20">
                         <td className="px-4 py-2"><a href={`/leads/${l.id}`} className="font-medium text-lime-700 hover:underline">{l.name || 'Lead'}</a><span className="ml-2 text-xs text-muted-foreground">{l.source||''}</span></td>
-                        <td className="px-2 py-2 font-mono text-xs">{l.phone||'â€”'}</td>
-                        <td className="text-center"><span className="text-xs bg-muted px-2 py-0.5 rounded-full">{l.crm_status || l.lead_status||'â€”'}</span></td>
+                        <td className="px-2 py-2 font-mono text-xs">{l.phone||'—'}</td>
+                        <td className="text-center"><span className="text-xs bg-muted px-2 py-0.5 rounded-full">{l.crm_status || l.lead_status||'—'}</span></td>
                         <td className="text-center text-xs">{l.assigned_to_profile?.full_name || l.assigned_to || 'Unassigned'}</td>
-                        <td className="text-right px-4"><a href={`/leads/${l.id}`} className="text-xs text-lime-700 hover:underline">Profile â†’</a></td>
+                        <td className="text-right px-4"><a href={`/leads/${l.id}`} className="text-xs text-lime-700 hover:underline">Profile →</a></td>
                       </tr>
                     ))}
                   </tbody>
@@ -328,7 +328,7 @@ export default function UnifiedMasterDashboard() {
                 {filteredLeads.slice(0,24).map((l:any)=>(
                   <a key={l.id} href={`/leads/${l.id}`} className="block bg-card border border-border rounded-xl p-3 hover:border-lime-200 hover:shadow-sm transition-all">
                     <p className="font-semibold text-sm truncate">{l.name || 'Lead'}</p>
-                    <p className="text-xs text-muted-foreground">{l.phone} Â· {l.source||'â€”'}</p>
+                    <p className="text-xs text-muted-foreground">{l.phone} · {l.source||'—'}</p>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-xs bg-lime-50 border border-lime-200 px-2 py-0.5 rounded-full">{l.crm_status || l.lead_status}</span>
                       <span className="text-xs text-muted-foreground">{l.assigned_to ? 'Assigned' : 'Unassigned'}</span>
