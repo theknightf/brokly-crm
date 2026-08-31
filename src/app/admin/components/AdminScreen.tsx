@@ -46,8 +46,7 @@ import LeaveTab from './LeaveTab';
 import KpiTargetsTab from './KpiTargetsTab';
 import TasksTab from './TasksTab';
 import RotationTab from './RotationTab';
-import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
-import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
+import UnifiedMasterDashboard from '@/app/components/UnifiedMasterDashboard';
 
 type TabKey =
   | 'leadSources'
@@ -749,10 +748,7 @@ export default function AdminScreen() {
           ) : activeTab === 'productivity' ? (
             <ProductivityDashboard />
           ) : activeTab === 'performance360' ? (
-            <div className="space-y-6">
-              <DressCodeEvaluationForm />
-              <WeightedLeaderboard />
-            </div>
+            <UnifiedMasterDashboard />
           ) : activeTab === 'callLogs' ? (
             <CallLogsTab />
           ) : activeTab === 'emailTemplates' ? (
