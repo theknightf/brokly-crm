@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, TrendingUp, Calendar, Users, BarChart3, ExternalLink, Loader2, RefreshCw, Bell, Zap, Filter, ArrowRight, Target, ShoppingBag, PhoneOff, XCircle, CheckCircle, Flame, Snowflake, Pause, LayoutGrid, List, Search, RotateCw } from 'lucide-react';
 import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
 import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
-import OwnerQuickActionsBar from '@/app/components/OwnerQuickActionsBar';
 import LeadStageCardsBar from '@/app/components/LeadStageCardsBar';
 import { toast } from 'sonner';
 
@@ -124,55 +123,43 @@ export default function UnifiedMasterDashboard() {
   const filteredLeads = pipelineLeads;
 
   return (
-    <div className="space-y-6">
-      {/* 1-Click Quick Actions Bar — top of Dashboard per spec */}
-      <OwnerQuickActionsBar onLeaderboard={scrollToLeaderboard} />
-
-      {/* Header - identical for Admin & Owner */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen transition-colors duration-200 space-y-6 p-4 md:p-6 -m-4 md:-m-6">
+      {/* Header - page MUST start here per spec - no purple banner above */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow"><ShieldCheck size={18} className="text-white"/></div>
+          <div className="w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white flex items-center justify-center shadow"><ShieldCheck size={18} className="text-white dark:text-zinc-900"/></div>
           <div>
-            <h1 className="text-lg font-bold text-foreground">Executive Master Dashboard</h1>
-            <p className="text-xs text-muted-foreground">Identical for <span className="font-semibold text-violet-600">Admin</span> & <span className="font-semibold text-indigo-600">Owner</span> · {data.period?.from} → {data.period?.to} · {data.leadSummary?.total ?? 0} leads · {data.summary?.conversionRate ?? 0}% conv</p>
+            <h1 className="text-zinc-900 dark:text-white font-bold text-xl">Executive Master Dashboard</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm">Identical for <span className="font-semibold text-zinc-900 dark:text-white">Admin</span> & <span className="font-semibold text-zinc-900 dark:text-white">Owner</span> · {data.period?.from} → {data.period?.to} · {data.leadSummary?.total ?? 0} leads</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-muted rounded-lg p-1">
-            <button onClick={() => setRange('week')} className={`px-3 py-1 rounded-full text-xs font-medium ${range==='week'?'bg-card shadow':''}`}>Week</button>
-            <button onClick={() => setRange('month')} className={`px-3 py-1 rounded-full text-xs font-medium ${range==='month'?'bg-card shadow':''}`}>Month</button>
-          </div>
-          <button onClick={load} className="p-2 rounded-lg hover:bg-muted"><RefreshCw size={14}/></button>
+          <button onClick={() => setRange('week')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='week' ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Week</button>
+          <button onClick={() => setRange('month')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='month' ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Month</button>
+          <button onClick={load} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-2 rounded-xl transition-colors"><RefreshCw size={14}/></button>
         </div>
       </div>
 
-      {/* Dual-Mode Toggle — sleek minimalist segmented control */}
-      <div className="sticky top-2 z-20 bg-zinc-900/80 backdrop-blur-xl border border-zinc-800 rounded-2xl p-1.5 shadow-sm flex gap-1.5">
+      {/* View Switcher Toggle — Sales & Team Performance vs Leads Pipeline & Data Hub */}
+      <div className="bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-2xl p-1.5 flex gap-1.5">
         <button
           onClick={() => setMode('sales')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all border ${mode==='sales' ? 'bg-zinc-800 text-zinc-100 shadow-sm border-zinc-700/60' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border-transparent'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-lime-500 text-zinc-950 font-bold shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
         >
           <Users size={16}/> Sales & Team Performance
-          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-lime-500/20 text-lime-400">{data.leaderboard.length}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='sales' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.leaderboard.length}</span>
         </button>
         <button
           onClick={() => setMode('leads')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all border ${mode==='leads' ? 'bg-zinc-800 text-zinc-100 shadow-sm border-zinc-700/60' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border-transparent'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-lime-500 text-zinc-950 font-bold shadow-sm' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
         >
           <Target size={16}/> Leads Pipeline & Data Hub
-          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-lime-500/20 text-lime-400">{data.summary?.totalLeads ?? 0}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.summary?.totalLeads ?? 0}</span>
         </button>
       </div>
 
-      {/* Lead Stages Grid — responsive, enterprise card styling */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-foreground flex items-center gap-2"><BarChart3 size={14} className="text-violet-600"/> Lead Stages — 1-Click Filter</h3>
-          {stageFilter && <button onClick={() => setStageFilter(null)} className="text-xs bg-zinc-800 text-zinc-100 border border-zinc-700/60 px-3 py-1 rounded-full flex items-center gap-1 hover:bg-zinc-700"><Filter size={12}/> Reset <span className="font-semibold">{stageFilter}</span></button>}
-        </div>
-        <LeadStageCardsBar stats={stageStats as any} activeStageKey={activeStageKeyForBar} onStageClick={handleStageClick} />
-        <p className="text-xs text-muted-foreground">Click any card to instantly filter the pipeline table/Kanban below. <span className="font-mono bg-muted px-1 py-0.5 rounded">GET /api/dashboard/unified-master.leadStageStats</span></p>
-      </div>
+      {/* Lead Stages Grid — directly below tabs per spec hierarchy */}
+      <LeadStageCardsBar stats={stageStats as any} activeStageKey={activeStageKeyForBar} onStageClick={handleStageClick} />
 
       {mode === 'sales' ? (
         <>
@@ -357,8 +344,6 @@ export default function UnifiedMasterDashboard() {
           </div>
         </>
       )}
-
-      <p className="text-xs text-center text-muted-foreground">Single unified endpoint <code className="bg-muted px-1 py-0.5 rounded">GET /api/dashboard/unified-master</code> · modes <code>sales|leads</code> · interactive stage cards → Kanban/Table filter · `leadStageStats` + `teamPerformance` + `payrollDeductionsSummary`</p>
     </div>
   );
 }
