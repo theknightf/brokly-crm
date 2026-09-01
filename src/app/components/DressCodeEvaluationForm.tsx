@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import React, { useEffect, useState } from 'react';
 import { Shirt, Star, Loader2, Check, AlertCircle, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
@@ -68,6 +68,7 @@ export default function DressCodeEvaluationForm() {
           <p className="text-xs text-muted-foreground">Admin input → feeds Leaderboard (30%) & Owner 360 in real-time</p>
         </div>
       </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -109,8 +110,8 @@ export default function DressCodeEvaluationForm() {
         <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm resize-none" />
       </div>
 
-      <button onClick={submit} disabled={submitting || !employeeId} className="bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold rounded-xl py-3 w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-sm hover:shadow-[0_0_16px_rgba(163,230,53,0.3)]">
-        {submitting ? <Loader2 size={14} className="animate-spin text-zinc-950"/> : <Check size={14} className="text-zinc-950"/>} Submit Evaluation
+      <button onClick={submit} disabled={submitting || !employeeId} className="btn-primary w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50">
+        {submitting ? <Loader2 size={14} className="animate-spin"/> : <Check size={14}/>} Submit Evaluation
       </button>
       <p className="text-[11px] text-muted-foreground text-center mt-2">Writes to <code>evaluations</code> → <code>activity_log</code> → Leaderboard & 360 profile update instantly</p>
     </div>
