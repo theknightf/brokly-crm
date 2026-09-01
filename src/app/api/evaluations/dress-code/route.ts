@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     if (!employeeId) return NextResponse.json({ error: 'employeeId required' }, { status: 400 });
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'date must be YYYY-MM-DD' }, { status: 400 });
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return NextResponse.json({ error: 'dressCodeRating must be 1-5' }, { status: 400 });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 3) return NextResponse.json({ error: 'dressCodeRating must be 1-3 (1=Casual, 2=Semi-Formal, 3=Classic/Formal)' }, { status: 400 });
 
     // Verify employee exists
     const { data: emp } = await (supabase as any).from('user_profiles').select('id').eq('id', employeeId).maybeSingle();

@@ -84,16 +84,20 @@ export default function DressCodeEvaluationForm() {
       </div>
 
       <div className="mt-4">
-        <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating (1–5) *</label>
-        <div className="flex items-center gap-2">
-          {[1,2,3,4,5].map(n => (
-            <button key={n} type="button" onClick={() => setRating(n)} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 ${rating===n ? 'bg-lime-500/15 border-2 border-lime-400 text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-800/80 border border-zinc-700 text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200'}`}>
-              <span className="flex">{Array.from({length:n}).map((_,i)=><Star key={i} size={12} className={rating===n? 'fill-lime-400 text-lime-400':'fill-amber-400 text-amber-400'}/>)}</span>
-              {n}
+        <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating *</label>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { v: 1, label: 'Casual', sub: 'Score 1 · Low' },
+            { v: 2, label: 'Semi-Formal', sub: 'Score 2 · Medium' },
+            { v: 3, label: 'Classic / Formal', sub: 'Score 3 · High' },
+          ].map(o => (
+            <button key={o.v} type="button" onClick={() => setRating(o.v)} className={`p-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 border-2 ${rating===o.v ? 'bg-lime-500/15 border-lime-400 text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-800/80 border-zinc-700 text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200'}`}>
+              <span className="text-sm">{o.label}</span>
+              <span className="text-[11px] opacity-70">{o.sub}</span>
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">{rating<=2 ? 'Needs improvement' : rating===3 ? 'Acceptable' : rating===4 ? 'Good' : 'Exemplary'} · {Math.round(rating/5*100)}% → DressScore</p>
+        <p className="text-xs text-muted-foreground mt-1">Feeds lead quality ranking · {rating===1?'Low weight': rating===2?'Medium weight':'High weight'}</p>
       </div>
 
       <div className="mt-4">

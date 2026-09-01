@@ -289,9 +289,22 @@ function DeleteConfirm({
   onClose,
 }: {
   name: string;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void> | void;
   onClose: () => void;
 }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmRemove = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+    } catch {
+      // error is handled inside onConfirm
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -309,15 +322,21 @@ function DeleteConfirm({
           Are you sure you want to remove <span className="font-semibold">&quot;{name}&quot;</span>?
           They will lose access to Brokly.
         </p>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="btn-secondary flex-1">
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+          >
             Cancel
           </button>
           <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 rounded-lg bg-destructive text-white text-sm font-medium hover:bg-destructive/90 transition-colors"
+            type="button"
+            onClick={handleConfirmRemove}
+            disabled={isDeleting}
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
           >
-            Remove User
+            {isDeleting ? "Removing..." : "Remove User"}
           </button>
         </div>
       </div>

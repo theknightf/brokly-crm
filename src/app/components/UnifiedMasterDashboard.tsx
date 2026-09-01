@@ -4,6 +4,11 @@ import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, Tren
 import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
 import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
 import LeadStageCardsBar from '@/app/components/LeadStageCardsBar';
+import KpiCardsGrid from '@/app/components/KpiCardsGrid';
+import DailyLeaderboard from '@/app/components/DailyLeaderboard';
+import DelayList from '@/app/components/DelayList';
+import DashboardTeamFilter from '@/app/components/DashboardTeamFilter';
+import ActivityPerHourChart from '@/app/components/ActivityPerHourChart';
 import { toast } from 'sonner';
 
 interface UnifiedData {
@@ -38,6 +43,8 @@ export default function UnifiedMasterDashboard() {
   const [pipelineLeads, setPipelineLeads] = useState<any[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [rotating, setRotating] = useState(false);
+  const [filterTeamId, setFilterTeamId] = useState<string | null>(null);
+  const [filterAgentId, setFilterAgentId] = useState<string | null>(null);
 
   const leaderboardRef = useRef<HTMLDivElement | null>(null);
   const pipelineRef = useRef<HTMLDivElement | null>(null);
@@ -158,8 +165,21 @@ export default function UnifiedMasterDashboard() {
         </button>
       </div>
 
+      {/* Hierarchical Team & Agent Filter — persistent top-bar */}
+      <DashboardTeamFilter onChange={(t,a)=>{ setFilterTeamId(t); setFilterAgentId(a); }} />
+
       {/* Lead Stages Grid — directly below tabs per spec hierarchy */}
       <LeadStageCardsBar stats={stageStats as any} activeStageKey={activeStageKeyForBar} onStageClick={handleStageClick} />
+
+      {/* KPI 21-Card Grid — role-aware counts + trends */}
+      <KpiCardsGrid teamId={filterTeamId || undefined} agentId={filterAgentId || undefined} />
+
+      {/* Hourly Activity + Daily Leaderboard + Delay Management */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2"><ActivityPerHourChart teamId={filterTeamId || undefined} agentId={filterAgentId || undefined} /></div>
+        <div><DailyLeaderboard /></div>
+      </div>
+      <DelayList />
 
       {mode === 'sales' ? (
         <>

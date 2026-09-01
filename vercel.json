@@ -2,5 +2,6 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "crons": [{ "path": "/api/cron/rotate-leads", "schedule": "0 * * * *" }]
 }
