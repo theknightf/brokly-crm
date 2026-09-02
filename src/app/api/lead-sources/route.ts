@@ -5,6 +5,8 @@ import { isAdminRole } from '@/lib/roles';
 export const dynamic = 'force-dynamic';
 
 // GET /api/lead-sources?active=true — list active sources (authenticated)
+// No pagination: every active source is returned so the import dropdown shows
+// the complete catalog regardless of how many rows exist.
 export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -14,6 +16,9 @@ export async function GET(request: Request) {
   const activeOnly = url.searchParams.get('active') !== 'false';
   let q = supabase.from('lead_sources').select('id, name, is_active, created_at').order('name');
   if (activeOnly) q = q.eq('is_active', true);
+  // Explicitly drop any implicit page size by asking for a large range.
+  // Supabase defaults to 1000 rows per request; bump it to 10k for safety.
+  q = q.range(0, 9999);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ sources: data || [] });

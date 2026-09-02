@@ -85,9 +85,13 @@ export async function GET(request: Request) {
       db.from('evaluations').select('employee_id, dress_code_rating, date').gte('date', range.start).lte('date', range.end),
     ]);
 
+    // New: fetch status change events from activity_log for the same period
+    const statusChangesRes = await db.from('activity_log').select('user_id, action_type, created_at').gte('created_at', `${range.start}T00:00:00`).lte('created_at', `${range.end}T23:59:59.999`).eq('action_type', 'lead_status_updated');
+
     const attendance = attendanceRes.data || [];
     const calls = callsRes.data || [];
     const evals = evalRes.data || [];
+    const statusChanges = statusChangesRes.data || [];
 
     // Group maps
     const attByUser = new Map<string, typeof attendance>();
@@ -104,6 +108,11 @@ export async function GET(request: Request) {
     evals.forEach((e: any) => {
       if (!evalByUser.has(e.employee_id)) evalByUser.set(e.employee_id, []);
       evalByUser.get(e.employee_id)!.push(e);
+    });
+    const statusByUser = new Map<string, typeof statusChanges>();
+    statusChanges.forEach((s: any) => {
+      if (!statusByUser.has(s.user_id)) statusByUser.set(s.user_id, []);
+      statusByUser.get(s.user_id)!.push(s);
     });
 
     const ranked = users.map((u: any) => {
@@ -124,6 +133,10 @@ export async function GET(request: Request) {
       const userEvals = evalByUser.get(u.id) || [];
       const avgRating = userEvals.length > 0 ? userEvals.reduce((s: number, e: any) => s + e.dress_code_rating, 0) / userEvals.length : null;
 
+      // NEW: count only status change actions from activity_log
+      const userStatusChanges = statusByUser.get(u.id) || [];
+      const statusChangeCount = userStatusChanges.length;
+
       const cScore = callScore(totalCalls, converted);
       const aScore = attendanceScore(present, totalDays, late);
       const dScore = dressScore(avgRating);
@@ -143,6 +156,7 @@ export async function GET(request: Request) {
           lateDays: late,
           dressEvaluations: userEvals.length,
           avgDressRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
+          statusChanges: statusChangeCount,
         },
         scores: {
           callScore: cScore,

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Buildi
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
+import { isAdminRole } from '@/lib/roles';
 
 interface LeadBoardProps {
   leads: Lead[];
@@ -11,6 +12,7 @@ interface LeadBoardProps {
   onEdit: (lead: Lead) => void;
   onStatusChange: (id: string, status: LeadStatus) => void;
   onDelete: (id: string) => void;
+  isAdmin?: boolean;
 }
 
 const formatBudget = (min?: number, max?: number) => {
@@ -154,7 +156,7 @@ function BoardCard({
   );
 }
 
-export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDelete }: LeadBoardProps) {
+export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDelete, isAdmin = false }: LeadBoardProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const deletingLead = leads.find((l) => l.id === deletingId) || null;
   const columns: { key: string; label: string; stage?: LeadStatus }[] = [
@@ -164,42 +166,44 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDel
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
-      {columns.map((col) => {
-        const colLeads = col.stage
-          ? leads.filter((l) => (l.status || 'Fresh Leads') === col.stage)
-          : leads.filter((l) => !PIPELINE_STAGES.includes(l.status || 'Fresh Leads'));
-        return (
-          <div key={col.key} className="w-[272px] flex-shrink-0 flex flex-col max-h-[calc(100vh-260px)]">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border mb-2 sticky top-0 z-10">
-              {col.stage ? (
-                <StatusBadge status={col.stage} showDot />
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  <span className="w-2.5 h-2.5 rounded-full bg-clay-soft" />
-                  {col.label}
-                </span>
-              )}
-              <span className="ml-auto text-xs font-bold text-muted-foreground bg-muted rounded-full px-2 py-0.5 tabular-nums">
-                {colLeads.length}
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {colLeads.length === 0 ? (
-                <div className="border border-dashed border-border rounded-2xl py-10 text-center text-xs text-muted-foreground">
-                  Drop leads here
+        {columns.map((col) => {
+          const colLeads = col.stage
+            ? leads.filter((l) => (l.status || 'Fresh Leads') === col.stage)
+            : leads.filter((l) => !PIPELINE_STAGES.includes(l.status || 'Fresh Leads'));
+          return (
+            <div key={col.key} className="w-[272px] flex-shrink-0 flex flex-col max-h-[calc(100vh-260px)]">
+              {!isAdmin && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border mb-2 sticky top-0 z-10">
+                  {col.stage ? (
+                    <StatusBadge status={col.stage} showDot />
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                      <span className="w-2.5 h-2.5 rounded-full bg-clay-soft" />
+                      {col.label}
+                    </span>
+                  )}
+                  <span className="ml-auto text-xs font-bold text-muted-foreground bg-muted rounded-full px-2 py-0.5 tabular-nums">
+                    {colLeads.length}
+                  </span>
                 </div>
-              ) : (
-                colLeads.map((lead, i) => (
-                  <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
-                    <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} onDelete={setDeletingId} />
-                  </div>
-                ))
               )}
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                {colLeads.length === 0 ? (
+                  <div className="border border-dashed border-border rounded-2xl py-10 text-center text-xs text-muted-foreground">
+                    Drop leads here
+                  )
+                ) : (
+                  colLeads.map((lead, i) => (
+                    <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
+                      <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} onDelete={setDeletingId} />
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
       {deletingLead && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40" onClick={() => setDeletingId(null)}>
           <div className="w-full max-w-sm rounded-2xl bg-card border border-border p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
