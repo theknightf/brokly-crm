@@ -359,34 +359,34 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     >
       {step === 'upload' && (
         <div className="p-6 space-y-4">
-          {/* Default Stage / Status / Project — dark UI, above file input per spec */}
+          {/* Global defaults toolbar — 3 selectors side-by-side next to file upload per spec */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-zinc-900 border border-zinc-800">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">Default Stage</label>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Lead Source</label>
+              <div className="relative">
+                <select value={defaultSource} onChange={e=>setDefaultSource(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                  <option value="">Use file value</option>
+                  {sourceList.map(s=> <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Assign To</label>
+              <div className="relative">
+                <select value={defaultOwner} onChange={e=>setDefaultOwner(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                  <option value="">— Unassigned —</option>
+                  {ownerList.map(u=> <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Stage</label>
               <div className="relative">
                 <select value={defaultStage} onChange={e=>{ setDefaultStage(e.target.value); setDefaultStatus(''); }} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
                   <option value="">Use file value</option>
                   {stageList.map(s=> <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">Default Status</label>
-              <div className="relative">
-                <select value={defaultStatus} onChange={e=>setDefaultStatus(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
-                  <option value="">Use file value</option>
-                  {(defaultStage ? statusList.filter(s=> s===defaultStage || !PIPELINE_STAGES.includes(s as any)) : statusList).map(s=> <option key={s} value={s}>{s}</option>)}
-                </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">Default Project</label>
-              <div className="relative">
-                <select value={defaultProject} onChange={e=>setDefaultProject(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
-                  <option value="">Use file value</option>
-                  {projectList.map(p=> <option key={p.id} value={p.name}>{p.name}</option>)}
                 </select>
                 <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
               </div>
@@ -638,43 +638,11 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
         </div>
       )}
 
-      {/* Footer — live DB dropdowns */}
+      {/* Footer — actions only; defaults are in header toolbar and persist */}
       {step !== 'done' && (
         <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Default owner</span>
-              <select
-                value={defaultOwner}
-                onChange={(e) => setDefaultOwner(e.target.value)}
-                className="input-base h-8 text-xs appearance-none pr-8 min-w-[140px]"
-                disabled={loadingMeta}
-              >
-                <option value="">— Unassigned —</option>
-                {ownerList.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Default Lead Source</span>
-              <select
-                value={defaultSource}
-                onChange={(e) => setDefaultSource(e.target.value)}
-                className="input-base h-8 text-xs appearance-none pr-8 min-w-[140px]"
-                disabled={loadingMeta}
-              >
-                <option value="">Use file value</option>
-                {sourceList.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {loadingMeta && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> Loading…</span>}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {loadingMeta ? <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> Loading…</span> : <span>{defaultSource || defaultOwner || defaultStage ? `Defaults: ${[defaultSource && `Source=${defaultSource}`, defaultOwner && `Assign=${ownerList.find(u=>u.id===defaultOwner)?.name || defaultOwner}`, defaultStage && `Stage=${defaultStage}`].filter(Boolean).join(' · ') || 'Using file values'}` : 'Using file values'}</span>}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleClose} className="btn-secondary">
