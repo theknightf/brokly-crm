@@ -54,7 +54,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
           sidebarCollapsed={sidebarCollapsed}
         />
         <main className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="pwa-content max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-24 lg:pb-6">
+          <div
+            className="pwa-content max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-32 lg:pb-6"
+            style={{ paddingBottom: 'max(8rem, calc(7rem + env(safe-area-inset-bottom)))' }}
+          >
             {!isDashboard && (
               <button
                 type="button"

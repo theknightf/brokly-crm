@@ -209,7 +209,7 @@ export default function BulkActionBar({
   return (
     <>
       <div
-        className="fixed bottom-6 left-0 right-0 z-40 flex justify-center pointer-events-none slide-up-enter px-3"
+        className="fixed bottom-[max(5.5rem,calc(5rem+env(safe-area-inset-bottom)))] lg:bottom-6 z-[45] flex justify-center pointer-events-none slide-up-enter px-3 left-0 right-0 lg:left-0"
         style={{ paddingLeft: 'calc(var(--sidebar-w) + 0.75rem)' }}
       >
         <div className="bg-foreground text-background rounded-2xl shadow-modal px-5 py-3 flex items-center gap-4 min-w-[min(380px,90vw)] max-w-full overflow-x-auto pointer-events-auto">

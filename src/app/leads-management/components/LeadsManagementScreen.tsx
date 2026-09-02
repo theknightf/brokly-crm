@@ -905,7 +905,7 @@ export default function LeadsManagementScreen({
   };
 
   return (
-    <div className="page-aurora min-h-full space-y-5 rounded-[2rem] p-3 sm:p-5">
+    <div className="page-aurora min-h-[calc(100dvh-8rem)] lg:min-h-full space-y-5 rounded-[2rem] p-3 sm:p-5 flex flex-col">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-[1.75rem] border border-border/70 bg-card/80 p-4 sm:p-5 shadow-sm backdrop-blur-xl">
         <div className="animate-rise-in">
@@ -1213,7 +1213,10 @@ export default function LeadsManagementScreen({
             className="absolute inset-0 bg-foreground/30 backdrop-blur-sm animate-in fade-in"
             onClick={() => setViewLead(null)}
           />
-          <div className="relative flex flex-col bg-card border-border shadow-modal w-full sm:max-w-md sm:w-full sm:h-full sm:border-l sm:rounded-none rounded-t-2xl max-h-[92dvh] sm:max-h-full overflow-hidden animate-in fade-in slide-in-from-right-4">
+          <div
+            className="relative flex flex-col bg-card border-border shadow-modal w-full sm:max-w-md sm:w-full sm:h-full sm:border-l sm:rounded-none rounded-t-2xl max-h-[85dvh] sm:max-h-full overflow-hidden animate-in fade-in slide-in-from-right-4"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
             <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border flex-shrink-0 bg-card z-10">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">

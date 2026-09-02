@@ -232,8 +232,15 @@ export default function LeadsTable({
         </div>
       )}
 
-      {/* Mobile full-width card list — MobileLeadCard handles all 7 design sections */}
-      <div className="sm:hidden flex flex-col gap-3 px-1 pb-2">
+      {/* Mobile full-width card list — centered in viewport, safe-area aware */}
+      <div
+        className={`sm:hidden flex flex-col gap-4 px-1 pt-2 pb-32 sm:min-h-0 items-stretch ${
+          leads.length === 1
+            ? 'min-h-[calc(100dvh-220px)] justify-center'
+            : 'min-h-[calc(100dvh-220px)] justify-start'
+        }`}
+        style={{ paddingBottom: 'max(8rem, calc(7rem + env(safe-area-inset-bottom)))' }}
+      >
         {leads.length === 0 ? (
           <EmptyState
             icon={<Users size={24} className="text-muted-foreground" />}
