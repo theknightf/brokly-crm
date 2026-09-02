@@ -13,6 +13,7 @@ interface LeadBoardProps {
   onStatusChange: (id: string, status: LeadStatus) => void;
   onDelete: (id: string) => void;
   isAdmin?: boolean;
+  onPostCall?: (lead: Lead) => void;
 }
 
 const formatBudget = (min?: number, max?: number) => {
@@ -29,12 +30,14 @@ function BoardCard({
   onEdit,
   onStatusChange,
   onDelete,
+  onPostCall,
 }: {
   lead: Lead;
   onView: (lead: Lead) => void;
   onEdit: (lead: Lead) => void;
   onStatusChange: (id: string, status: LeadStatus) => void;
   onDelete: (id: string) => void;
+  onPostCall?: (lead: Lead) => void;
 }) {
   const inPipeline = pipelineIndex(lead.status) >= 0;
   const prev = inPipeline ? prevPipelineStage(lead.status) : undefined;
@@ -106,14 +109,18 @@ function BoardCard({
 
       {lead.phone && (
         <div className="mt-2 flex items-center gap-1.5">
-          <a
-            href={`tel:${lead.phone.replace(/[^0-9+,]/g, '')}`}
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onPostCall) onPostCall(lead);
+              else window.location.href = `tel:${lead.phone.replace(/[^0-9+,]/g, '')}`;
+            }}
             className="flex-1 h-8 rounded-lg bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary flex items-center justify-center gap-1 text-xs font-semibold hover:bg-primary/20 dark:hover:bg-primary/25 transition-colors"
           >
             <Phone size={12} />
             Call
-          </a>
+          </button>
           <a
             href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
             target="_blank"
@@ -156,7 +163,7 @@ function BoardCard({
   );
 }
 
-export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDelete, isAdmin = false }: LeadBoardProps) {
+export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDelete, isAdmin = false, onPostCall }: LeadBoardProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const deletingLead = leads.find((l) => l.id === deletingId) || null;
   const columns: { key: string; label: string; stage?: LeadStatus }[] = [
@@ -195,7 +202,7 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDel
                 ) : (
                   colLeads.map((lead, i) => (
                     <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
-                      <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} onDelete={setDeletingId} />
+                      <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} onDelete={setDeletingId} onPostCall={onPostCall} />
                     </div>
                   ))
                 )}

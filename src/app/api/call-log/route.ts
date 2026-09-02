@@ -141,8 +141,15 @@ export async function POST(request: Request) {
     'Not Interested': 'Not Interested',
     'No Answer': 'No Answer',
     'Wrong Number': 'Wrong Number',
+    'Wrong Phone': 'Wrong Number',
     Cancellation: 'Cancellation',
     'Closed Number': 'Closed Number',
+    Answered: 'Following Up',
+    'Follow-up': 'Following Up',
+    'Follow Up': 'Following Up',
+    'Schedule Meeting': 'Meeting',
+    Meeting: 'Meeting',
+    'Following Up': 'Following Up',
   };
   const STATUS_TO_LEGACY: Record<string, string> = {
     'Fresh Leads': 'New',

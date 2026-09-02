@@ -49,6 +49,7 @@ interface LeadsTableProps {
   onOpenLogCall?: (lead: Lead) => void;
   /** Mobile-only: open the Add Note sheet for a lead */
   onAddNote?: (lead: Lead) => void;
+  onPostCall?: (lead: Lead) => void;
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
@@ -148,6 +149,7 @@ export default function LeadsTable({
   onPageSizeChange,
   onOpenLogCall,
   onAddNote,
+  onPostCall,
 }: LeadsTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
@@ -256,6 +258,7 @@ export default function LeadsTable({
               onStatusChange={onStatusChange}
               onOpenLogCall={onOpenLogCall}
               onAddNote={onAddNote}
+              onPostCall={onPostCall}
             />
           ))
         )}

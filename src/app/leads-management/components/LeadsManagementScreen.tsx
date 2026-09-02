@@ -62,6 +62,7 @@ import LeadTimeline from './LeadTimeline';
 import DealStatusModal from './DealStatusModal';
 import QuickPaymentPlanModal from './QuickPaymentPlanModal';
 import LogCallModal from './LogCallModal';
+import PostCallOutcomeModal from './PostCallOutcomeModal';
 
 export interface FilterState {
   search: string;
@@ -263,6 +264,8 @@ export default function LeadsManagementScreen({
   } | null>(null);
   const [payPlanLead, setPayPlanLead] = useState<Lead | null>(null);
   const [logCallLead, setLogCallLead] = useState<Lead | null>(null);
+  const [postCallLead, setPostCallLead] = useState<Lead | null>(null);
+  const [postCallInitiatedAt, setPostCallInitiatedAt] = useState<number | null>(null);
   const [callHistoryKey, setCallHistoryKey] = useState(0);
   const statusPendingRef = useRef<Set<string>>(new Set());
   // Tracks lead IDs that have just had a call logged — they are optimistically
@@ -503,6 +506,31 @@ export default function LeadsManagementScreen({
     //    the server-side state. Do NOT block the UI.
     void fetchLeads();
   }, [viewLead?.id]);
+
+  // Post-Call Outcome: triggered by Call button — shows modal immediately + dials tel:
+  const handlePostCallTrigger = useCallback((lead: Lead) => {
+    setPostCallInitiatedAt(Date.now());
+    setPostCallLead(lead);
+    if (lead.phone) {
+      const tel = lead.phone.replace(/[^0-9+,]/g, '');
+      if (tel) {
+        // Let React paint the portal modal before the OS dialer steals focus
+        setTimeout(() => {
+          window.location.href = `tel:${tel}`;
+        }, 80);
+      }
+    }
+  }, []);
+
+  const handlePostCallSaved = useCallback(
+    (lead: Lead, outcome: string) => {
+      // Remove/update from queue instantly — same optimistic pattern as LogCall
+      handleCallLogged(lead, outcome);
+      setPostCallLead(null);
+      setPostCallInitiatedAt(null);
+    },
+    [handleCallLogged],
+  );
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds);
@@ -1086,6 +1114,7 @@ export default function LeadsManagementScreen({
             onStatusChange={handleStatusChange}
             onDelete={handleDeleteLead}
             isAdmin={isAdminRole(user?.role)}
+            onPostCall={handlePostCallTrigger}
           />
         ) : (
           <LeadsTable
@@ -1115,6 +1144,7 @@ export default function LeadsManagementScreen({
             }}
             onOpenLogCall={(lead) => setLogCallLead(lead)}
             onAddNote={(lead) => setViewLead(lead)}
+            onPostCall={handlePostCallTrigger}
           />
         )}
       </div>
@@ -1356,13 +1386,14 @@ export default function LeadsManagementScreen({
               <div className="grid grid-cols-2 gap-2">
                 {viewLead.phone && (
                   <>
-                    <a
-                      href={`tel:${viewLead.phone.replace(/[^0-9+,]/g, '')}`}
+                    <button
+                      type="button"
+                      onClick={() => handlePostCallTrigger(viewLead)}
                       className="h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
                     >
                       <PhoneCall size={15} />
                       Call
-                    </a>
+                    </button>
                     <a
                       href={`https://wa.me/${viewLead.phone.replace(/[^0-9]/g, '')}`}
                       target="_blank"
@@ -1781,6 +1812,17 @@ export default function LeadsManagementScreen({
           onCallLogged={handleCallLogged}
         />
       )}
+
+      {/* Post-Call Outcome Modal — triggered by Call button (tel: + instant modal) */}
+      <PostCallOutcomeModal
+        lead={postCallLead}
+        open={!!postCallLead}
+        onClose={() => {
+          setPostCallLead(null);
+          setPostCallInitiatedAt(null);
+        }}
+        onSaved={handlePostCallSaved}
+      />
 
 
     </div>

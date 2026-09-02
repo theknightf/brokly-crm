@@ -32,6 +32,7 @@ interface MobileLeadCardProps {
   onStatusChange: (id: string, s: LeadStatus) => void;
   onOpenLogCall?: (lead: Lead) => void;
   onAddNote?: (lead: Lead) => void;
+  onPostCall?: (lead: Lead) => void;
 }
 
 function formatEgyBudget(min?: number, max?: number) {
@@ -93,6 +94,7 @@ export default function MobileLeadCard({
   onStatusChange,
   onOpenLogCall,
   onAddNote,
+  onPostCall,
 }: MobileLeadCardProps) {
   const { user } = useAuth();
   const [statusOpen, setStatusOpen] = useState(false);
@@ -293,15 +295,22 @@ export default function MobileLeadCard({
       {/* 3. Primary Communication Actions — Call dials directly */}
       <div className="px-4 pt-3 grid grid-cols-2 gap-3">
         {lead.phone ? (
-          <a
-            href={`tel:${lead.phone.replace(/[^0-9+,]/g, '')}`}
-            onClick={() => onOpenLogCall?.(lead)}
+          <button
+            type="button"
+            onClick={() => {
+              if (onPostCall) onPostCall(lead);
+              else onOpenLogCall?.(lead);
+              // Fallback tel trigger if onPostCall doesn't handle it (e.g. no phone)
+              if (!onPostCall && lead.phone) {
+                window.location.href = `tel:${lead.phone.replace(/[^0-9+,]/g, '')}`;
+              }
+            }}
             className="h-11 rounded-xl border border-border bg-card dark:bg-card hover:bg-muted/40 dark:hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
             aria-label={`Call ${lead.phone}`}
           >
             <PhoneCall size={16} className="text-muted-foreground" />
             Call
-          </a>
+          </button>
         ) : (
           <button
             type="button"
