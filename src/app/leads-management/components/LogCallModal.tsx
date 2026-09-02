@@ -23,6 +23,13 @@ interface LogCallModalProps {
   lead: Lead;
   onClose: () => void;
   onDone: () => void;
+  /**
+   * Fires AFTER the backend confirms a successful save (200/201). The parent
+   * uses this to optimistically remove the lead from the active queue so the
+   * sales agent sees an instant list/board update without a page reload.
+   * Optional — older parents that don't pass it still work via onDone.
+   */
+  onCallLogged?: (lead: Lead, outcome: string) => void;
 }
 
 /**
@@ -32,7 +39,7 @@ interface LogCallModalProps {
  * "Closed Number" (رقم مغلق) is now an explicit outcome so the contact's
  * unreachable number is recorded against the lead and call log.
  */
-export default function LogCallModal({ lead, onClose, onDone }: LogCallModalProps) {
+export default function LogCallModal({ lead, onClose, onDone, onCallLogged }: LogCallModalProps) {
   const [channel, setChannel] = useState('Call');
   const [direction, setDirection] = useState<'incoming' | 'outgoing'>('outgoing');
   const [outcome, setOutcome] = useState('Connected');
@@ -79,6 +86,11 @@ export default function LogCallModal({ lead, onClose, onDone }: LogCallModalProp
           /* non-fatal: tag write fails silently, call log already saved */
         }
       }
+      // Notify the parent so it can optimistically drop the lead from the
+      // sales agent's active queue — this fires BEFORE onDone so the parent
+      // can mutate state in one batch (avoids double-render). The lead is
+      // NOT deleted from the DB; only the in-memory list/board filter changes.
+      try { onCallLogged?.(lead, outcome); } catch { /* parent handler errors must not break the modal */ }
       toast.success('Call logged');
       onDone();
     } catch (err: any) {

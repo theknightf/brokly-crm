@@ -771,6 +771,9 @@ export const leadsService = {
     action?: string;
     sortKey?: string;
     sortDir?: 'asc' | 'desc';
+    /** Lead IDs to exclude from the result — used to optimistically remove leads
+     *  after a call is logged so the queue reflects the change instantly. */
+    recentlyCalledIds?: string[];
   }) {
     const supabase = createClient();
     const {
@@ -785,6 +788,7 @@ export const leadsService = {
       action = '',
       sortKey = 'createdAt',
       sortDir = 'desc',
+      recentlyCalledIds = [],
     } = params || {};
 
     const columnMap: Record<string, string> = {
@@ -846,6 +850,12 @@ export const leadsService = {
       if (agent) query = query.eq('agent', agent);
       if (project) query = query.eq('project', project);
       if (propertyType) query = query.eq('property_type', propertyType);
+      // Exclude leads the agent just called so the queue updates instantly.
+      // The "not.in" filter is safe — empty arrays must NOT be passed or
+      // PostgREST will return zero rows.
+      if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
+        query = query.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
+      }
 
       const from = Math.max(0, (page - 1) * pageSize);
       const to = from + pageSize - 1;

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Plus,
   Download,
@@ -264,6 +264,10 @@ export default function LeadsManagementScreen({
   const [logCallLead, setLogCallLead] = useState<Lead | null>(null);
   const [callHistoryKey, setCallHistoryKey] = useState(0);
   const statusPendingRef = useRef<Set<string>>(new Set());
+  // Tracks lead IDs that have just had a call logged — they are optimistically
+  // removed from the local list and excluded from the next fetchLeads() result
+  // so the sales agent's queue is instantly refreshed without a page reload.
+  const recentlyCalledRef = useRef<Set<string>>(new Set());
   const [dupWarning, setDupWarning] = useState<{
     existing: any;
     pendingLead: Lead;
@@ -340,6 +344,8 @@ export default function LeadsManagementScreen({
         action: filters.action || undefined,
         sortKey,
         sortDir,
+        // Exclude leads that were optimistically removed after call logging
+        recentlyCalledIds: Array.from(recentlyCalledRef.current),
       });
       if (requestId !== fetchRef.current) return;
       setLeads((res.data || []) as Lead[]);
@@ -443,6 +449,45 @@ export default function LeadsManagementScreen({
       toast.error(err?.message || 'Failed to delete lead');
     }
   };
+
+  /**
+   * Called by LogCallModal after the backend confirms a successful save.
+   * Optimistically removes the lead from the local list AND records the ID so
+   * the next server fetch also excludes it (via the `recentlyCalled` filter).
+   * The lead is NOT deleted — only hidden from the agent's working queue.
+   */
+  const handleCallLogged = useCallback((loggedLead: Lead, outcome: string) => {
+    const leadId = loggedLead.id;
+
+    // 1. Optimistic local removal: instantly drop from list/board
+    setLeads((prev) => {
+      if (!prev.find((l) => l.id === leadId)) return prev; // already gone
+      return prev.filter((l) => l.id !== leadId);
+    });
+
+    // 2. Decrement total so pagination stays accurate
+    setTotal((t) => Math.max(0, t - 1));
+
+    // 3. Remove from selected set (if somehow selected)
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      n.delete(leadId);
+      return n;
+    });
+
+    // 4. Close the lead preview if this lead was open
+    if (viewLead?.id === leadId) setViewLead(null);
+
+    // 5. Track ID so the next fetchLeads() can exclude it from the server result
+    //    (the API already handles last_call_at / action='called_today' natively)
+    recentlyCalledRef.current.add(leadId);
+    // Auto-clear after 5 minutes so re-fetching naturally re-includes it
+    setTimeout(() => recentlyCalledRef.current.delete(leadId), 5 * 60 * 1000);
+
+    // 6. Trigger a silent background refresh so the next page/fetch reflects
+    //    the server-side state. Do NOT block the UI.
+    void fetchLeads();
+  }, [viewLead?.id]);
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds);
@@ -1713,6 +1758,7 @@ export default function LeadsManagementScreen({
             setLogCallLead(null);
             setCallHistoryKey((k) => k + 1);
           }}
+          onCallLogged={handleCallLogged}
         />
       )}
 
