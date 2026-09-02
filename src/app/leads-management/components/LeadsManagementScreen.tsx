@@ -1098,6 +1098,8 @@ export default function LeadsManagementScreen({
               setPageSize(s);
               setCurrentPage(1);
             }}
+            onOpenLogCall={(lead) => setLogCallLead(lead)}
+            onAddNote={(lead) => setViewLead(lead)}
           />
         )}
       </div>

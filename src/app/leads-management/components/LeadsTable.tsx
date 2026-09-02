@@ -24,6 +24,7 @@ import {
 } from './leadStages';
 import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
+import MobileLeadCard from './MobileLeadCard';
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -44,6 +45,10 @@ interface LeadsTableProps {
   totalCount: number;
   onPageChange: (p: number) => void;
   onPageSizeChange: (s: number) => void;
+  /** Mobile-only: open the Log Call modal for a lead (e.g. header quick action) */
+  onOpenLogCall?: (lead: Lead) => void;
+  /** Mobile-only: open the Add Note sheet for a lead */
+  onAddNote?: (lead: Lead) => void;
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
@@ -141,6 +146,8 @@ export default function LeadsTable({
   totalCount,
   onPageChange,
   onPageSizeChange,
+  onOpenLogCall,
+  onAddNote,
 }: LeadsTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
@@ -225,7 +232,7 @@ export default function LeadsTable({
         </div>
       )}
 
-      {/* Mobile one-hand card list */}
+      {/* Mobile full-width card list — MobileLeadCard handles all 7 design sections */}
       <div className="sm:hidden flex flex-col gap-3 px-1 pb-2">
         {leads.length === 0 ? (
           <EmptyState
@@ -234,118 +241,20 @@ export default function LeadsTable({
             description="No leads match your current filters. Try adjusting your search criteria or add a new lead."
           />
         ) : (
-          leads.map((lead) => {
-            const next = nextPipelineStage(lead.status);
-            const due = isOverdue(lead.followUpDue);
-            return (
-              <div
-                key={lead.id}
-                className={`bg-card border rounded-2xl p-3.5 shadow-sm transition-colors ${
-                  selectedIds.has(lead.id)
-                    ? 'border-primary ring-1 ring-primary/30'
-                    : 'border-border'
-                }`}
-              >
-                {/* Header row */}
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(lead.id)}
-                    onChange={(e) => onSelectRow(lead.id, e.target.checked)}
-                    className="w-5 h-5 rounded border-input accent-primary cursor-pointer flex-shrink-0"
-                    aria-label={`Select ${lead.name || lead.id}`}
-                  />
-                  <button
-                    onClick={() => onView?.(lead)}
-                    className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {(lead.name || lead.id)
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')
-                        .slice(0, 2)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-foreground truncate">
-                        {lead.name || `Lead ${lead.id}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate flex items-center gap-0.5">
-                        <MapPin size={10} className="flex-shrink-0" />
-                        {lead.location || '—'}
-                      </p>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => onEdit?.(lead)}
-                      className="w-10 h-10 rounded-xl hover:bg-secondary text-muted-foreground flex items-center justify-center active:scale-95 transition-transform"
-                      aria-label="Edit lead"
-                    >
-                      <Pencil size={17} />
-                    </button>
-                    <button
-                      onClick={() => setDeletingId(lead.id)}
-                      className="w-10 h-10 rounded-xl hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center active:scale-95 transition-transform"
-                      aria-label="Delete lead"
-                    >
-                      <Trash2 size={17} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status + budget */}
-                <div className="flex items-center gap-2 mt-3">
-                  <StatusDropdown
-                    currentStatus={lead.status || 'Fresh Leads'}
-                    leadId={lead.id}
-                    onStatusChange={onStatusChange}
-                  />
-                  <button
-                    onClick={() => next != null && next !== lead.status && onStatusChange(lead.id, next)}
-                    disabled={!next || next === lead.status}
-                    className="h-10 px-3 rounded-xl bg-primary text-primary-foreground flex items-center gap-1 text-xs font-bold disabled:opacity-40 active:scale-95 transition-transform shadow-sm"
-                    aria-label="Advance status"
-                  >
-                    <Zap size={15} />
-                    {next ? `Next: ${next}` : 'Final stage'}
-                  </button>
-                  <div className="ml-auto text-right">
-                    <p className="text-sm font-bold text-foreground tabular-nums leading-tight">
-                      {formatBudget(lead.budgetMin, lead.budgetMax)}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">{lead.propertyType || '—'}</p>
-                  </div>
-                </div>
-
-                {/* Follow-up */}
-                <div className="flex items-center justify-between mt-2.5">
-                  <span className="text-xs text-muted-foreground">
-                    Follow-up:{' '}
-                    <span className={`font-semibold ${due ? 'text-red-500' : 'text-foreground'}`}>
-                      {formatDate(lead.followUpDue)}
-                      {due ? ' · overdue' : ''}
-                    </span>
-                  </span>
-                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-lg font-medium">
-                    {lead.source || '—'}
-                  </span>
-                </div>
-
-                {/* Big thumb-zone actions */}
-                <div className="mt-3">
-                  <LeadQuickActions
-                    lead={{
-                      id: lead.id,
-                      name: lead.name || '',
-                      phone: lead.phone,
-                      project: lead.project,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })
+          leads.map((lead) => (
+            <MobileLeadCard
+              key={lead.id}
+              lead={lead}
+              selected={selectedIds.has(lead.id)}
+              onSelect={onSelectRow}
+              onView={onView ?? (() => {})}
+              onEdit={onEdit ?? (() => {})}
+              onDelete={(id) => setDeletingId(id)}
+              onStatusChange={onStatusChange}
+              onOpenLogCall={onOpenLogCall}
+              onAddNote={onAddNote}
+            />
+          ))
         )}
       </div>
 
