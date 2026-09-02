@@ -36,6 +36,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
         run: npm run build
 
+      - name: Ensure Android assets directory exists
+        run: mkdir -p android/app/src/main/assets out
+
       - name: Sync Capacitor with Android
         run: npx cap sync android
 
