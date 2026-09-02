@@ -102,10 +102,11 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
   const [followUpDate, setFollowUpDate] = useState('');
   const [followUpTime, setFollowUpTime] = useState('12:00');
   const [saving, setSaving] = useState(false);
+  const [nativeDuration, setNativeDuration] = useState<number | null>(null);
 
   useEffect(() => setMounted(true), []);
 
-  // Reset when opening for a new lead
+  // Reset when opening for a new lead + capture native duration if already tracked
   useEffect(() => {
     if (open && lead) {
       setOutcome(null);
@@ -113,8 +114,39 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
       setFollowUpDate(addDays(formatToday(), 1));
       setFollowUpTime('12:00');
       setSaving(false);
+      // If native CallTracker already captured a call for this number, prefill duration
+      try {
+        const last = (window as any).__lastNativeCall as { phoneNumber: string; duration: number } | null;
+        const normalizedLead = (lead.phone || '').replace(/\D/g, '').slice(-10);
+        const normalizedLast = last?.phoneNumber ? String(last.phoneNumber).replace(/\D/g, '').slice(-10) : '';
+        if (last && normalizedLast && normalizedLast === normalizedLead) {
+          setNativeDuration(Math.max(0, Math.floor(last.duration)));
+        } else {
+          setNativeDuration(null);
+        }
+      } catch {
+        setNativeDuration(null);
+      }
+    } else if (!open) {
+      setNativeDuration(null);
     }
   }, [open, lead?.id]);
+
+  // Listen for native callEnded while modal is open (Android bridge)
+  useEffect(() => {
+    if (!open || !lead) return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { phoneNumber: string; duration: number } | undefined;
+      if (!detail?.phoneNumber || !lead.phone) return;
+      const a = detail.phoneNumber.replace(/\D/g, '').slice(-10);
+      const b = lead.phone.replace(/\D/g, '').slice(-10);
+      if (a && b && a === b) {
+        setNativeDuration(Math.max(0, Math.floor(detail.duration)));
+      }
+    };
+    window.addEventListener('brokly:callEnded' as any, handler);
+    return () => window.removeEventListener('brokly:callEnded' as any, handler);
+  }, [open, lead?.id, lead?.phone]);
 
   // Body scroll lock + ESC
   useEffect(() => {
@@ -147,6 +179,8 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
     try {
       const nextFollowUpDate = needsSchedule ? (followUpDate || addDays(formatToday(), 1)) : undefined;
       const nextFollowUpDateTime = needsSchedule && followUpTime ? `${nextFollowUpDate}T${followUpTime}:00` : nextFollowUpDate;
+      // Prefer native CallTracker duration (CallLog) when available
+      const durationSeconds = nativeDuration != null ? nativeDuration : 0;
 
       const res = await fetch('/api/call-log', {
         method: 'POST',
@@ -160,7 +194,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
           direction: 'outgoing',
           outcome,
           notes: notes.trim() || '',
-          duration_seconds: 0,
+          duration_seconds: durationSeconds,
           followUpDateTime: nextFollowUpDateTime,
           next_follow_up_date: nextFollowUpDate,
         }),
@@ -256,6 +290,14 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 overscroll-contain min-h-0 p-5 sm:p-6 space-y-5">
+          {nativeDuration != null && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2 text-xs flex items-center gap-2 animate-in fade-in">
+              <PhoneCall size={13} />
+              <span>
+                Native duration captured: <span className="font-bold">{nativeDuration}s</span> — will be saved with this log.
+              </span>
+            </div>
+          )}
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3">Select outcome *</p>
             <div className="grid grid-cols-2 gap-2.5">

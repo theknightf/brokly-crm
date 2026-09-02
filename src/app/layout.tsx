@@ -7,6 +7,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { PWAProvider } from '@/components/PWAProvider';
 import { MobileTableLabeler } from '@/components/MobileTableLabeler';
+import NativeCallTrackerProvider from '@/components/NativeCallTrackerProvider';
 import '../styles/tailwind.css';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -83,6 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </AuthProvider>
         <PWAProvider />
         <MobileTableLabeler />
+        <NativeCallTrackerProvider />
 
         <script
           type="module"
