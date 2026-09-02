@@ -952,6 +952,21 @@ function rowToLead(row: any) {
   };
 }
 
+export const leadSourcesService = {
+  async getActive() {
+    const res = await fetch('/api/lead-sources?active=true', { cache: 'no-store' });
+    if (!res.ok) return [];
+    const j = await res.json().catch(()=>null);
+    return j?.sources || [];
+  },
+  async create(name: string) {
+    const res = await fetch('/api/lead-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+    const j = await res.json().catch(()=>null);
+    if (!res.ok) throw new Error(j?.error || 'Failed to create source');
+    return j.source;
+  },
+};
+
 function leadToRow(lead: any, userId?: string) {
   const row: any = {
     name: lead.name,
@@ -961,6 +976,7 @@ function leadToRow(lead: any, userId?: string) {
     budget_min: lead.budgetMin,
     budget_max: lead.budgetMax,
     source: lead.source,
+    lead_source_id: lead.leadSourceId || lead.lead_source_id || null,
     agent: lead.agent,
     agent_initials: lead.agentInitials,
     crm_status: lead.status,

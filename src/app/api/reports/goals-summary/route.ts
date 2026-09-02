@@ -54,7 +54,7 @@ export async function GET(request: Request) {
 
   if (profilesRes.error) return NextResponse.json({ error: profilesRes.error.message }, { status: 500 });
   // leads/calls/kpi are best-effort - empty array if missing
-  const profiles = (profilesRes.data || []).filter((p: any) => p.role !== 'owner' ? true : true); // include all for report
+  const profiles = (profilesRes.data || []).filter((p: any) => p.role !== 'owner' && p.role !== 'admin');
   const leads = (leadsRes.data || []).filter((l: any) => inRange(l.created_at));
   const calls = (callsRes.data || []).filter((c: any) => inRange(c.created_at));
 

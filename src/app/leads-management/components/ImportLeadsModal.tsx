@@ -50,6 +50,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [duplicatePhones, setDuplicatePhones] = useState<Set<string>>(new Set());
   const [defaultOwner, setDefaultOwner] = useState('');
   const [ownerList, setOwnerList] = useState<{ id: string; name: string }[]>([]);
+  const [defaultSource, setDefaultSource] = useState('');
+  const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
+  const [loadingMeta, setLoadingMeta] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [checkingDupes, setCheckingDupes] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -71,6 +74,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     setDuplicatePhones(new Set());
     setDefaultOwner('');
     setOwnerList([]);
+    setDefaultSource('');
+    setSourceList([]);
+    setLoadingMeta(false);
     setParsing(false);
     setCheckingDupes(false);
     setImporting(false);
@@ -82,6 +88,21 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     reset();
     onClose();
   };
+
+  // Fetch live users + sources on mount — no stale cache, active only
+  React.useEffect(() => {
+    if (!open) return;
+    setLoadingMeta(true);
+    Promise.all([
+      teamsService.getAssignableUsers().then((d:any)=>(d||[]).map((u:any)=>({id:u.id,name:u.name}))).catch(()=>[]),
+      fetch('/api/lead-sources?active=true', { cache: 'no-store' }).then(r=>r.json()).then(j=> (j.sources||[]).map((s:any)=>({id:s.id,name:s.name}))).catch(()=>[]),
+    ]).then(([users, sources])=>{
+      setOwnerList(users);
+      if (users.length && !defaultOwner) setDefaultOwner(users[0].id);
+      setSourceList(sources);
+      if (sources.length && !defaultSource) setDefaultSource(sources[0].name);
+    }).finally(()=> setLoadingMeta(false));
+  }, [open]);
 
   const loadOwners = async () => {
     try {
@@ -242,6 +263,12 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
             `Row ${row.rowNumber}: phone ${row.phone} already existed — imported as a new lead`
           );
         }
+        // Default Lead Source dropdown overrides file value for ALL rows per spec
+        const finalSource = (defaultSource || row.source || 'Other').trim();
+        // Validate against active lead_sources — fallback to Other if not found
+        const matchedSource = sourceList.find(s => s.name.toLowerCase() === finalSource.toLowerCase());
+        const resolvedSource = matchedSource ? matchedSource.name : finalSource;
+        const resolvedSourceId = matchedSource ? matchedSource.id : (sourceList.find(s=>s.name==='Other')?.id || null);
         batch.push({
           name: row.name || 'Unknown',
           phone: row.phone,
@@ -250,7 +277,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           propertyType: undefined,
           budgetMin: undefined,
           budgetMax: undefined,
-          source: row.source || 'Other',
+          source: resolvedSource,
+          leadSourceId: resolvedSourceId,
           agent: row.assignedName || '',
           agentInitials: row.assignedName
             ? row.assignedName
@@ -556,26 +584,43 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
         </div>
       )}
 
-      {/* Footer */}
+      {/* Footer — live DB dropdowns */}
       {step !== 'done' && (
         <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Default owner</span>
-            <select
-              value={defaultOwner}
-              onChange={(e) => setDefaultOwner(e.target.value)}
-              onClick={() => {
-                if (ownerList.length === 0) loadOwners();
-              }}
-              className="input-base h-8 text-xs appearance-none pr-8"
-            >
-              <option value="">— Unassigned —</option>
-              {ownerList.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Default owner</span>
+              <select
+                value={defaultOwner}
+                onChange={(e) => setDefaultOwner(e.target.value)}
+                className="input-base h-8 text-xs appearance-none pr-8 min-w-[140px]"
+                disabled={loadingMeta}
+              >
+                <option value="">— Unassigned —</option>
+                {ownerList.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Default Lead Source</span>
+              <select
+                value={defaultSource}
+                onChange={(e) => setDefaultSource(e.target.value)}
+                className="input-base h-8 text-xs appearance-none pr-8 min-w-[140px]"
+                disabled={loadingMeta}
+              >
+                <option value="">Use file value</option>
+                {sourceList.map((s) => (
+                  <option key={s.id} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {loadingMeta && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> Loading…</span>}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleClose} className="btn-secondary">

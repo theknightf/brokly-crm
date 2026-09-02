@@ -84,7 +84,7 @@ export async function GET(request: Request) {
   ]);
 
   const profiles = (profilesRes.data || []).filter((p: any) => p.is_active !== false);
-  const employees = profiles.filter((p: any) => p.role !== 'owner');
+  const employees = profiles.filter((p: any) => p.role !== 'owner' && p.role !== 'admin');
   const totalEmployees = employees.length;
 
   // Today's attendance

@@ -72,8 +72,9 @@ export async function GET(request: Request) {
     const totalDays = daysInRange(range.start, range.end);
 
     const db: any = supabase;
-    const { data: users } = await db.from('user_profiles').select('id, full_name, email, role, is_active, created_at').eq('is_active', true).order('full_name');
-    if (!users) return NextResponse.json({ period: periodParam, range, users: [] });
+    const { data: usersRaw } = await db.from('user_profiles').select('id, full_name, email, role, is_active, created_at').eq('is_active', true).order('full_name');
+    const users = (usersRaw || []).filter((u: any) => u.role !== 'owner' && u.role !== 'admin');
+    if (!users || users.length === 0) return NextResponse.json({ period: periodParam, range, users: [] });
 
     const userIds = users.map((u: any) => u.id);
     const office = await loadOfficeHours(db as any).catch(() => ({ toleranceMinutes: 12 * 60 + 30 } as any));

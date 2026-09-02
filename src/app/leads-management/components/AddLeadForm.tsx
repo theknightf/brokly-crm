@@ -13,7 +13,7 @@ import {
   ALL_SOURCES,
   ALL_PROPERTY_TYPES,
 } from './mockLeads';
-import { projectsService, teamService, teamsService } from '@/lib/services/crmService';
+import { projectsService, teamService, teamsService, leadSourcesService } from '@/lib/services/crmService';
 
 interface AddLeadFormData {
   name: string;
@@ -94,6 +94,9 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
   const [agentList, setAgentList] = useState<string[]>([]);
   const [userList, setUserList] = useState<{ id: string; name: string }[]>([]);
+  const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
+  const [newSourceName, setNewSourceName] = useState('');
+  const [creatingSource, setCreatingSource] = useState(false);
   const [developers, setDevelopers] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string; status: string }[]
@@ -116,7 +119,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       teamService.getAll().catch(() => []),
       projectsService.getAll().catch(() => []),
       teamsService.getAssignableUsers().catch(() => []),
-    ]).then(([teamData, projectData, assignableUsers]) => {
+      leadSourcesService.getActive().catch(() => []),
+    ]).then(([teamData, projectData, assignableUsers, sources]) => {
       const activeAgents = (teamData as any[])
         .filter((m) => m.status === 'Active')
         .map((m) => m.name);
@@ -142,6 +146,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           name: u.name,
         }))
       );
+      setSourceList((sources as any[]).map((s:any)=> ({ id: s.id, name: s.name })));
     });
   }, []);
 
@@ -189,7 +194,9 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   const onFormSubmit = async (data: AddLeadFormData) => {
     const today = new Date().toISOString().split('T')[0];
     const assignedUser = userList.find((u) => u.id === data.assignedTo);
-    const newLead: Lead = {
+    const matchedSource = sourceList.find(s=> s.name === data.source) || (ALL_SOURCES.includes(data.source as any) ? { id: '', name: data.source } as any : null);
+    const leadSourceId = matchedSource?.id || null;
+    const newLead: Lead & { leadSourceId?: string | null } = {
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
       name: data.name,
       phone: data.phone,
@@ -199,6 +206,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       budgetMin: data.budgetMin ? Number(data.budgetMin) : undefined,
       budgetMax: data.budgetMax ? Number(data.budgetMax) : undefined,
       source: data.source || initialData?.source || 'Facebook Ads',
+      leadSourceId,
       agent: data.agent,
       agentInitials: data.agent
         ? data.agent
@@ -268,18 +276,37 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             <label htmlFor="add-source" className="label-base">
               Lead source <span className="text-xs font-normal text-red-500">*</span>
             </label>
-            <div className="relative">
-              <select
-                id="add-source"
-                disabled={!canEditProtectedFields}
-                className={`${selectClass(!!errors.source)} ${!canEditProtectedFields ? 'bg-muted/60 text-muted-foreground cursor-not-allowed' : ''}`}
-                {...register('source', { required: 'Lead source is required' })}
-              >
-                {ALL_SOURCES.map((s) => (
-                  <option key={`quick-source-${s}`} value={s}>{s}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <div className="relative flex gap-2">
+              <div className="relative flex-1">
+                <select
+                  id="add-source"
+                  disabled={!canEditProtectedFields}
+                  className={`${selectClass(!!errors.source)} ${!canEditProtectedFields ? 'bg-muted/60 text-muted-foreground cursor-not-allowed' : ''}`}
+                  {...register('source', { required: 'Lead source is required' })}
+                >
+                  {sourceList.length ? sourceList.map((s) => (
+                    <option key={`quick-source-${s.id}`} value={s.name}>{s.name}</option>
+                  )) : ALL_SOURCES.map((s) => (
+                    <option key={`quick-source-${s}`} value={s}>{s}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              </div>
+              {canEditProtectedFields && (
+                <div className="flex gap-1">
+                  <input value={newSourceName} onChange={e=>setNewSourceName(e.target.value)} placeholder="New source" className="input-base h-9 text-xs w-28" />
+                  <button type="button" disabled={creatingSource || !newSourceName.trim()} onClick={async()=>{
+                    if(!newSourceName.trim()) return;
+                    setCreatingSource(true);
+                    try{
+                      const created = await leadSourcesService.create(newSourceName.trim());
+                      setSourceList(prev=> [...prev, {id: created.id, name: created.name}].sort((a,b)=>a.name.localeCompare(b.name)));
+                      setValue('source', created.name);
+                      setNewSourceName('');
+                    }catch(e:any){ alert(e.message); } finally{ setCreatingSource(false); }
+                  }} className="h-9 px-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1"><Plus size={12}/>{creatingSource?'…':'+'}</button>
+                </div>
+              )}
             </div>
             {!canEditProtectedFields && (
               <p className="mt-1 text-[11px] text-muted-foreground">Only Admin and Owner can change it.</p>
