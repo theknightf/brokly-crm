@@ -11,9 +11,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { leadsService, teamsService } from '@/lib/services/crmService';
+import { leadsService, teamsService, adminSettingsService, projectsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseLeadFile, ImportField, ImportParseResult, ParsedRow } from '@/lib/leadsImport';
+import { PIPELINE_STAGES, ALL_REAL_STATUSES } from './leadStages';
 
 const IMPORT_FIELDS: { value: ImportField; label: string; required?: boolean }[] = [
   { value: 'phone', label: 'Mobile / Phone', required: true },
@@ -52,6 +53,12 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [ownerList, setOwnerList] = useState<{ id: string; name: string }[]>([]);
   const [defaultSource, setDefaultSource] = useState('');
   const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
+  const [defaultStage, setDefaultStage] = useState('');
+  const [defaultStatus, setDefaultStatus] = useState('');
+  const [stageList, setStageList] = useState<{ id: string; name: string }[]>([]);
+  const [statusList, setStatusList] = useState<string[]>([]);
+  const [defaultProject, setDefaultProject] = useState('');
+  const [projectList, setProjectList] = useState<{ id: string; name: string }[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [checkingDupes, setCheckingDupes] = useState(false);
@@ -76,6 +83,12 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     setOwnerList([]);
     setDefaultSource('');
     setSourceList([]);
+    setDefaultStage('');
+    setDefaultStatus('');
+    setStageList([]);
+    setStatusList([]);
+    setDefaultProject('');
+    setProjectList([]);
     setLoadingMeta(false);
     setParsing(false);
     setCheckingDupes(false);
@@ -89,18 +102,23 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     onClose();
   };
 
-  // Fetch live users + sources on mount — no stale cache, active only
+  // Fetch live users + sources + stages + projects on mount — no stale cache, active only
   React.useEffect(() => {
     if (!open) return;
     setLoadingMeta(true);
     Promise.all([
       teamsService.getAssignableUsers().then((d:any)=>(d||[]).map((u:any)=>({id:u.id,name:u.name}))).catch(()=>[]),
       fetch('/api/lead-sources?active=true', { cache: 'no-store' }).then(r=>r.json()).then(j=> (j.sources||[]).map((s:any)=>({id:s.id,name:s.name}))).catch(()=>[]),
-    ]).then(([users, sources])=>{
+      adminSettingsService.getAll().then((g:any)=> (g.pipelineStages||[]).filter((s:any)=>s.active).map((s:any)=>({id:s.id,name:s.name}))).catch(()=> PIPELINE_STAGES.map(s=>({id:s,name:s})) ),
+      projectsService.getAll().then((d:any)=>(d||[]).filter((p:any)=>p.status==='Active').map((p:any)=>({id:p.id,name:p.name}))).catch(()=>[]),
+    ]).then(([users, sources, stages, projects])=>{
       setOwnerList(users);
       if (users.length && !defaultOwner) setDefaultOwner(users[0].id);
       setSourceList(sources);
-      if (sources.length && !defaultSource) setDefaultSource(sources[0].name);
+      const stagesToUse = stages.length ? stages : PIPELINE_STAGES.map(s=>({id:s,name:s}));
+      setStageList(stagesToUse);
+      setStatusList(ALL_REAL_STATUSES);
+      setProjectList(projects);
     }).finally(()=> setLoadingMeta(false));
   }, [open]);
 
@@ -263,12 +281,15 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
             `Row ${row.rowNumber}: phone ${row.phone} already existed — imported as a new lead`
           );
         }
-        // Default Lead Source dropdown overrides file value for ALL rows per spec
+        // Default dropdowns override file values per spec — Stage/Status/Project/Source
         const finalSource = (defaultSource || row.source || 'Other').trim();
-        // Validate against active lead_sources — fallback to Other if not found
         const matchedSource = sourceList.find(s => s.name.toLowerCase() === finalSource.toLowerCase());
         const resolvedSource = matchedSource ? matchedSource.name : finalSource;
         const resolvedSourceId = matchedSource ? matchedSource.id : (sourceList.find(s=>s.name==='Other')?.id || null);
+        // Stage/Status precedence: Default Status > Default Stage > file status > system default
+        const rawStageStatus = (defaultStatus || defaultStage || row.status || 'Fresh Leads').trim();
+        const finalStatus = rawStageStatus || 'Fresh Leads';
+        const finalProject = (defaultProject || row.project || '').trim();
         batch.push({
           name: row.name || 'Unknown',
           phone: row.phone,
@@ -279,6 +300,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           budgetMax: undefined,
           source: resolvedSource,
           leadSourceId: resolvedSourceId,
+          status: finalStatus,
+          project: finalProject,
           agent: row.assignedName || '',
           agentInitials: row.assignedName
             ? row.assignedName
@@ -288,12 +311,10 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                 .toUpperCase()
                 .slice(0, 2)
             : '',
-          status: (row.status || 'Fresh Leads') as any,
           lastContact: row.date || new Date().toISOString().split('T')[0],
           followUpDue: row.date || new Date().toISOString().split('T')[0],
           createdAt: row.date || undefined,
           developer: row.developer || '',
-          project: row.project || '',
           unit: row.unit || '',
           interestLevel: row.interestLevel || '',
           notes: row.notes || '',
@@ -337,7 +358,40 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       size="xl"
     >
       {step === 'upload' && (
-        <div className="p-6">
+        <div className="p-6 space-y-4">
+          {/* Default Stage / Status / Project — dark UI, above file input per spec */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Default Stage</label>
+              <div className="relative">
+                <select value={defaultStage} onChange={e=>{ setDefaultStage(e.target.value); setDefaultStatus(''); }} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                  <option value="">Use file value</option>
+                  {stageList.map(s=> <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Default Status</label>
+              <div className="relative">
+                <select value={defaultStatus} onChange={e=>setDefaultStatus(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                  <option value="">Use file value</option>
+                  {(defaultStage ? statusList.filter(s=> s===defaultStage || !PIPELINE_STAGES.includes(s as any)) : statusList).map(s=> <option key={s} value={s}>{s}</option>)}
+                </select>
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1">Default Project</label>
+              <div className="relative">
+                <select value={defaultProject} onChange={e=>setDefaultProject(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                  <option value="">Use file value</option>
+                  {projectList.map(p=> <option key={p.id} value={p.name}>{p.name}</option>)}
+                </select>
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+              </div>
+            </div>
+          </div>
           {parsing ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
               <Loader2 size={28} className="animate-spin text-primary" />
