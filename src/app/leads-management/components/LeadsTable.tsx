@@ -232,13 +232,9 @@ export default function LeadsTable({
         </div>
       )}
 
-      {/* Mobile full-width card list — centered in viewport, safe-area aware */}
+      {/* Mobile full-width card list — pinned to top, safe-area aware so bottom card never hides behind nav */}
       <div
-        className={`sm:hidden flex flex-col gap-4 px-1 pt-2 pb-32 sm:min-h-0 items-stretch ${
-          leads.length === 1
-            ? 'min-h-[calc(100dvh-220px)] justify-center'
-            : 'min-h-[calc(100dvh-220px)] justify-start'
-        }`}
+        className="sm:hidden flex flex-col gap-4 px-1 pt-2 pb-32"
         style={{ paddingBottom: 'max(8rem, calc(7rem + env(safe-area-inset-bottom)))' }}
       >
         {leads.length === 0 ? (

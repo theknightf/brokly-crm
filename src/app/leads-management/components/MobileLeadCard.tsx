@@ -290,17 +290,29 @@ export default function MobileLeadCard({
         </span>
       </div>
 
-      {/* 3. Primary Communication Actions */}
+      {/* 3. Primary Communication Actions — Call dials directly */}
       <div className="px-4 pt-3 grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => onOpenLogCall?.(lead)}
-          className="h-11 rounded-xl border border-border bg-card dark:bg-card hover:bg-muted/40 dark:hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-          aria-label="Call lead"
-        >
-          <PhoneCall size={16} className="text-muted-foreground" />
-          Call
-        </button>
+        {lead.phone ? (
+          <a
+            href={`tel:${lead.phone.replace(/[^0-9+,]/g, '')}`}
+            onClick={() => onOpenLogCall?.(lead)}
+            className="h-11 rounded-xl border border-border bg-card dark:bg-card hover:bg-muted/40 dark:hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            aria-label={`Call ${lead.phone}`}
+          >
+            <PhoneCall size={16} className="text-muted-foreground" />
+            Call
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="h-11 rounded-xl border border-border bg-muted text-muted-foreground text-sm font-semibold flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
+            aria-label="No phone"
+          >
+            <PhoneCall size={16} />
+            Call
+          </button>
+        )}
         <a
           href={lead.phone ? `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}` : undefined}
           target={lead.phone ? '_blank' : undefined}
