@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase/client';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
@@ -268,6 +269,20 @@ export default function LeadsManagementScreen({
   // removed from the local list and excluded from the next fetchLeads() result
   // so the sales agent's queue is instantly refreshed without a page reload.
   const recentlyCalledRef = useRef<Set<string>>(new Set());
+
+  // Lock body scroll when View Lead drawer is open (Add Lead modal handled by Modal portal)
+  useEffect(() => {
+    if (!viewLead) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+    };
+  }, [viewLead]);
   const [dupWarning, setDupWarning] = useState<{
     existing: any;
     pendingLead: Lead;
@@ -1206,8 +1221,8 @@ export default function LeadsManagementScreen({
         }}
       />
 
-      {/* View Lead Drawer */}
-      {viewLead && (
+      {/* View Lead Drawer — portal + fixed ensures viewport overlay regardless of scroll */}
+      {viewLead && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end">
           <div
             className="absolute inset-0 bg-foreground/30 backdrop-blur-sm animate-in fade-in"
@@ -1695,7 +1710,7 @@ export default function LeadsManagementScreen({
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* Edit Lead Modal — dedicated edit interface (not AddLeadForm) */}
       {editLead && (

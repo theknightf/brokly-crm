@@ -1,5 +1,6 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -26,25 +27,42 @@ export default function Modal({
   children,
   size = 'md',
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     if (open) {
       document.addEventListener('keydown', handleKey);
+      // Lock body scroll and compensate for scrollbar to prevent layout shift
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
       document.body.classList.add('modal-open');
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+      return () => {
+        document.removeEventListener('keydown', handleKey);
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+        document.body.classList.remove('modal-open');
+      };
     }
     return () => {
       document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = '';
-      document.body.classList.remove('modal-open');
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  const modalContent = (
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4"
       role="dialog"
@@ -57,8 +75,7 @@ export default function Modal({
         aria-hidden
       />
       <div
-        className={`relative z-[101] w-full ${sizeClasses[size]} bg-card sm:rounded-2xl rounded-t-3xl shadow-modal flex flex-col overflow-hidden slide-up-enter
-          max-h-[85dvh] sm:max-h-[85vh] max-h-[85vh]`}
+        className={`relative z-[101] w-full ${sizeClasses[size]} bg-card sm:rounded-2xl rounded-t-3xl shadow-modal flex flex-col overflow-hidden slide-up-enter max-h-[85dvh] sm:max-h-[85vh]`}
         style={{ maxHeight: 'min(85vh, 85dvh)' }}
       >
         {/* Header — fixed, never scrolls */}
@@ -83,4 +100,8 @@ export default function Modal({
       </div>
     </div>
   );
+
+  // Portal to document.body breaks out of parent overflow/transform contexts,
+  // ensuring fixed positioning is always relative to the viewport.
+  return createPortal(modalContent, document.body);
 }
