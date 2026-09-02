@@ -7,8 +7,11 @@ function isSecureApp(): boolean {
   return !!process.env.NEXT_PUBLIC_SITE_URL?.startsWith('https');
 }
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+
 function getProjectRef(): string {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const url = SUPABASE_URL;
   return url.match(/https:\/\/([^.]+)\./)?.[1] ?? '';
 }
 
@@ -31,9 +34,7 @@ export async function createClient() {
     }
   }
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
