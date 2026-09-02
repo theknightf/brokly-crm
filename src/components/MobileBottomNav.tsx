@@ -32,8 +32,15 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   void isAdminRole(profile?.role);
 
   return (
-    <nav className="mobile-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 pb-safe">
-      <div className="flex items-center justify-around h-16 relative px-2">
+    <nav className="mobile-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40">
+      <div
+        className="flex items-center justify-around relative px-2"
+        style={{
+          height: '64px',
+          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          paddingTop: '6px',
+        }}
+      >
         {/* Left items */}
         {LEFT_ITEMS.map((item) => {
           const active = isActive(item.href);

@@ -33,10 +33,12 @@ export default function Modal({
     if (open) {
       document.addEventListener('keydown', handleKey);
       document.body.style.overflow = 'hidden';
+      document.body.classList.add('modal-open');
     }
     return () => {
       document.removeEventListener('keydown', handleKey);
       document.body.style.overflow = '';
+      document.body.classList.remove('modal-open');
     };
   }, [open, onClose]);
 
@@ -44,17 +46,23 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
-      <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-card sm:rounded-2xl rounded-t-2xl shadow-modal fade-in sm:max-h-[90vh] max-h-[92dvh] flex flex-col slide-up-enter`}
+        className="absolute inset-0 z-[100] bg-foreground/40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
+      <div
+        className={`relative z-[101] w-full ${sizeClasses[size]} bg-card sm:rounded-2xl rounded-t-3xl shadow-modal flex flex-col overflow-hidden slide-up-enter
+          max-h-[85dvh] sm:max-h-[85vh] max-h-[85vh]`}
+        style={{ maxHeight: 'min(85vh, 85dvh)' }}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 sm:p-6 border-b border-border flex-shrink-0">
+        {/* Header — fixed, never scrolls */}
+        <div className="flex items-start justify-between p-5 sm:p-6 border-b border-border flex-shrink-0 bg-card">
           <div className="min-w-0">
             <h2 id="modal-title" className="text-base sm:text-lg font-semibold text-foreground">
               {title}
@@ -70,8 +78,8 @@ export default function Modal({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto flex-1">{children}</div>
+        {/* Body — only this scrolls */}
+        <div className="overflow-y-auto flex-1 overscroll-contain min-h-0">{children}</div>
       </div>
     </div>
   );

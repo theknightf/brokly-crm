@@ -1764,10 +1764,14 @@ export default function LeadsManagementScreen({
         />
       )}
 
-      {/* Mobile one-hand FAB: add lead */}
+      {/* Mobile one-hand FAB: add lead — hidden when modal is open (handled via body.modal-open + data-fab) */}
       <button
+        data-fab="mobile-add-lead"
         onClick={() => setAddModalOpen(true)}
-        className="sm:hidden fixed bottom-24 right-4 z-40 w-14 h-14 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform is-standalone:bottom-28"
+        aria-hidden={addModalOpen ? 'true' : undefined}
+        className={`sm:hidden fixed bottom-24 right-4 z-40 w-14 h-14 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform is-standalone:bottom-28 ${
+          addModalOpen ? 'hidden' : 'flex'
+        }`}
         aria-label="Add lead"
       >
         <Plus size={26} />

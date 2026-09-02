@@ -698,8 +698,11 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
         </button>
       </div>
 
-      {/* Sticky footer */}
-      <div className="sticky bottom-0 z-10 bg-card border-t border-border px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-2xl">
+      {/* Sticky footer — stays pinned to bottom of scroll viewport, safe-area aware */}
+      <div
+        className="sticky bottom-0 z-10 bg-card border-t border-border px-6 pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-2xl"
+        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+      >
         <p className="text-xs text-muted-foreground hidden sm:block">
           ✅ Phone and source are required
         </p>

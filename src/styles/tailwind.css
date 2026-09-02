@@ -550,10 +550,16 @@
   padding-top: env(safe-area-inset-top);
 }
 .pb-safe {
-  padding-bottom: calc(env(safe-area-inset-bottom));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 .pt-safe {
-  padding-top: calc(env(safe-area-inset-top));
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+/* Hide bottom nav + FAB when any modal/drawer is open — prevents overlap
+   Modal.tsx adds `modal-open` to <body> while open; CSS hides chrome. */
+body.modal-open .mobile-bottom-nav,
+body.modal-open [data-fab="mobile-add-lead"] {
+  display: none !important;
 }
 
 @keyframes pwaPageIn {
