@@ -81,7 +81,7 @@ export default function LogCallModal({ lead, onClose, onDone, onCallLogged }: Lo
       // so it surfaces on the lead's timeline + the column filter in the board.
       if (outcome === 'Closed Number' && lead?.id) {
         try {
-          await leadsService.update(lead.id, { tags: Array.from(new Set([...(lead.tags || []), 'closed_number'])) });
+          await leadsService.update(lead.id, { tags: Array.from(new Set([...(((lead as any).tags as string[] | undefined) || []), 'closed_number'])) } as any);
         } catch {
           /* non-fatal: tag write fails silently, call log already saved */
         }

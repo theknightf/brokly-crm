@@ -191,7 +191,7 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDel
                 {colLeads.length === 0 ? (
                   <div className="border border-dashed border-border rounded-2xl py-10 text-center text-xs text-muted-foreground">
                     Drop leads here
-                  )
+                  </div>
                 ) : (
                   colLeads.map((lead, i) => (
                     <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
