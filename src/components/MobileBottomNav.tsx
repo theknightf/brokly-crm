@@ -33,8 +33,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
 
   return (
     <nav className="mobile-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 pb-safe">
-      <div className="flex items-stretch h-16 relative">
-
+      <div className="flex items-center justify-around h-16 relative px-2">
         {/* Left items */}
         {LEFT_ITEMS.map((item) => {
           const active = isActive(item.href);
@@ -59,21 +58,8 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
           );
         })}
 
-        {/* Center Add Lead FAB */}
-        <div className="flex flex-col items-center justify-center flex-1 relative">
-          <Link
-            href="/leads-management?new=1"
-            aria-label="Add lead"
-            className="absolute -top-5 flex flex-col items-center gap-0.5 group"
-          >
-            <span className="relative flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-[0_6px_24px_-4px_rgba(132,204,22,0.7)] group-active:scale-90 transition-transform duration-150">
-              {/* pulse ring */}
-              <span className="absolute inset-0 rounded-full bg-primary/50 animate-ping" style={{ animationDuration: '2.5s' }} />
-              <Plus size={26} strokeWidth={2.5} className="relative z-10" />
-            </span>
-            <span className="text-[10px] font-semibold text-primary mt-1 leading-none">Add lead</span>
-          </Link>
-        </div>
+        {/* Spacer for centered Add Lead */}
+        <div className="flex-1" />
 
         {/* Right items */}
         {RIGHT_ITEMS.map((item) => {
@@ -111,6 +97,18 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
           {t('common.menu')}
         </button>
 
+        {/* Center Add Lead - perfectly centered */}
+        <Link
+          href="/leads-management?new=1"
+          aria-label="Add lead"
+          className="absolute left-1/2 -translate-x-1/2 -top-5 flex flex-col items-center gap-0.5 group"
+        >
+          <span className="relative flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-[0_6px_24px_-4px_rgba(132,204,22,0.7)] group-active:scale-90 transition-transform duration-150">
+            <span className="absolute inset-0 rounded-full bg-primary/50 animate-ping" style={{ animationDuration: '2.5s' }} />
+            <Plus size={26} strokeWidth={2.5} className="relative z-10" />
+          </span>
+          <span className="text-[10px] font-semibold text-primary leading-none">Add lead</span>
+        </Link>
       </div>
     </nav>
   );

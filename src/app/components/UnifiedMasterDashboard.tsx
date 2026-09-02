@@ -131,34 +131,39 @@ export default function UnifiedMasterDashboard() {
 
   return (
     <div className="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen transition-colors duration-200 space-y-6 p-4 md:p-6 -m-4 md:-m-6">
-      {/* Header - page MUST start here per spec - no purple banner above */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-zinc-900 dark:bg-white flex items-center justify-center shadow"><ShieldCheck size={18} className="text-white dark:text-zinc-900"/></div>
-          <div>
-            <h1 className="text-zinc-900 dark:text-white font-bold text-xl">Executive Master Dashboard</h1>
-            <p className="text-zinc-500 dark:text-zinc-400 text-sm">Identical for <span className="font-semibold text-zinc-900 dark:text-white">Admin</span> & <span className="font-semibold text-zinc-900 dark:text-white">Owner</span><span className="mx-1 text-zinc-400">•</span>{data.period?.from} → {data.period?.to}<span className="mx-1 text-zinc-400">•</span>{data.leadSummary?.total ?? 0} leads</p>
-          </div>
+      {/* Header — clean dark aesthetic, no floating capsule */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-zinc-900 dark:text-white font-bold text-xl flex items-center gap-2">
+            Executive Master Dashboard
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 dark:bg-zinc-800 border border-zinc-800 dark:border-zinc-700 text-[11px] font-medium text-zinc-400">
+              <span className="w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
+              Live
+            </span>
+          </h1>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
+            {data.period?.from} — {data.period?.to} <span className="mx-1 text-zinc-400">•</span> {data.leadSummary?.total ?? 0} leads <span className="mx-1 text-zinc-400">•</span> {data.summary.totalEmployees} team
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setRange('week')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='week' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Week</button>
-          <button onClick={() => setRange('month')} className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${range==='month' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>Month</button>
-          <button onClick={load} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 p-2 rounded-xl transition-colors"><RefreshCw size={14}/></button>
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <button onClick={() => setRange('week')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='week' ? 'bg-zinc-900 dark:bg-zinc-800 text-white dark:text-white border-zinc-800 dark:border-zinc-700 shadow-sm' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>Week</button>
+          <button onClick={() => setRange('month')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='month' ? 'bg-zinc-900 dark:bg-zinc-800 text-white dark:text-white border-zinc-800 dark:border-zinc-700 shadow-sm' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>Month</button>
+          <button onClick={load} className="w-8 h-8 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors"><RefreshCw size={14}/></button>
         </div>
       </div>
 
-      {/* View Switcher Toggle — Sales & Team Performance vs Leads Pipeline & Data Hub */}
-      <div className="bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-2xl p-1.5 flex gap-1.5">
+      {/* View Switcher — modern pill with subtle glow */}
+      <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full p-1 flex gap-1 w-full sm:w-auto">
         <button
           onClick={() => setMode('sales')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-lime-500 text-zinc-950 font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-lime-400' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
         >
           <Users size={16}/> Sales & Team Performance
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='sales' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.leaderboard.length}</span>
         </button>
         <button
           onClick={() => setMode('leads')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-zinc-800 text-lime-400 border border-lime-500/30 font-semibold shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-lime-500 text-zinc-950 font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-lime-400' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
         >
           <Target size={16}/> Leads Pipeline & Data Hub
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.summary?.totalLeads ?? 0}</span>
@@ -183,21 +188,21 @@ export default function UnifiedMasterDashboard() {
 
       {mode === 'sales' ? (
         <>
-          {/* Executive Overview — Sales */}
+          {/* Executive Overview — Sales — dark surface #16181d */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             {[
-              { label: 'Total Employees', value: data.summary.totalEmployees, icon: Users, color: 'text-slate-700 bg-slate-100' },
-              { label: 'Present Today', value: data.summary.presentToday, sub: `${data.summary.absentToday} absent · ${data.summary.lateToday} late`, icon: Calendar, color: 'text-emerald-600 bg-emerald-50' },
-              { label: 'Avg Hours', value: `${data.summary.avgHours}h`, sub: `${data.summary.totalHours}h total`, icon: Clock, color: 'text-sky-600 bg-sky-50' },
-              { label: 'Attendance Rate', value: `${data.summary.attendanceRate}%`, icon: BarChart3, color: 'text-indigo-600 bg-indigo-50' },
-              { label: 'Expenses', value: `${data.expenses.totalThis}`, sub: `${data.expenses.changePct>=0?'+':''}${data.expenses.changePct}%`, icon: Banknote, color: 'text-amber-600 bg-amber-50' },
-              { label: 'Pending Deductions', value: data.deductions.pending, sub: `${data.notifications.unread} unread alerts`, icon: Bell, color: 'text-red-600 bg-red-50' },
+              { label: 'Total Employees', value: data.summary.totalEmployees, icon: Users, color: 'text-slate-400 bg-slate-500/10' },
+              { label: 'Present Today', value: data.summary.presentToday, sub: `${data.summary.absentToday} absent · ${data.summary.lateToday} late`, icon: Calendar, color: 'text-emerald-400 bg-emerald-500/10' },
+              { label: 'Avg Hours', value: `${data.summary.avgHours}h`, sub: `${data.summary.totalHours}h total`, icon: Clock, color: 'text-sky-400 bg-sky-500/10' },
+              { label: 'Attendance Rate', value: `${data.summary.attendanceRate}%`, icon: BarChart3, color: 'text-indigo-400 bg-indigo-500/10' },
+              { label: 'Expenses', value: `${data.expenses.totalThis}`, sub: `${data.expenses.changePct>=0?'+':''}${data.expenses.changePct}%`, icon: Banknote, color: 'text-amber-400 bg-amber-500/10' },
+              { label: 'Pending Deductions', value: data.deductions.pending, sub: `${data.notifications.unread} unread alerts`, icon: Bell, color: 'text-red-400 bg-red-500/10' },
             ].map(card => (
-              <div key={card.label} className="bg-card border border-border rounded-xl p-3">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center mb-2 ${card.color}`}><card.icon size={14}/></div>
-                <p className="text-xs text-muted-foreground">{card.label}</p>
-                <p className="text-lg font-bold text-foreground">{card.value}</p>
-                {card.sub && <p className="text-xs text-muted-foreground truncate">{card.sub}</p>}
+              <div key={card.label} className="bg-white dark:bg-[#16181d] dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 transition-all">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-2 ${card.color}`}><card.icon size={14}/></div>
+                <p className="text-zinc-600 dark:text-zinc-400 text-xs font-bold tracking-wider uppercase truncate">{card.label}</p>
+                <p className="text-2xl font-black text-zinc-900 dark:text-white mt-1">{card.value}</p>
+                {card.sub && <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-1 truncate">{card.sub}</p>}
               </div>
             ))}
           </div>
