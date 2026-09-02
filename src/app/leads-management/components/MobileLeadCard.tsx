@@ -162,7 +162,7 @@ export default function MobileLeadCard({
   // compact hidden checkbox — still accessible for bulk select, but not prominent per reference
   return (
     <div
-      className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition-all ${
+      className={`bg-card dark:bg-card border rounded-2xl shadow-sm overflow-hidden transition-all ${
         selected ? 'border-primary ring-1 ring-primary/30' : 'border-border'
       }`}
     >
@@ -205,14 +205,14 @@ export default function MobileLeadCard({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onEdit(lead)}
-              className="w-9 h-9 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground flex items-center justify-center active:scale-95 transition-transform"
+              className="w-9 h-9 rounded-xl bg-muted/60 dark:bg-muted hover:bg-muted dark:hover:bg-muted/80 text-muted-foreground flex items-center justify-center active:scale-95 transition-transform"
               aria-label="Edit lead"
             >
               <Pencil size={16} />
             </button>
             <button
               onClick={() => onDelete(lead.id)}
-              className="w-9 h-9 rounded-xl bg-muted/60 hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center active:scale-95 transition-transform"
+              className="w-9 h-9 rounded-xl bg-muted/60 dark:bg-muted hover:bg-red-500/10 dark:hover:bg-red-500/20 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center active:scale-95 transition-transform"
               aria-label="Delete lead"
             >
               <Trash2 size={16} />
@@ -231,12 +231,7 @@ export default function MobileLeadCard({
           <button
             type="button"
             onClick={() => setStatusOpen((o) => !o)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-bold border active:scale-[0.98] transition-transform"
-            style={{
-              backgroundColor: '#e6ffed',
-              color: '#0f7a3a',
-              borderColor: '#a7f3d0',
-            }}
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-bold border active:scale-[0.98] transition-transform bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
             aria-label={`Stage: ${lead.status || 'Fresh Leads'}`}
           >
             <span className="truncate max-w-[110px]">{lead.status || 'Fresh Leads'}</span>
@@ -245,7 +240,7 @@ export default function MobileLeadCard({
           {statusOpen && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setStatusOpen(false)} aria-hidden />
-              <div className="absolute left-0 top-full mt-1 z-40 flex flex-col bg-white border border-border rounded-xl shadow-xl min-w-[240px] py-1 max-h-80 overflow-y-auto">
+              <div className="absolute left-0 top-full mt-1 z-40 flex flex-col bg-card dark:bg-card border border-border rounded-xl shadow-xl min-w-[240px] py-1 max-h-80 overflow-y-auto">
                 <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                   Pipeline
                 </p>
@@ -287,7 +282,7 @@ export default function MobileLeadCard({
 
         {/* Status badge — darker green pill with lightning */}
         <span
-          className="inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-xs font-bold text-white"
+          className="inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-xs font-bold text-white dark:text-white"
           style={{ backgroundColor: '#2f855a' }}
         >
           <Zap size={13} className="fill-white" />
@@ -300,7 +295,7 @@ export default function MobileLeadCard({
         <button
           type="button"
           onClick={() => onOpenLogCall?.(lead)}
-          className="h-11 rounded-xl border border-border bg-white hover:bg-muted/40 text-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+          className="h-11 rounded-xl border border-border bg-card dark:bg-card hover:bg-muted/40 dark:hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           aria-label="Call lead"
         >
           <PhoneCall size={16} className="text-muted-foreground" />
@@ -313,12 +308,12 @@ export default function MobileLeadCard({
           onClick={(e) => {
             if (!lead.phone) e.preventDefault();
           }}
-          className={`h-11 rounded-xl border border-border bg-white hover:bg-muted/40 text-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform ${
+          className={`h-11 rounded-xl border border-border bg-card dark:bg-card hover:bg-muted/40 dark:hover:bg-muted text-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform ${
             !lead.phone ? 'opacity-50 pointer-events-none' : ''
           }`}
           aria-label="WhatsApp lead"
         >
-          <MessageCircle size={16} className="text-[#25D366]" />
+          <MessageCircle size={16} className="text-[#25D366] dark:text-[#25D366]" />
           WhatsApp
         </a>
       </div>
@@ -331,7 +326,7 @@ export default function MobileLeadCard({
               key={c.key}
               type="button"
               onClick={() => handleChip(c.outcome)}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#eaf4ff] hover:bg-[#dbeafe] text-[#2b5c8a] text-xs font-semibold whitespace-nowrap flex-shrink-0 active:scale-95 transition-transform border border-[#dbeafe]"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#eaf4ff] dark:bg-sky-900/30 hover:bg-[#dbeafe] dark:hover:bg-sky-800/40 text-[#2b5c8a] dark:text-sky-300 text-xs font-semibold whitespace-nowrap flex-shrink-0 active:scale-95 transition-transform border border-[#dbeafe] dark:border-sky-800/50"
             >
               {c.icon}
               {c.label}
@@ -341,7 +336,7 @@ export default function MobileLeadCard({
       </div>
 
       {/* 5. Bottom Footer Bar */}
-      <div className="mt-3 px-4 py-3 flex items-center justify-between gap-3 border-t border-border/60 bg-white">
+      <div className="mt-3 px-4 py-3 flex items-center justify-between gap-3 border-t border-border/60 bg-card dark:bg-card">
         <p className="text-xs flex items-center gap-1.5 min-w-0">
           <span className="text-muted-foreground">Follow-up:</span>
           <span className={`font-bold tabular-nums ${overdue ? 'text-red-500' : 'text-red-500'}`}>

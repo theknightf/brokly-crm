@@ -71,7 +71,7 @@ function BoardCard({
             e.stopPropagation();
             onDelete(lead.id);
           }}
-          className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          className="w-7 h-7 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
           aria-label="Delete lead"
         >
           <Trash2 size={13} />
@@ -109,7 +109,7 @@ function BoardCard({
           <a
             href={`tel:${lead.phone.replace(/[^0-9+,]/g, '')}`}
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center gap-1 text-xs font-semibold hover:bg-primary/20 transition-colors"
+            className="flex-1 h-8 rounded-lg bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary flex items-center justify-center gap-1 text-xs font-semibold hover:bg-primary/20 dark:hover:bg-primary/25 transition-colors"
           >
             <Phone size={12} />
             Call
@@ -119,7 +119,7 @@ function BoardCard({
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center gap-1 text-xs font-semibold hover:bg-emerald-100 transition-colors"
+            className="flex-1 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400 flex items-center justify-center gap-1 text-xs font-semibold hover:bg-emerald-500/20 dark:hover:bg-emerald-500/25 transition-colors"
           >
             <MessageCircle size={12} />
             WA
@@ -134,7 +134,7 @@ function BoardCard({
             e.stopPropagation();
             if (prev) onStatusChange(lead.id, prev);
           }}
-          className="w-7 h-7 rounded-lg hover:bg-secondary text-muted-foreground disabled:opacity-30 flex items-center justify-center transition-colors"
+          className="w-7 h-7 rounded-lg hover:bg-muted dark:hover:bg-muted text-muted-foreground disabled:opacity-30 flex items-center justify-center transition-colors"
           aria-label="Move to previous stage"
         >
           <ChevronLeft size={14} />
@@ -146,7 +146,7 @@ function BoardCard({
             e.stopPropagation();
             if (next) onStatusChange(lead.id, next);
           }}
-          className="w-7 h-7 rounded-lg hover:bg-secondary text-muted-foreground disabled:opacity-30 flex items-center justify-center transition-colors"
+          className="w-7 h-7 rounded-lg hover:bg-muted dark:hover:bg-muted text-muted-foreground disabled:opacity-30 flex items-center justify-center transition-colors"
           aria-label="Move to next stage"
         >
           <ChevronRight size={14} />

@@ -2,7 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, CalendarClock, CalendarCheck2, Menu, Plus } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarClock, CalendarCheck2, Menu } from 'lucide-react';
 import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -65,9 +65,6 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
           );
         })}
 
-        {/* Spacer for centered Add Lead */}
-        <div className="flex-1" />
-
         {/* Right items */}
         {RIGHT_ITEMS.map((item) => {
           const active = isActive(item.href);
@@ -103,19 +100,6 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
           </span>
           {t('common.menu')}
         </button>
-
-        {/* Center Add Lead - perfectly centered */}
-        <Link
-          href="/leads-management?new=1"
-          aria-label="Add lead"
-          className="absolute left-1/2 -translate-x-1/2 -top-5 flex flex-col items-center gap-0.5 group"
-        >
-          <span className="relative flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-[0_6px_24px_-4px_rgba(132,204,22,0.7)] group-active:scale-90 transition-transform duration-150">
-            <span className="absolute inset-0 rounded-full bg-primary/50 animate-ping" style={{ animationDuration: '2.5s' }} />
-            <Plus size={26} strokeWidth={2.5} className="relative z-10" />
-          </span>
-          <span className="text-[10px] font-semibold text-primary leading-none">Add lead</span>
-        </Link>
       </div>
     </nav>
   );
