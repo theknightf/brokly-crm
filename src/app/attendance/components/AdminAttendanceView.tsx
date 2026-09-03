@@ -149,7 +149,7 @@ function MultiShiftSettingsCard({ shifts, onSave }: { shifts: ShiftConfig[]; onS
         <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center"><Settings2 size={14} /></div>
         <div>
           <h3 className="text-sm font-bold text-foreground">إعدادات الورديات — Multi-Shift Assignment Engine</h3>
-          <p className="text-xs text-muted-foreground">وردية قياسية 12:00–20:00 ومسائية 01:00–09:00 — سماح 20د لكل وردية</p>
+           <p className="text-xs text-muted-foreground">وردية قياسية 12:00–20:00 ومسائية 13:00–21:00 — سماح 20د لكل وردية</p>
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -719,25 +719,25 @@ export default function AdminAttendanceView() {
                       <td className="px-3 py-2.5 text-xs text-muted-foreground">{i+1}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">{(r.user.full_name||r.user.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
-                          <div><p className="text-sm font-semibold truncate max-w-[160px]">{r.user.full_name||'—'}</p><p className="text-xs text-muted-foreground truncate max-w-[160px]">{r.user.email}</p></div>
+                          <div className="w-7 h-7 rounded-full bg-primary/10 text-primary dark:bg-primary/15 flex items-center justify-center text-xs font-bold">{(r.user.full_name||r.user.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
+                          <div><p className="text-sm font-semibold text-foreground truncate max-w-[160px]">{r.user.full_name||'—'}</p><p className="text-xs text-muted-foreground truncate max-w-[160px]">{r.user.email}</p></div>
                         </div>
                       </td>
                       <td className="px-3 py-2.5 text-xs">
                         <div className="flex flex-wrap items-center gap-1">
-                          <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-full">{r.teamName}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.shift.id==='shift2' ? 'bg-violet-100 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>{r.shift.id==='shift2'?'م':'ق'}</span>
+                          <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-1 rounded-full">{r.teamName}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${r.shift.id==='shift2' ? 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30'}`}>{r.shift.id==='shift2'?'م':'ق'}</span>
                           {r.hasTeamDelay && <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded-full text-[10px] font-bold" title={r.delayReason}>وردية معدلة</span>}
                         </div>
                         {r.hasTeamDelay && r.daily.some(d=> d.hasDelay) && <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">{r.daily.find(d=> d.hasDelay)?.shift.start}–{r.daily.find(d=> d.hasDelay)?.shift.end} {r.delayReason ? `· ${r.delayReason}` : ''}</p>}
                       </td>
-                      <td className="px-3 py-2.5 text-center"><span className="text-sm font-bold text-emerald-600">{r.present}</span><span className="text-xs text-muted-foreground">/{workingDays}</span></td>
-                      <td className="px-3 py-2.5 text-center"><span className="text-sm font-bold text-red-600">{r.absent}</span></td>
-                      <td className="px-3 py-2.5 text-center"><span className="text-xs font-bold text-sky-600">{r.leave} إجازة</span><span className="text-xs text-lime-600 ml-1">{r.permCover? `+${r.permCover} إذن`:''}</span></td>
-                      <td className="px-3 py-2.5 text-center"><span className={`text-sm font-bold ${r.totalNetLate>0?'text-amber-600':'text-muted-foreground'}`}>{r.totalNetLate}m</span></td>
-                      <td className="px-3 py-2.5 text-center"><span className={`text-sm font-bold ${r.totalOt>0?'text-violet-600':'text-muted-foreground'}`}>{fmtHM(r.totalOt)}</span></td>
-                      <td className="px-3 py-2.5 text-center text-sm font-semibold">{fmtHM(r.totalWork)}</td>
-                      <td className="px-3 py-2.5 text-center"><span className={`px-2 py-1 rounded-full text-xs font-bold border ${r.rate>=90?'bg-emerald-50 text-emerald-700 border-emerald-200': r.rate>=70?'bg-amber-50 text-amber-700 border-amber-200':'bg-red-50 text-red-600 border-red-200'}`}>{r.rate}%</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{r.present}</span><span className="text-xs text-muted-foreground">/{workingDays}</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-sm font-bold text-red-600 dark:text-red-400">{r.absent}</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className="text-xs font-bold text-sky-600 dark:text-sky-400">{r.leave} إجازة</span><span className="text-xs text-lime-600 dark:text-lime-400 ml-1">{r.permCover? `+${r.permCover} إذن`:''}</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className={`text-sm font-bold ${r.totalNetLate>0?'text-amber-600 dark:text-amber-400':'text-muted-foreground'}`}>{r.totalNetLate}m</span></td>
+                      <td className="px-3 py-2.5 text-center"><span className={`text-sm font-bold ${r.totalOt>0?'text-violet-600 dark:text-violet-400':'text-muted-foreground'}`}>{fmtHM(r.totalOt)}</span></td>
+                      <td className="px-3 py-2.5 text-center text-sm font-semibold text-foreground">{fmtHM(r.totalWork)}</td>
+                      <td className="px-3 py-2.5 text-center"><span className={`px-2 py-1 rounded-full text-xs font-bold border ${r.rate>=90?'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30': r.rate>=70?'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30':'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/30'}`}>{r.rate}%</span></td>
                       <td className="px-3 py-2.5 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={()=> { setViewMode('individual'); setSelectedEmployeeId(r.user.id); }} className="w-7 h-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-primary flex items-center justify-center"><Eye size={14}/></button>
@@ -756,14 +756,14 @@ export default function AdminAttendanceView() {
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">{(r.user.full_name||r.user.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
-                      <div><p className="text-sm font-bold">{r.user.full_name||'—'}</p><p className="text-xs text-muted-foreground">{r.teamName} — {r.shift.labelAr}</p></div>
+                      <div><p className="text-sm font-bold text-foreground">{r.user.full_name||'—'}</p><p className="text-xs text-muted-foreground">{r.teamName} — {r.shift.labelAr}</p></div>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${r.rate>=90?'bg-emerald-50 text-emerald-700 border-emerald-200': r.rate>=70?'bg-amber-50 text-amber-700 border-amber-200':'bg-red-50 text-red-600 border-red-200'}`}>{r.rate}%</span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${r.rate>=90?'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30': r.rate>=70?'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30':'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/30'}`}>{r.rate}%</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-muted/40 rounded-xl p-2"><p className="text-xs text-muted-foreground">حاضر</p><p className="text-sm font-black text-emerald-600">{r.present}/{workingDays}</p></div>
-                    <div className="bg-muted/40 rounded-xl p-2"><p className="text-xs text-muted-foreground">الصافي تأخير</p><p className="text-sm font-black text-amber-600">{r.totalNetLate}m</p></div>
-                    <div className="bg-muted/40 rounded-xl p-2"><p className="text-xs text-muted-foreground">إضافي</p><p className="text-sm font-black text-violet-600">{fmtHM(r.totalOt)}</p></div>
+                    <div className="bg-muted/40 rounded-xl p-2"><p className="text-xs text-muted-foreground">حاضر</p><p className="text-sm font-black text-emerald-600 dark:text-emerald-400">{r.present}/{workingDays}</p></div>
+                    <div className="bg-muted/40 rounded-xl p-2"><p className="text-xs text-muted-foreground">الصافي تأخير</p><p className="text-sm font-black text-amber-600 dark:text-amber-400">{r.totalNetLate}m</p></div>
+                    <div className="bg-muted/40 rounded-xl p-2"><p className="text-xs text-muted-foreground">إضافي</p><p className="text-sm font-black text-violet-600 dark:text-violet-400">{fmtHM(r.totalOt)}</p></div>
                   </div>
                   <div className="flex gap-2 mt-3">
                     <button onClick={()=> { setViewMode('individual'); setSelectedEmployeeId(r.user.id); }} className="flex-1 h-9 rounded-xl border border-border bg-card text-sm font-semibold flex items-center justify-center gap-1.5"><Eye size={14}/> كشف</button>
@@ -780,7 +780,7 @@ export default function AdminAttendanceView() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center font-bold">{(individualData.user.full_name||individualData.user.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
               <div>
-                <p className="text-sm font-bold">{individualData.user.full_name||individualData.user.email} — {teamNameById.get(individualData.user.team_id||'')||'—'} — {individualData.shift.labelAr}</p>
+                <p className="text-sm font-bold text-foreground">{individualData.user.full_name||individualData.user.email} — {teamNameById.get(individualData.user.team_id||'')||'—'} — {individualData.shift.labelAr}</p>
                 <p className="text-xs text-muted-foreground">{formatMonthAr(year, month)} · {workingDays} يوم · {individualData.agg?.present??0} حاضر · {individualData.agg?.totalNetLate??0} د صافي · {fmtHM(individualData.agg?.totalOt||0)} إضافي</p>
               </div>
             </div>
@@ -803,9 +803,9 @@ export default function AdminAttendanceView() {
                     <td className="px-3 py-2 text-xs font-mono">{d.date.slice(5)}</td>
                     <td className="px-3 py-2 text-xs">{d.rec?.check_in_time ? fmtTime(d.rec.check_in_time) : '—'}</td>
                     <td className="px-3 py-2 text-xs">{d.rec?.check_out_time ? fmtTime(d.rec.check_out_time) : '—'}</td>
-                    <td className="px-3 py-2 text-xs font-semibold">{d.ev.netWorkHours}</td>
-                    <td className="px-3 py-2 text-xs"><span className={d.ev.netLateMinutes ? 'text-amber-600 font-bold':'text-muted-foreground'}>{d.ev.netLateMinutes ? `${d.ev.netLateMinutes}m` : '—'}</span>{d.ev.rawLateMinutes!==d.ev.netLateMinutes ? <span className="text-[10px] text-muted-foreground ml-1">({d.ev.rawLateMinutes})</span> : null}</td>
-                    <td className="px-3 py-2 text-xs"><span className={d.ev.overtimeMinutes ? 'text-violet-600 font-bold':'text-muted-foreground'}>{d.ev.overtimeMinutes ? fmtHM(d.ev.overtimeMinutes):'—'}</span></td>
+                    <td className="px-3 py-2 text-xs font-semibold text-foreground">{d.ev.netWorkHours}</td>
+                    <td className="px-3 py-2 text-xs"><span className={d.ev.netLateMinutes ? 'text-amber-600 dark:text-amber-400 font-bold':'text-muted-foreground'}>{d.ev.netLateMinutes ? `${d.ev.netLateMinutes}m` : '—'}</span>{d.ev.rawLateMinutes!==d.ev.netLateMinutes ? <span className="text-[10px] text-muted-foreground ml-1">({d.ev.rawLateMinutes})</span> : null}</td>
+                    <td className="px-3 py-2 text-xs"><span className={d.ev.overtimeMinutes ? 'text-violet-600 dark:text-violet-400 font-bold':'text-muted-foreground'}>{d.ev.overtimeMinutes ? fmtHM(d.ev.overtimeMinutes):'—'}</span></td>
                     <td className="px-3 py-2"><span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold border ${d.ev.badgeClass}`}>{d.ev.statusAr}</span></td>
                     <td className="px-3 py-2 text-xs max-w-[220px]">
                       <div className="flex flex-wrap items-center gap-1">
@@ -844,17 +844,17 @@ export default function AdminAttendanceView() {
                     </td>
                     <td className="px-3 py-2 text-xs">
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-full">{r.teamName}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.shift.id==='shift2'?'bg-violet-100 text-violet-700':'bg-emerald-50 text-emerald-700'}`}>{r.shift.labelAr}</span>
+                        <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-1 rounded-full">{r.teamName}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${r.shift.id==='shift2'?'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30':'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30'}`}>{r.shift.labelAr}</span>
                         {r.hasDelay && <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded-full text-[10px] font-bold">معدلة {r.shift.start}–{r.shift.end}</span>}
                       </div>
                       {r.hasDelay && <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">وردية معدلة: {r.shift.start}–{r.shift.end} · سماح حتى {formatMinutes(r.shift.toleranceMinutes)} {r.delayReason ? `· ${r.delayReason}` : ''}</p>}
                     </td>
-                    <td className="px-3 py-2 text-xs">{r.rec?.check_in_time ? fmtTime(r.rec.check_in_time) : '—'}</td>
-                    <td className="px-3 py-2 text-xs">{r.rec?.check_out_time ? fmtTime(r.rec.check_out_time) : '—'}</td>
-                    <td className="px-3 py-2 text-xs font-semibold">{r.ev.netWorkHours}</td>
-                    <td className="px-3 py-2 text-xs"><span className={r.ev.netLateMinutes?'text-amber-600 font-bold':'text-muted-foreground'}>{r.ev.netLateMinutes? `${r.ev.netLateMinutes}m`:'—'}</span></td>
-                    <td className="px-3 py-2 text-xs"><span className={r.ev.overtimeMinutes?'text-violet-600 font-bold':'text-muted-foreground'}>{r.ev.overtimeMinutes? fmtHM(r.ev.overtimeMinutes):'—'}</span></td>
+                    <td className="px-3 py-2 text-xs text-foreground">{r.rec?.check_in_time ? fmtTime(r.rec.check_in_time) : '—'}</td>
+                    <td className="px-3 py-2 text-xs text-foreground">{r.rec?.check_out_time ? fmtTime(r.rec.check_out_time) : '—'}</td>
+                    <td className="px-3 py-2 text-xs font-semibold text-foreground">{r.ev.netWorkHours}</td>
+                    <td className="px-3 py-2 text-xs"><span className={r.ev.netLateMinutes?'text-amber-600 dark:text-amber-400 font-bold':'text-muted-foreground'}>{r.ev.netLateMinutes? `${r.ev.netLateMinutes}m`:'—'}</span></td>
+                    <td className="px-3 py-2 text-xs"><span className={r.ev.overtimeMinutes?'text-violet-600 dark:text-violet-400 font-bold':'text-muted-foreground'}>{r.ev.overtimeMinutes? fmtHM(r.ev.overtimeMinutes):'—'}</span></td>
                     <td className="px-3 py-2"><span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold border ${r.ev.badgeClass}`}>{r.ev.statusAr}</span></td>
                     <td className="px-3 py-2 text-xs max-w-[220px]">
                       <div className="flex flex-wrap items-center gap-1">

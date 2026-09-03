@@ -303,3 +303,29 @@ model PayrollEntry {
 
   @@map("payroll_entries")
 }
+
+model CompanySetting {
+  key       String   @id @map("key")
+  value     Json?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("company_settings")
+}
+
+model TeamShiftAdjustment {
+  id           String    @id @default(uuid()) @db.Uuid
+  teamId       String?   @map("team_id") @db.Uuid
+  teamName     String    @map("team_name")
+  date         DateTime? @map("date") @db.Date
+  startTime    String    @map("start_time")
+  endTime      String    @map("end_time")
+  graceMinutes Int       @default(20) @map("grace_minutes")
+  reason       String?   @default("") @map("reason")
+  isTemporary  Boolean   @default(true) @map("is_temporary")
+  createdBy    String?   @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([teamName, date])
+  @@index([teamId])
+  @@map("team_shift_adjustments")
+}
