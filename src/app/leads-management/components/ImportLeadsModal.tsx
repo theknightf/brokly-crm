@@ -360,35 +360,35 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       {step === 'upload' && (
         <div className="p-6 space-y-4">
           {/* Global defaults toolbar — 3 selectors side-by-side next to file upload per spec */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">Lead Source</label>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Lead Source</label>
               <div className="relative">
-                <select value={defaultSource} onChange={e=>setDefaultSource(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                <select value={defaultSource} onChange={e=>setDefaultSource(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
                   <option value="">Use file value</option>
                   {sourceList.map(s=> <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 pointer-events-none" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">Assign To</label>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Assign To</label>
               <div className="relative">
-                <select value={defaultOwner} onChange={e=>setDefaultOwner(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                <select value={defaultOwner} onChange={e=>setDefaultOwner(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
                   <option value="">— Unassigned —</option>
                   {ownerList.map(u=> <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 pointer-events-none" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">Stage</label>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">Stage</label>
               <div className="relative">
-                <select value={defaultStage} onChange={e=>{ setDefaultStage(e.target.value); setDefaultStatus(''); }} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
+                <select value={defaultStage} onChange={e=>{ setDefaultStage(e.target.value); setDefaultStatus(''); }} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 pr-8 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
                   <option value="">Use file value</option>
                   {stageList.map(s=> <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 pointer-events-none" />
               </div>
             </div>
           </div>

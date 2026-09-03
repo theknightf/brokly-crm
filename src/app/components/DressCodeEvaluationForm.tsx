@@ -62,7 +62,7 @@ export default function DressCodeEvaluationForm() {
   return (
     <div className="bg-card border border-border rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-4">
-        <div className="bg-zinc-800 border border-zinc-700 text-lime-400 p-2 rounded-xl"><Shirt size={16} /></div>
+        <div className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-lime-600 dark:text-lime-400 p-2 rounded-xl"><Shirt size={16} /></div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">Daily Dress Code Evaluation</h3>
           <p className="text-xs text-muted-foreground">Admin input → feeds Leaderboard (30%) & Owner 360 in real-time</p>
@@ -72,14 +72,14 @@ export default function DressCodeEvaluationForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5">Employee *</label>
-          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all">
+          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all">
             <option value="">Select employee…</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} · {e.role}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1"><Calendar size={12}/> Date *</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all" />
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all" />
         </div>
       </div>
 
@@ -91,7 +91,7 @@ export default function DressCodeEvaluationForm() {
             { v: 2, label: 'Semi-Formal', sub: 'Score 2 · Medium' },
             { v: 3, label: 'Classic / Formal', sub: 'Score 3 · High' },
           ].map(o => (
-            <button key={o.v} type="button" onClick={() => setRating(o.v)} className={`p-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 border-2 ${rating===o.v ? 'bg-lime-500/15 border-lime-400 text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-800/80 border-zinc-700 text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200'}`}>
+            <button key={o.v} type="button" onClick={() => setRating(o.v)} className={`p-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 border-2 ${rating===o.v ? 'bg-lime-500/15 border-lime-400 text-lime-600 dark:text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100'}`}>
               <span className="text-sm">{o.label}</span>
               <span className="text-[11px] opacity-70">{o.sub}</span>
             </button>
@@ -102,11 +102,11 @@ export default function DressCodeEvaluationForm() {
 
       <div className="mt-4">
         <label className="block text-xs font-medium text-foreground mb-1.5">Behavioral Flags (comma separated)</label>
-        <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm" />
+        <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm" />
       </div>
       <div className="mt-3">
         <label className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="w-full bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm resize-none" />
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm resize-none" />
       </div>
 
       <button onClick={submit} disabled={submitting || !employeeId} className="bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold rounded-xl py-3 w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-sm hover:shadow-[0_0_16px_rgba(163,230,53,0.3)]">

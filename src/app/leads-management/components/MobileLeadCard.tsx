@@ -182,7 +182,7 @@ export default function MobileLeadCard({
         {/* Left: avatar + name/location */}
         <button
           onClick={() => onView(lead)}
-          className="flex items-start gap-3 min-w-0 flex-1 text-left"
+          className="flex items-start gap-3 min-w-0 flex-1 text-left group cursor-pointer"
           aria-label={`Open ${lead.name || lead.id}`}
         >
           <div
@@ -192,7 +192,7 @@ export default function MobileLeadCard({
             {initials}
           </div>
           <div className="min-w-0 pt-0.5">
-            <p className="font-bold text-foreground text-[15px] leading-tight truncate">
+            <p className="font-bold text-foreground group-hover:text-primary group-hover:underline cursor-pointer text-[15px] leading-tight truncate transition-colors">
               {lead.name || `Lead ${lead.id}`}
             </p>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">

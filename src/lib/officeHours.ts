@@ -20,7 +20,7 @@ export interface OfficeHoursConfig {
 
 const DEFAULT_START = '12:00';
 const DEFAULT_END = '20:00';
-const DEFAULT_GRACE = 30;
+const DEFAULT_GRACE = 20;
 
 export function toMinutes(time: string | undefined | null): number {
   if (!time) return -1;

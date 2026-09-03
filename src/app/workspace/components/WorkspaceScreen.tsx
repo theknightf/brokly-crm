@@ -1,5 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { CalendarClock, Check, Circle, Filter, Loader2, RefreshCw, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { followUpsService } from '@/lib/services/crmService';
@@ -31,6 +32,7 @@ interface FollowUp {
   priority: string;
   dueDate: string;
   dueTime?: string;
+  leadId?: string;
 }
 
 const DEFAULT_FILTERS: Filters = { agent: '', status: 'any', priority: 'any', date: 'any', from: '', to: '' };
@@ -129,6 +131,7 @@ export default function WorkspaceScreen() {
           priority: x.priority,
           dueDate: x.dueDate,
           dueTime: x.dueTime,
+          leadId: (x as any).leadId || '',
         }))
       );
     } catch {
@@ -314,11 +317,21 @@ export default function WorkspaceScreen() {
                 const due = dueMeta(item.dueDate);
                 return (
                   <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="table-td">
+                    <td className="table-td" data-label={t('workspace.name')}>
                       <div className="min-w-0">
-                        <p className="font-semibold text-foreground truncate">
-                          {item.contactName || item.title || 'Unnamed'}
-                        </p>
+                        {item.leadId ? (
+                          <Link
+                            href={`/leads/${item.leadId}`}
+                            className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer truncate block transition-colors"
+                            title={`Open profile for ${item.contactName || item.title || 'lead'}`}
+                          >
+                            {item.contactName || item.title || 'Unnamed'}
+                          </Link>
+                        ) : (
+                          <p className="font-semibold text-foreground truncate">
+                            {item.contactName || item.title || 'Unnamed'}
+                          </p>
+                        )}
                         {item.propertyInterest && (
                           <p className="text-xs text-muted-foreground truncate max-w-[220px]">
                             {item.propertyInterest}
@@ -326,7 +339,7 @@ export default function WorkspaceScreen() {
                         )}
                       </div>
                     </td>
-                    <td className="table-td">
+                    <td className="table-td" data-label={t('workspace.dueDate')}>
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold ${due.cls}`}
                       >
@@ -335,14 +348,14 @@ export default function WorkspaceScreen() {
                         {item.dueTime ? ` · ${item.dueTime}` : ''}
                       </span>
                     </td>
-                    <td className="table-td">
+                    <td className="table-td" data-label={t('workspace.status')}>
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-[11px] font-semibold ${statusColor(item.status)}`}
                       >
                         {item.status}
                       </span>
                     </td>
-                    <td className="table-td">
+                    <td className="table-td" data-label={t('workspace.priority')}>
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-[11px] font-semibold ${
                           item.priority === 'High'
@@ -355,7 +368,7 @@ export default function WorkspaceScreen() {
                         {item.priority}
                       </span>
                     </td>
-                    <td className="table-td">
+                    <td className="table-td" data-label={t('workspace.doneCol')}>
                       <CompletionIndicator item={item} />
                     </td>
                   </tr>

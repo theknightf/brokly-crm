@@ -49,13 +49,13 @@ export const DEFAULT_WORKING_HOURS: WorkingHours = {
   start: '12:00',
   end: '20:00',
   flexibleHours: false,
-  lateGraceMinutes: 30,
+  lateGraceMinutes: 20,
   workdays: [0, 1, 2, 3, 4, 5, 6],
 };
 
 export const DEFAULT_PAYROLL_RULES: PayrollRules = {
   dailySalaryBasis: 26,
-  lateGraceMinutes: 30,
+  lateGraceMinutes: 20,
   deductPerLateMinute: 0,
   absenceDeductionPerDay: 0,
   overtimeEnabled: false,

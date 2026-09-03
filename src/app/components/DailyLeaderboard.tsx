@@ -21,7 +21,7 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
         <h3 className="font-bold flex items-center gap-2 text-zinc-900 dark:text-white"><Trophy size={16} className="text-amber-500"/> Daily Leaderboard</h3>
-        <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} className="bg-zinc-900 border border-zinc-700 text-zinc-100 rounded-xl px-3 py-1.5 text-xs" />
+        <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs" />
       </div>
       {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin"/></div> :
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">

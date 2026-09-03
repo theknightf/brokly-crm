@@ -212,14 +212,14 @@ export default function UnifiedMasterDashboard() {
             <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2"><ShoppingBag size={16} className="text-emerald-600"/><h3 className="text-sm font-bold">Sales Performance KPIs ↔ Lead Analytics</h3></div>
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300">
-                  Conversion: <strong className="text-lime-400">{data.conversionMetrics.conversionRate}%</strong>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                  Conversion: <strong className="text-lime-600 dark:text-lime-400">{data.conversionMetrics.conversionRate}%</strong>
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300">
-                  Revenue: <strong className="text-white">{Number(data.conversionMetrics.revenue||0).toLocaleString()} EGP</strong>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                  Revenue: <strong className="text-zinc-900 dark:text-white">{Number(data.conversionMetrics.revenue||0).toLocaleString()} EGP</strong>
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300">
-                  Avg Score: <strong className="text-lime-400">{data.teamPerformance?.avgScore ?? '-'}/100</strong>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                  Avg Score: <strong className="text-lime-600 dark:text-lime-400">{data.teamPerformance?.avgScore ?? '-'}/100</strong>
                 </span>
               </div>
             </div>

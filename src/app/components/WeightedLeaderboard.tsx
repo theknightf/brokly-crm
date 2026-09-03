@@ -20,9 +20,9 @@ function RankIcon({ rank }: { rank: number }) {
 function ScoreBar({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
   return (
     <div className="flex-1">
-      <div className="flex items-center gap-1 text-[10px] text-zinc-400 mb-1">{icon}<span>{label}</span></div>
-      <div className="bg-zinc-800 rounded-full h-2 overflow-hidden"><div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${value}%` }} /></div>
-      <div className="text-[11px] font-bold text-zinc-100 mt-0.5">{value}</div>
+      <div className="flex items-center gap-1 text-[10px] text-zinc-500 dark:text-zinc-400 mb-1">{icon}<span>{label}</span></div>
+      <div className="bg-zinc-200 dark:bg-zinc-800 rounded-full h-2 overflow-hidden"><div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${value}%` }} /></div>
+      <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">{value}</div>
     </div>
   );
 }
@@ -49,12 +49,12 @@ export default function WeightedLeaderboard() {
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
-      <div className="p-4 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-3">
+      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="bg-zinc-800 border border-zinc-700 text-amber-400 p-2 rounded-xl"><Trophy size={16} /></div>
+          <div className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-amber-500 dark:text-amber-400 p-2 rounded-xl"><Trophy size={16} /></div>
           <div>
-            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-1.5">Performance Leaderboard <span className="text-xs font-normal text-zinc-400 hidden sm:inline">· Weighted 40/30/30</span></h2>
-            <p className="text-xs text-zinc-400 font-mono">{range ? `${range.start} → ${range.end}` : ''} · Total = Call×0.40 + Att×0.30 + Dress×0.30</p>
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">Performance Leaderboard <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400 hidden sm:inline">· Weighted 40/30/30</span></h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">{range ? `${range.start} → ${range.end}` : ''} · Total = Call×0.40 + Att×0.30 + Dress×0.30</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -76,7 +76,7 @@ export default function WeightedLeaderboard() {
               <RankIcon rank={u.rank}/>
               <div className="w-8 h-8 rounded-full bg-lime-50 dark:bg-lime-500/10 border border-lime-500/20 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-lime-700 dark:text-lime-400">{(u.full_name||u.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</span></div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-zinc-100 truncate flex items-center gap-1">{u.full_name || u.email} <span className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-[10px] px-2 py-0.5 rounded-md">{u.role}</span> <span className="text-[11px] text-lime-400 hidden sm:inline">360 →</span></p>
+                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-1">{u.full_name || u.email} <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 text-[10px] px-2 py-0.5 rounded-md">{u.role}</span> <span className="text-[11px] text-lime-600 dark:text-lime-400 hidden sm:inline">360 →</span></p>
                 <div className="flex gap-3 mt-1">
                   <ScoreBar label="Call 40%" value={u.scores.callScore} icon={<Phone size={10} className="text-emerald-400"/>} color="bg-emerald-400"/>
                   <ScoreBar label="Attend 30%" value={u.scores.attendanceScore} icon={<Clock size={10} className="text-sky-400"/>} color="bg-sky-400"/>
@@ -84,7 +84,7 @@ export default function WeightedLeaderboard() {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="flex items-center gap-1 justify-end"><TrendingUp size={12} className="text-lime-400"/><span className="text-base font-bold text-lime-400">{u.totalScore}</span><span className="text-xs text-zinc-400">/100</span></div>
+                <div className="flex items-center gap-1 justify-end"><TrendingUp size={12} className="text-lime-600 dark:text-lime-400"/><span className="text-base font-bold text-lime-600 dark:text-lime-400">{u.totalScore}</span><span className="text-xs text-zinc-500 dark:text-zinc-400">/100</span></div>
                 <p className="text-[11px] text-muted-foreground">{u.metrics.totalCalls} calls · {u.metrics.presentDays}/{u.metrics.totalDays} days · {u.metrics.avgDressRating!=null ? `${u.metrics.avgDressRating}/5` : 'no rating'}</p>
               </div>
             </a>

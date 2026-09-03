@@ -327,7 +327,7 @@ export default function LeadsTable({
                           .slice(0, 2)}
                       </div>
                       <div className="min-w-0">
-                        <a href={`/leads/${lead.id}`} className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-violet-600 hover:underline block">
+                        <a href={`/leads/${lead.id}`} className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block">
                           {lead.name || `Lead ${lead.id}`}
                         </a>
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
