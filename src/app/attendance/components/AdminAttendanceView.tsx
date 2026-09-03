@@ -121,10 +121,11 @@ function MultiShiftSettingsCard({ shifts, onSave }: { shifts: ShiftConfig[]; onS
     } catch(e:any){ toast.error(e?.message||'فشل حفظ الورديات'); } finally{ setSaving(false); }
   };
 
-  const ShiftRow = ({ shift, setShift, title, subtitle }: any) => (
+  const ShiftRow = ({ shift, setShift, titleAr, titleEn, subtitle }: any) => (
     <div className="rounded-xl border border-border p-3 bg-muted/20">
-      <p className="text-xs font-bold text-foreground">{title}</p>
-      <p className="text-[11px] text-muted-foreground mb-2">{subtitle} — {shift.teamNames.join(', ')}</p>
+      <p className="text-xs font-bold text-foreground" dir="rtl">{titleAr}</p>
+      <p className="text-[11px] text-muted-foreground" dir="ltr">{titleEn}</p>
+      <p className="text-[11px] text-muted-foreground mb-2" dir="ltr">{subtitle} — {shift.teamNames.join(', ')}</p>
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-foreground">البداية</span>
@@ -147,14 +148,15 @@ function MultiShiftSettingsCard({ shifts, onSave }: { shifts: ShiftConfig[]; onS
     <div className="bg-card border border-border rounded-2xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center"><Settings2 size={14} /></div>
-        <div>
-          <h3 className="text-sm font-bold text-foreground">إعدادات الورديات — Multi-Shift Assignment Engine</h3>
-           <p className="text-xs text-muted-foreground">وردية قياسية 12:00–20:00 ومسائية 13:00–21:00 — سماح 20د لكل وردية</p>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-foreground" dir="rtl">إعدادات الورديات</p>
+          <p className="text-[11px] text-muted-foreground" dir="ltr">Multi-Shift Assignment Engine</p>
+          <p className="text-xs text-muted-foreground mt-0.5" dir="rtl">وردية قياسية 12:00–20:00 ومسائية 13:00–21:00 — سماح 20د لكل وردية</p>
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <ShiftRow shift={s1} setShift={setS1} title="الوردية القياسية — Shift 1" subtitle="Sales, Admin, Operations" />
-        <ShiftRow shift={s2} setShift={setS2} title="الوردية المسائية — Shift 2" subtitle="Support, Evening Team" />
+        <ShiftRow shift={s1} setShift={setS1} titleAr="الوردية القياسية" titleEn="Shift 1" subtitle="Sales, Admin, Operations" />
+        <ShiftRow shift={s2} setShift={setS2} titleAr="الوردية المسائية" titleEn="Shift 2" subtitle="Support, Evening Team" />
       </div>
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/60">
         <p className="text-xs text-muted-foreground">المنطق: ضمن 20د = <span className="text-emerald-600 font-bold">حاضر</span> · بعدها <span className="text-amber-600 font-bold">متأخر</span> من بداية الوردية · إذن يخصم الصافي · قبل نهاية الوردية = <span className="text-orange-600 font-bold">مبكر</span> · بعد النهاية = <span className="text-violet-600 font-bold">إضافي</span></p>
@@ -558,12 +560,13 @@ export default function AdminAttendanceView() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center"><CalendarCheck2 size={20} /></div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">سجل الحضور والانصراف، الورديات، والإجازات</h1>
-            <p className="text-sm text-muted-foreground" dir="rtl">{shifts.map(s=> `${s.labelAr} ${s.start}–${s.end} · سماح ${s.graceMinutes}د حتى ${formatMinutes(s.toleranceMinutes)}`).join('  •  ')}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Attendance, Shifts & Leaves — {formatMonthEn(year, month)} · {activeUsers.length} staff · بدون عمود كود الموظف</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><CalendarCheck2 size={20} /></div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-foreground" dir="rtl">سجل الحضور والانصراف، الورديات، والإجازات</h1>
+            <p className="text-xs text-muted-foreground mt-0.5" dir="ltr">Attendance, Shifts & Leaves — {formatMonthEn(year, month)} · {activeUsers.length} staff</p>
+            <p className="text-[11px] text-muted-foreground" dir="rtl">بدون عمود كود الموظف</p>
+            <p className="text-sm text-muted-foreground mt-1" dir="rtl">{shifts.map(s=> `${s.labelAr} ${s.start}–${s.end} · سماح ${s.graceMinutes}د حتى ${formatMinutes(s.toleranceMinutes)}`).join('  •  ')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -580,21 +583,24 @@ export default function AdminAttendanceView() {
       {/* Active Team Shift Delays Banner */}
       {shiftAdjustments.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center"><Clock size={12} /></div>
-            <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">الورديات المعدلة النشطة — Active Shift Adjustments</h3>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0"><Clock size={12} /></div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-sm font-bold text-amber-900 dark:text-amber-200" dir="rtl">الورديات المعدلة النشطة</span>
+              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300" dir="ltr">Active Shift Adjustments</span>
+            </div>
             <span className="text-xs bg-white dark:bg-zinc-900 border border-amber-200 dark:border-amber-500/20 px-2 py-0.5 rounded-full">{shiftAdjustments.length}</span>
           </div>
           <div className="space-y-2">
             {shiftAdjustments.slice(0,4).map(adj=> (
               <div key={adj.id} className="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-zinc-900 border border-amber-100 dark:border-zinc-800 rounded-xl px-3 py-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                  <span className="font-bold text-foreground">{adj.teamName}</span>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span className="font-bold text-foreground" dir="ltr">{adj.teamName}</span>
                   <span className="text-muted-foreground">→</span>
-                  <span className="font-mono text-xs bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 rounded-full">وردية معدلة: {adj.startTime} – {adj.endTime}</span>
-                  <span className="text-xs text-muted-foreground">سماح {adj.graceMinutes}د حتى {formatMinutes((() => { const [h,m]=adj.startTime.split(':').map(Number); return h*60+m+adj.graceMinutes; })())}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${adj.isTemporary ? 'bg-sky-100 text-sky-700' : 'bg-violet-100 text-violet-700'}`}>{adj.isTemporary ? (adj.date ? `مؤقت ${adj.date}` : 'مؤقت') : 'دائم'}</span>
+                  <span className="font-mono text-xs bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 rounded-full" dir="rtl">وردية معدلة: <bdi dir="ltr">{adj.startTime} – {adj.endTime}</bdi></span>
+                  <span className="text-xs text-muted-foreground" dir="rtl">سماح {adj.graceMinutes}د حتى <bdi dir="ltr">{formatMinutes((() => { const [h,m]=adj.startTime.split(':').map(Number); return h*60+m+adj.graceMinutes; })())}</bdi></span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${adj.isTemporary ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300'}`} dir="rtl">{adj.isTemporary ? (adj.date ? `مؤقت ${adj.date}` : 'مؤقت') : 'دائم'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {adj.reason && <span className="text-xs text-muted-foreground max-w-[160px] truncate" title={adj.reason}>{adj.reason}</span>}
@@ -670,11 +676,11 @@ export default function AdminAttendanceView() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={(e)=> setSearch(e.target.value)} placeholder="بحث بالاسم / Live search by name…" className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-sm placeholder:text-zinc-400 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
+          <input value={search} onChange={(e)=> setSearch(e.target.value)} placeholder="بحث بالاسم…" dir="rtl" className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-sm placeholder:text-zinc-400 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
         </div>
         <div className="relative">
           <select value={shiftFilter} onChange={(e)=> setShiftFilter(e.target.value as any)} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 pr-8 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none min-w-[150px]">
-            <option value="all">All Shifts — كل الورديات</option>
+            <option value="all">كل الورديات (All Shifts)</option>
             <option value="shift1">Shift 1 — 12:00–20:00</option>
             <option value="shift2">Shift 2 — 13:00–21:00</option>
           </select>
@@ -689,12 +695,12 @@ export default function AdminAttendanceView() {
         </div>
         <div className="relative">
           <select value={statusFilter} onChange={(e)=> setStatusFilter(e.target.value)} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 pr-8 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none min-w-[150px]">
-            <option value="all">All Statuses — الكل</option>
-            <option value="present">Present — حاضر</option>
-            <option value="late">Late — متأخر</option>
-            <option value="absent">Absent — غياب بدون إذن</option>
-            <option value="leave">Leave — إجازة</option>
-            <option value="permission">Permission — بإذن</option>
+            <option value="all">الكل (All Statuses)</option>
+            <option value="present">حاضر (Present)</option>
+            <option value="late">متأخر (Late)</option>
+            <option value="absent">غياب بدون إذن (Absent)</option>
+            <option value="leave">إجازة (Leave)</option>
+            <option value="permission">بإذن (Permission)</option>
           </select>
           <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" />
         </div>
@@ -756,7 +762,7 @@ export default function AdminAttendanceView() {
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">{(r.user.full_name||r.user.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
-                      <div><p className="text-sm font-bold text-foreground">{r.user.full_name||'—'}</p><p className="text-xs text-muted-foreground">{r.teamName} — {r.shift.labelAr}</p></div>
+                      <div><p className="text-sm font-bold text-foreground" dir="ltr">{r.user.full_name||'—'}</p><p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap"><span dir="ltr">{r.teamName}</span><span className="text-muted-foreground">—</span><span dir="rtl">{r.shift.labelAr}</span></p></div>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${r.rate>=90?'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30': r.rate>=70?'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30':'bg-red-50 text-red-600 border-red-200 dark:bg-red-500/15 dark:text-red-300 dark:border-red-500/30'}`}>{r.rate}%</span>
                   </div>
@@ -779,9 +785,9 @@ export default function AdminAttendanceView() {
           <div className="p-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white flex items-center justify-center font-bold">{(individualData.user.full_name||individualData.user.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
-              <div>
-                <p className="text-sm font-bold text-foreground">{individualData.user.full_name||individualData.user.email} — {teamNameById.get(individualData.user.team_id||'')||'—'} — {individualData.shift.labelAr}</p>
-                <p className="text-xs text-muted-foreground">{formatMonthAr(year, month)} · {workingDays} يوم · {individualData.agg?.present??0} حاضر · {individualData.agg?.totalNetLate??0} د صافي · {fmtHM(individualData.agg?.totalOt||0)} إضافي</p>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground flex items-center gap-1.5 flex-wrap"><span dir="ltr">{individualData.user.full_name||individualData.user.email}</span><span className="text-muted-foreground">—</span><span dir="ltr">{teamNameById.get(individualData.user.team_id||'')||'—'}</span><span className="text-muted-foreground">—</span><span dir="rtl">{individualData.shift.labelAr}</span></p>
+                <p className="text-xs text-muted-foreground" dir="rtl">{formatMonthAr(year, month)} · {workingDays} يوم · {individualData.agg?.present??0} حاضر · {individualData.agg?.totalNetLate??0} د صافي · {fmtHM(individualData.agg?.totalOt||0)} إضافي</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
