@@ -18,7 +18,8 @@ export type ImportField =
   | 'interestLevel'
   | 'assigned'
   | 'notes'
-  | 'location';
+  | 'location'
+  | 'budget';
 
 /** Normalized interest-level values we accept (English + Arabic). */
 const INTEREST_LEVELS = ['Hot', 'Warm', 'Cold', 'New'] as const;
@@ -120,6 +121,18 @@ const FIELD_ALIASES: Record<ImportField, string[]> = {
   ],
   location: ['location', 'city', 'area', 'المدينة', 'المنطقة', 'موقع', 'عنوان'],
   notes: ['notes', 'note', 'comment', 'ملاحظات', 'ملاحظة'],
+  budget: [
+    'budget',
+    'price',
+    'budget min',
+    'budget max',
+    'amount',
+    'value',
+    'الميزانية',
+    'السعر',
+    'ميزانية',
+    'سعر',
+  ],
 };
 
 const SOURCE_FALLBACK = 'Other';
@@ -155,6 +168,7 @@ export function detectField(header: string): ImportField | undefined {
   if (/assigned|agent|مندوب|المسؤول/.test(key)) return 'assigned';
   if (/location|مدينة/.test(key)) return 'location';
   if (/source|مصدر/.test(key)) return 'source';
+  if (/budget|price|ميزانية|سعر/.test(key)) return 'budget';
   return undefined;
 }
 
@@ -218,6 +232,9 @@ export interface ParsedRow {
   assignedName?: string;
   location?: string;
   notes?: string;
+  budget?: string; // raw budget string from sheet
+  budgetMin?: number;
+  budgetMax?: number;
   reasons: string[]; // validation problems (empty = importable)
 }
 
@@ -226,6 +243,29 @@ export interface ImportParseResult {
   rows: ParsedRow[];
   /** header index -> mapped field ('' = skip column). */
   mapping: Record<number, ImportField>;
+}
+
+function parseBudget(raw: unknown): { min?: number; max?: number; raw: string } {
+  const s = cellToStr(raw);
+  if (!s) return { raw: '' };
+  // Support formats: "100000", "100k-200k", "100,000 - 200,000", "100000-200000"
+  const cleaned = s.replace(/[^\d\-–—kK.,]/g, ' ').trim();
+  // Try range with dash
+  const rangeMatch = cleaned.match(/([\d,.kK]+)\s*[-–—]\s*([\d,.kK]+)/);
+  const toNum = (v: string): number | undefined => {
+    let t = v.replace(/,/g, '').trim().toLowerCase();
+    let mul = 1;
+    if (t.endsWith('k')) { mul = 1000; t = t.slice(0, -1); }
+    const n = Number(t);
+    return Number.isFinite(n) && n > 0 ? Math.round(n * mul) : undefined;
+  };
+  if (rangeMatch) {
+    const min = toNum(rangeMatch[1]);
+    const max = toNum(rangeMatch[2]);
+    return { min, max, raw: s };
+  }
+  const single = toNum(cleaned.split(/[\s,]+/)[0] || '');
+  return { min: single, max: single, raw: s };
 }
 
 /** Turn a string date-ish value into YYYY-MM-DD, or ''. */
@@ -400,9 +440,21 @@ export async function parseLeadFile(
     if (interestRaw && !interestNorm)
       reasons.push(`Unknown interest level "${interestRaw.slice(0, 40)}"`);
 
+    const budgetRaw = cellToStr(getMapped(obj, headers, mapping, 'budget'));
+    const budgetParsed = budgetRaw ? parseBudget(budgetRaw) : { min: undefined, max: undefined, raw: '' };
+    if (budgetRaw && !budgetParsed.min && !budgetParsed.max) {
+      reasons.push(`Invalid budget "${budgetRaw.slice(0, 30)}"`);
+    }
+
+    // Enhanced validation: names exist and phone format
+    const nameVal = cellToStr(getMapped(obj, headers, mapping, 'name'));
+    if (!nameVal || nameVal.trim().length < 2) {
+      reasons.push('Missing or too short name (min 2 chars)');
+    }
+
     return {
       rowNumber: idx + 2,
-      name: cellToStr(getMapped(obj, headers, mapping, 'name')) || undefined,
+      name: nameVal || undefined,
       phone: normalizedPhone,
       status: statusNorm || statusRaw || DEFAULT_STATUS,
       source: cellToStr(getMapped(obj, headers, mapping, 'source')) || SOURCE_FALLBACK,
@@ -416,6 +468,9 @@ export async function parseLeadFile(
       assignedName: assignedName || undefined,
       location: cellToStr(getMapped(obj, headers, mapping, 'location')) || undefined,
       notes: cellToStr(getMapped(obj, headers, mapping, 'notes')) || undefined,
+      budget: budgetParsed.raw || undefined,
+      budgetMin: budgetParsed.min,
+      budgetMax: budgetParsed.max,
       reasons,
     };
   });
