@@ -6,7 +6,6 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle2,
-  XCircle,
   ChevronDown,
   ArrowLeft,
   ArrowRight,
@@ -19,13 +18,15 @@ import {
   Users,
   Database,
   Eye,
+  Palette,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { leadsService, teamsService, adminSettingsService, projectsService } from '@/lib/services/crmService';
+import { leadsService, teamsService, adminSettingsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 import { parseLeadFile, ImportField, ImportParseResult, ParsedRow } from '@/lib/leadsImport';
-import { PIPELINE_STAGES, ALL_REAL_STATUSES } from './leadStages';
+import { PIPELINE_STAGES } from './leadStages';
 
 const IMPORT_FIELDS: { value: ImportField; label: string; required?: boolean }[] = [
   { value: 'phone', label: 'Mobile / Phone *', required: true },
@@ -46,10 +47,12 @@ const IMPORT_FIELDS: { value: ImportField; label: string; required?: boolean }[]
 
 const STEP_LABELS = [
   { n: 1, title: 'File Upload', desc: 'رفع الملف' },
-  { n: 2, title: 'Global Settings', desc: 'الإعدادات العامة' },
+  { n: 2, title: 'Batch Configuration', desc: 'إعدادات الشيت' },
   { n: 3, title: 'Mapping & Preview', desc: 'المطابقة والمعاينة' },
   { n: 4, title: 'Import & Summary', desc: 'التأكيد والملخص' },
 ];
+
+const STAGE_COLORS = ['#22c55e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#f97316', '#6b7280', '#10b981'];
 
 interface ImportLeadsModalProps {
   open: boolean;
@@ -58,7 +61,8 @@ interface ImportLeadsModalProps {
 }
 
 export default function ImportLeadsModal({ open, onClose, onImported }: ImportLeadsModalProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAdmin = isAdminRole(profile?.role);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [storedFile, setStoredFile] = useState<File | null>(null);
@@ -69,19 +73,25 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [duplicatePhones, setDuplicatePhones] = useState<Set<string>>(new Set());
 
-  // Global Settings (Step 2) — mandatory
+  // Global Settings — Batch Configuration Panel
   const [defaultSource, setDefaultSource] = useState('');
   const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
-  const [customSource, setCustomSource] = useState('');
+  const [sourceQuery, setSourceQuery] = useState('');
+  const [sourceOpen, setSourceOpen] = useState(false);
   const [addingSource, setAddingSource] = useState(false);
+
   const [defaultStage, setDefaultStage] = useState('New Fresh');
-  const [stageList, setStageList] = useState<{ id: string; name: string }[]>([]);
-  const [defaultOwner, setDefaultOwner] = useState<string>(''); // '' = Unassigned, '__ROUND_ROBIN__' = round robin, or user id
+  const [stageList, setStageList] = useState<{ id: string; name: string; color?: string }[]>([]);
+  const [stageQuery, setStageQuery] = useState('');
+  const [stageOpen, setStageOpen] = useState(false);
+  const [stageColor, setStageColor] = useState('#22c55e');
+  const [addingStage, setAddingStage] = useState(false);
+
+  const [defaultOwner, setDefaultOwner] = useState<string>('');
   const [ownerList, setOwnerList] = useState<{ id: string; name: string }[]>([]);
   const [duplicateAction, setDuplicateAction] = useState<'skip' | 'update'>('skip');
   const [loadingMeta, setLoadingMeta] = useState(false);
 
-  // Import progress (Step 4)
   const [parsing, setParsing] = useState(false);
   const [checkingDupes, setCheckingDupes] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -97,8 +107,11 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     setRows([]);
     setDuplicatePhones(new Set());
     setDefaultSource('');
-    setCustomSource('');
+    setSourceQuery('');
+    setSourceOpen(false);
     setDefaultStage('New Fresh');
+    setStageQuery('');
+    setStageOpen(false);
     setDefaultOwner('');
     setDuplicateAction('skip');
     setProgress(null);
@@ -121,25 +134,36 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     Promise.all([
       teamsService.getAssignableUsers().then((d: any) => (d || []).map((u: any) => ({ id: u.id, name: u.name }))).catch(() => []),
       fetch('/api/lead-sources?active=true', { cache: 'no-store' }).then(r => r.json()).then(j => (j.sources || []).map((s: any) => ({ id: s.id, name: s.name }))).catch(() => []),
-      adminSettingsService.getAll().then((g: any) => (g.pipelineStages || []).filter((s: any) => s.active).map((s: any) => ({ id: s.id, name: s.name }))).catch(() => PIPELINE_STAGES.map(s => ({ id: s, name: s }))),
+      adminSettingsService.getAll().then((g: any) => (g.pipelineStages || []).filter((s: any) => s.active).map((s: any) => ({ id: s.id, name: s.name, color: s.color }))).catch(() => PIPELINE_STAGES.map(s => ({ id: s, name: s, color: '#6b7280' }))),
     ]).then(([users, sources, stages]) => {
       setOwnerList(users);
       setSourceList(sources);
-      const stagesToUse = stages.length ? stages : PIPELINE_STAGES.map(s => ({ id: s, name: s }));
+      const stagesToUse = stages.length ? stages : PIPELINE_STAGES.map(s => ({ id: s, name: s, color: '#6b7280' }));
       setStageList(stagesToUse);
-      // defaults: keep New Fresh if exists, otherwise first stage
       if (!stagesToUse.find(s => s.name === 'New Fresh') && stagesToUse.length) {
         setDefaultStage(stagesToUse[0].name);
       }
     }).finally(() => setLoadingMeta(false));
   }, [open]);
 
-  const handleAddCustomSource = async () => {
-    const name = customSource.trim();
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-combobox="source"]')) setSourceOpen(false);
+      if (!target.closest('[data-combobox="stage"]')) setStageOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  const handleAddSource = async (nameRaw?: string) => {
+    const name = (nameRaw ?? sourceQuery).trim();
     if (!name || name.length < 2) { toast.error('Source name min 2 chars'); return; }
     if (sourceList.some(s => s.name.toLowerCase() === name.toLowerCase())) {
-      toast.error('Source already exists'); return;
+      toast.error('Source already exists'); setDefaultSource(sourceList.find(s=> s.name.toLowerCase()===name.toLowerCase())!.name); setSourceQuery(''); setSourceOpen(false); return;
     }
+    if (!isAdmin) { toast.error('Only Admin/Owner can create new sources'); return; }
     setAddingSource(true);
     try {
       const res = await fetch('/api/lead-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
@@ -148,9 +172,29 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       const newSrc = j.source;
       setSourceList(prev => [...prev, { id: newSrc.id, name: newSrc.name }].sort((a,b)=> a.name.localeCompare(b.name)));
       setDefaultSource(newSrc.name);
-      setCustomSource('');
+      setSourceQuery('');
+      setSourceOpen(false);
       toast.success(`Source "${newSrc.name}" added`);
     } catch (e:any) { toast.error(e?.message || 'Failed to add source'); } finally { setAddingSource(false); }
+  };
+
+  const handleAddStage = async () => {
+    const name = stageQuery.trim();
+    if (!name || name.length < 2) { toast.error('Stage name min 2 chars'); return; }
+    if (stageList.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+      toast.error('Stage already exists'); setDefaultStage(stageList.find(s=> s.name.toLowerCase()===name.toLowerCase())!.name); setStageQuery(''); setStageOpen(false); return;
+    }
+    if (!isAdmin) { toast.error('Only Admin/Owner can create new stages'); return; }
+    setAddingStage(true);
+    try {
+      const created = await adminSettingsService.create('pipelineStages', { name, color: stageColor, order: stageList.length + 1, active: true });
+      const newStage = { id: created.id, name: created.name, color: created.color || stageColor };
+      setStageList(prev => [...prev, newStage]);
+      setDefaultStage(newStage.name);
+      setStageQuery('');
+      setStageOpen(false);
+      toast.success(`Stage "${newStage.name}" added`);
+    } catch (e:any) { toast.error(e?.message || 'Failed to create stage'); } finally { setAddingStage(false); }
   };
 
   const reloadDupes = async (parsed: ParsedRow[]) => {
@@ -220,7 +264,6 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     } catch (err:any) { toast.error(err?.message || 'Failed to re-map'); } finally { setParsing(false); }
   };
 
-  // Resolve assigned display name for preview (handles round-robin)
   const getPreviewAssignee = (row: ParsedRow, index: number): string => {
     if (defaultOwner === '__ROUND_ROBIN__') {
       if (!ownerList.length) return 'Round-Robin';
@@ -230,7 +273,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       return ownerList.find(u => u.id === defaultOwner)?.name || defaultOwner;
     }
     if (row.assignedName) return row.assignedName;
-    return 'Unassigned / Pool';
+    return 'بدون تعيين / Pool';
   };
 
   const validRows = rows.filter(r => r.reasons.length === 0);
@@ -246,15 +289,21 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const canProceedFromSettings = !!defaultSource && !!defaultStage;
   const unmappedColumns = result ? result.headers.filter((h,i)=> !mapping[i]).filter(Boolean) : [];
 
+  const filteredSources = sourceList.filter(s => s.name.toLowerCase().includes(sourceQuery.toLowerCase()));
+  const isSourceExactMatch = sourceList.some(s => s.name.toLowerCase() === sourceQuery.toLowerCase().trim());
+  const showCreateSource = isAdmin && sourceQuery.trim().length >= 2 && !isSourceExactMatch;
+
+  const filteredStages = stageList.filter(s => s.name.toLowerCase().includes(stageQuery.toLowerCase()));
+  const isStageExactMatch = stageList.some(s => s.name.toLowerCase() === stageQuery.toLowerCase().trim());
+  const showCreateStage = isAdmin && stageQuery.trim().length >= 2 && !isStageExactMatch;
+
   const doImport = async () => {
     if (!result) return;
-    if (!canProceedFromSettings) { toast.error('Please select Source and Stage in Step 2'); setStep(2); return; }
+    if (!canProceedFromSettings) { toast.error('Please select Source and Stage in Batch Configuration'); setStep(2); return; }
     setImporting(true);
     setProgress({ current: 0, total: rows.length });
     setSummary(null);
 
-    // Prepare payload for backend: send all rows with global settings
-    // Do chunked import for progress bar
     const chunkSize = 50;
     const chunks: ParsedRow[][] = [];
     for (let i=0;i<rows.length;i+=chunkSize) chunks.push(rows.slice(i,i+chunkSize));
@@ -263,7 +312,6 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     const allDetails: string[] = [];
     const allErrors: string[] = [];
 
-    // Resolve sourceId
     const matchedSource = sourceList.find(s => s.name.toLowerCase() === defaultSource.toLowerCase());
     const sourceId = matchedSource?.id || null;
 
@@ -294,9 +342,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       } catch (e:any) {
         const msg = e?.message || 'Chunk failed';
         allErrors.push(`Chunk ${cIdx+1}: ${msg}`);
-        // Fallback to client-side bulkInsert for this chunk (skip duplicates mode)
         if (duplicateAction === 'skip') {
-          // try fallback via leadsService
           try {
             const fallbackBatch = chunk.filter(r=>{
               const dup = !!r.phone && duplicatePhones.has(r.phone.replace(/\D/g,''));
@@ -329,7 +375,6 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           } catch {}
         }
       }
-      // small delay to allow UI to update
       await new Promise(r=> setTimeout(r, 150));
     }
 
@@ -377,7 +422,6 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       <div className="p-6 space-y-4">
         <StepIndicator />
 
-        {/* Step 1: File Upload */}
         {step===1 && (
           <div className="space-y-4">
             {parsing ? (
@@ -411,7 +455,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                 <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-left">
                   {[
                     { icon: <FileText size={14}/>, title:'Step 1', desc:'Upload .xlsx/.csv' },
-                    { icon: <Settings2 size={14}/>, title:'Step 2', desc:'Global Source/Stage/Owner' },
+                    { icon: <Settings2 size={14}/>, title:'Step 2', desc:'Batch Configuration' },
                     { icon: <Eye size={14}/>, title:'Step 3', desc:'Map & Preview 5 rows' },
                   ].map(card=> (
                     <div key={card.title} className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 flex gap-2">
@@ -424,76 +468,151 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
             )}
             <div className="flex justify-end">
               <button disabled={!storedFile || parsing} onClick={()=> setStep(2)} className="h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-2 disabled:opacity-40 hover:bg-primary/90">
-                Next — Global Settings <ArrowRight size={14}/>
+                Next — Batch Configuration <ArrowRight size={14}/>
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2: Global Settings & Assignment */}
         {step===2 && (
           <div className="space-y-4">
+            <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 flex gap-2">
+              <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center flex-shrink-0"><FileSpreadsheet size={14}/></div>
+              <div>
+                <p className="text-sm font-bold text-sky-900 dark:text-sky-200">تم قراءة {rows.length} ليد من الشيت — نافذة إعدادات الشيت</p>
+                <p className="text-xs text-sky-700 dark:text-sky-300">Batch Configuration Panel — جميع الإعدادات التالية ستُطبق على كل الليدات في هذه الدفعة.</p>
+              </div>
+            </div>
             <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 flex gap-2 text-amber-800 dark:text-amber-200">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0"/>
               <p className="text-xs leading-relaxed">All settings below will be <b>applied to every lead in this batch</b>. Please review carefully before continuing.</p>
             </div>
 
-            {/* Source */}
+            {/* Source — Creatable Combobox */}
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-violet-50 dark:bg-violet-500/10 text-violet-600 flex items-center justify-center"><Database size={14}/></div>
-                <h3 className="text-sm font-bold text-foreground">Lead Source *</h3>
+                <h3 className="text-sm font-bold text-foreground">Lead Source (مصدر الليد) *</h3>
                 <span className="text-[11px] bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">Required</span>
+                {!isAdmin && <span className="text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 rounded-full text-muted-foreground">Admin/Owner can create</span>}
               </div>
-              <div className="relative">
-                <select value={defaultSource} onChange={e=> setDefaultSource(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 pr-8 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
-                  <option value="">Select source… *</option>
-                  {sourceList.map(s=> <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
+              <div className="relative" data-combobox="source">
+                <div className="relative">
+                  <input
+                    value={sourceOpen ? sourceQuery : (defaultSource || '')}
+                    onFocus={()=> { setSourceOpen(true); setSourceQuery(defaultSource || ''); }}
+                    onChange={e=> { setSourceQuery(e.target.value); setSourceOpen(true); }}
+                    placeholder="Select or search source…"
+                    className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 pr-8 text-sm placeholder:text-zinc-400 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none"
+                  />
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
+                </div>
+                {sourceOpen && (
+                  <div className="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                    {filteredSources.length === 0 && !showCreateSource ? (
+                      <div className="px-3 py-3 text-xs text-muted-foreground text-center">No sources found</div>
+                    ) : (
+                      <>
+                        {filteredSources.map(s=> (
+                          <button key={s.id} onClick={()=> { setDefaultSource(s.name); setSourceQuery(''); setSourceOpen(false); }} className={`w-full text-left px-3 py-2.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-between ${defaultSource===s.name ? 'bg-lime-50 dark:bg-lime-500/10 text-lime-700 dark:text-lime-300 font-semibold' : 'text-foreground'}`}>
+                            <span>{s.name}</span>{defaultSource===s.name && <Check size={14}/>}
+                          </button>
+                        ))}
+                        {showCreateSource && (
+                          <button onClick={()=> handleAddSource(sourceQuery)} disabled={addingSource} className="w-full text-left px-3 py-2.5 text-sm bg-lime-50 dark:bg-lime-500/10 hover:bg-lime-100 dark:hover:bg-lime-500/20 text-lime-700 dark:text-lime-300 border-t border-lime-200 dark:border-lime-500/20 flex items-center gap-2 font-semibold disabled:opacity-50">
+                            <Plus size={14}/>{addingSource ? 'Creating…' : `+ إضافة مصدر جديد: "${sourceQuery.trim()}"`}
+                          </button>
+                        )}
+                        {!isAdmin && sourceQuery && !isSourceExactMatch && (
+                          <div className="px-3 py-2 text-xs text-muted-foreground border-t border-zinc-200 dark:border-zinc-700">Only Admin/Owner can create new sources</div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2">
-                <input value={customSource} onChange={e=> setCustomSource(e.target.value)} placeholder="Or type new source (e.g., TikTok, Event) and add…" className="flex-1 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
-                <button onClick={handleAddCustomSource} disabled={addingSource || !customSource.trim()} className="h-9 px-3 rounded-xl bg-zinc-900 dark:bg-zinc-800 text-white text-xs font-bold flex items-center gap-1 disabled:opacity-40"><Plus size={12}/>{addingSource ? '...' : 'Add'}</button>
-              </div>
-              <p className="text-[11px] text-muted-foreground">Options loaded dynamically (Facebook Ads, Google Ads, TikTok, Referral, Cold Call, Real Estate Portal…)</p>
+              {defaultSource && <p className="text-xs text-muted-foreground">Selected: <span className="font-semibold text-foreground">{defaultSource}</span></p>}
             </div>
 
-            {/* Stage */}
+            {/* Stage — Creatable with color */}
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 flex items-center justify-center"><FileText size={14}/></div>
-                <h3 className="text-sm font-bold text-foreground">Stage / Status *</h3>
+                <h3 className="text-sm font-bold text-foreground">Stage / Pipeline (مرحلة الليد) *</h3>
                 <span className="text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 rounded-full">Default: New Fresh</span>
+                {!isAdmin && <span className="text-[11px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 rounded-full text-muted-foreground">Admin create only</span>}
               </div>
-              <div className="relative">
-                <select value={defaultStage} onChange={e=> setDefaultStage(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 pr-8 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
-                  {stageList.map(s=> <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
+              <div className="relative" data-combobox="stage">
+                <div className="relative">
+                  <input
+                    value={stageOpen ? stageQuery : (defaultStage || '')}
+                    onFocus={()=> { setStageOpen(true); setStageQuery(defaultStage || ''); }}
+                    onChange={e=> { setStageQuery(e.target.value); setStageOpen(true); }}
+                    placeholder="Select or search stage…"
+                    className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 pr-8 text-sm placeholder:text-zinc-400 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none"
+                  />
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
+                </div>
+                {stageOpen && (
+                  <div className="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl max-h-72 overflow-y-auto">
+                    {filteredStages.map(s=> (
+                      <button key={s.id} onClick={()=> { setDefaultStage(s.name); setStageQuery(''); setStageOpen(false); }} className={`w-full text-left px-3 py-2.5 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 ${defaultStage===s.name ? 'bg-lime-50 dark:bg-lime-500/10 text-lime-700 dark:text-lime-300 font-semibold' : 'text-foreground'}`}>
+                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: (s as any).color || '#6b7280' }} />
+                        <span>{s.name}</span>{defaultStage===s.name && <Check size={14} className="ml-auto"/>}
+                      </button>
+                    ))}
+                    {isAdmin ? (
+                      showCreateStage ? (
+                        <div className="p-3 border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 space-y-2">
+                          <p className="text-xs font-bold text-foreground">+ إضافة مرحلة جديدة</p>
+                          <div className="flex gap-2">
+                            <input value={stageQuery} onChange={e=> setStageQuery(e.target.value)} placeholder="Stage name" className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
+                            <div className="relative">
+                              <input type="color" value={stageColor} onChange={e=> setStageColor(e.target.value)} className="w-10 h-9 rounded-lg border border-zinc-200 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-900" title="Stage color" />
+                              <Palette size={10} className="absolute -top-1 -right-1 text-zinc-400 pointer-events-none bg-white dark:bg-zinc-900 rounded-full p-0.5" />
+                            </div>
+                          </div>
+                          <button onClick={handleAddStage} disabled={addingStage || stageQuery.trim().length<2} className="w-full h-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-40">
+                            {addingStage ? <Loader2 size={12} className="animate-spin"/> : <Plus size={12}/>} {addingStage ? 'Creating…' : `إضافة "${stageQuery.trim()}"`}
+                          </button>
+                        </div>
+                      ) : stageQuery.trim().length>=2 ? (
+                        <div className="px-3 py-2 text-xs text-muted-foreground border-t border-zinc-200 dark:border-zinc-700">No matching stage — keep typing to create</div>
+                      ) : null
+                    ) : (
+                      stageQuery && !isStageExactMatch && (
+                        <div className="px-3 py-2 text-xs text-muted-foreground border-t border-zinc-200 dark:border-zinc-700">Only Admin/Owner can create new stages</div>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
-              <p className="text-[11px] text-muted-foreground">Pipeline mapped: New Fresh → {stageList.slice(0,4).map(s=> s.name).join(' • ')}</p>
+              {defaultStage && (
+                <p className="text-xs flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full" style={{ background: (stageList.find(s=> s.name===defaultStage) as any)?.color || '#22c55e' }} />
+                  <span className="text-muted-foreground">Selected:</span> <span className="font-semibold text-foreground">{defaultStage}</span>
+                </p>
+              )}
             </div>
 
             {/* Assignment */}
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-600 flex items-center justify-center"><Users size={14}/></div>
-                <h3 className="text-sm font-bold text-foreground">Agent Assignment *</h3>
+                <h3 className="text-sm font-bold text-foreground">Assignee (تعيين الليدز) *</h3>
                 <span className="text-[11px] bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full">Required</span>
               </div>
               <div className="relative">
                 <select value={defaultOwner} onChange={e=> setDefaultOwner(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 pr-8 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none appearance-none">
-                  <option value="">— Unassigned / Pool (بركة الليدز) —</option>
+                  <option value="">بدون تعيين (Pool / Unassigned)</option>
                   {ownerList.map(u=> <option key={u.id} value={u.id}>{u.name}</option>)}
-                  <option value="__ROUND_ROBIN__">🔄 Round-Robin Auto Assign (توزيع تلقائي بالتساوي)</option>
+                  <option value="__ROUND_ROBIN__">🔄 توزيع عادل بالتساوي (Round-Robin)</option>
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"/>
               </div>
               {defaultOwner === '__ROUND_ROBIN__' && (
-                <p className="text-xs bg-lime-50 dark:bg-lime-500/10 border border-lime-200 dark:border-lime-500/20 text-lime-700 dark:text-lime-300 rounded-xl px-3 py-2">Will distribute evenly among {ownerList.length} active team members.</p>
+                <p className="text-xs bg-lime-50 dark:bg-lime-500/10 border border-lime-200 dark:border-lime-500/20 text-lime-700 dark:text-lime-300 rounded-xl px-3 py-2">سيتم التوزيع بالتساوي على {ownerList.length} عضو نشط.</p>
               )}
-              <p className="text-[11px] text-muted-foreground">Choose Pool for unassigned, a specific agent, or Round-Robin for equal distribution.</p>
             </div>
 
             {/* Duplicate handling */}
@@ -507,7 +626,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   <p className="text-xs font-bold">Update Existing</p><p className="text-[11px]">تحديث البيانات</p>
                 </button>
               </div>
-              <p className="text-[11px] text-muted-foreground">Checks phone numbers against DB. {duplicateAction==='skip' ? 'Duplicates will be skipped.' : 'Duplicates will be updated with new data.'} {duplicateRows.length>0 ? `${duplicateRows.length} duplicates detected.` : ''}</p>
+              {duplicateRows.length>0 && <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1"><AlertTriangle size={12}/>{duplicateRows.length} duplicates detected in file + DB.</p>}
             </div>
 
             <div className="flex justify-between pt-2">
@@ -517,7 +636,6 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           </div>
         )}
 
-        {/* Step 3: Column Mapping & Preview */}
         {step===3 && result && (
           <div className="space-y-4">
             {unmappedColumns.length>0 && (
@@ -547,13 +665,13 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
 
             <div className="bg-card border border-border rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h3 className="text-sm font-bold text-foreground">Preview — First 5 rows with applied Source/Stage/Assignee</h3>
+                <h3 className="text-sm font-bold text-foreground">Quick Preview — First 3-5 rows with Source/Stage/Agent</h3>
                 <span className="text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-full">{importableRows.length}/{rows.length} ready</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-zinc-50 dark:bg-zinc-900 border-b border-border">
-                    <tr>{['#','Name','Phone','Email','Budget','Notes','Source*','Stage*','Assigned*','Status'].map(h=> <th key={h} className="px-3 py-2 text-left text-xs font-bold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr>
+                    <tr>{['#','Name','Phone','Email','Budget','Source*','Stage*','Assigned*','Status'].map(h=> <th key={h} className="px-3 py-2 text-left text-xs font-bold text-muted-foreground whitespace-nowrap">{h}</th>)}</tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {rows.slice(0,5).map((r, idx)=> {
@@ -565,7 +683,6 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                           <td className="px-3 py-2 text-xs font-mono">{r.phone || <span className="text-red-500">—</span>}</td>
                           <td className="px-3 py-2 text-xs truncate max-w-[120px]">{r.email || '—'}</td>
                           <td className="px-3 py-2 text-xs">{r.budget || '—'}</td>
-                          <td className="px-3 py-2 text-xs truncate max-w-[120px]">{r.notes || '—'}</td>
                           <td className="px-3 py-2 text-xs"><span className="bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full text-xs">{defaultSource || r.source}</span></td>
                           <td className="px-3 py-2 text-xs"><span className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full text-xs">{defaultStage}</span></td>
                           <td className="px-3 py-2 text-xs truncate max-w-[120px]">{getPreviewAssignee(r, idx)}</td>
@@ -578,7 +695,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   </tbody>
                 </table>
               </div>
-              {rows.length>5 && <p className="px-4 py-2 text-xs text-muted-foreground border-t border-border">Showing 5 of {rows.length} rows — full import will process all.</p>}
+              {rows.length>5 && <p className="px-4 py-2 text-xs text-muted-foreground border-t border-border">Showing 5 of {rows.length} rows — applies to all {rows.length}.</p>}
               <div className="px-4 py-3 bg-muted/20 border-t border-border flex flex-wrap gap-2 text-xs">
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"/> Valid: {validRows.length}</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"/> Invalid: {invalidRows.length}</span>
@@ -590,13 +707,12 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
             <div className="flex justify-between">
               <button onClick={()=> setStep(2)} className="h-10 px-4 rounded-xl border border-border bg-white dark:bg-zinc-900 text-sm font-semibold flex items-center gap-2"><ArrowLeft size={14}/> Back</button>
               <button onClick={()=> { setProgress({current:0, total: rows.length}); setStep(4); }} className="h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-2 disabled:opacity-40" disabled={importableRows.length===0}>
-                Confirm — Import {importableRows.length} leads <ArrowRight size={14}/>
+                تأكيد الاستيراد وتطبيق البيانات — Import {importableRows.length} <ArrowRight size={14}/>
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 4: Import & Summary */}
         {step===4 && (
           <div className="space-y-4">
             {!summary ? (
@@ -605,8 +721,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center"><Loader2 size={18} className={importing ? 'animate-spin' : ''}/></div>
                     <div>
-                      <p className="text-sm font-bold text-foreground">{importing ? 'Importing leads…' : 'Ready to import'}</p>
-                      <p className="text-xs text-muted-foreground">{importing && progress ? `Importing ${progress.current} of ${progress.total} leads…` : `${importableRows.length} leads will be imported${duplicateAction==='update' ? `, ${duplicateRows.length} will be updated` : `, ${duplicateRows.length} duplicates will be skipped`}`}</p>
+                      <p className="text-sm font-bold text-foreground">{importing ? 'Importing leads…' : 'Ready to import — تأكيد الاستيراد وتطبيق البيانات'}</p>
+                      <p className="text-xs text-muted-foreground">{importing && progress ? `Importing ${progress.current} of ${progress.total} leads…` : `${importableRows.length} leads will be imported • Source: ${defaultSource} • Stage: ${defaultStage}`}</p>
                     </div>
                   </div>
                   {importing && progress && (
@@ -618,21 +734,15 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                     </div>
                   )}
                   <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3"><p className="text-lg font-black text-foreground">{rows.length}</p><p className="text-xs text-muted-foreground">Total rows</p></div>
+                    <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3"><p className="text-lg font-black text-foreground">{rows.length}</p><p className="text-xs text-muted-foreground">Total</p></div>
                     <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-3"><p className="text-lg font-black text-emerald-600">{importableRows.length}</p><p className="text-xs text-muted-foreground">Will import</p></div>
                     <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-3"><p className="text-lg font-black text-red-600">{invalidRows.length + (duplicateAction==='skip' ? duplicateRows.length : 0)}</p><p className="text-xs text-muted-foreground">Skipped</p></div>
-                  </div>
-                  <div className="flex gap-2 flex-wrap text-xs">
-                    <span className="bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 text-violet-700 dark:text-violet-300 px-2 py-1 rounded-full">Source: {defaultSource}</span>
-                    <span className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-full">Stage: {defaultStage}</span>
-                    <span className="bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 text-sky-700 dark:text-sky-300 px-2 py-1 rounded-full">Assignee: {defaultOwner==='__ROUND_ROBIN__' ? 'Round-Robin' : defaultOwner ? ownerList.find(u=> u.id===defaultOwner)?.name : 'Pool'}</span>
-                    <span className={`px-2 py-1 rounded-full border text-xs font-bold ${duplicateAction==='skip' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>{duplicateAction==='skip' ? 'Skip Duplicates' : 'Update Existing'}</span>
                   </div>
                 </div>
                 <div className="flex justify-between">
                   <button disabled={importing} onClick={()=> setStep(3)} className="h-10 px-4 rounded-xl border border-border bg-white dark:bg-zinc-900 text-sm font-semibold flex items-center gap-2 disabled:opacity-40"><ArrowLeft size={14}/> Back</button>
-                  <button disabled={importing || importableRows.length===0} onClick={doImport} className="h-11 px-6 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-2 disabled:opacity-40 min-w-[160px] justify-center">
-                    {importing ? <><Loader2 size={16} className="animate-spin"/> Importing…</> : <><Upload size={16}/> Confirm Import</>}
+                  <button disabled={importing || importableRows.length===0} onClick={doImport} className="h-11 px-6 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-2 disabled:opacity-40 min-w-[180px] justify-center">
+                    {importing ? <><Loader2 size={16} className="animate-spin"/> Importing…</> : <>تأكيد الاستيراد وتطبيق البيانات</>}
                   </button>
                 </div>
               </>
@@ -667,11 +777,10 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
         )}
       </div>
 
-      {/* Footer meta */}
       {step!==4 && (
         <div className="px-6 pb-6 flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-4">
-          <span>{loadingMeta ? <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> Loading sources & stages…</span> : `${rows.length? `${rows.length} rows · ${validRows.length} valid` : 'No rows yet'} · ${duplicateAction==='skip'?'Skip':'Update'} duplicates`}</span>
-          <span className="hidden sm:inline">High-contrast • Dark/Light • Arabic headers supported</span>
+          <span>{loadingMeta ? <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> Loading…</span> : `${rows.length? `${rows.length} rows · ${validRows.length} valid` : 'No rows yet'} · ${duplicateAction==='skip'?'Skip':'Update'} duplicates`}</span>
+          <span className="hidden sm:inline">High-contrast • Dark/Light • Creatable for Admin/Owner</span>
         </div>
       )}
     </Modal>
