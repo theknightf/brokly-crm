@@ -1,35 +1,148 @@
-// ─── Attendance Policy Engine ───────────────────────────────────────────────
-// Pure logic for Cairo office shift 12:00–20:00 with 20-min grace.
-// All functions are server & client safe (no Supabase).
-import { OfficeHoursConfig, toMinutes, formatMinutes } from './officeHours';
+// ─── Enterprise Attendance Policy Engine ─────────────────────────────────
+// Multi-shift, Leaves & Permissions-aware. Server & client safe (no Supabase).
+// Shift 1: 12:00–20:00 grace 20 (cutoff 12:20) · Shift 2: 13:00–21:00 grace 20 (cutoff 13:20)
+// Leaves override absent; Permissions offset net late/early calculations.
 
+import { OfficeHoursConfig, toMinutes, formatMinutes, buildOfficeHours } from './officeHours';
+
+// ─── Shift Definitions ───────────────────────────────────────────────────
+export interface ShiftConfig extends OfficeHoursConfig {
+  id: string; // 'shift1' | 'shift2'
+  labelAr: string;
+  labelEn: string;
+  teamNames: string[]; // teams assigned to this shift
+}
+
+export const DEFAULT_SHIFTS: ShiftConfig[] = [
+  {
+    id: 'shift1',
+    labelAr: 'الوردية القياسية',
+    labelEn: 'Standard Shift',
+    start: '12:00',
+    end: '20:00',
+    startMinutes: 12 * 60,
+    endMinutes: 20 * 60,
+    graceMinutes: 20,
+    toleranceMinutes: 12 * 60 + 20,
+    flexibleHours: false,
+    officeHours: [12,13,14,15,16,17,18,19,20],
+    teamNames: ['Sales', 'Admin', 'Operations', 'Marketing', 'Default'],
+  },
+  {
+    id: 'shift2',
+    labelAr: 'الوردية المسائية',
+    labelEn: 'Late Shift',
+    start: '13:00',
+    end: '21:00',
+    startMinutes: 13 * 60,
+    endMinutes: 21 * 60,
+    graceMinutes: 20,
+    toleranceMinutes: 13 * 60 + 20,
+    flexibleHours: false,
+    officeHours: [13,14,15,16,17,18,19,20,21],
+    teamNames: ['Support', 'Evening Team', 'Evening', 'Support Team', 'Customer Support'],
+  },
+];
+
+export function buildShiftConfig(base: { start: string; end: string; graceMinutes: number; id: string; labelAr: string; labelEn: string; teamNames: string[] }): ShiftConfig {
+  const cfg = buildOfficeHours({ start: base.start, end: base.end, lateGraceMinutes: base.graceMinutes });
+  return {
+    ...cfg,
+    id: base.id,
+    labelAr: base.labelAr,
+    labelEn: base.labelEn,
+    teamNames: base.teamNames,
+  };
+}
+
+export function getShiftForTeam(teamName?: string | null, shifts: ShiftConfig[] = DEFAULT_SHIFTS): ShiftConfig {
+  const name = (teamName || '').trim().toLowerCase();
+  for (const s of shifts) {
+    if (s.teamNames.some((t) => t.toLowerCase() === name)) return s;
+  }
+  // default to shift1
+  return shifts[0] || DEFAULT_SHIFTS[0];
+}
+
+export function getShiftForUser(user: { team_id?: string | null; teamName?: string | null }, teamNameById: Map<string,string>, shifts: ShiftConfig[] = DEFAULT_SHIFTS): ShiftConfig {
+  const teamName = user.teamName || (user.team_id ? teamNameById.get(user.team_id) : undefined) || '';
+  return getShiftForTeam(teamName, shifts);
+}
+
+// ─── Leave Types ─────────────────────────────────────────────────────────
+export type LeaveType = 'annual' | 'sick' | 'unpaid' | 'holiday' | string;
+export const LEAVE_TYPES: { value: string; ar: string; en: string; color: string }[] = [
+  { value: 'annual', ar: 'إجازة اعتيادية / سنوية', en: 'Paid Annual', color: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 border-sky-200' },
+  { value: 'sick', ar: 'إجازة مرضي - طبي معتمد', en: 'Sick Leave', color: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 border-amber-200' },
+  { value: 'unpaid', ar: 'إجازة بدون راتب', en: 'Unpaid Leave', color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700' },
+  { value: 'holiday', ar: 'عطلة رسمية', en: 'Official Holiday', color: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300 border-violet-200' },
+];
+export function leaveAr(type: string): string {
+  return LEAVE_TYPES.find((x) => x.value === type)?.ar || type || 'إجازة';
+}
+export function leaveBadgeClass(type: string): string {
+  return LEAVE_TYPES.find((x) => x.value === type)?.color || 'bg-sky-100 text-sky-700 border-sky-200';
+}
+
+// ─── Permissions ─────────────────────────────────────────────────────────
+export type PermissionType = 'late_arrival' | 'early_departure' | 'mission';
+export const PERMISSION_TYPES: { value: PermissionType; ar: string; en: string }[] = [
+  { value: 'late_arrival', ar: 'إذن تأخير معتمد', en: 'Late Arrival Permission' },
+  { value: 'early_departure', ar: 'إذن انصراف مبكر', en: 'Early Departure Permission' },
+  { value: 'mission', ar: 'إذن مأمورية عمل خارجية', en: 'Mid-shift Mission' },
+];
+export function permissionAr(type: string): string {
+  return PERMISSION_TYPES.find((x) => x.value === type)?.ar || type;
+}
+
+export interface Permission {
+  id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  type: PermissionType;
+  excusedMinutes: number;
+  reason: string;
+  status: 'approved' | 'pending' | 'rejected';
+  approvedBy?: string;
+  approvedByName?: string;
+}
+
+// ─── Attendance Status ───────────────────────────────────────────────────
 export type AttendanceStatus =
-  | 'present' // حاضر - On Time (within grace)
-  | 'late' // متأخر
-  | 'early_departure' // انصراف مبكر
-  | 'overtime' // إضافي (checked out after end)
-  | 'present_overtime' // حاضر + إضافي
-  | 'late_overtime' // متأخر + إضافي
-  | 'absent' // غياب
-  | 'leave'; // إجازة
+  | 'present'
+  | 'late'
+  | 'early_departure'
+  | 'overtime'
+  | 'present_overtime'
+  | 'late_overtime'
+  | 'absent'
+  | 'leave'
+  | 'permission'; // covered by permission, still show as present but with permission badge
 
 export interface DailyAttendanceInput {
-  checkIn?: string | null; // ISO timestamp
-  checkOut?: string | null; // ISO timestamp
-  leaveType?: string | null; // e.g. 'إجازة رسمية'
+  checkIn?: string | null;
+  checkOut?: string | null;
+  leaveType?: string | null; // annual/sick/unpaid/holiday
   isExcused?: boolean;
+  permissions?: Permission[]; // permissions for this day (approved only affect net)
 }
 
 export interface DailyAttendanceResult {
   status: AttendanceStatus;
   statusAr: string;
   statusEn: string;
-  lateMinutes: number; // from shift start (12:00) if late, else 0
-  overtimeMinutes: number; // after 20:00
-  earlyDepartureMinutes: number; // before 20:00
-  netWorkMinutes: number; // actual worked
-  netWorkHours: string; // "8h 15m"
+  rawLateMinutes: number;
+  netLateMinutes: number;
+  lateMinutes: number; // alias net
+  overtimeMinutes: number;
+  earlyDepartureMinutes: number;
+  netEarlyMinutes: number;
+  netWorkMinutes: number;
+  netWorkHours: string;
   badgeClass: string;
+  permissionNote?: string;
+  leaveType?: string | null;
+  excusedMinutes: number;
 }
 
 const STATUS_AR: Record<AttendanceStatus, string> = {
@@ -39,19 +152,21 @@ const STATUS_AR: Record<AttendanceStatus, string> = {
   overtime: 'إضافي',
   present_overtime: 'حاضر + إضافي',
   late_overtime: 'متأخر + إضافي',
-  absent: 'غياب',
+  absent: 'غياب بدون إذن',
   leave: 'إجازة',
+  permission: 'بإذن معتمد',
 };
 
 const STATUS_EN: Record<AttendanceStatus, string> = {
   present: 'Present - On Time',
   late: 'Late',
-  early_departure: 'Early Departure',
+  early_departure: 'Early Leave',
   overtime: 'Overtime',
   present_overtime: 'Present + Overtime',
   late_overtime: 'Late + Overtime',
   absent: 'Absent',
   leave: 'Leave',
+  permission: 'Permission',
 };
 
 function minutesOfDayFromISO(iso: string | null | undefined): number {
@@ -77,12 +192,10 @@ export function minutesToHM(mins: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-/** Convert OfficeHoursConfig to Arabic display like "12:00 م - 08:00 م" */
 export function officeCfgToAr(cfg: OfficeHoursConfig): string {
   const toAr = (t: string) => {
     const mins = toMinutes(t);
     if (mins < 0) return t;
-    const h12 = mins % (12 * 60);
     const hour = Math.floor(mins / 60);
     const displayHour = hour % 12 === 0 ? 12 : hour % 12;
     const mm = String(mins % 60).padStart(2, '0');
@@ -92,55 +205,104 @@ export function officeCfgToAr(cfg: OfficeHoursConfig): string {
   return `${toAr(cfg.start)} - ${toAr(cfg.end)} | فترة سماح ${cfg.graceMinutes} دقيقة حتى ${toAr(formatMinutes(cfg.toleranceMinutes))}`;
 }
 
-/** Core policy: evaluate a single day */
+export function shiftsToAr(shifts: ShiftConfig[]): string {
+  return shifts.map((s) => `${s.labelAr} ${officeCfgToAr(s)}`).join('  •  ');
+}
+
+/** Core policy: evaluate single day with shift + permissions */
 export function evaluateDailyAttendance(
   input: DailyAttendanceInput,
   cfg: OfficeHoursConfig
 ): DailyAttendanceResult {
-  // Leave overrides everything
+  const permissions = (input.permissions || []).filter((p) => p.status === 'approved');
+  const excusedLate = permissions
+    .filter((p) => p.type === 'late_arrival')
+    .reduce((s, p) => s + (p.excusedMinutes || 0), 0);
+  const excusedEarly = permissions
+    .filter((p) => p.type === 'early_departure')
+    .reduce((s, p) => s + (p.excusedMinutes || 0), 0);
+  // mission excuses whole day absence if present? treat as permission note but still need checkIn? mission means not required to be present? We'll treat as not absent if mission approved
+  const hasMission = permissions.some((p) => p.type === 'mission' && p.status === 'approved');
+  const permissionNote = permissions.length
+    ? permissions.map((p) => `${permissionAr(p.type)} (${p.excusedMinutes}m${p.reason ? ': ' + p.reason : ''})`).join('، ')
+    : undefined;
+
+  // Leave overrides everything (no penalty)
   if (input.isExcused || input.leaveType) {
+    const type = input.leaveType || 'leave';
     return {
       status: 'leave',
-      statusAr: STATUS_AR.leave,
-      statusEn: STATUS_EN.leave,
+      statusAr: leaveAr(type),
+      statusEn: type,
+      rawLateMinutes: 0,
+      netLateMinutes: 0,
       lateMinutes: 0,
       overtimeMinutes: 0,
       earlyDepartureMinutes: 0,
+      netEarlyMinutes: 0,
       netWorkMinutes: 0,
       netWorkHours: '—',
-      badgeClass: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 border-sky-200',
+      badgeClass: leaveBadgeClass(type),
+      permissionNote,
+      leaveType: type,
+      excusedMinutes: excusedLate + excusedEarly,
     };
   }
 
-  // Absent: no check-in
+  // Absent: no check-in and no mission
   if (!input.checkIn) {
+    if (hasMission) {
+      return {
+        status: 'permission',
+        statusAr: 'مأمورية معتمدة',
+        statusEn: 'Mission',
+        rawLateMinutes: 0,
+        netLateMinutes: 0,
+        lateMinutes: 0,
+        overtimeMinutes: 0,
+        earlyDepartureMinutes: 0,
+        netEarlyMinutes: 0,
+        netWorkMinutes: 0,
+        netWorkHours: '—',
+        badgeClass: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300 border-violet-200',
+        permissionNote,
+        excusedMinutes: excusedLate + excusedEarly,
+      };
+    }
     return {
       status: 'absent',
       statusAr: STATUS_AR.absent,
       statusEn: STATUS_EN.absent,
+      rawLateMinutes: 0,
+      netLateMinutes: 0,
       lateMinutes: 0,
       overtimeMinutes: 0,
       earlyDepartureMinutes: 0,
+      netEarlyMinutes: 0,
       netWorkMinutes: 0,
       netWorkHours: '—',
       badgeClass: 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300 border-red-200',
+      permissionNote,
+      excusedMinutes: 0,
     };
   }
 
   const inMin = minutesOfDayFromISO(input.checkIn);
   const outMin = minutesOfDayFromISO(input.checkOut);
 
-  const isLate = inMin > cfg.toleranceMinutes;
-  const lateMinutes = isLate && inMin >= 0 ? Math.max(0, inMin - cfg.startMinutes) : 0;
+  const rawIsLate = inMin > cfg.toleranceMinutes;
+  const rawLateMinutes = rawIsLate && inMin >= 0 ? Math.max(0, inMin - cfg.startMinutes) : 0;
+  const netLateMinutes = Math.max(0, rawLateMinutes - excusedLate);
+  const netIsLate = netLateMinutes > 0;
 
   let overtimeMinutes = 0;
-  let earlyDepartureMinutes = 0;
+  let earlyRaw = 0;
   if (outMin >= 0) {
     if (outMin > cfg.endMinutes) overtimeMinutes = outMin - cfg.endMinutes;
-    else if (outMin >= 0 && outMin < cfg.endMinutes) earlyDepartureMinutes = cfg.endMinutes - outMin;
+    else if (outMin < cfg.endMinutes) earlyRaw = cfg.endMinutes - outMin;
   }
+  const netEarlyMinutes = Math.max(0, earlyRaw - excusedEarly);
 
-  // Net work minutes
   let netWorkMinutes = 0;
   if (input.checkIn && input.checkOut) {
     const a = new Date(input.checkIn).getTime();
@@ -148,19 +310,24 @@ export function evaluateDailyAttendance(
     if (!Number.isNaN(a) && !Number.isNaN(b) && b > a) netWorkMinutes = Math.round((b - a) / 60000);
   }
 
-  // Determine composite status
+  // Determine status with permission awareness
   let status: AttendanceStatus;
   let badgeClass: string;
-  if (isLate && overtimeMinutes > 0) {
+  const hasPermissionCover = permissions.length > 0 && netLateMinutes === 0 && netEarlyMinutes === 0 && (rawLateMinutes > 0 || earlyRaw > 0);
+
+  if (hasPermissionCover) {
+    status = 'permission';
+    badgeClass = 'bg-lime-50 text-lime-700 dark:bg-lime-500/15 dark:text-lime-300 border-lime-200';
+  } else if (netIsLate && overtimeMinutes > 0) {
     status = 'late_overtime';
     badgeClass = 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 border-amber-200';
-  } else if (!isLate && overtimeMinutes > 0) {
+  } else if (!netIsLate && overtimeMinutes > 0) {
     status = 'present_overtime';
     badgeClass = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border-emerald-200';
-  } else if (isLate) {
+  } else if (netIsLate) {
     status = 'late';
     badgeClass = 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 border-amber-200';
-  } else if (earlyDepartureMinutes > 0 && input.checkOut) {
+  } else if (netEarlyMinutes > 0 && input.checkOut) {
     status = 'early_departure';
     badgeClass = 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300 border-orange-200';
   } else {
@@ -172,16 +339,21 @@ export function evaluateDailyAttendance(
     status,
     statusAr: STATUS_AR[status],
     statusEn: STATUS_EN[status],
-    lateMinutes,
+    rawLateMinutes,
+    netLateMinutes,
+    lateMinutes: netLateMinutes,
     overtimeMinutes,
-    earlyDepartureMinutes,
+    earlyDepartureMinutes: earlyRaw,
+    netEarlyMinutes,
     netWorkMinutes,
     netWorkHours: fmtDuration(netWorkMinutes),
     badgeClass,
+    permissionNote,
+    excusedMinutes: excusedLate + excusedEarly,
   };
 }
 
-/** Aggregated monthly totals per employee */
+// ─── Aggregated ────────────────────────────────────────────────────────
 export interface MonthlyAggregate {
   userId: string;
   daysInMonth: number;
@@ -189,41 +361,50 @@ export interface MonthlyAggregate {
   late: number;
   absent: number;
   leave: number;
+  permissionCovered: number;
   earlyDeparture: number;
-  totalLateMinutes: number;
+  totalRawLate: number;
+  totalNetLate: number;
   totalOvertimeMinutes: number;
   totalOvertimeHours: string;
   totalWorkMinutes: number;
   totalWorkHours: string;
-  attendanceRate: number; // 0-100
+  attendanceRate: number;
+  totalLeaves: number;
+  totalPermissions: number;
 }
 
-/** Build aggregates for a full month */
 export function aggregateMonthly(
-  days: { date: string; checkIn?: string | null; checkOut?: string | null; leaveType?: string | null }[],
+  days: { date: string; checkIn?: string | null; checkOut?: string | null; leaveType?: string | null; permissions?: Permission[] }[],
   cfg: OfficeHoursConfig
 ): Omit<MonthlyAggregate, 'userId' | 'daysInMonth'> & { daysInMonth: number } {
   let present = 0;
   let late = 0;
   let absent = 0;
   let leave = 0;
+  let permissionCovered = 0;
   let earlyDeparture = 0;
-  let totalLateMinutes = 0;
+  let totalRawLate = 0;
+  let totalNetLate = 0;
   let totalOvertimeMinutes = 0;
   let totalWorkMinutes = 0;
+  let totalPermissions = 0;
 
   days.forEach((d) => {
-    const r = evaluateDailyAttendance({ checkIn: d.checkIn, checkOut: d.checkOut, leaveType: d.leaveType }, cfg);
+    const r = evaluateDailyAttendance({ checkIn: d.checkIn, checkOut: d.checkOut, leaveType: d.leaveType, permissions: d.permissions }, cfg);
     if (r.status === 'leave') leave += 1;
     else if (r.status === 'absent') absent += 1;
     else {
       present += 1;
       if (r.status === 'late' || r.status === 'late_overtime') late += 1;
       if (r.status === 'early_departure') earlyDeparture += 1;
+      if (r.status === 'permission') permissionCovered += 1;
     }
-    totalLateMinutes += r.lateMinutes;
+    totalRawLate += r.rawLateMinutes;
+    totalNetLate += r.netLateMinutes;
     totalOvertimeMinutes += r.overtimeMinutes;
     totalWorkMinutes += r.netWorkMinutes;
+    if (d.permissions?.length) totalPermissions += 1;
   });
 
   const attendanceRate = days.length ? Math.round((present / days.length) * 100) : 0;
@@ -234,20 +415,22 @@ export function aggregateMonthly(
     late,
     absent,
     leave,
+    permissionCovered,
     earlyDeparture,
-    totalLateMinutes,
+    totalRawLate,
+    totalNetLate,
     totalOvertimeMinutes,
     totalOvertimeHours: fmtDuration(totalOvertimeMinutes),
     totalWorkMinutes,
     totalWorkHours: fmtDuration(totalWorkMinutes),
     attendanceRate,
+    totalLeaves: leave,
+    totalPermissions,
   };
 }
 
-// ─── Helpers for UI filtering ──────────────────────────────────────────
-
+// ─── Helpers ───────────────────────────────────────────────────────────
 export function getDaysInMonth(year: number, month: number): string[] {
-  // month 1-12
   const days = new Date(year, month, 0).getDate();
   const out: string[] = [];
   for (let d = 1; d <= days; d++) {
@@ -257,20 +440,7 @@ export function getDaysInMonth(year: number, month: number): string[] {
 }
 
 export function formatMonthAr(year: number, month: number): string {
-  const arMonths = [
-    'يناير',
-    'فبراير',
-    'مارس',
-    'أبريل',
-    'مايو',
-    'يونيو',
-    'يوليو',
-    'أغسطس',
-    'سبتمبر',
-    'أكتوبر',
-    'نوفمبر',
-    'ديسمبر',
-  ];
+  const arMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
   return `${arMonths[month - 1]} ${year}`;
 }
 
@@ -279,27 +449,21 @@ export function formatMonthEn(year: number, month: number): string {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-// For table filters
-export function matchesAttendanceStatus(
-  evaluatedStatus: AttendanceStatus,
-  filter: string // 'all' | 'present' | 'late' | 'absent' | 'leave' | 'early_departure' etc
-): boolean {
+export function matchesAttendanceStatus(evaluatedStatus: AttendanceStatus, filter: string): boolean {
   if (filter === 'all') return true;
   if (filter === 'late') return evaluatedStatus === 'late' || evaluatedStatus === 'late_overtime';
-  if (filter === 'present') return evaluatedStatus === 'present' || evaluatedStatus === 'present_overtime';
+  if (filter === 'present') return evaluatedStatus === 'present' || evaluatedStatus === 'present_overtime' || evaluatedStatus === 'permission';
   if (filter === 'early') return evaluatedStatus === 'early_departure';
   if (filter === 'overtime') return evaluatedStatus === 'present_overtime' || evaluatedStatus === 'late_overtime';
   return evaluatedStatus === filter;
 }
 
-/** Late minutes calculation helper exposed for tests */
 export function calcLateMinutes(checkInISO: string, cfg: OfficeHoursConfig): number {
   const m = minutesOfDayFromISO(checkInISO);
   if (m < 0 || m <= cfg.toleranceMinutes) return 0;
   return Math.max(0, m - cfg.startMinutes);
 }
 
-/** Overtime helper */
 export function calcOvertimeMinutes(checkOutISO: string, cfg: OfficeHoursConfig): number {
   const m = minutesOfDayFromISO(checkOutISO);
   if (m < 0 || m <= cfg.endMinutes) return 0;
