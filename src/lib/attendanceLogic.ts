@@ -469,3 +469,98 @@ export function calcOvertimeMinutes(checkOutISO: string, cfg: OfficeHoursConfig)
   if (m < 0 || m <= cfg.endMinutes) return 0;
   return m - cfg.endMinutes;
 }
+
+// ─── Team Shift Delay / Rescheduling ─────────────────────────────────────
+export interface TeamShiftAdjustment {
+  id: string;
+  teamId: string | null;
+  teamName: string;
+  date: string | null; // null = permanent, YYYY-MM-DD = temporary
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
+  graceMinutes: number;
+  reason?: string;
+  isTemporary: boolean;
+  createdAt?: string;
+  createdBy?: string;
+}
+
+export function getEffectiveShiftForTeam(
+  teamName: string | null | undefined,
+  teamId: string | null | undefined,
+  date: string | null | undefined,
+  baseShifts: ShiftConfig[] = DEFAULT_SHIFTS,
+  adjustments: TeamShiftAdjustment[] = []
+): ShiftConfig {
+  const base = getShiftForTeam(teamName, baseShifts);
+  if (!adjustments.length) return base;
+
+  const normTeam = (teamName || '').trim().toLowerCase();
+  const normId = (teamId || '').trim();
+
+  // Prefer exact date match (temporary) first
+  if (date) {
+    const temp = adjustments.find((a) => {
+      if (!a.isTemporary || !a.date) return false;
+      if (a.date !== date) return false;
+      if (a.teamId && normId) return a.teamId === normId;
+      return (a.teamName || '').trim().toLowerCase() === normTeam;
+    });
+    if (temp) {
+      return buildShiftConfig({
+        id: base.id,
+        labelAr: base.labelAr,
+        labelEn: base.labelEn,
+        start: temp.startTime,
+        end: temp.endTime,
+        graceMinutes: temp.graceMinutes,
+        teamNames: base.teamNames,
+      });
+    }
+  }
+
+  // Fallback to permanent adjustment for this team
+  const perm = adjustments.find((a) => {
+    if (a.isTemporary) return false;
+    if (a.teamId && normId) return a.teamId === normId;
+    return (a.teamName || '').trim().toLowerCase() === normTeam;
+  });
+  if (perm) {
+    return buildShiftConfig({
+      id: base.id,
+      labelAr: base.labelAr,
+      labelEn: base.labelEn,
+      start: perm.startTime,
+      end: perm.endTime,
+      graceMinutes: perm.graceMinutes,
+      teamNames: base.teamNames,
+    });
+  }
+
+  return base;
+}
+
+export function getEffectiveShiftForUserWithAdjustments(
+  user: { team_id?: string | null; teamName?: string | null },
+  teamNameById: Map<string, string>,
+  date: string | null | undefined,
+  baseShifts: ShiftConfig[] = DEFAULT_SHIFTS,
+  adjustments: TeamShiftAdjustment[] = []
+): ShiftConfig {
+  const teamName = user.teamName || (user.team_id ? teamNameById.get(user.team_id) : undefined) || '';
+  return getEffectiveShiftForTeam(teamName, user.team_id || null, date, baseShifts, adjustments);
+}
+
+export function formatShiftAdjustmentLabel(adj: TeamShiftAdjustment): string {
+  const datePart = adj.isTemporary && adj.date ? `ليوم ${adj.date}` : 'دائم';
+  return `${adj.teamName}: ${officeCfgToAr({ start: adj.startTime, end: adj.endTime, startMinutes: toMinutes(adj.startTime), endMinutes: toMinutes(adj.endTime), graceMinutes: adj.graceMinutes, toleranceMinutes: toMinutes(adj.startTime) + adj.graceMinutes, flexibleHours: false, officeHours: [] } as any)} — ${datePart}${adj.reason ? ` — ${adj.reason}` : ''}`;
+}
+
+export function addMinutesToTime(time: string, offsetMins: number): string {
+  const mins = toMinutes(time);
+  if (mins < 0) return time;
+  const total = mins + offsetMins;
+  const h = Math.floor(((total % 1440) + 1440) % 1440 / 60);
+  const m = ((total % 1440) + 1440) % 1440 % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}

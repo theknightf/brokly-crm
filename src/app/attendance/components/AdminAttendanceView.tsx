@@ -34,14 +34,20 @@ import {
   formatMonthEn,
   DEFAULT_SHIFTS,
   getShiftForUser,
+  getEffectiveShiftForTeam,
+  getEffectiveShiftForUserWithAdjustments,
+  officeCfgToAr,
   type ShiftConfig,
   type Permission,
+  type TeamShiftAdjustment,
 } from '@/lib/attendanceLogic';
 import { exportAttendancePDF } from '@/lib/attendancePdf';
 import { exportCSV } from '@/lib/exportReport';
 import { attendancePermissionsService } from '@/lib/attendancePermissionsService';
+import { teamShiftAdjustmentsService } from '@/lib/teamShiftAdjustmentsService';
 import ManualAttendanceModal from './ManualAttendanceModal';
 import LeavePermissionModal from './LeavePermissionModal';
+import TeamShiftDelayModal from './TeamShiftDelayModal';
 
 interface AttendanceUser {
   id: string;
@@ -182,6 +188,8 @@ export default function AdminAttendanceView() {
   const [editUser, setEditUser] = useState<AttendanceUser|null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [shifts, setShifts] = useState<ShiftConfig[]>(()=> DEFAULT_SHIFTS);
+  const [shiftAdjustments, setShiftAdjustments] = useState<TeamShiftAdjustment[]>([]);
+  const [teamShiftModalOpen, setTeamShiftModalOpen] = useState(false);
 
   const daysInMonth = useMemo(()=> getDaysInMonth(year, month), [year, month]);
   const monthFrom = daysInMonth[0];
@@ -200,8 +208,8 @@ export default function AdminAttendanceView() {
       setUsers(data.users||[]);
       setRecords(data.attendance||[]);
       setTeams(teamsList);
-      // leaves & permissions parallel
-      const [leaveData, permData] = await Promise.all([
+      // leaves, permissions & team shift adjustments parallel
+      const [leaveData, permData, shiftAdjs] = await Promise.all([
         (async ()=> {
           try {
             const { leaveService } = await import('@/lib/services/peopleOpsService');
@@ -222,9 +230,16 @@ export default function AdminAttendanceView() {
             return await attendancePermissionsService.getForRange(monthFrom, monthTo);
           } catch { return [] as Permission[]; }
         })(),
+        (async ()=> {
+          try {
+            const adjs = await teamShiftAdjustmentsService.getAll();
+            return adjs as TeamShiftAdjustment[];
+          } catch { return [] as TeamShiftAdjustment[]; }
+        })(),
       ]);
       setLeaves(leaveData as any);
       setPermissions(permData as any);
+      setShiftAdjustments(shiftAdjs as any);
       if (!selectedEmployeeId && data.users?.length) setSelectedEmployeeId(data.users[0].id);
       if (selectedDay < monthFrom || selectedDay > monthTo) setSelectedDay(monthFrom);
     } catch { toast.error('تعذر تحميل بيانات الحضور'); } finally { setLoading(false); }
@@ -290,15 +305,18 @@ export default function AdminAttendanceView() {
     return m;
   }, [records]);
 
-  // ── Overview with multi-shift + permissions ───────────────────────────
+  // ── Overview with multi-shift + permissions + team shift delays ────────
   const overviewRows = useMemo(()=> {
     return activeUsers.map(u=>{
-      const shift = getShiftForUser(u, teamNameById, shifts);
+      const baseShift = getShiftForUser(u, teamNameById, shifts);
+      const teamName = teamNameById.get(u.team_id||'')||'';
       const daily = daysInMonth.map(date=>{
         const rec = recordMap.get(`${u.id}|${date}`);
         const leaveType = isOnLeave(u.id, date);
         const perms = permsByUserDate.get(`${u.id}|${date}`) || [];
-        return { date, checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms, shift };
+        const shift = getEffectiveShiftForTeam(teamName, u.team_id||null, date, shifts, shiftAdjustments);
+        const hasDelay = shift.start !== baseShift.start || shift.end !== baseShift.end;
+        return { date, checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms, shift, baseShift, hasDelay };
       });
       let present=0, late=0, absent=0, leave=0, early=0, permCover=0, totalNetLate=0, totalOt=0, totalWork=0, permCount=0, leaveCount=0;
       daily.forEach(d=>{
@@ -317,9 +335,14 @@ export default function AdminAttendanceView() {
         if (d.permissions?.length) permCount+=1;
       });
       const rate = workingDays ? Math.round((present/workingDays)*100):0;
-      return { user:u, teamName: teamNameById.get(u.team_id||'')||'—', shift, present, late, absent, leave, early, permCover, totalNetLate, totalOt, totalWork, rate, daily, permCount, leaveCount };
+      const teamName = teamNameById.get(u.team_id||'')||'—';
+      const baseShift = getShiftForUser(u, teamNameById, shifts);
+      // Check if team has any delay in this month (for badge)
+      const hasTeamDelay = daily.some(d=> d.hasDelay);
+      const delayReason = hasTeamDelay ? (shiftAdjustments.find(a=> (a.teamId ? a.teamId===u.team_id : (a.teamName||'').toLowerCase()===teamName.toLowerCase()) && (a.isTemporary ? daysInMonth.includes(a.date||'') : true))?.reason || '') : '';
+      return { user:u, teamName, shift: baseShift, present, late, absent, leave, early, permCover, totalNetLate, totalOt, totalWork, rate, daily, permCount, leaveCount, hasTeamDelay, delayReason };
     });
-  }, [activeUsers, daysInMonth, recordMap, isOnLeave, permsByUserDate, shifts, teamNameById, workingDays]);
+  }, [activeUsers, daysInMonth, recordMap, isOnLeave, permsByUserDate, shifts, teamNameById, workingDays, shiftAdjustments]);
 
   const filteredOverview = useMemo(()=>{
     const q = search.toLowerCase().trim();
@@ -354,26 +377,36 @@ export default function AdminAttendanceView() {
   const individualData = useMemo(()=>{
     const u = activeUsers.find(x=> x.id===selectedEmployeeId) || activeUsers[0];
     if (!u) return null;
-    const shift = getShiftForUser(u, teamNameById, shifts);
+    const teamName = teamNameById.get(u.team_id||'')||'';
     const rows = daysInMonth.map((date, idx)=>{
       const rec = recordMap.get(`${u.id}|${date}`);
       const leaveType = isOnLeave(u.id, date);
       const perms = permsByUserDate.get(`${u.id}|${date}`) || [];
+      const shift = getEffectiveShiftForTeam(teamName, u.team_id||null, date, shifts, shiftAdjustments);
       const ev = evaluateDailyAttendance({ checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms }, shift);
-      return { idx: idx+1, date, rec, leaveType, perms, ev, shift };
+      // Attach delay info
+      const base = getShiftForUser(u, teamNameById, shifts);
+      const hasDelay = shift.start !== base.start || shift.end !== base.end;
+      const delayInfo = hasDelay ? shiftAdjustments.find(a=> (a.teamId ? a.teamId===u.team_id : (a.teamName||'').toLowerCase()===teamName.toLowerCase()) && (a.isTemporary ? a.date===date : true)) : null;
+      return { idx: idx+1, date, rec, leaveType, perms, ev, shift, baseShift: base, hasDelay, delayReason: delayInfo?.reason || '' };
     });
     const agg = overviewRows.find(r=> r.user.id===u.id);
-    return { user:u, shift, rows, agg };
-  }, [activeUsers, selectedEmployeeId, daysInMonth, recordMap, isOnLeave, permsByUserDate, shifts, teamNameById, overviewRows]);
+    const effectiveShift = getShiftForUser(u, teamNameById, shifts); // base for header, individual rows already have per-date effective
+    return { user:u, shift: effectiveShift, rows, agg };
+  }, [activeUsers, selectedEmployeeId, daysInMonth, recordMap, isOnLeave, permsByUserDate, shifts, teamNameById, overviewRows, shiftAdjustments]);
 
   const dailyRows = useMemo(()=>{
     return activeUsers.map(u=>{
-      const shift = getShiftForUser(u, teamNameById, shifts);
+      const teamName = teamNameById.get(u.team_id||'')||'';
+      const shift = getEffectiveShiftForTeam(teamName, u.team_id||null, selectedDay, shifts, shiftAdjustments);
+      const base = getShiftForUser(u, teamNameById, shifts);
       const rec = recordMap.get(`${u.id}|${selectedDay}`);
       const leaveType = isOnLeave(u.id, selectedDay);
       const perms = permsByUserDate.get(`${u.id}|${selectedDay}`) || [];
       const ev = evaluateDailyAttendance({ checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms }, shift);
-      return { user:u, teamName: teamNameById.get(u.team_id||'')||'—', shift, rec, leaveType, perms, ev };
+      const hasDelay = shift.start !== base.start || shift.end !== base.end;
+      const delayAdj = hasDelay ? shiftAdjustments.find(a=> (a.teamId ? a.teamId===u.team_id : (a.teamName||'').toLowerCase()===teamName.toLowerCase()) && (a.isTemporary ? a.date===selectedDay : true)) : null;
+      return { user:u, teamName, shift, baseShift: base, hasDelay, delayReason: delayAdj?.reason || '', rec, leaveType, perms, ev };
     }).filter(r=>{
       const q = search.toLowerCase().trim();
       if (q && !r.user.full_name.toLowerCase().includes(q) && !r.user.email.toLowerCase().includes(q)) return false;
@@ -423,34 +456,48 @@ export default function AdminAttendanceView() {
     ];
 
     if (viewMode==='overview') {
-      const rows = filteredOverview.map((r,i)=> [
-        String(i+1),
-        r.user.full_name || r.user.email,
-        `${r.teamName} — ${r.shift.labelAr}`,
-        '—',
-        '—',
-        fmtHM(r.totalWork),
-        String(r.totalNetLate),
-        fmtHM(r.totalOt),
-        `${r.present} حاضر · ${r.late} متأخر · ${r.absent} غياب بدون إذن · ${r.leave} إجازة${r.permCover? ` · ${r.permCover} بإذن`:''}`,
-        r.permCount ? `${r.permCount} إذن معتمد` : (r.leave? `${r.leave} إجازة`:''),
-      ]);
+      const rows = filteredOverview.map((r,i)=> {
+        const delay = r.hasTeamDelay ? r.daily.find(d=> d.hasDelay) : null;
+        const delayNote = delay ? `وردية معدلة: ${delay.shift.start}–${delay.shift.end}${r.delayReason ? ` (${r.delayReason})` : ''}` : '';
+        const permNote = r.permCount ? `${r.permCount} إذن معتمد` : (r.leave? `${r.leave} إجازة`:'');
+        const notes = [delayNote, permNote].filter(Boolean).join(' • ') || (delayNote ? delayNote : '');
+        // Show adjusted shift label in team column if delayed
+        const teamLabel = delay ? `${r.teamName} — ${r.shift.labelAr} (معدلة ${delay.shift.start}–${delay.shift.end})` : `${r.teamName} — ${r.shift.labelAr}`;
+        return [
+          String(i+1),
+          r.user.full_name || r.user.email,
+          teamLabel,
+          '—',
+          '—',
+          fmtHM(r.totalWork),
+          String(r.totalNetLate),
+          fmtHM(r.totalOt),
+          `${r.present} حاضر · ${r.late} متأخر · ${r.absent} غياب بدون إذن · ${r.leave} إجازة${r.permCover? ` · ${r.permCover} بإذن`:''}`,
+          notes,
+        ];
+      });
       exportAttendancePDF({ meta, kpis: kpiList, tables: [{ headers: pdfHeaders, rows, captionAr:`الملخص الشهري المجمع — ${formatMonthAr(year, month)}`, captionEn:`Team Monthly Overview` }], orientation:'landscape', filename:`attendance-overview-${year}-${pad(month)}` });
       exportCSV(`attendance-overview-${year}-${pad(month)}`, pdfHeaders, rows);
     } else if (viewMode==='individual' && individualData) {
       const u = individualData.user;
-      const rows = individualData.rows.map(d=> [
-        String(d.idx),
-        u.full_name || u.email,
-        teamNameById.get(u.team_id||'')||'—' + ` — ${d.shift.labelAr}`,
-        d.rec?.check_in_time ? fmtTime(d.rec.check_in_time) : '—',
-        d.rec?.check_out_time ? fmtTime(d.rec.check_out_time) : '—',
-        d.ev.netWorkHours,
-        String(d.ev.netLateMinutes),
-        fmtHM(d.ev.overtimeMinutes),
-        d.ev.statusAr + (d.leaveType ? ` (${d.leaveType})` : ''),
-        d.ev.permissionNote || d.leaveType || '',
-      ]);
+      const rows = individualData.rows.map(d=> {
+        const delayNote = d.hasDelay ? `وردية معدلة: ${d.shift.start}–${d.shift.end}${d.delayReason ? ` (${d.delayReason})` : ''}` : '';
+        const baseNote = d.ev.permissionNote || d.leaveType || '';
+        const notes = [delayNote, baseNote].filter(Boolean).join(' • ');
+        const teamShiftLabel = d.hasDelay ? `${teamNameById.get(u.team_id||'')||'—'} — ${d.shift.labelAr} (معدلة)` : `${teamNameById.get(u.team_id||'')||'—'} — ${d.shift.labelAr}`;
+        return [
+          String(d.idx),
+          u.full_name || u.email,
+          teamShiftLabel,
+          d.rec?.check_in_time ? fmtTime(d.rec.check_in_time) : '—',
+          d.rec?.check_out_time ? fmtTime(d.rec.check_out_time) : '—',
+          d.ev.netWorkHours,
+          String(d.ev.netLateMinutes),
+          fmtHM(d.ev.overtimeMinutes),
+          d.ev.statusAr + (d.leaveType ? ` (${d.leaveType})` : '') + (d.hasDelay ? ' — وردية معدلة' : ''),
+          notes || (d.hasDelay ? delayNote : ''),
+        ];
+      });
       const indKpi = [
         { label:'أيام الحضور', value: String(individualData.agg?.present??0)},
         { label:'أيام الغياب بدون إذن', value: String(individualData.agg?.absent??0)},
@@ -461,18 +508,24 @@ export default function AdminAttendanceView() {
       exportAttendancePDF({ meta:{...meta, headcount:1}, kpis: indKpi, tables:[{ headers: pdfHeaders, rows, captionAr:`كشف مفصل — ${u.full_name||u.email} — ${formatMonthAr(year, month)} (${individualData.shift.labelAr})`, captionEn:`Individual Timesheet`} ], orientation:'landscape', filename:`attendance-individual-${u.full_name||u.id}-${year}-${pad(month)}` });
       exportCSV(`attendance-individual-${u.id}-${year}-${pad(month)}`, pdfHeaders, rows);
     } else if (viewMode==='daily') {
-      const rows = dailyRows.map((r,i)=> [
-        String(i+1),
-        r.user.full_name || r.user.email,
-        `${r.teamName} — ${r.shift.labelAr}`,
-        r.rec?.check_in_time ? fmtTime(r.rec.check_in_time) : '—',
-        r.rec?.check_out_time ? fmtTime(r.rec.check_out_time) : '—',
-        r.ev.netWorkHours,
-        String(r.ev.netLateMinutes),
-        fmtHM(r.ev.overtimeMinutes),
-        r.ev.statusAr,
-        r.ev.permissionNote || r.leaveType || '',
-      ]);
+      const rows = dailyRows.map((r,i)=> {
+        const delayNote = r.hasDelay ? `وردية معدلة: ${r.shift.start}–${r.shift.end}${r.delayReason ? ` (${r.delayReason})` : ''}` : '';
+        const baseNote = r.ev.permissionNote || r.leaveType || '';
+        const notes = [delayNote, baseNote].filter(Boolean).join(' • ');
+        const teamShiftLabel = r.hasDelay ? `${r.teamName} — ${r.shift.labelAr} (معدلة ${r.shift.start}–${r.shift.end})` : `${r.teamName} — ${r.shift.labelAr}`;
+        return [
+          String(i+1),
+          r.user.full_name || r.user.email,
+          teamShiftLabel,
+          r.rec?.check_in_time ? fmtTime(r.rec.check_in_time) : '—',
+          r.rec?.check_out_time ? fmtTime(r.rec.check_out_time) : '—',
+          r.ev.netWorkHours,
+          String(r.ev.netLateMinutes),
+          fmtHM(r.ev.overtimeMinutes),
+          r.ev.statusAr + (r.hasDelay ? ' — معدلة' : ''),
+          notes,
+        ];
+      });
       const dayKpi = [
         { label:'الحاضرون', value: String(dailyRows.filter(r=> r.ev.status!=='absent').length)},
         { label:'الغائبون بدون إذن', value: String(dailyRows.filter(r=> r.ev.status==='absent').length)},
@@ -515,6 +568,7 @@ export default function AdminAttendanceView() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={handleExportPDF} className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-2 hover:bg-primary/90"><Printer size={16}/> تصدير PDF</button>
+          <button onClick={()=> setTeamShiftModalOpen(true)} className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-bold flex items-center gap-2 shadow-sm"><Clock size={16}/> تأخير وردية الفريق</button>
           <button onClick={()=> openLeavePerm()} className="h-10 px-4 rounded-xl bg-lime-500 hover:bg-lime-400 text-zinc-950 text-sm font-bold flex items-center gap-2"><ShieldCheck size={16}/> إجازة / إذن</button>
           <button onClick={()=> setManualOpen(true)} className="h-10 px-4 rounded-xl border border-border bg-card text-foreground text-sm font-semibold flex items-center gap-2 hover:bg-muted"><Plus size={16}/> حضور يدوي</button>
           <button onClick={()=> setReloadTick(t=>t+1)} className="w-10 h-10 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted"><RefreshCw size={16}/></button>
@@ -522,6 +576,36 @@ export default function AdminAttendanceView() {
       </div>
 
       <MultiShiftSettingsCard shifts={shifts} onSave={setShifts} />
+
+      {/* Active Team Shift Delays Banner */}
+      {shiftAdjustments.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center"><Clock size={12} /></div>
+            <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">الورديات المعدلة النشطة — Active Shift Adjustments</h3>
+            <span className="text-xs bg-white dark:bg-zinc-900 border border-amber-200 dark:border-amber-500/20 px-2 py-0.5 rounded-full">{shiftAdjustments.length}</span>
+          </div>
+          <div className="space-y-2">
+            {shiftAdjustments.slice(0,4).map(adj=> (
+              <div key={adj.id} className="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-zinc-900 border border-amber-100 dark:border-zinc-800 rounded-xl px-3 py-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span className="font-bold text-foreground">{adj.teamName}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="font-mono text-xs bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 rounded-full">وردية معدلة: {adj.startTime} – {adj.endTime}</span>
+                  <span className="text-xs text-muted-foreground">سماح {adj.graceMinutes}د حتى {formatMinutes((() => { const [h,m]=adj.startTime.split(':').map(Number); return h*60+m+adj.graceMinutes; })())}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${adj.isTemporary ? 'bg-sky-100 text-sky-700' : 'bg-violet-100 text-violet-700'}`}>{adj.isTemporary ? (adj.date ? `مؤقت ${adj.date}` : 'مؤقت') : 'دائم'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {adj.reason && <span className="text-xs text-muted-foreground max-w-[160px] truncate" title={adj.reason}>{adj.reason}</span>}
+                  <button onClick={async()=>{ if(confirm('حذف هذا التعديل؟')){ await teamShiftAdjustmentsService.remove(adj.id); setShiftAdjustments(prev=> prev.filter(x=> x.id!==adj.id)); toast.success('تم حذف التعديل'); setReloadTick(t=>t+1); }}} className="text-xs text-red-600 hover:underline">حذف</button>
+                </div>
+              </div>
+            ))}
+            {shiftAdjustments.length>4 && <p className="text-xs text-muted-foreground">+ {shiftAdjustments.length-4} تعديلات أخرى</p>}
+          </div>
+        </div>
+      )}
 
       <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap gap-4 items-end">
         <div className="flex items-center gap-2">
@@ -639,7 +723,14 @@ export default function AdminAttendanceView() {
                           <div><p className="text-sm font-semibold truncate max-w-[160px]">{r.user.full_name||'—'}</p><p className="text-xs text-muted-foreground truncate max-w-[160px]">{r.user.email}</p></div>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-xs"><span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-full">{r.teamName}</span><span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${r.shift.id==='shift2' ? 'bg-violet-100 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>{r.shift.id==='shift2'?'م':'ق'}</span></td>
+                      <td className="px-3 py-2.5 text-xs">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-full">{r.teamName}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.shift.id==='shift2' ? 'bg-violet-100 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>{r.shift.id==='shift2'?'م':'ق'}</span>
+                          {r.hasTeamDelay && <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded-full text-[10px] font-bold" title={r.delayReason}>وردية معدلة</span>}
+                        </div>
+                        {r.hasTeamDelay && r.daily.some(d=> d.hasDelay) && <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">{r.daily.find(d=> d.hasDelay)?.shift.start}–{r.daily.find(d=> d.hasDelay)?.shift.end} {r.delayReason ? `· ${r.delayReason}` : ''}</p>}
+                      </td>
                       <td className="px-3 py-2.5 text-center"><span className="text-sm font-bold text-emerald-600">{r.present}</span><span className="text-xs text-muted-foreground">/{workingDays}</span></td>
                       <td className="px-3 py-2.5 text-center"><span className="text-sm font-bold text-red-600">{r.absent}</span></td>
                       <td className="px-3 py-2.5 text-center"><span className="text-xs font-bold text-sky-600">{r.leave} إجازة</span><span className="text-xs text-lime-600 ml-1">{r.permCover? `+${r.permCover} إذن`:''}</span></td>
@@ -716,7 +807,16 @@ export default function AdminAttendanceView() {
                     <td className="px-3 py-2 text-xs"><span className={d.ev.netLateMinutes ? 'text-amber-600 font-bold':'text-muted-foreground'}>{d.ev.netLateMinutes ? `${d.ev.netLateMinutes}m` : '—'}</span>{d.ev.rawLateMinutes!==d.ev.netLateMinutes ? <span className="text-[10px] text-muted-foreground ml-1">({d.ev.rawLateMinutes})</span> : null}</td>
                     <td className="px-3 py-2 text-xs"><span className={d.ev.overtimeMinutes ? 'text-violet-600 font-bold':'text-muted-foreground'}>{d.ev.overtimeMinutes ? fmtHM(d.ev.overtimeMinutes):'—'}</span></td>
                     <td className="px-3 py-2"><span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold border ${d.ev.badgeClass}`}>{d.ev.statusAr}</span></td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground max-w-[180px] truncate">{d.ev.permissionNote || d.leaveType || ''}<button onClick={()=> openLeavePerm(individualData.user.id, d.date)} className="ml-2 text-primary hover:underline">+إذن</button></td>
+                    <td className="px-3 py-2 text-xs max-w-[220px]">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {d.hasDelay && <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded-full text-[10px] font-bold">وردية معدلة: {d.shift.start}–{d.shift.end}</span>}
+                        {d.ev.permissionNote && <span className="text-muted-foreground truncate">{d.ev.permissionNote}</span>}
+                        {d.leaveType && !d.ev.permissionNote && <span className="text-muted-foreground">{d.leaveType}</span>}
+                        {d.hasDelay && d.delayReason && <span className="text-amber-600 dark:text-amber-400 truncate" title={d.delayReason}>· {d.delayReason}</span>}
+                        {!d.hasDelay && !d.ev.permissionNote && !d.leaveType && <span className="text-muted-foreground">—</span>}
+                      </div>
+                      <button onClick={()=> openLeavePerm(individualData.user.id, d.date)} className="ml-2 text-primary hover:underline text-[11px]">+إذن</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -742,17 +842,29 @@ export default function AdminAttendanceView() {
                         <span className="text-sm font-semibold truncate max-w-[150px]">{r.user.full_name||'—'}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-xs"><span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-full">{r.teamName}</span><span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded font-bold ${r.shift.id==='shift2'?'bg-violet-100 text-violet-700':'bg-emerald-50 text-emerald-700'}`}>{r.shift.labelAr}</span></td>
+                    <td className="px-3 py-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-1 rounded-full">{r.teamName}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.shift.id==='shift2'?'bg-violet-100 text-violet-700':'bg-emerald-50 text-emerald-700'}`}>{r.shift.labelAr}</span>
+                        {r.hasDelay && <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded-full text-[10px] font-bold">معدلة {r.shift.start}–{r.shift.end}</span>}
+                      </div>
+                      {r.hasDelay && <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">وردية معدلة: {r.shift.start}–{r.shift.end} · سماح حتى {formatMinutes(r.shift.toleranceMinutes)} {r.delayReason ? `· ${r.delayReason}` : ''}</p>}
+                    </td>
                     <td className="px-3 py-2 text-xs">{r.rec?.check_in_time ? fmtTime(r.rec.check_in_time) : '—'}</td>
                     <td className="px-3 py-2 text-xs">{r.rec?.check_out_time ? fmtTime(r.rec.check_out_time) : '—'}</td>
                     <td className="px-3 py-2 text-xs font-semibold">{r.ev.netWorkHours}</td>
                     <td className="px-3 py-2 text-xs"><span className={r.ev.netLateMinutes?'text-amber-600 font-bold':'text-muted-foreground'}>{r.ev.netLateMinutes? `${r.ev.netLateMinutes}m`:'—'}</span></td>
                     <td className="px-3 py-2 text-xs"><span className={r.ev.overtimeMinutes?'text-violet-600 font-bold':'text-muted-foreground'}>{r.ev.overtimeMinutes? fmtHM(r.ev.overtimeMinutes):'—'}</span></td>
                     <td className="px-3 py-2"><span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold border ${r.ev.badgeClass}`}>{r.ev.statusAr}</span></td>
-                    <td className="px-3 py-2 text-xs max-w-[180px] truncate">
-                      <span className="text-muted-foreground">{r.ev.permissionNote || r.leaveType || ''}</span>
-                      <button onClick={()=> openLeavePerm(r.user.id, selectedDay)} className="ml-2 text-primary hover:underline text-xs">+إذن/إجازة</button>
-                      {selectedDay===todayLocal() && !r.rec?.check_in_time ? <button onClick={()=> handleQuickAction('checkin', r.user, selectedDay)} className="ml-1 h-6 px-2 rounded-full bg-primary text-primary-foreground text-[11px] font-bold">حضور</button> : null}
+                    <td className="px-3 py-2 text-xs max-w-[220px]">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {r.hasDelay && <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded-full text-[10px] font-bold">وردية معدلة</span>}
+                        {r.ev.permissionNote ? <span className="text-muted-foreground truncate">{r.ev.permissionNote}</span> : r.leaveType ? <span className="text-muted-foreground">{r.leaveType}</span> : r.hasDelay ? <span className="text-amber-600 dark:text-amber-400">{r.shift.start}–{r.shift.end} · {r.delayReason || 'تأخير معتمد'}</span> : <span className="text-muted-foreground">—</span>}
+                      </div>
+                      <div className="flex items-center gap-1 mt-1">
+                        <button onClick={()=> openLeavePerm(r.user.id, selectedDay)} className="text-primary hover:underline text-xs">+إذن/إجازة</button>
+                        {selectedDay===todayLocal() && !r.rec?.check_in_time ? <button onClick={()=> handleQuickAction('checkin', r.user, selectedDay)} className="h-6 px-2 rounded-full bg-primary text-primary-foreground text-[11px] font-bold">حضور</button> : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -765,6 +877,7 @@ export default function AdminAttendanceView() {
       {manualOpen && <ManualAttendanceModal users={users} defaultDate={viewMode==='daily'? selectedDay: monthFrom} onClose={()=> setManualOpen(false)} onSaved={()=> { setManualOpen(false); setReloadTick(t=>t+1); }} />}
       {editUser && <ManualAttendanceModal users={users} defaultDate={viewMode==='daily'? selectedDay: monthFrom} editUserId={editUser.id} onClose={()=> setEditUser(null)} onSaved={()=> { setEditUser(null); setReloadTick(t=>t+1); }} />}
       {leavePermOpen && <LeavePermissionModal users={users as any} defaultUserId={leavePermUserId} defaultDate={leavePermDate} onClose={()=> setLeavePermOpen(false)} onSaved={()=> { setLeavePermOpen(false); setReloadTick(t=>t+1); }} />}
+      {teamShiftModalOpen && <TeamShiftDelayModal teams={teams} defaultTeamId={teamFilter !== 'all' ? teamFilter : undefined} defaultDate={viewMode==='daily' ? selectedDay : todayLocal()} onClose={()=> setTeamShiftModalOpen(false)} onSaved={()=> { setTeamShiftModalOpen(false); setReloadTick(t=>t+1); toast.success('تم تحديث ورديات الفريق — أعيد حساب الحضور'); }} />}
     </div>
   );
 }
