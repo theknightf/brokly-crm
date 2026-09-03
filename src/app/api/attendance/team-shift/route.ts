@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 function isSchemaError(msg?: string): boolean {
   if (!msg) return false;
-  return /relation .* does not exist|column .* does not exist|does not exist/i.test(msg);
+  return /relation .* does not exist|column .* does not exist|does not exist|schema cache|Could not find the table|PGRST205|PGRST202/i.test(msg);
 }
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   try {
     const { data, error } = await supabase.from('team_shift_adjustments').select('*').order('date', { ascending: true });
     if (error) {
-      if (isSchemaError(error.message)) {
+      if (isSchemaError(`${error.message} ${error.code} ${error.details || ''}`)) {
         // fallback to company_settings
         const { data: settings } = await supabase.from('company_settings').select('value').eq('key', 'teamShiftAdjustments').maybeSingle();
         const adjustments = settings?.value ? (Array.isArray(settings.value) ? settings.value : (settings.value as any).adjustments || []) : [];
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   try {
     const { data, error } = await supabase.from('team_shift_adjustments').insert(payload).select('*').single();
     if (error) {
-      if (isSchemaError(error.message)) {
+      if (isSchemaError(`${error.message} ${error.code} ${error.details || ''}`)) {
         // fallback to company_settings
         const { data: settings } = await supabase.from('company_settings').select('value').eq('key', 'teamShiftAdjustments').maybeSingle();
         const current = settings?.value ? (Array.isArray(settings.value) ? settings.value : []) : [];
@@ -102,8 +102,8 @@ export async function DELETE(request: Request) {
   }
 
   const { error } = await supabase.from('team_shift_adjustments').delete().eq('id', id);
-  if (error && !isSchemaError(error.message)) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (error && isSchemaError(error.message)) {
+  if (error && !isSchemaError(`${error.message} ${error.code} ${error.details || ''}`)) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error && isSchemaError(`${error.message} ${error.code} ${error.details || ''}`)) {
     const { data: settings } = await supabase.from('company_settings').select('value').eq('key', 'teamShiftAdjustments').maybeSingle();
     const current = settings?.value ? (Array.isArray(settings.value) ? settings.value : []) : [];
     const next = current.filter((a: any) => a.id !== id);

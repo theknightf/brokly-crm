@@ -7,8 +7,10 @@ const SETTINGS_KEY = 'teamShiftAdjustments';
 
 function isSchemaError(err: any): boolean {
   if (!err) return false;
-  const msg = err.message || String(err);
-  return /relation .* does not exist|column .* does not exist|does not exist/i.test(msg);
+  const msg = String(err.message || err.code || err.details || err);
+  const code = String((err as any)?.code || '');
+  if (code === 'PGRST205' || code === 'PGRST202') return true;
+  return /relation .* does not exist|column .* does not exist|does not exist|schema cache|Could not find the table/i.test(msg);
 }
 
 function mapRow(r: any): TeamShiftAdjustment {
