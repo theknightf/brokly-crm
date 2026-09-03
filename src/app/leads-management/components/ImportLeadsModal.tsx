@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, FileSpreadsheet, Loader2, Check, Plus, ChevronDown, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Loader2, Check, Plus, ChevronDown, X, Users, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import { teamsService, adminSettingsService } from '@/lib/services/crmService';
@@ -15,6 +15,47 @@ interface ImportLeadsModalProps {
 
 const STAGE_COLORS = ['#22c55e', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
 
+// Sales-relevant roles shown in the Assignee dropdown (live users only, active members).
+const ASSIGNABLE_ROLES = new Set([
+  'owner',
+  'admin',
+  'branch_manager',
+  'team_leader',
+  'senior_agent',
+  'agent',
+  'telecaller',
+  'broker',
+  'sales',
+]);
+
+export interface ImportAgent {
+  id: string;
+  name: string;
+  role: string;
+  teamName?: string;
+}
+
+function roleLabel(role?: string): string {
+  const r = String(role || 'agent').toLowerCase();
+  const map: Record<string, string> = {
+    owner: 'Owner',
+    admin: 'Admin',
+    branch_manager: 'Branch Manager',
+    team_leader: 'Team Lead',
+    senior_agent: 'Senior Agent',
+    agent: 'Sales Agent',
+    telecaller: 'Telecaller',
+    broker: 'Broker',
+    sales: 'Sales',
+  };
+  return map[r] || r;
+}
+
+function initialsOf(name: string): string {
+  const parts = String(name || '?').trim().split(/\s+/).map((p) => p[0]).filter(Boolean);
+  return (parts.join('').slice(0, 2) || '?').toUpperCase();
+}
+
 export default function ImportLeadsModal({ open, onClose, onImported }: ImportLeadsModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -25,7 +66,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
 
   const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
   const [stages, setStages] = useState<{ id: string; name: string; color?: string }[]>([]);
-  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
+  const [agents, setAgents] = useState<ImportAgent[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(false);
 
   const [source, setSource] = useState('');
@@ -41,7 +82,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [stageColor, setStageColor] = useState('#22c55e');
   const [creatingStage, setCreatingStage] = useState(false);
 
-  const [assignee, setAssignee] = useState(''); // '' = Pool, '__ROUND_ROBIN__' = RR, else user id
+  // 'unassigned' = Pool, 'round-robin' = RR, else the user's unique id
+  const [assignee, setAssignee] = useState('unassigned');
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
 
   const reset = useCallback(() => {
     setFileName('');
@@ -56,7 +99,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     setStageQuery('');
     setStageOpen(false);
     setStageCreateOpen(false);
-    setAssignee('');
+    setAssignee('unassigned');
+    setAssigneeOpen(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
@@ -66,46 +110,81 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     onClose();
   };
 
-  // Load dropdown data when modal opens
+  // Load dropdown data when modal opens — Sources, Stages, and the LIVE users list
   useEffect(() => {
     if (!open) return;
+    let alive = true;
     setLoadingMeta(true);
-    Promise.all([
-      fetch('/api/lead-sources?active=true', { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((j) => (j.sources || []).map((s: any) => ({ id: s.id, name: s.name })))
-        .catch(() => []),
-      adminSettingsService
-        .getAll()
-        .then((g: any) =>
-          (g.pipelineStages || [])
-            .filter((s: any) => s.active)
-            .map((s: any) => ({ id: s.id, name: s.name, color: s.color }))
-        )
-        .catch(() => PIPELINE_STAGES.map((s) => ({ id: s, name: s }))),
-      teamsService
-        .getAssignableUsers()
-        .then((d: any) => (d || []).map((u: any) => ({ id: u.id, name: u.name })))
-        .catch(() => []),
-    ])
-      .then(([srcs, stgs, ags]) => {
-        setSources(srcs);
-        const stagesToUse = stgs.length ? stgs : PIPELINE_STAGES.map((s) => ({ id: s, name: s }));
-        setStages(stagesToUse);
-        if (!stagesToUse.find((s: { name: string }) => s.name === 'Fresh Leads') && stagesToUse.length) {
-          setStage(stagesToUse[0].name);
-        }
-        setAgents(ags);
-      })
-      .finally(() => setLoadingMeta(false));
+    (async () => {
+      const [srcs, stgs, rawAgents] = await Promise.all([
+        fetch('/api/lead-sources?active=true', { cache: 'no-store' })
+          .then((r) => r.json())
+          .then((j) => (j.sources || []).map((s: any) => ({ id: s.id, name: s.name })))
+          .catch(() => []),
+        adminSettingsService
+          .getAll()
+          .then((g: any) =>
+            (g.pipelineStages || [])
+              .filter((s: any) => s.active)
+              .map((s: any) => ({ id: s.id, name: s.name, color: s.color }))
+          )
+          .catch(() => PIPELINE_STAGES.map((s) => ({ id: s, name: s }))),
+        // Live CRM users (permission-aware: admin sees all active, others see scope)
+        teamsService.getAssignableUsers().catch(() => [] as any[]),
+      ]);
+      if (!alive) return;
+      setSources(srcs);
+      const stagesToUse = stgs.length ? stgs : PIPELINE_STAGES.map((s) => ({ id: s, name: s }));
+      setStages(stagesToUse);
+      if (!stagesToUse.find((s: { name: string }) => s.name === 'Fresh Leads') && stagesToUse.length) {
+        setStage(stagesToUse[0].name);
+      }
+      // Keep only active members with sales-relevant roles
+      let list: ImportAgent[] = (rawAgents || [])
+        .filter((u: any) => ASSIGNABLE_ROLES.has(String(u.role || 'agent').toLowerCase()))
+        .map((u: any) => ({ id: u.id, name: u.name, role: u.role || 'agent' }));
+      if (!list.length) {
+        list = (rawAgents || []).map((u: any) => ({ id: u.id, name: u.name, role: u.role || 'agent' }));
+      }
+      // Best-effort: attach each member's team badge (never blocks the dropdown)
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const ids = list.map((u) => u.id);
+        const [teamsList, profilesRes] = await Promise.all([
+          teamsService.getAll().catch(() => [] as { id: string; name: string }[]),
+          ids.length
+            ? supabase.from('user_profiles').select('id, team_id')
+            : Promise.resolve({ data: [] as any[] } as any),
+        ]);
+        if (!alive) return;
+        const teamNameById = new Map((teamsList as any[]).map((t: any) => [t.id, t.name]));
+        const teamIdByUser = new Map<string, string | null>(
+          (((profilesRes as any)?.data || []) as any[]).map((r: any) => [r.id, r.team_id])
+        );
+        list = list.map((u) => ({
+          ...u,
+          teamName: teamNameById.get(teamIdByUser.get(u.id) || '') || undefined,
+        }));
+      } catch {
+        /* team badges stay hidden — users list still works */
+      }
+      if (alive) setAgents(list);
+    })().finally(() => {
+      if (alive) setLoadingMeta(false);
+    });
+    return () => {
+      alive = false;
+    };
   }, [open ]);
 
-  // Close creatable dropdowns on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       if (!t.closest('[data-cb="source"]')) setSourceOpen(false);
       if (!t.closest('[data-cb="stage"]')) setStageOpen(false);
+      if (!t.closest('[data-cb="assignee"]')) setAssigneeOpen(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -227,7 +306,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           globalSource: source.trim(),
           sourceId: matched?.id || null,
           globalStage: stage.trim(),
-          globalAssignedTo: assignee || '',
+          // 'unassigned' = Pool, 'round-robin' = even split, else the user's unique id
+          globalAssignedTo: assignee,
           duplicateAction: 'skip',
         }),
       });
@@ -545,27 +625,155 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
               </div>
             </div>
 
-            {/* 3. Assign To */}
+            {/* 3. Assign To — live users, grouped: Pool / Round-Robin / Team Members */}
             <div>
               <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                 Assign To (تعيين إلى)
               </label>
-              <div className="relative">
-                <select
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
+              <div className="relative" data-cb="assignee">
+                <button
+                  type="button"
                   disabled={importing || loadingMeta}
-                  className="w-full appearance-none bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 pe-9 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none"
+                  onClick={() => setAssigneeOpen((o) => !o)}
+                  className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center gap-2.5 disabled:opacity-60"
                 >
-                  <option value="">Unassigned / Pool (بدون تعيين)</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                  <option value="__ROUND_ROBIN__">Round-Robin (توزيع عادل بالتساوي على التيم)</option>
-                </select>
-                <ChevronDown size={15} className="absolute end-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                  {assignee === 'round-robin' ? (
+                    <>
+                      <span className="w-8 h-8 rounded-full bg-lime-500 text-zinc-950 flex items-center justify-center shrink-0">
+                        <RefreshCw size={14} />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-medium truncate">Round-Robin</span>
+                        <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                          توزيع عادل بالتساوي على التيم · {agents.length} agents
+                        </span>
+                      </span>
+                    </>
+                  ) : assignee !== 'unassigned' && agents.find((a) => a.id === assignee) ? (
+                    <>
+                      <span className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                        {initialsOf(agents.find((a) => a.id === assignee)!.name)}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-medium truncate">
+                          {agents.find((a) => a.id === assignee)!.name}
+                        </span>
+                        <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                          {roleLabel(agents.find((a) => a.id === assignee)!.role)}
+                          {agents.find((a) => a.id === assignee)!.teamName
+                            ? ` · ${agents.find((a) => a.id === assignee)!.teamName}`
+                            : ''}
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center justify-center shrink-0">
+                        <Users size={14} />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-medium truncate">Unassigned / Pool</span>
+                        <span className="block text-[11px] text-zinc-500 dark:text-zinc-400 truncate">بدون تعيين</span>
+                      </span>
+                    </>
+                  )}
+                  <ChevronDown
+                    size={15}
+                    className={`text-zinc-400 shrink-0 transition-transform ${assigneeOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {assigneeOpen && (
+                  <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl">
+                    <div className="max-h-60 overflow-y-auto py-1">
+                      {/* Option 1 — Pool */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignee('unassigned');
+                          setAssigneeOpen(false);
+                        }}
+                        className={`w-full text-start px-3.5 py-2.5 flex items-center gap-2.5 transition-colors ${
+                          assignee === 'unassigned'
+                            ? 'bg-lime-50 dark:bg-lime-500/10 text-lime-700 dark:text-lime-300 font-semibold'
+                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                        }`}
+                      >
+                        <span className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center justify-center shrink-0">
+                          <Users size={14} />
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm">بدون تعيين (Pool / Unassigned)</span>
+                          <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">Default fallback option</span>
+                        </span>
+                        {assignee === 'unassigned' && <Check size={14} className="shrink-0" />}
+                      </button>
+                      {/* Option 2 — Round-Robin */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignee('round-robin');
+                          setAssigneeOpen(false);
+                        }}
+                        className={`w-full text-start px-3.5 py-2.5 flex items-center gap-2.5 transition-colors ${
+                          assignee === 'round-robin'
+                            ? 'bg-lime-50 dark:bg-lime-500/10 text-lime-700 dark:text-lime-300 font-semibold'
+                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                        }`}
+                      >
+                        <span className="w-8 h-8 rounded-full bg-lime-500 text-zinc-950 flex items-center justify-center shrink-0">
+                          <RefreshCw size={14} />
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm">توزيع عادل بالتساوي (Round-Robin)</span>
+                          <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">
+                            Even split across {agents.length} active sales agents
+                          </span>
+                        </span>
+                        {assignee === 'round-robin' && <Check size={14} className="shrink-0" />}
+                      </button>
+                      {/* Group divider */}
+                      <p className="px-3.5 pt-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800 mt-1">
+                        أعضاء الفريق (Team Members) · {agents.length}
+                      </p>
+                      {agents.length === 0 && (
+                        <p className="px-3.5 py-3 text-xs text-zinc-500 text-center">
+                          {loadingMeta ? 'Loading team…' : 'No active sales members found'}
+                        </p>
+                      )}
+                      {agents.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => {
+                            setAssignee(a.id);
+                            setAssigneeOpen(false);
+                          }}
+                          className={`w-full text-start px-3.5 py-2.5 flex items-center gap-2.5 transition-colors ${
+                            assignee === a.id
+                              ? 'bg-lime-50 dark:bg-lime-500/10 text-lime-700 dark:text-lime-300 font-semibold'
+                              : 'hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                          }`}
+                        >
+                          <span className="w-8 h-8 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                            {initialsOf(a.name)}
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm truncate">{a.name}</span>
+                            <span className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{roleLabel(a.role)}</span>
+                              {a.teamName && (
+                                <span className="text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 px-1.5 py-px rounded-full truncate max-w-[120px]">
+                                  {a.teamName}
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                          {assignee === a.id && <Check size={14} className="shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

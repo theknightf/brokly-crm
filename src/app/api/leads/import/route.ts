@@ -30,7 +30,10 @@ export async function POST(request: Request) {
   const rows: any[] = body.rows; // parsed rows from frontend
   const globalSource: string = String(body.globalSource || body.source || '').trim();
   const globalStage: string = String(body.globalStage || body.stage || 'New Fresh').trim() || 'New Fresh';
-  const globalAssignedTo: string = body.globalAssignedTo !== undefined ? String(body.globalAssignedTo) : '';
+  // Assignee keywords: 'unassigned' = Pool, 'round-robin' = even split, else the user's unique id
+  // (legacy '__ROUND_ROBIN__' / 'round_robin' / '__UNASSIGNED__' still accepted)
+  const rawAssignedTo: string = body.globalAssignedTo !== undefined ? String(body.globalAssignedTo) : '';
+  const globalAssignedTo: string = rawAssignedTo === 'unassigned' ? '' : rawAssignedTo;
   const duplicateAction: 'skip' | 'update' = body.duplicateAction === 'update' ? 'update' : 'skip';
   const sourceId: string | null = body.sourceId || null;
 
@@ -44,7 +47,10 @@ export async function POST(request: Request) {
 
   // Fetch assignable users if round-robin requested
   let roundRobinUsers: { id: string; name: string }[] = [];
-  const isRoundRobin = globalAssignedTo === '__ROUND_ROBIN__' || globalAssignedTo === 'round_robin';
+  const isRoundRobin =
+    globalAssignedTo === '__ROUND_ROBIN__' ||
+    globalAssignedTo === 'round_robin' ||
+    globalAssignedTo === 'round-robin';
   if (isRoundRobin) {
     try {
       const { data: users, error } = await supabase.from('user_profiles').select('id, full_name, role, is_active').eq('is_active', true).order('full_name');
