@@ -4,7 +4,7 @@ import { X, Loader2, Save, Clock, AlertTriangle, Calendar, Users, Timer } from '
 import { toast } from 'sonner';
 import { teamShiftAdjustmentsService } from '@/lib/teamShiftAdjustmentsService';
 import { DEFAULT_SHIFTS, getShiftForTeam, addMinutesToTime } from '@/lib/attendanceLogic';
-import { buildOfficeHours, formatMinutes } from '@/lib\officeHours';
+import { formatMinutes } from '@/lib/officeHours';
 
 interface TeamOption { id: string; name: string }
 

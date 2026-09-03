@@ -88,7 +88,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
         setSources(srcs);
         const stagesToUse = stgs.length ? stgs : PIPELINE_STAGES.map((s) => ({ id: s, name: s }));
         setStages(stagesToUse);
-        if (!stagesToUse.find((s) => s.name === 'Fresh Leads') && stagesToUse.length) {
+        if (!stagesToUse.find((s: { name: string }) => s.name === 'Fresh Leads') && stagesToUse.length) {
           setStage(stagesToUse[0].name);
         }
         setAgents(ags);

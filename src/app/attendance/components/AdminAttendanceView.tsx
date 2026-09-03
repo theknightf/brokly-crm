@@ -335,12 +335,12 @@ export default function AdminAttendanceView() {
         if (d.permissions?.length) permCount+=1;
       });
       const rate = workingDays ? Math.round((present/workingDays)*100):0;
-      const teamName = teamNameById.get(u.team_id||'')||'—';
-      const baseShift = getShiftForUser(u, teamNameById, shifts);
+      const teamLabel = teamNameById.get(u.team_id||'')||'—';
+      const resolvedShift = getShiftForUser(u, teamNameById, shifts);
       // Check if team has any delay in this month (for badge)
       const hasTeamDelay = daily.some(d=> d.hasDelay);
-      const delayReason = hasTeamDelay ? (shiftAdjustments.find(a=> (a.teamId ? a.teamId===u.team_id : (a.teamName||'').toLowerCase()===teamName.toLowerCase()) && (a.isTemporary ? daysInMonth.includes(a.date||'') : true))?.reason || '') : '';
-      return { user:u, teamName, shift: baseShift, present, late, absent, leave, early, permCover, totalNetLate, totalOt, totalWork, rate, daily, permCount, leaveCount, hasTeamDelay, delayReason };
+      const delayReason = hasTeamDelay ? (shiftAdjustments.find(a=> (a.teamId ? a.teamId===u.team_id : (a.teamName||'').toLowerCase()===teamLabel.toLowerCase()) && (a.isTemporary ? daysInMonth.includes(a.date||'') : true))?.reason || '') : '';
+      return { user:u, teamName: teamLabel, shift: resolvedShift, present, late, absent, leave, early, permCover, totalNetLate, totalOt, totalWork, rate, daily, permCount, leaveCount, hasTeamDelay, delayReason };
     });
   }, [activeUsers, daysInMonth, recordMap, isOnLeave, permsByUserDate, shifts, teamNameById, workingDays, shiftAdjustments]);
 
