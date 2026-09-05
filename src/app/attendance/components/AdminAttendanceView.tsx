@@ -37,6 +37,7 @@ import {
   getEffectiveShiftForTeam,
   getEffectiveShiftForUserWithAdjustments,
   officeCfgToAr,
+  countWorkingDays,
   type ShiftConfig,
   type Permission,
   type TeamShiftAdjustment,
@@ -196,7 +197,8 @@ export default function AdminAttendanceView() {
   const daysInMonth = useMemo(()=> getDaysInMonth(year, month), [year, month]);
   const monthFrom = daysInMonth[0];
   const monthTo = daysInMonth[daysInMonth.length-1];
-  const workingDays = daysInMonth.length;
+  // Fridays are a weekly holiday — excluded from working days & absence math.
+  const workingDays = useMemo(()=> countWorkingDays(daysInMonth), [daysInMonth]);
 
   const load = useCallback(async ()=>{
     setLoading(true);
@@ -322,7 +324,7 @@ export default function AdminAttendanceView() {
       });
       let present=0, late=0, absent=0, leave=0, early=0, permCover=0, totalNetLate=0, totalOt=0, totalWork=0, permCount=0, leaveCount=0;
       daily.forEach(d=>{
-        const r = evaluateDailyAttendance({ checkIn:d.checkIn, checkOut:d.checkOut, leaveType:d.leaveType, permissions:d.permissions }, d.shift);
+        const r = evaluateDailyAttendance({ checkIn:d.checkIn, checkOut:d.checkOut, leaveType:d.leaveType, permissions:d.permissions }, d.shift, d.date);
         if (r.status==='leave') { leave+=1; leaveCount+=1; }
         else if (r.status==='absent') absent+=1;
         else {
@@ -354,7 +356,7 @@ export default function AdminAttendanceView() {
       if (shiftFilter!=='all' && r.shift.id!==shiftFilter) return false;
       if (statusFilter!=='all') {
         const has = r.daily.some(d=>{
-          const ev = evaluateDailyAttendance({ checkIn:d.checkIn, checkOut:d.checkOut, leaveType:d.leaveType, permissions:d.permissions }, d.shift);
+          const ev = evaluateDailyAttendance({ checkIn:d.checkIn, checkOut:d.checkOut, leaveType:d.leaveType, permissions:d.permissions }, d.shift, d.date);
           if (statusFilter==='late') return ev.status==='late' || ev.status==='late_overtime';
           if (statusFilter==='present') return ev.status==='present' || ev.status==='present_overtime' || ev.status==='permission';
           return ev.status===statusFilter;
@@ -385,7 +387,7 @@ export default function AdminAttendanceView() {
       const leaveType = isOnLeave(u.id, date);
       const perms = permsByUserDate.get(`${u.id}|${date}`) || [];
       const shift = getEffectiveShiftForTeam(teamName, u.team_id||null, date, shifts, shiftAdjustments);
-      const ev = evaluateDailyAttendance({ checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms }, shift);
+      const ev = evaluateDailyAttendance({ checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms }, shift, date);
       // Attach delay info
       const base = getShiftForUser(u, teamNameById, shifts);
       const hasDelay = shift.start !== base.start || shift.end !== base.end;
@@ -405,7 +407,7 @@ export default function AdminAttendanceView() {
       const rec = recordMap.get(`${u.id}|${selectedDay}`);
       const leaveType = isOnLeave(u.id, selectedDay);
       const perms = permsByUserDate.get(`${u.id}|${selectedDay}`) || [];
-      const ev = evaluateDailyAttendance({ checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms }, shift);
+      const ev = evaluateDailyAttendance({ checkIn: rec?.check_in_time||null, checkOut: rec?.check_out_time||null, leaveType, permissions: perms }, shift, selectedDay);
       const hasDelay = shift.start !== base.start || shift.end !== base.end;
       const delayAdj = hasDelay ? shiftAdjustments.find(a=> (a.teamId ? a.teamId===u.team_id : (a.teamName||'').toLowerCase()===teamName.toLowerCase()) && (a.isTemporary ? a.date===selectedDay : true)) : null;
       return { user:u, teamName, shift, baseShift: base, hasDelay, delayReason: delayAdj?.reason || '', rec, leaveType, perms, ev };
@@ -628,7 +630,7 @@ export default function AdminAttendanceView() {
       <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap gap-4 items-end">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center"><Calendar size={16} className="text-muted-foreground" /></div>
-          <div><p className="text-xs font-bold text-foreground">الشهر / السنة</p><p className="text-xs text-muted-foreground">{formatMonthAr(year, month)} — {formatMonthEn(year, month)}</p></div>
+          <div><p className="text-xs font-bold text-foreground">الشهر / السنة</p><p className="text-xs text-muted-foreground">{formatMonthAr(year, month)} — {formatMonthEn(year, month)}</p><p className="mt-1"><span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-500/30" dir="rtl">الجمعة عطلة أسبوعية</span> <span className="text-[10px] text-muted-foreground" dir="ltr">Friday off</span></p></div>
         </div>
         <div className="flex items-center gap-2 flex-1 min-w-[260px]">
           <div className="relative flex-1">

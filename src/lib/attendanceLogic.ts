@@ -209,10 +209,16 @@ export function shiftsToAr(shifts: ShiftConfig[]): string {
   return shifts.map((s) => `${s.labelAr} ${officeCfgToAr(s)}`).join('  •  ');
 }
 
-/** Core policy: evaluate single day with shift + permissions */
+/**
+ * Core policy: evaluate single day with shift + permissions.
+ * `dateStr` (YYYY-MM-DD) enables the Friday weekly-holiday rule: a Friday
+ * with no check-in is a day off (never absent, never deducted). A Friday
+ * WITH a check-in is evaluated normally (holiday work still earns overtime).
+ */
 export function evaluateDailyAttendance(
   input: DailyAttendanceInput,
-  cfg: OfficeHoursConfig
+  cfg: OfficeHoursConfig,
+  dateStr?: string | null
 ): DailyAttendanceResult {
   const permissions = (input.permissions || []).filter((p) => p.status === 'approved');
   const excusedLate = permissions
@@ -246,6 +252,27 @@ export function evaluateDailyAttendance(
       permissionNote,
       leaveType: type,
       excusedMinutes: excusedLate + excusedEarly,
+    };
+  }
+
+  // Weekly holiday: Friday with no check-in is a day off — never absent.
+  if (!input.checkIn && isFridayHoliday(dateStr)) {
+    return {
+      status: 'leave',
+      statusAr: 'عطلة أسبوعية',
+      statusEn: 'Friday Holiday',
+      rawLateMinutes: 0,
+      netLateMinutes: 0,
+      lateMinutes: 0,
+      overtimeMinutes: 0,
+      earlyDepartureMinutes: 0,
+      netEarlyMinutes: 0,
+      netWorkMinutes: 0,
+      netWorkHours: '—',
+      badgeClass: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300 border-violet-200',
+      permissionNote,
+      leaveType: 'holiday',
+      excusedMinutes: 0,
     };
   }
 
@@ -391,7 +418,7 @@ export function aggregateMonthly(
   let totalPermissions = 0;
 
   days.forEach((d) => {
-    const r = evaluateDailyAttendance({ checkIn: d.checkIn, checkOut: d.checkOut, leaveType: d.leaveType, permissions: d.permissions }, cfg);
+    const r = evaluateDailyAttendance({ checkIn: d.checkIn, checkOut: d.checkOut, leaveType: d.leaveType, permissions: d.permissions }, cfg, d.date);
     if (r.status === 'leave') leave += 1;
     else if (r.status === 'absent') absent += 1;
     else {
@@ -427,6 +454,44 @@ export function aggregateMonthly(
     totalLeaves: leave,
     totalPermissions,
   };
+}
+
+// ─── Weekly Holiday (Friday) ───────────────────────────────────────────
+// Company policy: every Friday is a weekly holiday — no attendance expected,
+// no absence recorded, no payroll deduction. Applies at the core-evaluation
+// level so it holds regardless of the saved `workdays` config array.
+export const FRIDAY_DOW = 5; // Date.getDay(): 0=Sun … 5=Fri 6=Sat
+
+/** Day of week for a YYYY-MM-DD (or ISO) string, -1 when unparseable. */
+export function dayOfWeek(dateStr?: string | null): number {
+  if (!dateStr || typeof dateStr !== 'string') return -1;
+  const day = dateStr.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return -1;
+  const d = new Date(`${day}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? -1 : d.getDay();
+}
+
+export function isFridayHoliday(dateStr?: string | null): boolean {
+  return dayOfWeek(dateStr) === FRIDAY_DOW;
+}
+
+export function isWorkingDay(dateStr?: string | null): boolean {
+  const dow = dayOfWeek(dateStr);
+  return dow >= 0 && dow !== FRIDAY_DOW;
+}
+
+/** Count working days (excludes Fridays) in a list of YYYY-MM-DD dates. */
+export function countWorkingDays(dates: string[]): number {
+  return dates.filter(isWorkingDay).length;
+}
+
+/** True when "now" is Friday on the business wall clock (default Africa/Cairo). */
+export function isFridayInTimeZone(date = new Date(), timeZone = 'Africa/Cairo'): boolean {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(date) === 'Fri';
+  } catch {
+    return date.getDay() === FRIDAY_DOW;
+  }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────

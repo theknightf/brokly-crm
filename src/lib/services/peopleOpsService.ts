@@ -50,7 +50,8 @@ export const DEFAULT_WORKING_HOURS: WorkingHours = {
   end: '20:00',
   flexibleHours: false,
   lateGraceMinutes: 20,
-  workdays: [0, 1, 2, 3, 4, 5, 6],
+  // Friday (5) is a weekly holiday — never a working day.
+  workdays: [0, 1, 2, 3, 4, 6],
 };
 
 export const DEFAULT_PAYROLL_RULES: PayrollRules = {

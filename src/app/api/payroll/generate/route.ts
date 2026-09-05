@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
 import { computePayrollEntry, round2 } from '@/lib/payrollMath';
+import { isFridayHoliday } from '@/lib/attendanceLogic';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,19 +58,22 @@ export async function POST(request: Request) {
     const workingEnd = wh.end || '20:00';
     const flexibleHours = !!wh.flexibleHours;
     const grace = Number(wh.lateGraceMinutes ?? 30);
-    const workdaysSet = new Set<number>((wh.workdays ?? [0, 1, 2, 3, 4, 5, 6]).map(Number));
+    // Friday (5) is a company weekly holiday — excluded from working days even
+    // if a legacy saved config still lists it.
+    const workdaysSet = new Set<number>((wh.workdays ?? [0, 1, 2, 3, 4, 6]).map(Number));
 
     const { data: rulesRow } = await db.from('company_settings').select('value').eq('key', 'payrollRules').maybeSingle();
     const rules = rulesRow?.value || {};
 
-    // ── Working-day list inside the period ──
+    // ── Working-day list inside the period (Fridays always excluded) ──
     const workdayDates: string[] = [];
     const cursor = new Date(start + 'T00:00:00');
     const endDate = new Date(end + 'T00:00:00');
     while (cursor <= endDate) {
       const dow = cursor.getDay();
-      if (workdaysSet.has(dow)) {
-        workdayDates.push(cursor.toISOString().slice(0, 10));
+      const iso = cursor.toISOString().slice(0, 10);
+      if (workdaysSet.has(dow) && !isFridayHoliday(iso)) {
+        workdayDates.push(iso);
       }
       cursor.setDate(cursor.getDate() + 1);
     }
@@ -128,15 +132,19 @@ export async function POST(request: Request) {
       const otherDeductions = Number(prior?.other_deductions ?? 0);
       const notes = prior?.notes || '';
 
-      // Attendance aggregation
+      // Attendance aggregation (Friday holiday check-ins don't cover workdays)
       const rows = perUserAttendance.get(emp.id) || [];
-      const daySet = new Set<string>(rows.map((r: any) => r.attendance_date));
+      const daySet = new Set<string>(
+        rows.map((r: any) => r.attendance_date).filter((d: string) => !isFridayHoliday(d))
+      );
       const attendanceDays = daySet.size;
       let lateMinutes = 0;
       let lateDays = 0;
       let overtimeMinutes = 0;
 
       for (const r of rows) {
+        // Holiday work never counts as late — but still earns overtime below.
+        const isHolidayWork = isFridayHoliday(r.attendance_date);
         const inLocal = r.check_in_time
           ? new Date(r.check_in_time).toLocaleString('en-US', { timeZone: TZ })
           : null;
@@ -146,7 +154,7 @@ export async function POST(request: Request) {
         const startMin = minutesOf(workingStart);
         const endMin = minutesOf(workingEnd);
 
-        if (flexibleHours) {
+        if (!isHolidayWork && flexibleHours) {
           // Flexible: late only if the actual worked duration is below required.
           const outLocal = r.check_out_time
             ? new Date(r.check_out_time).toLocaleString('en-US', { timeZone: TZ })
@@ -160,7 +168,7 @@ export async function POST(request: Request) {
             lateDays += 1;
             lateMinutes += l;
           }
-        } else {
+        } else if (!isHolidayWork) {
           const l = Math.max(0, inMin - (startMin + grace));
           if (l > 0) {
             lateDays += 1;
@@ -189,7 +197,8 @@ export async function POST(request: Request) {
         if (b >= a) {
           const dStart = new Date(a);
           while (dStart.getTime() <= b) {
-            if (workdaysSet.has(dStart.getDay())) leaveDays += 1;
+            const iso = `${dStart.getFullYear()}-${String(dStart.getMonth() + 1).padStart(2, '0')}-${String(dStart.getDate()).padStart(2, '0')}`;
+            if (workdaysSet.has(dStart.getDay()) && !isFridayHoliday(iso)) leaveDays += 1;
             dStart.setDate(dStart.getDate() + 1);
           }
         }

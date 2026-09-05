@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
 import { loadOfficeHours } from '@/lib/officeHours';
+import { isFridayHoliday, isFridayInTimeZone } from '@/lib/attendanceLogic';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +88,9 @@ export async function GET(request: Request) {
   const employees = profiles.filter((p: any) => p.role !== 'owner' && p.role !== 'admin');
   const totalEmployees = employees.length;
 
+  // Friday is a weekly holiday — nobody is absent or late, hours still count.
+  const fridayToday = isFridayInTimeZone();
+
   // Today's attendance
   const todayMap: Record<string, any> = {};
   (todayRes.data || []).forEach((r: any) => (todayMap[r.user_id] = r));
@@ -95,10 +99,10 @@ export async function GET(request: Request) {
     const rec = todayMap[e.id];
     if (rec?.check_in_time) {
       presentToday++;
-      if (statusOf(rec, office.toleranceMinutes) === 'late') lateToday++;
+      if (!fridayToday && statusOf(rec, office.toleranceMinutes) === 'late') lateToday++;
     }
   });
-  const absentToday = totalEmployees - presentToday;
+  const absentToday = fridayToday ? 0 : totalEmployees - presentToday;
 
   // Period attendance aggregates
   const periodByUser: Record<string, { present: number; late: number; hours: number }> = {};
@@ -108,7 +112,7 @@ export async function GET(request: Request) {
     const s = statusOf(r, office.toleranceMinutes);
     const cur = periodByUser[r.user_id] || { present: 0, late: 0, hours: 0 };
     if (r.check_in_time) cur.present++;
-    if (s === 'late') cur.late++;
+    if (s === 'late' && !isFridayHoliday(r.attendance_date)) cur.late++;
     cur.hours += durationHours(r.check_in_time, r.check_out_time);
     periodByUser[r.user_id] = cur;
   });

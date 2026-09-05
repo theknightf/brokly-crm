@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
 import { loadOfficeHours } from '@/lib/officeHours';
+import { isFridayHoliday, isFridayInTimeZone } from '@/lib/attendanceLogic';
 
 export const dynamic = 'force-dynamic';
 
@@ -131,6 +132,8 @@ export async function GET(request: Request) {
   const totalEmployees = employees.length;
 
   // ── Today's attendance ────────────────────────────────────────────────
+  // Friday is a weekly holiday — nobody is absent/late; hours still count.
+  const fridayToday = isFridayInTimeZone();
   const todayMap: Record<string, any> = {};
   (todayRes.data || []).forEach((r: any) => (todayMap[r.user_id] = r));
   let presentToday = 0;
@@ -141,16 +144,16 @@ export async function GET(request: Request) {
     const rec = todayMap[e.user_id];
     if (rec?.check_in_time) {
       presentToday += 1;
-      if (statusOf(rec, office.toleranceMinutes) === 'late') {
+      if (!fridayToday && statusOf(rec, office.toleranceMinutes) === 'late') {
         lateToday += 1;
         attentionToday.push(`${e.full_name} is late today`);
       }
-    } else {
+    } else if (!fridayToday) {
       notCheckedInToday += 1;
       attentionToday.push(`${e.full_name} has not checked in today`);
     }
   });
-  const absentToday = totalEmployees - presentToday;
+  const absentToday = fridayToday ? 0 : totalEmployees - presentToday;
 
   // ── Period stats (attendance rate, hours, overtime) ──────────────────
   const periodByUser: Record<string, { present: number; late: number; hours: number }> = {};
@@ -160,7 +163,7 @@ export async function GET(request: Request) {
     const s = statusOf(r, office.toleranceMinutes);
     const cur = periodByUser[r.user_id] || { present: 0, late: 0, hours: 0 };
     if (r.check_in_time) cur.present += 1;
-    if (s === 'late') cur.late += 1;
+    if (s === 'late' && !isFridayHoliday(r.attendance_date)) cur.late += 1;
     cur.hours += durationHours(r.check_in_time, r.check_out_time);
     periodByUser[r.user_id] = cur;
   });
