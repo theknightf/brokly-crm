@@ -68,7 +68,7 @@ export async function GET(request: Request) {
       .order('full_name'),
     supabase
       .from('attendance')
-      .select('user_id, check_in_time, check_out_time')
+      .select('user_id, check_in_time, check_out_time, source')
       .eq('attendance_date', date),
     supabase
       .from('site_visits')
@@ -157,6 +157,8 @@ export async function POST(request: Request) {
 
   const now = new Date().toISOString();
   const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : '';
+  // Remote-work override is stamped source='remote' so rosters/feeds can badge it.
+  const source = body.workMode === 'remote' ? 'remote' : 'admin';
 
   // Fetch the existing record first (for audit old values + merging edits).
   const { data: existing } = await supabase
@@ -178,7 +180,7 @@ export async function POST(request: Request) {
 
   // Auto-recalculate delay from the (possibly edited) check-in against the
   // employee shift window on the Cairo wall clock. Manual entries are stamped
-  // source='admin' — GPS/geofencing never applies to admin logging.
+  // source='admin' (or 'remote') — GPS/geofencing never applies to admin logging.
   let delayMinutes = 0;
   let isLate = false;
   if (effectiveCheckIn) {
@@ -204,7 +206,7 @@ export async function POST(request: Request) {
         check_out_time: effectiveCheckOut,
         delay_minutes: delayMinutes,
         is_late: isLate,
-        source: 'admin',
+        source,
         marked_by: actor.id,
         updated_at: now,
       })
@@ -218,7 +220,7 @@ export async function POST(request: Request) {
       check_out_time: effectiveCheckOut,
       delay_minutes: delayMinutes,
       is_late: isLate,
-      source: 'admin',
+      source,
       marked_by: actor.id,
     });
     result = { error };
@@ -274,4 +276,54 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, action, attendance_date: attendanceDate });
+}
+
+/**
+ * DELETE /api/attendance?userId=<id>&date=<YYYY-MM-DD> — ADMIN ONLY.
+ * Clears a day's record (used by the "mark Absent" override). Best-effort
+ * audit entry; never fails when the record is already missing.
+ */
+export async function DELETE(request: Request) {
+  const supabase = await createClient();
+  const actor = await requireAdmin(supabase);
+  if (!actor) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  const url = new URL(request.url);
+  const userId = url.searchParams.get('userId') || '';
+  const date = url.searchParams.get('date') || '';
+  if (!userId || !isDate(date)) {
+    return NextResponse.json({ error: 'userId and date (YYYY-MM-DD) are required' }, { status: 400 });
+  }
+  const { data: existing } = await supabase
+    .from('attendance')
+    .select('id, check_in_time, check_out_time')
+    .eq('user_id', userId)
+    .eq('attendance_date', date)
+    .maybeSingle();
+  if (!existing?.id) return NextResponse.json({ ok: true, cleared: false });
+
+  const { data: target } = await supabase
+    .from('user_profiles')
+    .select('full_name')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const { error } = await supabase.from('attendance').delete().eq('id', existing.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  try {
+    await supabase.from('audit_log').insert({
+      user_id: userId,
+      user_name: (target as any)?.full_name || '',
+      entity_type: 'attendance',
+      entity_id: date,
+      action: 'cleared',
+      prev_value: { check_in_time: existing.check_in_time, check_out_time: existing.check_out_time },
+      new_value: {},
+      description: `Attendance cleared for ${(target as any)?.full_name || userId} on ${date} (marked absent)`,
+    });
+  } catch {}
+
+  return NextResponse.json({ ok: true, cleared: true });
 }
