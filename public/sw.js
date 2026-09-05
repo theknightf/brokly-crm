@@ -2,13 +2,25 @@
  * Cache strategy:
  *  - _next/static assets: cache-first (immutable hashed filenames)
  *  - icons/fonts/images: cache-first
- *  - page navigations: network-first, falls back to cached copy when offline
- *  - API requests: network-only (data must stay fresh)
- *  2026-08-06: bumped version + added web-push handlers.
+ *  - page navigations: network-first (8s timeout) with offline fallback
+ *  - API requests + Supabase + _next/data (RSC payloads): network-only, NEVER cached
+ *  2026-09-05: v1.2.0 — bypass _next/data to kill stale-chunk infinite loads,
+ *  navigation timeout so flaky networks fall back instead of hanging.
  */
-const VERSION = 'brokly-v1.1.1';
+const VERSION = 'brokly-v1.2.0';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL_CACHE = `${VERSION}-shell`;
+const RUNTIME_CACHE = `${VERSION}-runtime`;
+
+// Navigation network timeout — hanging fetch must fall back, never spin forever.
+const NAV_TIMEOUT_MS = 8000;
+
+function fetchWithTimeout(request, ms) {
+  return Promise.race([
+    fetch(request),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('nav-timeout')), ms)),
+  ]);
+}
 
 const STATIC_ASSETS = [
   '/icons/icon-192-v2.png',
@@ -32,7 +44,9 @@ self.addEventListener('activate', (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((key) => key !== STATIC_CACHE && key !== SHELL_CACHE).map((key) => caches.delete(key))
+          keys
+            .filter((key) => key !== STATIC_CACHE && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+            .map((key) => caches.delete(key))
         )
       )
       .then(() => self.clients.claim())
@@ -86,20 +100,27 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Same-origin only (skip chrome-extension / cross-origin tracking)
+  // Cross-origin (Supabase, CDNs, tracking) — never touch, always network.
   if (url.origin !== self.location.origin) return;
+  // Explicit Supabase bypass (in case REST is ever same-origin proxied).
+  if (url.hostname.includes('supabase.co') || url.hostname.includes('supabase.in')) return;
 
-  // Never cache API calls or non-GET requests
+  // Never cache API calls, RSC flight payloads, or non-GET requests.
+  // /_next/data/* MUST stay network-only: caching it serves stale page data
+  // and dead buildIds after deploys (infinite loading / frozen pages).
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return;
-  if (url.pathname.endsWith('/revalidate') || url.pathname.includes('/__next/')) return;
+  if (url.pathname.startsWith('/_next/data/')) return;
+  if (url.pathname.endsWith('/revalidate')) return;
 
-  // App shell navigations: network-first with offline fallback
+  // App shell navigations: network-first with TIMEOUT + offline fallback.
+  // The timeout is the freeze fix: a hanging network must fall back to cache
+  // instead of leaving the page loading forever.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetchWithTimeout(request, NAV_TIMEOUT_MS)
         .then((response) => {
-          if (response.ok) {
+          if (response && response.ok) {
             const copy = response.clone();
             caches.open(SHELL_CACHE).then((cache) => cache.put('/', copy));
           }
@@ -148,19 +169,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Everything else: stale-while-revalidate
+  // Everything else (same-origin docs, manifest, misc): network-first with
+  // runtime-cache fallback. Kept OUT of STATIC_CACHE so generic responses can
+  // never poison immutable-asset lookups or survive version purges wrongly.
   event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        fetch(request)
-          .then((response) => {
-            if (response.ok) {
-              const copy = response.clone();
-              caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
-            }
-            return response;
-          })
-          .catch(() => cached || Response.error())
-    )
+    fetch(request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request).then((cached) => cached || Response.error()))
   );
 });

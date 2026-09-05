@@ -39,7 +39,8 @@ export default function LeadStageCardsBar({ stats, activeStageKey, onStageClick 
           <button
             key={key}
             onClick={() => onStageClick(key)}
-            className={`text-left bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800/90 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-2xl p-4 shadow-sm transition-all cursor-pointer hover:-translate-y-0.5 group flex flex-col justify-between min-h-[96px] ${
+            title="Open in Leads Management"
+            className={`text-left bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800/90 hover:border-lime-400/60 dark:hover:border-lime-500/50 hover:shadow-[0_0_18px_rgba(132,204,22,0.25)] rounded-2xl p-4 shadow-sm transition-all cursor-pointer hover:-translate-y-0.5 active:scale-[0.98] group flex flex-col justify-between min-h-[96px] ${
               isActive ? 'border-lime-400 ring-1 ring-lime-400/30 shadow-[0_0_12px_rgba(163,230,53,0.1)]' : ''
             }`}
           >

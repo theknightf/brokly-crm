@@ -1,5 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, TrendingUp, Calendar, Users, BarChart3, ExternalLink, Loader2, RefreshCw, Bell, Zap, Filter, ArrowRight, Target, ShoppingBag, PhoneOff, XCircle, CheckCircle, Flame, Snowflake, Pause, LayoutGrid, List, Search, RotateCw } from 'lucide-react';
 import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
 import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
@@ -31,7 +32,20 @@ const STAGE_META: Record<string, { label: string; icon: any; color: string; bg: 
   doneDeal: { label: 'D.Deal', icon: CheckCircle, color: 'text-emerald-700', bg: 'bg-emerald-100', border: 'border-emerald-300', stageKeys: ['Done Deal','D.Deal'] },
 };
 
+// Dashboard card → /leads-management query mapping (consumed by
+// LeadsManagementScreen via useSearchParams on mount).
+export const STAGE_CARD_QUERY: Record<string, string> = {
+  newFresh: 'stage=fresh',
+  newCold: 'stage=cold',
+  leadsPending: 'stage=pending',
+  callsAnswer: 'status=answered',
+  noAnswer: 'status=no_answer',
+  cancel: 'status=cancelled',
+  doneDeal: 'stage=deal',
+};
+
 export default function UnifiedMasterDashboard() {
+  const router = useRouter();
   const [range, setRange] = useState<'week'|'month'>('week');
   const [mode, setMode] = useState<DashboardMode>('sales');
   const [data, setData] = useState<UnifiedData | null>(null);
@@ -91,6 +105,14 @@ export default function UnifiedMasterDashboard() {
   })();
 
   const handleStageClick = (key: string) => {
+    // Deep-link into Leads Management pre-filtered (single source of truth
+    // for stage/status filtering lives in LeadsManagementScreen).
+    const q = STAGE_CARD_QUERY[key];
+    if (q) {
+      router.push(`/leads-management?${q}`);
+      return;
+    }
+    // Fallback: in-dashboard pipeline filter for unknown keys.
     const meta = (STAGE_META as any)[key];
     if (!meta) return;
     const target = meta.stageKeys[0];

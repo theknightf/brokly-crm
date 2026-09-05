@@ -41,9 +41,13 @@ export function PWAProvider() {
       setShowBanner(true);
     }
 
-    const onInstalled = () => setShowBanner(false);
+    // Single named handler per event (previously a second anonymous
+    // 'appinstalled' listener was added but never removed — listener leak).
+    const onInstalled = () => {
+      setShowBanner(false);
+      setInstallPrompt(null);
+    };
     window.addEventListener('appinstalled', onInstalled);
-    window.addEventListener('appinstalled', () => setInstallPrompt(null));
 
     // Keep the Toaster clear of the iOS home indicator in standalone mode
     document.documentElement.classList.toggle('is-standalone', isStandalone);

@@ -58,7 +58,8 @@ function StatusCard({ status, count, total, colorClass, interactive }: StatusCar
   return (
     <Link
       href={`/leads-management?status=${encodeURIComponent(status)}`}
-      className={`rounded-2xl border border-border bg-card p-4 flex flex-col gap-2 block transition-all hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 active:scale-[0.98]`}
+      title={`Open ${status} in Leads Management`}
+      className={`rounded-2xl border border-border bg-card p-4 flex flex-col gap-2 cursor-pointer transition-all hover:shadow-[0_0_18px_rgba(132,204,22,0.25)] hover:border-primary/50 hover:-translate-y-0.5 active:scale-[0.98]`}
     >
       {inner}
     </Link>
@@ -188,7 +189,8 @@ export default function KPIBentoGrid() {
       {/* Total leads hero card */}
       <Link
         href="/leads-management"
-        className="rounded-2xl border border-border bg-card px-6 py-4 flex items-center justify-between transition-all hover:shadow-md hover:border-primary/30 active:scale-[0.99]"
+        title="Open all leads in Leads Management"
+        className="rounded-2xl border border-border bg-card px-6 py-4 flex items-center justify-between cursor-pointer transition-all hover:shadow-[0_0_18px_rgba(132,204,22,0.25)] hover:border-primary/50 active:scale-[0.99]"
       >
         <div>
           <p className="text-sm text-muted-foreground font-medium">Total Leads</p>

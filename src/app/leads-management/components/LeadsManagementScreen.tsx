@@ -53,6 +53,7 @@ import {
 } from './leadStages';
 import { leadsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole } from '@/lib/roles';
@@ -72,6 +73,35 @@ export interface FilterState {
   project: string;
   propertyType: PropertyType | '';
   action: LeadAction | '';
+}
+
+/**
+ * Dashboard deep-link short keys → real pipeline statuses.
+ * Exact status names (e.g. ?status=Fresh%20Leads) always win; these aliases
+ * cover the executive cards: ?stage=fresh|cold|pending|deal and
+ * ?status=answered|no_answer|cancelled.
+ */
+const STAGE_PARAM_MAP: Record<string, LeadStatus> = {
+  fresh: 'Fresh Leads',
+  cold: 'Cold Calls',
+  pending: 'Pending Leads',
+  deal: 'Done Deal',
+};
+const STATUS_PARAM_ALIAS: Record<string, LeadStatus> = {
+  answered: 'Meeting',
+  no_answer: 'No Answer',
+  cancelled: 'Cancellation',
+  cancel: 'Cancellation',
+};
+
+export function resolveStatusParam(raw: string | null): LeadStatus | '' {
+  if (!raw) return '';
+  const v = raw.trim();
+  if (!v) return '';
+  const exact = ALL_REAL_STATUSES.find((s) => s.toLowerCase() === v.toLowerCase());
+  if (exact) return exact;
+  const key = v.toLowerCase().replace(/[\s-]+/g, '_');
+  return STAGE_PARAM_MAP[key] || STATUS_PARAM_ALIAS[key] || '';
 }
 
 interface CallHistoryRow {
@@ -306,14 +336,21 @@ export default function LeadsManagementScreen({
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
 
-  // Open a lead's preview when arriving from another page (e.g. a follow-up
-  // linked to a lead: /leads-management?lead=<id>) or open the add modal
-  // directly (?new=1, used by the topbar quick action).
+  // Deep-link intake via useSearchParams (dashboard cards, follow-ups, topbar):
+  // /leads-management?lead=<id> · ?new=1 · ?search= · ?status=<exact|alias> ·
+  // ?stage=fresh|cold|pending|deal. Applied on mount AND on in-place query
+  // changes (same-page Link navigations don't remount this screen).
+  const searchParams = useSearchParams();
+  const qpLead = searchParams.get('lead');
+  const qpNew = searchParams.get('new');
+  const qpSearch = searchParams.get('search');
+  const qpStatus = searchParams.get('status');
+  const qpStage = searchParams.get('stage');
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const leadId = params.get('lead');
     const openNew = params.get('new') === '1';
-    const statusParam = params.get('status');
     const searchParam = params.get('search');
     if (searchParam) {
       const url = new URL(window.location.href);
@@ -321,11 +358,16 @@ export default function LeadsManagementScreen({
       window.history.replaceState({}, '', url.toString());
       setFilters((f) => ({ ...f, search: searchParam }));
     }
-    if (statusParam && ALL_REAL_STATUSES.includes(statusParam as LeadStatus)) {
+    // Exact statuses (?status=Fresh%20Leads) + short aliases (?status=no_answer)
+    // + dashboard stage keys (?stage=fresh). Stage wins when both are present.
+    const resolved = resolveStatusParam(params.get('stage')) || resolveStatusParam(params.get('status'));
+    if (resolved) {
       const url = new URL(window.location.href);
       url.searchParams.delete('status');
+      url.searchParams.delete('stage');
       window.history.replaceState({}, '', url.toString());
-      setFilters((f) => ({ ...f, status: statusParam as LeadStatus }));
+      setFilters((f) => ({ ...f, status: resolved }));
+      setCurrentPage(1);
     }
     if (openNew) {
       const url = new URL(window.location.href);
@@ -343,8 +385,7 @@ export default function LeadsManagementScreen({
         if (lead) setViewLead(lead as Lead);
       })
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [qpLead, qpNew, qpSearch, qpStatus, qpStage]);
 
   const fetchLeads = async () => {
     const requestId = ++fetchRef.current;
