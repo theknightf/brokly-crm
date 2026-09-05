@@ -494,6 +494,92 @@ export function isFridayInTimeZone(date = new Date(), timeZone = 'Africa/Cairo')
   }
 }
 
+// ─── Cairo wall-clock helpers (server-safe, no deps) ────────────────────
+// Admin manual/batch entry works in Cairo wall time ("10:00 AM") while the DB
+// stores UTC. These convert both ways without external libraries.
+
+export interface CairoWall {
+  y: number;
+  m: number;
+  d: number;
+  mins: number; // minutes since midnight on the Cairo wall clock
+  dateStr: string; // YYYY-MM-DD (Cairo calendar date)
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/** Decompose any Date/ISO into Cairo wall-clock parts. Never throws. */
+export function cairoWall(date: Date | string): CairoWall {
+  const dt = date instanceof Date ? date : new Date(date);
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Cairo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(dt);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value || '00';
+    const y = Number(get('year'));
+    const m = Number(get('month'));
+    const d = Number(get('day'));
+    const mins = (Number(get('hour')) % 24) * 60 + Number(get('minute'));
+    return { y, m, d, mins, dateStr: `${y}-${pad2(m)}-${pad2(d)}` };
+  } catch {
+    return {
+      y: dt.getFullYear(),
+      m: dt.getMonth() + 1,
+      d: dt.getDate(),
+      mins: dt.getHours() * 60 + dt.getMinutes(),
+      dateStr: `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`,
+    };
+  }
+}
+
+/** Cairo wall-clock minutes for a stored ISO timestamp (-1 when invalid). */
+export function cairoMinutesOfISO(iso: string | null | undefined): number {
+  if (!iso) return -1;
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return -1;
+  return cairoWall(dt).mins;
+}
+
+/** Cairo calendar date (YYYY-MM-DD) for a stored ISO timestamp. */
+export function cairoDateOfISO(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return null;
+  return cairoWall(dt).dateStr;
+}
+
+/**
+ * Combine a YYYY-MM-DD date + "HH:MM" Cairo wall time into a UTC ISO string
+ * for storage. Returns null on invalid input. Handles EET/EEST via Intl.
+ */
+export function cairoISOFromWall(dateStr: string, hhmm: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec((hhmm || '').trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  const [y, mo, da] = dateStr.split('-').map(Number);
+  try {
+    // Cairo offset at local noon that day (stable half of the day).
+    const probe = new Date(Date.UTC(y, mo - 1, da, 12, 0));
+    const asCairo = new Date(probe.toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
+    const asUTC = new Date(probe.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const offsetMs = asCairo.getTime() - asUTC.getTime();
+    return new Date(Date.UTC(y, mo - 1, da, h, min) - offsetMs).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────
 export function getDaysInMonth(year: number, month: number): string[] {
   const days = new Date(year, month, 0).getDate();

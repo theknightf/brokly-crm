@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
+import { loadOfficeHours } from '@/lib/officeHours';
+import { cairoMinutesOfISO } from '@/lib/attendanceLogic';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
   const [usersRes, attendanceRes, siteVisitsRes] = await Promise.all([
     supabase
       .from('user_profiles')
-      .select('id, full_name, email, role, is_active')
+      .select('id, full_name, email, role, is_active, team_id')
       .order('full_name'),
     supabase
       .from('attendance')
@@ -174,6 +176,24 @@ export async function POST(request: Request) {
     );
   }
 
+  // Auto-recalculate delay from the (possibly edited) check-in against the
+  // employee shift window on the Cairo wall clock. Manual entries are stamped
+  // source='admin' — GPS/geofencing never applies to admin logging.
+  let delayMinutes = 0;
+  let isLate = false;
+  if (effectiveCheckIn) {
+    try {
+      const office = await loadOfficeHours(supabase as any);
+      const inMins = cairoMinutesOfISO(effectiveCheckIn);
+      const startMin = office.startMinutes >= 0 ? office.startMinutes : 9 * 60;
+      const tol = office.toleranceMinutes ?? startMin + (office.graceMinutes ?? 20);
+      if (inMins >= 0) {
+        delayMinutes = Math.max(0, inMins - tol);
+        isLate = inMins > tol;
+      }
+    } catch {}
+  }
+
   let result: { error: any } | null = null;
 
   if (existing?.id) {
@@ -182,6 +202,9 @@ export async function POST(request: Request) {
       .update({
         check_in_time: effectiveCheckIn,
         check_out_time: effectiveCheckOut,
+        delay_minutes: delayMinutes,
+        is_late: isLate,
+        source: 'admin',
         marked_by: actor.id,
         updated_at: now,
       })
@@ -193,6 +216,9 @@ export async function POST(request: Request) {
       attendance_date: attendanceDate,
       check_in_time: effectiveCheckIn,
       check_out_time: effectiveCheckOut,
+      delay_minutes: delayMinutes,
+      is_late: isLate,
+      source: 'admin',
       marked_by: actor.id,
     });
     result = { error };

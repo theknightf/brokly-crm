@@ -5,15 +5,16 @@ import { LayoutGrid, UserCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import EmployeeAttendanceView from './EmployeeAttendanceView';
-import AdminAttendanceView from './AdminAttendanceView';
+import AdminQuickAttendance from './AdminQuickAttendance';
 
 type AdminTab = 'team' | 'self';
 
 /**
  * /attendance router:
- * - Admin / Owner → comprehensive AdminAttendanceView by default, with a
- *   header toggle for their personal self check-in (EmployeeAttendanceView).
- *   Deep-linkable via ?view=self.
+ * - Admin / Owner → ultra-simple AdminQuickAttendance (instant logging +
+ *   batch + roster) by default, with a header toggle for their personal
+ *   self check-in (EmployeeAttendanceView). Deep-linkable via ?view=self.
+ *   The full enterprise HR surface lives in Admin → Attendance tab.
  * - Employees / agents → personal EmployeeAttendanceView (unchanged).
  */
 export default function AttendanceScreen() {
@@ -44,7 +45,7 @@ export default function AttendanceScreen() {
       <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#181b22] p-1 w-full sm:w-auto sm:self-start">
         {(
           [
-            ['team', 'إدارة حضور الفريق', 'Team Management', LayoutGrid],
+            ['team', 'تسجيل سريع للفريق', 'Quick Team Logger', LayoutGrid],
             ['self', 'تسجيل حضوري الشخصي', 'My Personal Check-in', UserCheck],
           ] as [AdminTab, string, string, any][]
         ).map(([key, ar, en, Icon]) => (
@@ -66,7 +67,7 @@ export default function AttendanceScreen() {
         ))}
       </div>
 
-      {tab === 'team' ? <AdminAttendanceView /> : <EmployeeAttendanceView />}
+      {tab === 'team' ? <AdminQuickAttendance /> : <EmployeeAttendanceView />}
     </div>
   );
 }

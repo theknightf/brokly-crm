@@ -1,6 +1,5 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import {
   Plus,
   Pencil,
@@ -19,7 +18,6 @@ import {
   ToggleRight,
   Loader2,
   Users,
-  UserCheck,
   CalendarCheck,
   Activity,
   Trophy,
@@ -31,7 +29,6 @@ import {
   Repeat,
   Shirt,
   BarChart3,
-  ArrowUpRight,
 } from 'lucide-react';
 import { adminSettingsService, developersService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +37,7 @@ import { isAdminRole, canManageUsers } from '@/lib/roles';
 import { toast } from 'sonner';
 import UsersTab from './UsersTab';
 import { WorkLocationCard } from './AttendanceTab';
+import AdminAttendanceView from '@/app/attendance/components/AdminAttendanceView';
 import ActivityDashboard from './ActivityDashboard';
 import ProductivityDashboard from './ProductivityDashboard';
 import CallLogsTab from './CallLogsTab';
@@ -361,42 +359,15 @@ function DeleteConfirm({
 }
 
 /**
- * Attendance settings tab — zero duplication: the comprehensive team
- * management view lives at /attendance, so this tab only offers shortcuts
- * there (team view + personal check-in) plus the GPS work-location config.
+ * Attendance settings tab — hosts the FULL enterprise HR surface (shift
+ * setups, multi-shift engine, leaves/deductions) plus the GPS work-location
+ * config. The ultra-simple daily logger lives at sidebar /attendance.
  */
-function AttendanceSettingsShortcuts() {
+function AttendanceSettingsEnterprise() {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Link
-          href="/attendance"
-          className="group rounded-2xl border border-border bg-card p-4 flex items-center gap-3 cursor-pointer transition-all hover:border-lime-400/50 hover:shadow-[0_0_18px_rgba(132,204,22,0.25)] hover:-translate-y-0.5 active:scale-[0.99]"
-        >
-          <span className="w-10 h-10 rounded-xl bg-lime-500/15 text-lime-600 dark:text-lime-400 flex items-center justify-center shrink-0">
-            <CalendarCheck size={18} />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-sm font-bold text-foreground" dir="rtl">إدارة حضور الفريق</span>
-            <span className="block text-[11px] text-muted-foreground" dir="ltr">Team Attendance Management — shifts, leaves, presence</span>
-          </span>
-          <ArrowUpRight size={15} className="text-muted-foreground group-hover:text-lime-500 transition-colors shrink-0" />
-        </Link>
-        <Link
-          href="/attendance?view=self"
-          className="group rounded-2xl border border-border bg-card p-4 flex items-center gap-3 cursor-pointer transition-all hover:border-lime-400/50 hover:shadow-[0_0_18px_rgba(132,204,22,0.25)] hover:-translate-y-0.5 active:scale-[0.99]"
-        >
-          <span className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-            <UserCheck size={18} />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-sm font-bold text-foreground" dir="rtl">تسجيل حضوري الشخصي</span>
-            <span className="block text-[11px] text-muted-foreground" dir="ltr">My Personal Check-in — self check-in/out</span>
-          </span>
-          <ArrowUpRight size={15} className="text-muted-foreground group-hover:text-lime-500 transition-colors shrink-0" />
-        </Link>
-      </div>
       <WorkLocationCard />
+      <AdminAttendanceView />
     </div>
   );
 }
@@ -786,7 +757,7 @@ export default function AdminScreen() {
           {activeTab === 'users' && canUsers ? (
             <UsersTab />
           ) : activeTab === 'attendance' ? (
-            <AttendanceSettingsShortcuts />
+            <AttendanceSettingsEnterprise />
           ) : activeTab === 'activity' ? (
             <ActivityDashboard />
           ) : activeTab === 'productivity' ? (
