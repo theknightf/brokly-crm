@@ -1,13 +1,27 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { LayoutGrid, UserCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import EmployeeAttendanceView from './EmployeeAttendanceView';
 import AdminAttendanceView from './AdminAttendanceView';
 
+type AdminTab = 'team' | 'self';
+
+/**
+ * /attendance router:
+ * - Admin / Owner → comprehensive AdminAttendanceView by default, with a
+ *   header toggle for their personal self check-in (EmployeeAttendanceView).
+ *   Deep-linkable via ?view=self.
+ * - Employees / agents → personal EmployeeAttendanceView (unchanged).
+ */
 export default function AttendanceScreen() {
   const { profile, loading } = useAuth();
-  const isAdminOrOwner = isAdminRole(profile?.role);
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<AdminTab>(() =>
+    searchParams.get('view') === 'self' ? 'self' : 'team'
+  );
 
   if (loading) {
     return (
@@ -17,6 +31,42 @@ export default function AttendanceScreen() {
     );
   }
 
-  // Employees get the self-service view; admins/owners get full management.
-  return isAdminOrOwner ? <AdminAttendanceView /> : <EmployeeAttendanceView />;
+  const isAdminOrOwner = isAdminRole(profile?.role);
+
+  // Regular employees keep the personal self check-in as their only view.
+  if (!isAdminOrOwner) {
+    return <EmployeeAttendanceView />;
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Admin view switcher — team management default, personal check-in one tap away */}
+      <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#181b22] p-1 w-full sm:w-auto sm:self-start">
+        {(
+          [
+            ['team', 'إدارة حضور الفريق', 'Team Management', LayoutGrid],
+            ['self', 'تسجيل حضوري الشخصي', 'My Personal Check-in', UserCheck],
+          ] as [AdminTab, string, string, any][]
+        ).map(([key, ar, en, Icon]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              tab === key
+                ? 'bg-lime-500 text-zinc-950 shadow'
+                : 'text-zinc-400 hover:text-zinc-100'
+            }`}
+          >
+            <Icon size={13} />
+            <span className="flex flex-col items-start leading-tight text-left">
+              <span dir="rtl">{ar}</span>
+              <span className="text-[10px] font-semibold opacity-70" dir="ltr">{en}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {tab === 'team' ? <AdminAttendanceView /> : <EmployeeAttendanceView />}
+    </div>
+  );
 }
