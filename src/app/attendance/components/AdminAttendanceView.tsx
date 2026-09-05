@@ -423,6 +423,18 @@ export default function AdminAttendanceView() {
     });
   }, [activeUsers, selectedDay, recordMap, isOnLeave, permsByUserDate, shifts, teamNameById, search, teamFilter, shiftFilter, statusFilter]);
 
+  // ── Live Office Presence Bar (selected day, after dailyRows — avoids TDZ) ──
+  const presence = useMemo(()=>{
+    let present = 0, late = 0, onLeave = 0, absent = 0;
+    for (const r of dailyRows) {
+      if (r.leaveType) { onLeave += 1; continue; }
+      if (!r.rec?.check_in_time) { absent += 1; continue; }
+      present += 1;
+      if (r.ev.netLateMinutes > 0) late += 1;
+    }
+    return { present, late, onLeave, absent, total: dailyRows.length };
+  }, [dailyRows]);
+
   // ── PDF: 10 cols without ID ─────────────────────────────────────────
   const pdfHeaders = [
     '# (م)',
@@ -671,6 +683,28 @@ export default function AdminAttendanceView() {
             <p className="text-xs font-semibold text-foreground">{k.labelAr}</p><p className="text-[10px] text-muted-foreground">{k.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* ── Live Office Presence Bar ── */}
+      <div className="rounded-2xl border border-white/10 bg-[#181b22] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-black text-zinc-200 me-1" dir="rtl">الحضور المباشر</p>
+          <p className="text-[10px] text-zinc-500 me-2" dir="ltr">Live presence · <span dir="ltr">{selectedDay}</span></p>
+          {[
+            { ar: 'حاضر الآن', en: 'Present', v: presence.present, cls: 'border-lime-500/30 bg-lime-500/10 text-lime-300', dot: 'bg-lime-400' },
+            { ar: 'متأخر', en: 'Late', v: presence.late, cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300', dot: 'bg-amber-400' },
+            { ar: 'في إجازة', en: 'On Leave', v: presence.onLeave, cls: 'border-sky-500/30 bg-sky-500/10 text-sky-300', dot: 'bg-sky-400' },
+            { ar: 'غائب', en: 'Absent', v: presence.absent, cls: 'border-red-500/30 bg-red-500/10 text-red-300', dot: 'bg-red-400' },
+          ].map((c) => (
+            <span key={c.en} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black ${c.cls}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+              <span dir="rtl">{c.ar}</span>
+              <span className="opacity-60 font-bold" dir="ltr">({c.en})</span>
+              <span className="tabular-nums" dir="ltr">{c.v}</span>
+            </span>
+          ))}
+          <span className="ms-auto text-[11px] text-zinc-500" dir="ltr">{presence.total} staff</span>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

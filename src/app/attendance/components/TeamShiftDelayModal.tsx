@@ -113,9 +113,9 @@ export default function TeamShiftDelayModal({ teams, defaultTeamId, defaultDate,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/30 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card rounded-t-2xl">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#181b22] border border-white/10 rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-[0_24px_70px_-20px_rgba(0,0,0,0.8)]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 sticky top-0 bg-[#181b22] rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <Clock size={14} />
@@ -168,7 +168,7 @@ export default function TeamShiftDelayModal({ teams, defaultTeamId, defaultDate,
             {adjustmentType==='temporary' && (
               <div className="mt-3">
                 <label className="block text-xs font-medium text-foreground mb-1">التاريخ — Date *</label>
-                <input type="date" value={date} onChange={e=> setDate(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
+                <input type="date" value={date} onChange={e=> setDate(e.target.value)} className="w-full bg-[#12141a] text-zinc-100 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
               </div>
             )}
           </div>
@@ -207,17 +207,17 @@ export default function TeamShiftDelayModal({ teams, defaultTeamId, defaultDate,
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-foreground" dir="rtl">بداية جديدة *</span>
                 <span className="text-[10px] text-muted-foreground" dir="ltr">New Start</span>
-                <input type="time" value={startTime} onChange={e=> { setStartTime(e.target.value); setOffsetApplied(null); }} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
+                <input type="time" value={startTime} onChange={e=> { setStartTime(e.target.value); setOffsetApplied(null); }} className="w-full bg-[#12141a] text-zinc-100 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-foreground" dir="rtl">نهاية جديدة *</span>
                 <span className="text-[10px] text-muted-foreground" dir="ltr">New End</span>
-                <input type="time" value={endTime} onChange={e=> { setEndTime(e.target.value); setOffsetApplied(null); }} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
+                <input type="time" value={endTime} onChange={e=> { setEndTime(e.target.value); setOffsetApplied(null); }} className="w-full bg-[#12141a] text-zinc-100 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
               </label>
             </div>
             <label className="flex flex-col gap-1 mt-3">
               <span className="text-xs font-medium text-foreground flex items-center gap-1" dir="rtl"><Clock size={12}/> فترة السماح <span className="text-muted-foreground font-normal" dir="ltr">— Grace Period (mins)</span></span>
-              <input type="number" min={0} max={120} value={grace} onChange={e=> setGrace(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
+              <input type="number" min={0} max={120} value={grace} onChange={e=> setGrace(e.target.value)} className="w-full bg-[#12141a] text-zinc-100 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
               <span className="text-[11px] text-muted-foreground" dir="rtl">السماح يبدأ من البداية الجديدة — Cutoff: <bdi dir="ltr" className="text-foreground">{graceCutoff}</bdi> · تأخير بعدها يُحتسب من <bdi dir="ltr">{startTime}</bdi></span>
             </label>
           </div>
@@ -240,7 +240,7 @@ export default function TeamShiftDelayModal({ teams, defaultTeamId, defaultDate,
               <span className="block text-xs font-bold text-foreground" dir="rtl">سبب التأخير</span>
               <span className="block text-[11px] text-muted-foreground" dir="ltr">Reason / Note (optional)</span>
             </label>
-            <input value={reason} onChange={e=> setReason(e.target.value)} placeholder="مثال: اجتماع خارجي، ظروف طقس، تأخير جماعي معتمد…" dir="rtl" className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
+            <input value={reason} onChange={e=> setReason(e.target.value)} placeholder="مثال: اجتماع خارجي، ظروف طقس، تأخير جماعي معتمد…" dir="rtl" className="w-full bg-[#12141a] text-zinc-100 border border-white/10 rounded-xl px-3 py-2.5 text-sm placeholder:text-zinc-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none" />
           </div>
 
           <div className="flex items-center gap-2 pt-2">

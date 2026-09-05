@@ -105,37 +105,43 @@ export default function LeavePermissionModal({ users, defaultUserId, defaultDate
     } finally { setSaving(false); }
   };
 
+  const darkInput =
+    'w-full bg-[#12141a] text-zinc-100 border border-white/10 rounded-xl px-3 py-2.5 text-sm placeholder:text-zinc-500 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-colors';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/30 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-xl fade-in">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card">
-          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-            <ShieldCheck size={16} className="text-primary" />
-            إجازة / إذن معتمد — Quick Action
-          </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center"><X size={16} /></button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#181b22] border border-white/10 rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-[0_24px_70px_-20px_rgba(0,0,0,0.8)]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 sticky top-0 bg-[#181b22] rounded-t-3xl sm:rounded-t-2xl">
+          <div>
+            <p className="text-base font-bold text-zinc-100 flex items-center gap-2" dir="rtl">
+              <ShieldCheck size={16} className="text-lime-400" />
+              إجازة / إذن معتمد
+            </p>
+            <p className="text-[11px] text-zinc-500" dir="ltr">Leave / Permission — Quick Action</p>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100 flex items-center justify-center transition-colors"><X size={16} /></button>
         </div>
 
         <div className="p-5 space-y-4">
           {/* Tabs */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+          <div className="grid grid-cols-2 gap-2 p-1 bg-[#12141a] border border-white/10 rounded-xl">
             <button
               onClick={() => setTab('leave')}
-              className={`h-10 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${tab==='leave' ? 'bg-white dark:bg-zinc-800 text-foreground shadow-sm border border-zinc-200 dark:border-zinc-700' : 'text-muted-foreground'}`}
+              className={`min-h-[44px] rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${tab==='leave' ? 'bg-lime-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-100'}`}
             >
               <Calendar size={14} /> إجازة رسمية
             </button>
             <button
               onClick={() => setTab('permission')}
-              className={`h-10 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${tab==='permission' ? 'bg-white dark:bg-zinc-800 text-foreground shadow-sm border border-zinc-200 dark:border-zinc-700' : 'text-muted-foreground'}`}
+              className={`min-h-[44px] rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${tab==='permission' ? 'bg-lime-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-100'}`}
             >
               <Clock size={14} /> إذن / مأمورية
             </button>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-foreground mb-1.5">الموظف *</label>
-            <select value={userId} onChange={(e)=> setUserId(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none">
+            <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">الموظف *</label>
+            <select value={userId} onChange={(e)=> setUserId(e.target.value)} className={darkInput} dir="rtl">
               <option value="">اختر الموظف…</option>
               {activeUsers.map((u)=> <option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
             </select>
@@ -145,37 +151,37 @@ export default function LeavePermissionModal({ users, defaultUserId, defaultDate
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1.5">من تاريخ *</label>
-                  <input type="date" value={date} onChange={(e)=> setDate(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
+                  <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">من تاريخ *</label>
+                  <input type="date" value={date} onChange={(e)=> setDate(e.target.value)} className={darkInput} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-foreground mb-1.5">إلى تاريخ *</label>
-                  <input type="date" value={endDate} onChange={(e)=> setEndDate(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
+                  <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">إلى تاريخ *</label>
+                  <input type="date" value={endDate} onChange={(e)=> setEndDate(e.target.value)} className={darkInput} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">نوع الإجازة *</label>
-                <select value={leaveType} onChange={(e)=> setLeaveType(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none">
-                  {LEAVE_TYPES.map((lt)=> <option key={lt.value} value={lt.value}>{lt.ar} — {lt.en}</option>)}
+                <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">نوع الإجازة *</label>
+                <select value={leaveType} onChange={(e)=> setLeaveType(e.target.value)} className={darkInput} dir="rtl">
+                  {LEAVE_TYPES.map((lt)=> <option key={lt.value} value={lt.value}>{lt.ar} ({lt.en})</option>)}
                 </select>
-                <p className="text-[11px] text-muted-foreground mt-1">ستظهر كشريط إجازة بدلاً من “غياب” ولا تُحتسب غرامة.</p>
+                <p className="text-[11px] text-zinc-500 mt-1" dir="rtl">ستظهر كشريط إجازة بدلاً من “غياب” ولا تُحتسب غرامة.</p>
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">السبب / ملاحظات</label>
-                <input value={leaveReason} onChange={(e)=> setLeaveReason(e.target.value)} placeholder="مثال: عطلة رسمية، تقرير طبي معتمد…" className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
+                <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">السبب / ملاحظات</label>
+                <input value={leaveReason} onChange={(e)=> setLeaveReason(e.target.value)} placeholder="مثال: عطلة رسمية، تقرير طبي معتمد…" dir="rtl" className={darkInput} />
               </div>
-              <button onClick={submitLeave} disabled={saving || !userId} className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+              <button onClick={submitLeave} disabled={saving || !userId} className="w-full min-h-[48px] rounded-xl bg-lime-500 hover:bg-lime-400 text-zinc-950 font-black flex items-center justify-center gap-2 disabled:opacity-50 shadow-[0_10px_28px_-10px_rgba(132,204,22,0.6)] transition-colors pb-[env(safe-area-inset-bottom)]">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} حفظ الإجازة
               </button>
             </>
           ) : (
             <>
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">التاريخ *</label>
-                <input type="date" value={date} onChange={(e)=> setDate(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
+                <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">التاريخ *</label>
+                <input type="date" value={date} onChange={(e)=> setDate(e.target.value)} className={darkInput} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">نوع الإذن *</label>
+                <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">نوع الإذن *</label>
                 <div className="grid grid-cols-3 gap-2">
                   {([
                     ['late_arrival','تأخير','Late'],
@@ -185,27 +191,27 @@ export default function LeavePermissionModal({ users, defaultUserId, defaultDate
                     <button
                       key={v}
                       onClick={()=> setPermType(v as any)}
-                      className={`p-3 rounded-xl border-2 text-xs font-bold flex flex-col items-center gap-1 transition-all ${permType===v ? 'bg-lime-500/10 border-lime-400 text-lime-700 dark:text-lime-400' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300'}`}
+                      className={`min-h-[64px] p-3 rounded-xl border-2 text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${permType===v ? 'bg-lime-500/15 border-lime-400 text-lime-300' : 'bg-[#12141a] border-white/10 text-zinc-400 hover:text-zinc-200'}`}
                     >
                       {v==='late_arrival' ? <Clock size={14} /> : v==='early_departure' ? <Briefcase size={14} /> : <ShieldCheck size={14} />}
-                      <span>{ar}</span><span className="text-[10px] opacity-70">{en}</span>
+                      <span dir="rtl">{ar}</span><span className="text-[10px] opacity-70" dir="ltr">{en}</span>
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">الدقائق/الساعات المعتمدة *</label>
+                <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">الدقائق المعتمدة *</label>
                 <div className="flex gap-2">
-                  <input type="number" min={1} max={480} value={excusedMins} onChange={(e)=> setExcusedMins(e.target.value)} className="flex-1 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
-                  <span className="px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-muted-foreground flex items-center">دقيقة</span>
+                  <input type="number" min={1} max={480} value={excusedMins} onChange={(e)=> setExcusedMins(e.target.value)} className={`${darkInput} flex-1`} dir="ltr" />
+                  <span className="px-3 py-2.5 rounded-xl bg-[#12141a] border border-white/10 text-xs font-bold text-zinc-400 flex items-center" dir="rtl">دقيقة</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1">مثال: متأخر 45د ومعه إذن 45د → الصافي 0. إذن مأمورية يغطي اليوم كاملاً.</p>
+                <p className="text-[11px] text-zinc-500 mt-1" dir="rtl">مثال: متأخر 45د ومعه إذن 45د ← الصافي 0. إذن مأمورية يغطي اليوم كاملاً.</p>
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">السبب معتمد من HR/Admin</label>
-                <input value={permReason} onChange={(e)=> setPermReason(e.target.value)} placeholder="مثال: موعد مستشفى، مهمة عميل خارجية بمدينة نصر…" className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none" />
+                <label className="block text-xs font-bold text-zinc-200 mb-1.5" dir="rtl">السبب معتمد من HR/Admin</label>
+                <input value={permReason} onChange={(e)=> setPermReason(e.target.value)} placeholder="مثال: موعد مستشفى، مهمة عميل خارجية…" dir="rtl" className={darkInput} />
               </div>
-              <button onClick={submitPermission} disabled={saving || !userId} className="w-full h-11 rounded-xl bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+              <button onClick={submitPermission} disabled={saving || !userId} className="w-full min-h-[48px] rounded-xl bg-lime-500 hover:bg-lime-400 text-zinc-950 font-black flex items-center justify-center gap-2 disabled:opacity-50 shadow-[0_10px_28px_-10px_rgba(132,204,22,0.6)] transition-colors pb-[env(safe-area-inset-bottom)]">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} منح الإذن
               </button>
             </>

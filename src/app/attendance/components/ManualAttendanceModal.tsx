@@ -142,27 +142,33 @@ export default function ManualAttendanceModal({
     }
   };
 
+  const darkInput =
+    'w-full bg-[#12141a] text-zinc-100 border border-white/10 rounded-xl px-3 py-2.5 text-sm placeholder:text-zinc-500 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-colors disabled:opacity-50';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/30 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl fade-in">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card">
-          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <UserPlus size={16} className="text-primary" />
-            {isEdit ? 'Edit attendance' : 'Add attendance'}
-          </h3>
-          <button onClick={onClose} className="btn-ghost p-1.5" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-[#181b22] border border-white/10 rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto shadow-[0_24px_70px_-20px_rgba(0,0,0,0.8)]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 sticky top-0 bg-[#181b22] rounded-t-3xl sm:rounded-t-2xl">
+          <div>
+            <p className="text-base font-bold text-zinc-100 flex items-center gap-2">
+              <UserPlus size={16} className="text-lime-400" />
+              {isEdit ? 'Edit attendance' : 'Add attendance'}
+            </p>
+            <p className="text-[11px] text-zinc-500" dir="ltr">{isEdit ? 'Edit record' : 'Manual entry'}</p>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100 flex items-center justify-center transition-colors" aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-zinc-400">
             The times you pick are saved exactly as shown. Regular check-ins use the server time.
           </p>
 
           <div>
-            <label className="label-base">Employee</label>
-            <select value={userId} onChange={(e) => setUserId(e.target.value)} className="input-base w-full" disabled={isEdit}>
+            <label className="block text-xs font-bold text-zinc-200 mb-1.5">Employee</label>
+            <select value={userId} onChange={(e) => setUserId(e.target.value)} className={darkInput} disabled={isEdit}>
               <option value="">Select employee…</option>
               {activeUsers.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -174,74 +180,74 @@ export default function ManualAttendanceModal({
           </div>
 
           <div>
-            <label className="label-base">Date</label>
+            <label className="block text-xs font-bold text-zinc-200 mb-1.5">Date</label>
             <input
               type="date"
               value={date}
               max={todayLocal()}
               onChange={(e) => setDate(e.target.value)}
-              className="input-base w-full"
+              className={darkInput}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label-base">Check-in time</label>
+              <label className="block text-xs font-bold text-zinc-200 mb-1.5">Check-in time</label>
               <input
                 type="time"
                 value={checkIn}
                 onChange={(e) => setCheckIn(e.target.value)}
-                className="input-base w-full"
+                className={darkInput}
               />
             </div>
             <div>
-              <label className="label-base">Check-out time</label>
+              <label className="block text-xs font-bold text-zinc-200 mb-1.5">Check-out time</label>
               <input
                 type="time"
                 value={checkOut}
                 onChange={(e) => setCheckOut(e.target.value)}
-                className="input-base w-full"
+                className={darkInput}
               />
             </div>
           </div>
 
           <div>
-            <label className="label-base">
-              Reason <span className="text-muted-foreground font-normal">(optional)</span>
+            <label className="block text-xs font-bold text-zinc-200 mb-1.5">
+              Reason <span className="text-zinc-500 font-normal">(optional)</span>
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={2}
               placeholder="e.g. Was on a field visit, sick day, permission…"
-              className="input-base w-full resize-none"
+              className={`${darkInput} resize-none`}
             />
           </div>
 
           {selectedUser && (
-            <div className="bg-muted/50 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+            <div className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-zinc-400" dir="ltr">
               Will be saved as:{' '}
-              <span className="font-medium text-foreground">
+              <span className="font-bold text-zinc-100">
                 {date} · {checkIn || '—'}
               </span>
               {checkOut ? (
                 <>
                   {' '}
-                  → <span className="font-medium text-foreground">{checkOut}</span>
+                  → <span className="font-bold text-zinc-100">{checkOut}</span>
                 </>
               ) : null}
               <span className="ml-1">(local time)</span>
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-1">
-            <button onClick={onClose} className="btn-secondary h-10 flex-1 text-sm">
+          <div className="flex items-center gap-2 pt-1 pb-[env(safe-area-inset-bottom)]">
+            <button onClick={onClose} className="h-11 flex-1 rounded-xl border border-white/15 text-sm font-bold text-zinc-200 hover:bg-white/5 transition-colors">
               Cancel
             </button>
             <button
               onClick={submit}
               disabled={saving || !userId}
-              className="btn-primary h-10 flex-1 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              className="h-11 flex-1 rounded-xl bg-lime-500 hover:bg-lime-400 text-zinc-950 text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50 shadow-[0_10px_28px_-10px_rgba(132,204,22,0.6)] transition-colors"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Attendance'}
