@@ -887,39 +887,50 @@ export const leadsService = {
       const from = Math.max(0, (page - 1) * pageSize);
       const to = from + pageSize - 1;
 
-      // Contacted-filters handled at DB for pagination accuracy:
-      // 'today' = lead has a call_log or follow-up created today;
-      // 'not-today' = none of the above.
-      let todayClause: string | undefined;
-      if (contacted) {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: todayLogs } = await supabase
-          .from('call_logs')
-          .select('entity_id')
-          .eq('entity_type', 'lead')
-          .gte('created_at', `${today}T00:00:00.000Z`)
-          .lte('created_at', `${today}T23:59:59.999Z`);
-        const logIds = new Set(
-          (todayLogs || [])
-            .map((r: any) => r.entity_id)
-            .filter((v: string | null | undefined): v is string => !!v)
-        );
-        const { data: todayFUs } = await supabase
-          .from('follow_ups')
-          .select('lead_id')
-          .gte('created_at', `${today}T00:00:00.000Z`)
-          .lte('created_at', `${today}T23:59:59.999Z`);
-        const fuIds = new Set(
-          (todayFUs || [])
-            .map((r: any) => r.lead_id)
-            .filter((v: string | null | undefined): v is string => !!v)
-        );
-        const contactedIds = [...new Set([...logIds, ...fuIds])];
-        if (contactedIds.length > 0) {
-          todayClause = contacted === 'today'
-            ? `id in (${contactedIds.map((id) => `"${id}"`).join(',')})`
-            : `id not in (${contactedIds.map((id) => `"${id}"`).join(',')})`;
+      // Contacted-today set: lead IDs with a call_log (entity_type='lead') or a
+      // follow_up created today. Always resolved — it stamps the contactedToday
+      // badge on every row — and additionally filters the query when the
+      // contacted filter is active. Day bounds use the client's local day
+      // converted to UTC so "today" matches what the user sees.
+      let contactedToday = new Set<string>();
+      try {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date();
+        end.setHours(23, 59, 59, 999);
+        const startIso = start.toISOString();
+        const endIso = end.toISOString();
+        const [{ data: todayLogs }, { data: todayFUs }] = await Promise.all([
+          supabase
+            .from('call_logs')
+            .select('entity_id')
+            .eq('entity_type', 'lead')
+            .gte('created_at', startIso)
+            .lte('created_at', endIso),
+          supabase
+            .from('follow_ups')
+            .select('lead_id')
+            .gte('created_at', startIso)
+            .lte('created_at', endIso),
+        ]);
+        const ids = [
+          ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
+          ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
+        ].filter((v): v is string => !!v);
+        contactedToday = new Set(ids);
+      } catch {
+        contactedToday = new Set<string>();
+      }
+
+      if (contacted === 'today') {
+        if (contactedToday.size === 0) {
+          return { data: [], total: 0, page, pageSize };
         }
+        query = query.in('id', [...contactedToday]);
+      } else if (contacted === 'not-today' && contactedToday.size > 0) {
+        // Empty set must NOT be passed to .not(..., 'in', ...) or PostgREST
+        // returns zero rows — only apply when non-empty.
+        query = query.not('id', 'in', `(${[...contactedToday].map((id) => `"${id}"`).join(',')})`);
       }
 
       const { data, error, count } = await query
@@ -934,7 +945,10 @@ export const leadsService = {
         throw new Error(error.message || 'Failed to load leads');
       }
       return {
-        data: (data || []).map(rowToLead),
+        data: (data || []).map((row: any) => ({
+          ...rowToLead(row),
+          contactedToday: contactedToday.has(row.id),
+        })),
         total: count ?? (data || []).length,
         page,
         pageSize,

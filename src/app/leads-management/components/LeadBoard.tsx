@@ -5,6 +5,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
 import { isAdminRole } from '@/lib/roles';
+import ContactedBadge from './ContactedBadge';
 
 interface LeadBoardProps {
   leads: Lead[];
@@ -58,6 +59,9 @@ function BoardCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground text-sm truncate">{lead.name || 'Lead'}</p>
+          <div className="mt-1">
+            <ContactedBadge contactedToday={lead.contactedToday} compact />
+          </div>
         </div>
         <button
           onClick={(e) => {

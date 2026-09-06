@@ -73,6 +73,8 @@ export interface FilterState {
   project: string;
   propertyType: PropertyType | '';
   action: LeadAction | '';
+  /** '' = all leads (default, nothing hidden), 'today' = contacted today, 'not-today' = not contacted today. */
+  contacted: '' | 'today' | 'not-today';
 }
 
 /**
@@ -255,6 +257,7 @@ export default function LeadsManagementScreen({
     project: '',
     propertyType: '',
     action: '',
+    contacted: '',
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -411,6 +414,7 @@ export default function LeadsManagementScreen({
         project: filters.project || undefined,
         propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
+        contacted: filters.contacted || undefined,
         sortKey,
         sortDir,
         // Exclude leads that were optimistically removed after call logging
@@ -809,6 +813,7 @@ export default function LeadsManagementScreen({
         agent: filters.agent || undefined,
         propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
+        contacted: filters.contacted || undefined,
       });
       const rows = (res.data || []).map((l: any) => [
         l.name,
@@ -870,6 +875,7 @@ export default function LeadsManagementScreen({
       project: '',
       propertyType: '',
       action: '',
+      contacted: '',
     });
     setCurrentPage(1);
   };

@@ -25,6 +25,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
+import ContactedBadge from './ContactedBadge';
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -330,6 +331,7 @@ export default function LeadsTable({
                         <a href={`/leads/${lead.id}`} className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block">
                           {lead.name || `Lead ${lead.id}`}
                         </a>
+                        <ContactedBadge contactedToday={lead.contactedToday} compact />
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                           <MapPin size={10} />
                           {lead.location || '—'}

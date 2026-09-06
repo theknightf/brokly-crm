@@ -189,6 +189,38 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
       </div>
+
+      {/* Contacted — three-state toggle, never a status/stage change */}
+      <div
+        className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 h-9"
+        role="group"
+        aria-label="Contacted filter"
+      >
+        {(
+          [
+            { value: '', label: 'All' },
+            { value: 'today', label: 'Contacted Today' },
+            { value: 'not-today', label: 'Not Contacted' },
+          ] as const
+        ).map((opt) => {
+          const active = filters.contacted === opt.value;
+          return (
+            <button
+              key={opt.value || 'all'}
+              type="button"
+              onClick={() => update('contacted', opt.value)}
+              aria-pressed={active}
+              className={`h-8 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                active
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
