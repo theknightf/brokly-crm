@@ -86,6 +86,42 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [assignee, setAssignee] = useState('unassigned');
   const [assigneeOpen, setAssigneeOpen] = useState(false);
 
+  // Smart panel direction: drop-up when there is no room below inside the
+  // scrolling modal body (otherwise the panel gets clipped and its footer —
+  // e.g. "Add New Stage" — becomes unreachable).
+  const [dropUpKey, setDropUpKey] = useState<'source' | 'stage' | 'assignee' | null>(null);
+  const sourceBoxRef = useRef<HTMLDivElement>(null);
+  const stageBoxRef = useRef<HTMLDivElement>(null);
+  const assigneeBoxRef = useRef<HTMLDivElement>(null);
+  const PANEL_SPACE: Record<'source' | 'stage' | 'assignee', number> = {
+    source: 300,
+    stage: 380,
+    assignee: 340,
+  };
+
+  const toggleDropdown = (key: 'source' | 'stage' | 'assignee') => {
+    const boxes = { source: sourceBoxRef, stage: stageBoxRef, assignee: assigneeBoxRef };
+    const setters = {
+      source: setSourceOpen,
+      stage: setStageOpen,
+      assignee: setAssigneeOpen,
+    };
+    const isOpen =
+      key === 'source' ? sourceOpen : key === 'stage' ? stageOpen : assigneeOpen;
+    // Single-open: opening one closes the others so panels never stack.
+    (Object.keys(setters) as ('source' | 'stage' | 'assignee')[]).forEach((k) => {
+      if (k !== key) setters[k](false);
+    });
+    if (isOpen) {
+      setters[key](false);
+      setDropUpKey(null);
+      return;
+    }
+    const rect = boxes[key].current?.getBoundingClientRect();
+    setDropUpKey(rect && rect.bottom + PANEL_SPACE[key] > window.innerHeight - 12 ? key : null);
+    setters[key](true);
+  };
+
   const reset = useCallback(() => {
     setFileName('');
     setRows([]);
@@ -101,6 +137,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     setStageCreateOpen(false);
     setAssignee('unassigned');
     setAssigneeOpen(false);
+    setDropUpKey(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
@@ -185,6 +222,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       if (!t.closest('[data-cb="source"]')) setSourceOpen(false);
       if (!t.closest('[data-cb="stage"]')) setStageOpen(false);
       if (!t.closest('[data-cb="assignee"]')) setAssigneeOpen(false);
+      if (!t.closest('[data-cb]')) setDropUpKey(null);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -392,11 +430,11 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
               <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                 Source (مصدر الليد) <span className="text-red-500">*</span>
               </label>
-              <div className="relative" data-cb="source">
+              <div className="relative" data-cb="source" ref={sourceBoxRef}>
                 <button
                   type="button"
                   disabled={importing || loadingMeta}
-                  onClick={() => setSourceOpen((o) => !o)}
+                  onClick={() => toggleDropdown('source')}
                   className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-3 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center justify-between gap-2 disabled:opacity-60"
                 >
                   <span className={source ? 'font-medium' : 'text-zinc-400'}>
@@ -408,8 +446,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   />
                 </button>
                 {sourceOpen && (
-                  <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl">
-                    <div className="max-h-52 overflow-y-auto py-1">
+                  <div className={`absolute z-50 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl ${dropUpKey === 'source' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}>
+                    <div className="max-h-52 overflow-y-auto overscroll-contain py-1">
                       {sources.length === 0 && (
                         <p className="px-3 py-3 text-xs text-zinc-500 text-center">No sources yet — add one below</p>
                       )}
@@ -496,11 +534,11 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
               <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                 Stage (مرحلة الليد) <span className="text-red-500">*</span>
               </label>
-              <div className="relative" data-cb="stage">
+              <div className="relative" data-cb="stage" ref={stageBoxRef}>
                 <button
                   type="button"
                   disabled={importing || loadingMeta}
-                  onClick={() => setStageOpen((o) => !o)}
+                  onClick={() => toggleDropdown('stage')}
                   className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-3 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center gap-2 disabled:opacity-60"
                 >
                   <span
@@ -514,8 +552,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   />
                 </button>
                 {stageOpen && (
-                  <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl">
-                    <div className="max-h-52 overflow-y-auto py-1">
+                  <div className={`absolute z-50 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl ${dropUpKey === 'stage' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}>
+                    <div className="max-h-52 overflow-y-auto overscroll-contain py-1">
                       {stages.length === 0 && (
                         <p className="px-3 py-3 text-xs text-zinc-500 text-center">No stages yet — add one below</p>
                       )}
@@ -630,11 +668,11 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
               <label className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">
                 Assign To (تعيين إلى)
               </label>
-              <div className="relative" data-cb="assignee">
+              <div className="relative" data-cb="assignee" ref={assigneeBoxRef}>
                 <button
                   type="button"
                   disabled={importing || loadingMeta}
-                  onClick={() => setAssigneeOpen((o) => !o)}
+                  onClick={() => toggleDropdown('assignee')}
                   className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center gap-2.5 disabled:opacity-60"
                 >
                   {assignee === 'round-robin' ? (
@@ -683,8 +721,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   />
                 </button>
                 {assigneeOpen && (
-                  <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl">
-                    <div className="max-h-60 overflow-y-auto py-1">
+                  <div className={`absolute z-50 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl ${dropUpKey === 'assignee' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}>
+                    <div className="max-h-60 overflow-y-auto overscroll-contain py-1">
                       {/* Option 1 — Pool */}
                       <button
                         type="button"
