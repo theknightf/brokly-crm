@@ -38,7 +38,7 @@ import {
   ALL_FOLLOW_UP_STATUSES,
   ALL_FOLLOW_UP_TYPES,
 } from './mockFollowUps';
-import { followUpsService, teamService } from '@/lib/services/crmService';
+import { followUpsService, teamService, teamsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -157,17 +157,40 @@ export default function FollowUpsManagementScreen() {
     setLoading(true);
     try {
       console.log('[FollowUpsManagementScreen] loadData starting...');
-      const [fuData, teamData] = await Promise.all([
+      const [fuData, teamData, assignableUsers] = await Promise.all([
         followUpsService.getAll(),
-        teamService.getAll(),
+        teamService.getAll().catch(() => []),
+        teamsService.getAssignableUsers().catch(() => []),
       ]);
       console.log('[FollowUpsManagementScreen] followUpsService.getAll() result:', fuData);
       console.log('[FollowUpsManagementScreen] teamService.getAll() result:', teamData);
-      setFollowUps(fuData as FollowUp[]);
-      const activeAgents = (teamData as any[])
+      console.log('[FollowUpsManagementScreen] assignableUsers result:', assignableUsers);
+
+      const followUpItems = (fuData || []) as FollowUp[];
+      setFollowUps(followUpItems);
+
+      // Collect all real users from user_profiles (via assignableUsers)
+      const userNames = (assignableUsers as { id: string; name: string }[])
+        .map((u) => u.name?.trim())
+        .filter(Boolean);
+
+      // Any agents from existing follow-up rows
+      const followUpAgents = followUpItems
+        .map((f) => f.agent?.trim())
+        .filter(Boolean);
+
+      // Any active members from team_members table
+      const teamAgents = (teamData as any[])
         .filter((m) => m.status === 'Active')
-        .map((m) => m.name);
-      setAgentList(activeAgents);
+        .map((m) => m.name?.trim())
+        .filter(Boolean);
+
+      // Combine with priority to real user_profiles, then followUp agents, then teamAgents
+      const combined = Array.from(new Set([...userNames, ...followUpAgents, ...teamAgents])).sort(
+        (a, b) => a.localeCompare(b)
+      );
+
+      setAgentList(combined);
     } catch (err: any) {
       console.error('[FollowUpsManagementScreen] loadData error:', err);
       // silently fall back to empty

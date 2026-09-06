@@ -158,7 +158,10 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
           developerName: p.developerName || '',
         }))
       );
-      setAgents((teamData as any[]).filter((m) => m.status === 'Active').map((m) => m.name));
+      const userNames = (assignableUsers as any[]).map((u) => u.name?.trim()).filter(Boolean);
+      const activeAgents = (teamData as any[]).filter((m) => m.status === 'Active').map((m) => m.name?.trim()).filter(Boolean);
+      const combined = Array.from(new Set([...userNames, ...activeAgents])).sort((a, b) => a.localeCompare(b));
+      setAgents(combined);
       setUsers((assignableUsers as any[]).map((u) => ({ id: u.id, name: u.name })));
       setTeams((teamsData as any[]).map((t) => ({ id: t.id, name: t.name })));
     });
