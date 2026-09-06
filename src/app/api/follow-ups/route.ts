@@ -36,6 +36,52 @@ function rowToFollowUp(row: any) {
 }
 
 /**
+ * GET /api/follow-ups — list all follow-ups (any signed-in member).
+ *
+ * Why this route exists: the Follow-ups page previously read the
+ * `follow_ups` table straight from the browser, so any RLS hiccup, missing
+ * migration, or network failure collapsed silently to `[]` and the page
+ * looked blank with no error. This endpoint runs service-side
+ * (service-role, RLS-proof) and returns the canonical contract
+ * `{ followUps, count }` — the same shape as
+ * GET /api/workspace/follow-ups — with deliberately NO default filters
+ * (no user_id / status / date constraint), so valid rows are never excluded.
+ * Related data needs no join: every field the UI renders (contact, agent,
+ * property, notes) is denormalized on the row; `leadId` is only used to
+ * deep-link to the lead.
+ */
+export async function GET() {
+  const serverClient = await createServerClient();
+  const {
+    data: { user },
+  } = await serverClient.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const db: any = getSupabaseService();
+    const { data, error } = await db
+      .from('follow_ups')
+      .select('*')
+      .order('due_date', { ascending: true });
+    if (error) {
+      // Same convention as /api/workspace/follow-ups: HTTP 200 with an empty
+      // list + error text, so the UI can show the message instead of a blank page.
+      return NextResponse.json(
+        { followUps: [], count: 0, error: error.message },
+        { status: 200 }
+      );
+    }
+    const rows = (data || []).map((r: any) => rowToFollowUp(r));
+    return NextResponse.json({ followUps: rows, count: rows.length });
+  } catch (e: any) {
+    return NextResponse.json(
+      { followUps: [], count: 0, error: e?.message || 'Failed to load follow-ups' },
+      { status: 200 }
+    );
+  }
+}
+
+/**
  * POST /api/follow-ups — create a follow-up (any signed-in member).
  *
  * Why this route exists: browser inserts hit follow_ups RLS + the

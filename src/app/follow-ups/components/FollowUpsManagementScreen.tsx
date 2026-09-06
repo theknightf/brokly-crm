@@ -71,7 +71,9 @@ const relationshipConfig: Record<RelationshipStatus, { color: string; dot: strin
 };
 
 function RelationshipBadge({ status }: { status: RelationshipStatus }) {
-  const cfg = relationshipConfig[status];
+  // Fall back to 'New' so one unexpected/NULL relationship_status value can
+  // never throw and blank the entire list.
+  const cfg = relationshipConfig[status] || relationshipConfig.New;
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${cfg.color}`}
@@ -91,7 +93,9 @@ interface FilterState {
 }
 
 function formatDate(dateStr: string) {
+  if (!dateStr || typeof dateStr !== 'string') return '—';
   const d = new Date(dateStr + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -106,7 +110,12 @@ function formatTime(timeStr?: string | null) {
 
 function isOverdue(dueDate: string, status: FollowUpStatus) {
   if (status === 'Completed' || status === 'Cancelled') return false;
-  return new Date(dueDate) < new Date(new Date().toDateString());
+  // Guard: new Date(null) coerces to the 1970 epoch, which would wrongly flag
+  // every NULL-due-date row as overdue.
+  if (!dueDate || typeof dueDate !== 'string') return false;
+  const d = new Date(dueDate);
+  if (Number.isNaN(d.getTime())) return false;
+  return d < new Date(new Date().toDateString());
 }
 
 export default function FollowUpsManagementScreen() {
@@ -115,6 +124,7 @@ export default function FollowUpsManagementScreen() {
   const [repairing, setRepairing] = useState(false);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     status: '',
@@ -155,6 +165,7 @@ export default function FollowUpsManagementScreen() {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       console.log('[FollowUpsManagementScreen] loadData starting...');
       const [fuData, teamData, assignableUsers] = await Promise.all([
@@ -193,7 +204,12 @@ export default function FollowUpsManagementScreen() {
       setAgentList(combined);
     } catch (err: any) {
       console.error('[FollowUpsManagementScreen] loadData error:', err);
-      // silently fall back to empty
+      // Never a blank screen: surface the failure with a retry affordance
+      // instead of silently falling back to empty.
+      const message =
+        err?.message || 'Could not load follow-ups. Check your connection and retry.';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -224,11 +240,13 @@ export default function FollowUpsManagementScreen() {
     let r = [...tabFiltered];
     if (filters.search) {
       const q = filters.search.toLowerCase();
+      // Null-safe: legacy/manual rows may carry NULL title/contact/property,
+      // and one .toLowerCase() on null would throw and blank the whole list.
       r = r.filter(
         (f) =>
-          f.title.toLowerCase().includes(q) ||
-          f.contactName.toLowerCase().includes(q) ||
-          f.propertyInterest.toLowerCase().includes(q)
+          (f.title || '').toLowerCase().includes(q) ||
+          (f.contactName || '').toLowerCase().includes(q) ||
+          (f.propertyInterest || '').toLowerCase().includes(q)
       );
     }
     if (filters.status) r = r.filter((f) => f.status === filters.status);
@@ -290,9 +308,9 @@ export default function FollowUpsManagementScreen() {
     const q = profileSearch.toLowerCase();
     return derivedProfiles.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.propertyInterest.toLowerCase().includes(q) ||
-        p.agent.toLowerCase().includes(q)
+        (p.name || '').toLowerCase().includes(q) ||
+        (p.propertyInterest || '').toLowerCase().includes(q) ||
+        (p.agent || '').toLowerCase().includes(q)
     );
   }, [profileSearch, derivedProfiles]);
 
@@ -529,8 +547,26 @@ export default function FollowUpsManagementScreen() {
         ))}
       </div>
 
-      {/* Customer Profiles Tab */}
-      {activeTab === 'profiles' ? (
+      {/* Loading / error states — always visible instead of a blank page */}
+      {loading ? (
+        <div className="card-base flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+          <Loader2 size={16} className="animate-spin" />
+          Loading follow-ups…
+        </div>
+      ) : loadError ? (
+        <div className="card-base flex flex-col items-center justify-center py-16 text-center border-red-200">
+          <AlertCircle size={40} className="text-red-400 mb-3" />
+          <p className="text-base font-semibold text-foreground">Could not load follow-ups</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-md">{loadError}</p>
+          <button
+            onClick={loadData}
+            className="btn-secondary mt-4 flex items-center gap-1.5 text-sm"
+          >
+            <RotateCcw size={14} />
+            Retry
+          </button>
+        </div>
+      ) : activeTab === 'profiles' ? (
         <div className="space-y-4">
           {/* Profile search */}
           <div className="card-base !p-4">
@@ -561,7 +597,7 @@ export default function FollowUpsManagementScreen() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold flex-shrink-0">
-                        {profile.name
+                        {(profile.name || '?')
                           .split(' ')
                           .map((n) => n[0])
                           .join('')
@@ -776,10 +812,10 @@ export default function FollowUpsManagementScreen() {
                             {/* Title row */}
                             <div className="flex items-start gap-2 flex-wrap">
                               <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeColor[fu.type]}`}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeColor[fu.type] || 'bg-slate-100 text-slate-600'}`}
                               >
-                                {typeIcon[fu.type]}
-                                {fu.type}
+                                {typeIcon[fu.type] || null}
+                                {fu.type || 'Call'}
                               </span>
                               <PriorityBadge priority={fu.priority} />
                               <span
