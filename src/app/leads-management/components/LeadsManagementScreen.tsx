@@ -97,11 +97,21 @@ const STATUS_PARAM_ALIAS: Record<string, LeadStatus> = {
 export function resolveStatusParam(raw: string | null): LeadStatus | '' {
   if (!raw) return '';
   const v = raw.trim();
-  if (!v) return '';
-  const exact = ALL_REAL_STATUSES.find((s) => s.toLowerCase() === v.toLowerCase());
-  if (exact) return exact;
+  if (!v || v.length > 60) return '';
+  // Exact pipeline status (case-insensitive) + filter-only extras the Leads
+  // filter dropdown itself offers (e.g. Duplicate Leads).
+  const exact = [...ALL_REAL_STATUSES, 'Duplicate Leads'].find(
+    (s) => s.toLowerCase() === v.toLowerCase()
+  );
+  if (exact) return exact as LeadStatus;
   const key = v.toLowerCase().replace(/[\s-]+/g, '_');
-  return STAGE_PARAM_MAP[key] || STATUS_PARAM_ALIAS[key] || '';
+  if (STAGE_PARAM_MAP[key] || STATUS_PARAM_ALIAS[key]) {
+    return (STAGE_PARAM_MAP[key] || STATUS_PARAM_ALIAS[key]) as LeadStatus;
+  }
+  // Verbatim fallback: dashboard cards deep-link literal stage names
+  // (e.g. Leaders Pending) so the applied filter always matches the card.
+  // The API exact-matches crm_status, so unknown values simply yield no rows.
+  return v as LeadStatus;
 }
 
 interface CallHistoryRow {

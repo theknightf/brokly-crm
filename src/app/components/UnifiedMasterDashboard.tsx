@@ -1,10 +1,8 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, TrendingUp, Calendar, Users, BarChart3, ExternalLink, Loader2, RefreshCw, Bell, Zap, Filter, ArrowRight, Target, ShoppingBag, PhoneOff, XCircle, CheckCircle, Flame, Snowflake, Pause, LayoutGrid, List, Search, RotateCw } from 'lucide-react';
+import { ShieldCheck, Trophy, Clock, Shirt, Phone, AlertTriangle, Banknote, TrendingUp, Calendar, Users, BarChart3, ExternalLink, Loader2, RefreshCw, Bell, Zap, Filter, ArrowRight, Target, ShoppingBag, LayoutGrid, List, Search, RotateCw } from 'lucide-react';
 import DressCodeEvaluationForm from '@/app/components/DressCodeEvaluationForm';
 import WeightedLeaderboard from '@/app/components/WeightedLeaderboard';
-import LeadStageCardsBar from '@/app/components/LeadStageCardsBar';
 import KpiCardsGrid from '@/app/components/KpiCardsGrid';
 import DailyLeaderboard from '@/app/components/DailyLeaderboard';
 import DelayList from '@/app/components/DelayList';
@@ -22,36 +20,12 @@ interface UnifiedData {
 type DashboardMode = 'sales' | 'leads';
 type PipelineView = 'kanban' | 'table';
 
-const STAGE_META: Record<string, { label: string; icon: any; color: string; bg: string; border: string; stageKeys: string[] }> = {
-  newFresh: { label: 'New Fresh', icon: Flame, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', stageKeys: ['Fresh Leads','New Fresh'] },
-  newCold: { label: 'New Cold', icon: Snowflake, color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-200', stageKeys: ['Cold Calls','New Cold'] },
-  leadsPending: { label: 'Leads Pending', icon: Pause, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', stageKeys: ['Pending Leads','Leads Pending','Following Up'] },
-  callsAnswer: { label: 'Calls Answer', icon: Phone, color: 'text-lime-700', bg: 'bg-lime-50', border: 'border-lime-200', stageKeys: ['Calls Answer','Calls Answered','Meeting','Interested'] },
-  noAnswer: { label: 'No Answer', icon: PhoneOff, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200', stageKeys: ['No Answer','No Answer At All'] },
-  cancel: { label: 'Cancel', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', stageKeys: ['Cancel','Cancellation'] },
-  doneDeal: { label: 'D.Deal', icon: CheckCircle, color: 'text-emerald-700', bg: 'bg-emerald-100', border: 'border-emerald-300', stageKeys: ['Done Deal','D.Deal'] },
-};
-
-// Dashboard card → /leads-management query mapping (consumed by
-// LeadsManagementScreen via useSearchParams on mount).
-export const STAGE_CARD_QUERY: Record<string, string> = {
-  newFresh: 'stage=fresh',
-  newCold: 'stage=cold',
-  leadsPending: 'stage=pending',
-  callsAnswer: 'status=answered',
-  noAnswer: 'status=no_answer',
-  cancel: 'status=cancelled',
-  doneDeal: 'stage=deal',
-};
-
 export default function UnifiedMasterDashboard() {
-  const router = useRouter();
   const [range, setRange] = useState<'week'|'month'>('week');
   const [mode, setMode] = useState<DashboardMode>('sales');
   const [data, setData] = useState<UnifiedData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [pipelineView, setPipelineView] = useState<PipelineView>('kanban');
   const [pipelineSearch, setPipelineSearch] = useState('');
   const [pipelineLeads, setPipelineLeads] = useState<any[]>([]);
@@ -61,7 +35,6 @@ export default function UnifiedMasterDashboard() {
   const [filterAgentId, setFilterAgentId] = useState<string | null>(null);
 
   const leaderboardRef = useRef<HTMLDivElement | null>(null);
-  const pipelineRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -78,14 +51,13 @@ export default function UnifiedMasterDashboard() {
     setPipelineLoading(true);
     try {
       const params = new URLSearchParams();
-      if (stageFilter) params.set('stage', stageFilter);
       if (pipelineSearch) params.set('search', pipelineSearch);
       params.set('pageSize', '50');
       const res = await fetch(`/api/leads?${params.toString()}`, { cache: 'no-store' });
       const j = await res.json();
       if (res.ok) setPipelineLeads(j.leads || []);
     } catch {} finally { setPipelineLoading(false); }
-  }, [mode, stageFilter, pipelineSearch]);
+  }, [mode, pipelineSearch]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadPipelineLeads(); }, [loadPipelineLeads]);
@@ -97,31 +69,6 @@ export default function UnifiedMasterDashboard() {
   }, [pipelineSearch]);
 
   const scrollToLeaderboard = () => leaderboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  const activeStageKeyForBar = (() => {
-    if (!stageFilter) return null;
-    for (const [k, v] of Object.entries(STAGE_META)) if ((v as any).stageKeys.includes(stageFilter)) return k;
-    return null;
-  })();
-
-  const handleStageClick = (key: string) => {
-    // Deep-link into Leads Management pre-filtered (single source of truth
-    // for stage/status filtering lives in LeadsManagementScreen).
-    const q = STAGE_CARD_QUERY[key];
-    if (q) {
-      router.push(`/leads-management?${q}`);
-      return;
-    }
-    // Fallback: in-dashboard pipeline filter for unknown keys.
-    const meta = (STAGE_META as any)[key];
-    if (!meta) return;
-    const target = meta.stageKeys[0];
-    const isActive = stageFilter === target;
-    const next = isActive ? null : target;
-    setStageFilter(next);
-    setTimeout(() => pipelineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
-    if (next) toast.success(`Filtered: ${meta.label}`, { description: `${(data?.leadStageStats as any)?.[key]?.count ?? 0} leads` });
-  };
 
   const handleRotate = async () => {
     setRotating(true);
@@ -138,16 +85,6 @@ export default function UnifiedMasterDashboard() {
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-lime-500"/></div>;
   if (error) return <div className="text-center py-10"><p className="text-sm text-destructive mb-3">{error}</p><button onClick={load} className="btn-secondary text-sm flex items-center gap-1 mx-auto"><RefreshCw size={14}/> Retry</button></div>;
   if (!data) return null;
-
-  const stageStats = data.leadStageStats || {
-    newFresh: { count: 0, percentage: '0%' },
-    newCold: { count: 0, percentage: '0%' },
-    leadsPending: { count: 0, percentage: '0%' },
-    callsAnswer: { count: 0, percentage: '0%' },
-    noAnswer: { count: 0, percentage: '0%' },
-    cancel: { count: 0, percentage: '0%' },
-    doneDeal: { count: 0, percentage: '0%', revenue: 0 },
-  };
 
   const filteredLeads = pipelineLeads;
 
@@ -195,10 +132,7 @@ export default function UnifiedMasterDashboard() {
       {/* Hierarchical Team & Agent Filter — persistent top-bar */}
       <DashboardTeamFilter onChange={(t,a)=>{ setFilterTeamId(t); setFilterAgentId(a); }} />
 
-      {/* Lead Stages Grid — directly below tabs per spec hierarchy */}
-      <LeadStageCardsBar stats={stageStats as any} activeStageKey={activeStageKeyForBar} onStageClick={handleStageClick} />
-
-      {/* KPI 21-Card Grid — role-aware counts + trends */}
+      {/* Lead status cards — every card deep-links to filtered Leads Management */}
       <KpiCardsGrid teamId={filterTeamId || undefined} agentId={filterAgentId || undefined} />
 
       {/* Hourly Activity + Daily Leaderboard + Delay Management */}
@@ -332,13 +266,12 @@ export default function UnifiedMasterDashboard() {
           </div>
 
           {/* Pipeline toolbar */}
-          <div ref={pipelineRef} className="bg-card border border-border rounded-2xl p-3 flex flex-wrap gap-2 items-center justify-between">
+          <div className="bg-card border border-border rounded-2xl p-3 flex flex-wrap gap-2 items-center justify-between">
             <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
               <div className="relative flex-1">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"/>
                 <input value={pipelineSearch} onChange={e=>setPipelineSearch(e.target.value)} placeholder="Search leads..." className="input-base pl-8 h-9 text-sm w-full"/>
               </div>
-              {stageFilter && <span className="text-xs bg-lime-500 text-zinc-950 font-semibold px-2 py-1 rounded-full flex items-center gap-1">Stage: {stageFilter} <button onClick={()=>setStageFilter(null)} className="hover:bg-white/20 rounded-full p-0.5"><XCircle size={10} className="text-zinc-950"/></button></span>}
             </div>
             <div className="flex items-center gap-2">
               <div className="flex bg-muted rounded-lg p-1">
@@ -352,7 +285,7 @@ export default function UnifiedMasterDashboard() {
           {/* Pipeline content */}
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
             {pipelineLoading ? <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-lime-700 dark:text-lime-400"/></div>
-            : filteredLeads.length===0 ? <div className="text-center py-12 text-sm text-muted-foreground">No leads {stageFilter ? `for stage "${stageFilter}"` : ''} {pipelineSearch ? `matching "${pipelineSearch}"` : ''}. <button onClick={()=>{setStageFilter(null); setPipelineSearch('');}} className="text-lime-700 dark:text-lime-400 underline">Clear filters</button></div>
+            : filteredLeads.length===0 ? <div className="text-center py-12 text-sm text-muted-foreground">No leads {pipelineSearch ? `matching "${pipelineSearch}"` : ''}. <button onClick={()=>{setPipelineSearch('');}} className="text-lime-700 dark:text-lime-400 underline">Clear search</button></div>
             : pipelineView==='table' ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

@@ -2,7 +2,17 @@
 import React, { useEffect, useState } from 'react';
 import { Trophy, Loader2 } from 'lucide-react';
 
-interface Row { user_id: string; full_name: string; role: string; totalActions: number; rank: number }
+interface Row {
+  user_id: string;
+  full_name: string;
+  role: string;
+  totalActions: number;
+  rank: number;
+  calls?: number;
+  statusUpdates?: number;
+  meetings?: number;
+  deals?: number;
+}
 
 export default function DailyLeaderboard({ date }: { date?: string }) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -27,12 +37,14 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {rows.slice(0,10).map(r=>(
             <div key={r.user_id} className="flex items-center gap-3 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${r.rank===1?'bg-amber-400 text-white': r.rank===2?'bg-zinc-300': r.rank===3?'bg-orange-400 text-white':'bg-zinc-100 dark:bg-zinc-800'}`}>{r.rank}</span>
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${r.rank===1?'bg-amber-400 text-white': r.rank===2?'bg-zinc-300 text-zinc-700': r.rank===3?'bg-orange-400 text-white':'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'}`}>{r.rank}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{r.full_name}</p>
-                <p className="text-xs text-zinc-500">{r.role}</p>
+                <p className="text-xs text-zinc-500 truncate">
+                  {r.role} · {r.calls ?? 0} calls · {r.statusUpdates ?? 0} updates · {r.meetings ?? 0} meetings · {r.deals ?? 0} deals
+                </p>
               </div>
-              <span className="text-sm font-bold text-lime-600">{r.totalActions} actions</span>
+              <span className="text-sm font-black text-lime-600 dark:text-lime-400 tabular-nums shrink-0">{r.totalActions} actions</span>
             </div>
           ))}
         </div>
