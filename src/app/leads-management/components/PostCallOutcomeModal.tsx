@@ -1,12 +1,12 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, PhoneOff, ThumbsUp, CalendarClock, CalendarCheck, AlertTriangle, Ban, X, Loader2, PhoneCall } from 'lucide-react';
+import { Check, PhoneOff, ThumbsUp, ThumbsDown, CalendarClock, CalendarCheck, AlertTriangle, Ban, X, Loader2, PhoneCall } from 'lucide-react';
 import { toast } from 'sonner';
 import { leadsService } from '@/lib/services/crmService';
 import type { Lead } from './mockLeads';
 
-export type PostCallOutcome = 'Answered' | 'No Answer' | 'Interested' | 'Follow-up' | 'Schedule Meeting' | 'Wrong Phone' | 'Closed Number';
+export type PostCallOutcome = 'Answered' | 'No Answer' | 'Interested' | 'Not Interested' | 'Follow-up' | 'Schedule Meeting' | 'Wrong Phone' | 'Closed Number';
 
 interface PostCallOutcomeModalProps {
   lead: Lead | null;
@@ -39,6 +39,14 @@ const OUTCOMES: { value: PostCallOutcome; labelEn: string; labelAr: string; icon
     icon: <ThumbsUp size={15} />,
     cls: 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100',
     activeCls: 'bg-sky-600 text-white border-sky-600 shadow-md',
+  },
+  {
+    value: 'Not Interested',
+    labelEn: 'Not Interested',
+    labelAr: 'غير مهتم',
+    icon: <ThumbsDown size={15} />,
+    cls: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100',
+    activeCls: 'bg-red-600 text-white border-red-600 shadow-md',
   },
   {
     value: 'Follow-up',
@@ -78,6 +86,7 @@ const OUTCOME_TO_STATUS: Record<PostCallOutcome, string> = {
   'Answered': 'Following Up',
   'No Answer': 'No Answer',
   'Interested': 'Interested',
+  'Not Interested': 'Not Interested',
   'Follow-up': 'Following Up',
   'Schedule Meeting': 'Meeting',
   'Wrong Phone': 'Wrong Number',
@@ -171,7 +180,16 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
 
   if (!open || !lead || !mounted) return null;
 
-  const needsSchedule = outcome === 'Follow-up' || outcome === 'Schedule Meeting';
+  // Follow-up / Meeting / No Answer all need a next-action date. For No Answer
+  // this is the retry reminder: the date lands in Follow-ups & Workspace so
+  // the agent is reminded to call back.
+  const needsSchedule = outcome === 'Follow-up' || outcome === 'Schedule Meeting' || outcome === 'No Answer';
+
+  const retryPresets: { label: string; days: number; time: string }[] = [
+    { label: 'Tomorrow 10:00', days: 1, time: '10:00' },
+    { label: 'In 2 days', days: 2, time: '12:00' },
+    { label: 'Next week', days: 7, time: '12:00' },
+  ];
 
   const handleSave = async () => {
     if (!lead || !outcome || saving) return;
@@ -243,7 +261,19 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
         }
       }
 
-      toast.success(`Logged: ${outcome}`);
+      if (needsSchedule && nextFollowUpDate) {
+        toast.success(`Logged: ${outcome}`, {
+          description:
+            outcome === 'No Answer'
+              ? `Retry reminder set for ${nextFollowUpDate}${followUpTime ? ` at ${followUpTime}` : ''} — find it in Follow-ups & Workspace.`
+              : outcome === 'Schedule Meeting'
+                ? `Meeting set for ${nextFollowUpDate} — see Calendar.`
+                : `Follow-up set for ${nextFollowUpDate}.`,
+          duration: 5000,
+        });
+      } else {
+        toast.success(`Logged: ${outcome}`);
+      }
       try {
         onSaved?.(lead, outcome);
       } catch {
@@ -326,8 +356,37 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
             <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 space-y-3 animate-in fade-in slide-in-from-top-2">
               <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5">
                 <CalendarCheck size={13} />
-                {outcome === 'Schedule Meeting' ? 'Meeting schedule' : 'Follow-up schedule'}
+                {outcome === 'Schedule Meeting'
+                  ? 'Meeting schedule'
+                  : outcome === 'No Answer'
+                    ? 'Retry schedule — remind me to call back'
+                    : 'Follow-up schedule'}
               </p>
+              {outcome === 'No Answer' && (
+                <div className="flex flex-wrap gap-1.5">
+                  {retryPresets.map((p) => {
+                    const active =
+                      followUpDate === addDays(formatToday(), p.days) && followUpTime === p.time;
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => {
+                          setFollowUpDate(addDays(formatToday(), p.days));
+                          setFollowUpTime(p.time);
+                        }}
+                        className={`h-8 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
+                          active
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'bg-white text-violet-700 border border-violet-200 hover:bg-violet-50'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold text-muted-foreground">Date</span>
@@ -352,7 +411,9 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
               <p className="text-[11px] text-muted-foreground">
                 {outcome === 'Schedule Meeting'
                   ? 'This meeting will appear on Calendar & Follow-ups.'
-                  : 'A follow-up will be created for this date.'}
+                  : outcome === 'No Answer'
+                    ? 'We’ll remind you to retry this lead on this date (Follow-ups & Workspace).'
+                    : 'A follow-up will be created for this date.'}
               </p>
             </div>
           )}
