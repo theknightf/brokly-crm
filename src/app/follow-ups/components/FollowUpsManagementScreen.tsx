@@ -156,16 +156,20 @@ export default function FollowUpsManagementScreen() {
   const loadData = async () => {
     setLoading(true);
     try {
+      console.log('[FollowUpsManagementScreen] loadData starting...');
       const [fuData, teamData] = await Promise.all([
         followUpsService.getAll(),
         teamService.getAll(),
       ]);
+      console.log('[FollowUpsManagementScreen] followUpsService.getAll() result:', fuData);
+      console.log('[FollowUpsManagementScreen] teamService.getAll() result:', teamData);
       setFollowUps(fuData as FollowUp[]);
       const activeAgents = (teamData as any[])
         .filter((m) => m.status === 'Active')
         .map((m) => m.name);
       setAgentList(activeAgents);
     } catch (err: any) {
+      console.error('[FollowUpsManagementScreen] loadData error:', err);
       // silently fall back to empty
     } finally {
       setLoading(false);
@@ -213,6 +217,14 @@ export default function FollowUpsManagementScreen() {
       return a.dueTime < b.dueTime ? -1 : 1;
     });
   }, [tabFiltered, filters]);
+
+  console.log('[FollowUpsManagementScreen] render state:', {
+    rawFollowUpsCount: followUps.length,
+    activeTab,
+    tabFilteredCount: tabFiltered.length,
+    filteredCount: filtered.length,
+    activeFilters: filters,
+  });
 
   const stats = useMemo(
     () => ({

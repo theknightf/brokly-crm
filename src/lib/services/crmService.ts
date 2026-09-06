@@ -1164,16 +1164,22 @@ export const followUpsService = {
   async getAll() {
     const supabase = createClient();
     try {
+      console.log('[crmService.followUpsService.getAll] executing query...');
       const { data, error } = await supabase
         .from('follow_ups')
         .select('*')
         .order('due_date', { ascending: true });
+      console.log('[crmService.followUpsService.getAll] raw data:', data, 'error:', error);
       if (error) {
+        console.error('[crmService.followUpsService.getAll] supabase error:', error);
         if (isSchemaError(error)) throw error;
         return [];
       }
-      return (data || []).map(rowToFollowUp);
+      const mapped = (data || []).map(rowToFollowUp);
+      console.log('[crmService.followUpsService.getAll] mapped followUps:', mapped);
+      return mapped;
     } catch (err: any) {
+      console.error('[crmService.followUpsService.getAll] caught exception:', err);
       if (isSchemaError(err)) throw err;
       return [];
     }
