@@ -20,8 +20,12 @@ import {
   RotateCcw,
   UserCircle2,
   TrendingUp,
+  Loader2,
+  Wrench,
 } from 'lucide-react';
+import { isAdminRole } from '@/lib/roles';
 import Modal from '@/components/ui/Modal';
+import { toast } from 'sonner';
 import { FollowUpStatusBadge, PriorityBadge } from './FollowUpStatusBadge';
 import FollowUpForm from './FollowUpForm';
 import {
@@ -104,8 +108,9 @@ function isOverdue(dueDate: string, status: FollowUpStatus) {
 }
 
 export default function FollowUpsManagementScreen() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
+  const [repairing, setRepairing] = useState(false);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
@@ -319,6 +324,31 @@ export default function FollowUpsManagementScreen() {
     setScheduleFromProfile(profile);
   };
 
+  // One-click repair: rebuilds follow_ups rows for every lead carrying a
+  // follow-up date (fixes reminders scheduled while sync was broken).
+  const handleRepair = async () => {
+    if (repairing) return;
+    setRepairing(true);
+    try {
+      const res = await fetch('/api/follow-ups/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allMissing: true }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error || 'Repair failed');
+      toast.success(
+        `Repaired reminders: ${j.created || 0} created, ${j.updated || 0} updated, ${j.cancelled || 0} cancelled`,
+        { duration: 6000 }
+      );
+      await loadData();
+    } catch (e: any) {
+      toast.error(e?.message || 'Repair failed');
+    } finally {
+      setRepairing(false);
+    }
+  };
+
   const activeFilterCount = [filters.status, filters.type, filters.priority, filters.agent].filter(
     Boolean
   ).length;
@@ -361,13 +391,26 @@ export default function FollowUpsManagementScreen() {
             Schedule and track follow-ups with your leads and customers
           </p>
         </div>
-        <button
-          onClick={() => setAddModalOpen(true)}
-          className="btn-primary flex items-center gap-1.5 text-sm self-start sm:self-auto"
-        >
-          <Plus size={15} />
-          Schedule Follow-up
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {isAdminRole((profile as any)?.role) && (
+            <button
+              onClick={handleRepair}
+              disabled={repairing}
+              title="Rebuild missing reminder rows for leads with follow-up dates"
+              className="btn-secondary flex items-center gap-1.5 text-sm disabled:opacity-50"
+            >
+              {repairing ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
+              {repairing ? 'Repairing…' : 'Repair missing'}
+            </button>
+          )}
+          <button
+            onClick={() => setAddModalOpen(true)}
+            className="btn-primary flex items-center gap-1.5 text-sm"
+          >
+            <Plus size={15} />
+            Schedule Follow-up
+          </button>
+        </div>
       </div>
 
       {/* KPI strip */}

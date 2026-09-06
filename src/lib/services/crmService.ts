@@ -48,6 +48,25 @@ function invalidateCache(): void {
   crmCache.clear();
 }
 
+/**
+ * Server-side follow-up reconcile (primary sync path). Hits
+ * POST /api/follow-ups/sync which runs service-role, so the reminder row is
+ * created even when the follow_ups RLS/trigger migrations were never applied.
+ * Best-effort — never throws; client syncFromLead remains the fallback.
+ */
+async function syncLeadFollowUpRow(leadId: string): Promise<void> {
+  if (!leadId) return;
+  try {
+    await fetch('/api/follow-ups/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadId }),
+    });
+  } catch {
+    /* fallback syncFromLead covers it */
+  }
+}
+
 /** Best-effort activity_log insert (lead timeline). Never throws. */
 async function logActivity(actionType: string, entityType: string, entityId: string, detail = '') {
   try {
@@ -477,6 +496,7 @@ export const leadsService = {
       );
     }
     invalidateCache();
+    await syncLeadFollowUpRow(id);
     await followUpsService.syncFromLead(data);
     return rowToLead(data);
   },
@@ -484,7 +504,7 @@ export const leadsService = {
   /**
    * Schedules (or reschedules) a follow-up on a lead. Reuses the existing
    * `follow_up_due` DATE column — the DB trigger + syncFromLead keep the linked
-   * follow_ups row in sync, which is what the Workspace Late/Today/Tomorrow
+   * `follow_ups` row in sync, which is what the Workspace Late/Today/Tomorrow
    * tabs read from.
    */
   async scheduleFollowUp(id: string, dueDate: string) {
@@ -497,6 +517,9 @@ export const leadsService = {
       .single();
     if (error) throw error;
     invalidateCache();
+    // Server-side sync is the primary path (service-role, RLS-proof);
+    // client syncFromLead stays as offline fallback. Both are idempotent.
+    await syncLeadFollowUpRow(id);
     await followUpsService.syncFromLead(data);
     return rowToLead(data);
   },
@@ -1199,6 +1222,9 @@ export const followUpsService = {
     try {
       const rows = Array.isArray(leadOrArray) ? leadOrArray : [leadOrArray];
       if (!rows.length) return;
+      // Terminal stages skip auto-creation — EXCEPT No Answer, which is a
+      // retry queue: an explicit follow-up date must always survive as a
+      // Pending reminder (mirrors /api/follow-ups/sync CANCEL_STATUSES).
       const terminal = new Set([
         'Done Deal',
         'Not Interested',
@@ -1206,8 +1232,6 @@ export const followUpsService = {
         'Duplicate Leads',
         'Wrong Number',
         'Closed Number',
-        'No Answer',
-        'No Answer At All',
         'Low Budget',
         'Data Rotation',
         'Won',
