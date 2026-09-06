@@ -95,8 +95,10 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function formatTime(timeStr: string) {
+function formatTime(timeStr?: string | null) {
+  if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return '—';
   const [h, m] = timeStr.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '—';
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 || 12;
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
@@ -263,8 +265,15 @@ export default function FollowUpsManagementScreen() {
     try {
       const created = await followUpsService.create(fu, user?.id || '');
       setFollowUps((p) => [created as FollowUp, ...p]);
-    } catch {
-      setFollowUps((p) => [fu, ...p]);
+      toast.success('Follow-up scheduled');
+      // Refetch so the list reflects the confirmed server state (and any
+      // trigger-synced rows), not just the optimistic item.
+      await loadData();
+    } catch (e: any) {
+      // Never render phantom rows: on failure show the exact error and keep
+      // the form state so nothing is lost.
+      toast.error(e?.message || 'Failed to schedule follow-up');
+      return;
     }
     setAddModalOpen(false);
     setScheduleFromProfile(null);
@@ -274,8 +283,11 @@ export default function FollowUpsManagementScreen() {
     try {
       const updated = await followUpsService.update(fu.id, fu);
       setFollowUps((p) => p.map((x) => (x.id === fu.id ? (updated as FollowUp) : x)));
-    } catch {
-      setFollowUps((p) => p.map((x) => (x.id === fu.id ? fu : x)));
+      toast.success('Follow-up updated');
+      await loadData();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update follow-up');
+      return;
     }
     setEditTarget(null);
   };

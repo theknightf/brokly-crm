@@ -175,7 +175,25 @@ CREATE TRIGGER trg_log_attendance
   AFTER INSERT OR UPDATE ON public.attendance
   FOR EACH ROW EXECUTE FUNCTION public.log_attendance_change();
 
--- ─── 3. OFFICE-HOUR / LATE LOGIC ─────────────────────────────────────────────
+-- ─── 3. REPORT HELPERS ────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.daily_action_count(p_user_id UUID, p_date DATE)
+RETURNS INTEGER LANGUAGE sql STABLE AS $$
+  SELECT COUNT(*)::INTEGER
+  FROM public.activity_log
+  WHERE user_id = p_user_id
+    AND created_at::date = p_date;
+$$;
+
+
+CREATE OR REPLACE FUNCTION public.daily_active_seconds(p_user_id UUID, p_date DATE)
+RETURNS INTEGER LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(SUM(total_active_seconds), 0)::INTEGER
+  FROM public.user_daily_activity
+  WHERE user_id = p_user_id AND activity_date = p_date;
+$$;
+
+-- ─── 4. OFFICE-HOUR / LATE LOGIC ─────────────────────────────────────────────
 
 DO $$
 BEGIN
@@ -195,7 +213,7 @@ RETURNS INTEGER LANGUAGE sql STABLE AS $$
   END::INTEGER;
 $$;
 
--- ─── 4. USER SESSIONS / ACTIVITY / DAILY AGGREGATES ──────────────────────────
+-- ─── 5. USER SESSIONS / ACTIVITY / DAILY AGGREGATES ──────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.user_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -216,6 +234,8 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user_login
   ON public.user_sessions(user_id, login_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_active
   ON public.user_sessions(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_user_sessions_date
+  ON public.user_sessions((login_at::date) DESC);
 
 CREATE TABLE IF NOT EXISTS public.user_activity_log (
   id BIGSERIAL PRIMARY KEY,
@@ -232,6 +252,8 @@ CREATE INDEX IF NOT EXISTS idx_user_activity_session
   ON public.user_activity_log(session_id);
 CREATE INDEX IF NOT EXISTS idx_user_activity_type
   ON public.user_activity_log(event_type);
+CREATE INDEX IF NOT EXISTS idx_user_activity_date
+  ON public.user_activity_log((occurred_at::date) DESC);
 
 CREATE TABLE IF NOT EXISTS public.user_daily_activity (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -287,36 +309,7 @@ CREATE POLICY "users_own_daily"
 
 ALTER TABLE public.user_sessions REPLICA IDENTITY FULL;
 
--- ─── 4. REPORT HELPERS ────────────────────────────────────────────────────────
--- Defined AFTER the tables they read (LANGUAGE sql validates at creation).
-
-CREATE OR REPLACE FUNCTION public.daily_action_count(p_user_id UUID, p_date DATE)
-RETURNS INTEGER LANGUAGE sql STABLE AS $$
-  SELECT COUNT(*)::INTEGER
-  FROM public.activity_log
-  WHERE user_id = p_user_id
-    AND created_at::date = p_date;
-$$;
-
-CREATE OR REPLACE FUNCTION public.daily_active_seconds(p_user_id UUID, p_date DATE)
-RETURNS INTEGER LANGUAGE sql STABLE AS $$
-  SELECT COALESCE(SUM(total_active_seconds), 0)::INTEGER
-  FROM public.user_daily_activity
-  WHERE user_id = p_user_id AND activity_date = p_date;
-$$;
-
--- ─── 5. SESSION / HEARTBEAT HELPERS ──────────────────────────────────────────
-
--- Live DB is missing this base helper — define it so the triggers below work.
-CREATE OR REPLACE FUNCTION public.update_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
-  RETURN NEW;
-END;
-$$;
+-- ─── 6. SESSION / HEARTBEAT HELPERS ──────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.close_stale_sessions(timeout_minutes INTEGER DEFAULT 5)
 RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -437,24 +430,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_activity_log TO authenticate
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_daily_activity TO authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.user_activity_log_id_seq TO authenticated;
 
--- ─── 8. CALL LOGS — UPSERT FIX ────────────────────────────────────────────────
--- The old PARTIAL unique index (WHERE client_ref IS NOT NULL) cannot serve as
--- an ON CONFLICT arbiter → Postgres error 42P10 on every upsert. Replace it
--- with a plain unique index (NULLs are distinct, so rows without client_ref
--- are unaffected) and add the UPDATE policy the upsert's implicit UPDATE needs.
-
-DROP INDEX IF EXISTS public.idx_call_logs_client_ref;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_call_logs_client_ref_unique
-  ON public.call_logs (client_ref);
-
-DROP POLICY IF EXISTS "users_update_call_logs" ON public.call_logs;
-CREATE POLICY "users_update_call_logs"
-  ON public.call_logs FOR UPDATE TO authenticated
-  USING (public.is_admin_or_owner_v2() OR user_id = auth.uid())
-  WITH CHECK (public.is_admin_or_owner_v2() OR user_id = auth.uid());
-
--- ─── 9. BACKFILL: salvage call logs stashed in admin_settings ────────────────
+-- ─── 8. BACKFILL: salvage call logs stashed in admin_settings ────────────────
 -- Each fallback row stores a JSON call object in admin_settings.color.
 -- Loop per-row and skip anything malformed so this migration can never fail.
 
@@ -497,7 +473,7 @@ BEGIN
   END LOOP;
 END $$;
 
--- ─── 10. REALTIME ────────────────────────────────────────────────────────────
+-- ─── 9. REALTIME ─────────────────────────────────────────────────────────────
 
 DO $$
 BEGIN

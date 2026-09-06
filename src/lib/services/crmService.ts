@@ -797,6 +797,9 @@ export const leadsService = {
     /** Lead IDs to exclude from the result — used to optimistically remove leads
      *  after a call is logged so the queue reflects the change instantly. */
     recentlyCalledIds?: string[];
+    /** Contact filter (no stage/status change): 'today' = called or followed
+     *  up today, 'not-today' = no contact recorded today. '' = all. */
+    contacted?: '' | 'today' | 'not-today';
   }) {
     const supabase = createClient();
     const {
@@ -812,6 +815,7 @@ export const leadsService = {
       sortKey = 'createdAt',
       sortDir = 'desc',
       recentlyCalledIds = [],
+      contacted = '',
     } = params || {};
 
     const columnMap: Record<string, string> = {
@@ -882,6 +886,41 @@ export const leadsService = {
 
       const from = Math.max(0, (page - 1) * pageSize);
       const to = from + pageSize - 1;
+
+      // Contacted-filters handled at DB for pagination accuracy:
+      // 'today' = lead has a call_log or follow-up created today;
+      // 'not-today' = none of the above.
+      let todayClause: string | undefined;
+      if (contacted) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: todayLogs } = await supabase
+          .from('call_logs')
+          .select('entity_id')
+          .eq('entity_type', 'lead')
+          .gte('created_at', `${today}T00:00:00.000Z`)
+          .lte('created_at', `${today}T23:59:59.999Z`);
+        const logIds = new Set(
+          (todayLogs || [])
+            .map((r: any) => r.entity_id)
+            .filter((v: string | null | undefined): v is string => !!v)
+        );
+        const { data: todayFUs } = await supabase
+          .from('follow_ups')
+          .select('lead_id')
+          .gte('created_at', `${today}T00:00:00.000Z`)
+          .lte('created_at', `${today}T23:59:59.999Z`);
+        const fuIds = new Set(
+          (todayFUs || [])
+            .map((r: any) => r.lead_id)
+            .filter((v: string | null | undefined): v is string => !!v)
+        );
+        const contactedIds = [...new Set([...logIds, ...fuIds])];
+        if (contactedIds.length > 0) {
+          todayClause = contacted === 'today'
+            ? `id in (${contactedIds.map((id) => `"${id}"`).join(',')})`
+            : `id not in (${contactedIds.map((id) => `"${id}"`).join(',')})`;
+        }
+      }
 
       const { data, error, count } = await query
         .order(column, { ascending: sortDir !== 'desc' })
@@ -1198,15 +1237,35 @@ export const followUpsService = {
   },
 
   async create(fu: any, userId: string) {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('follow_ups')
-      .insert(followUpToRow(fu, userId))
-      .select()
-      .single();
-    if (error) throw error;
-    invalidateCache();
-    return rowToFollowUp(data);
+    // Prefer the service-side route: it validates required fields and upserts
+    // on lead_id, so RLS/unique-constraint failures can never silently drop
+    // the reminder. Direct insert is only a network-failure fallback.
+    try {
+      const res = await fetch('/api/follow-ups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...fu, leadId: fu.leadId || undefined }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error || 'Failed to create follow-up');
+      invalidateCache();
+      return j.followUp;
+    } catch (e: any) {
+      // Only fall back to a direct insert when the API itself is unreachable
+      // (network error with no server message). Validation/DB errors throw.
+      if (e instanceof TypeError) {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('follow_ups')
+          .insert(followUpToRow(fu, userId))
+          .select()
+          .single();
+        if (error) throw error;
+        invalidateCache();
+        return rowToFollowUp(data);
+      }
+      throw e;
+    }
   },
 
   /**

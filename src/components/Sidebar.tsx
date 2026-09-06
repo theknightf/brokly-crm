@@ -294,22 +294,23 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
         <SidebarContent collapsed={collapsed} isActive={isActive} nav={nav} />
       </aside>
 
-      {/* Mobile sidebar */}
+      {/* Mobile sidebar — single brand header lives inside SidebarContent
+          (a second header here used to render the Brokly logo twice) */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex flex-col w-60 bg-card border-r border-border lg:hidden sidebar-transition ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between px-4 h-14 border-b border-border">
-          <div className="flex items-center gap-2">
-            <AppLogo size={28} />
-            <span className="font-bold text-base text-lime-gradient">Brokly</span>
-          </div>
-          <button onClick={onMobileClose} className="btn-ghost p-1.5">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        <SidebarContent collapsed={false} isActive={isActive} nav={nav} />
+        <SidebarContent
+          collapsed={false}
+          isActive={isActive}
+          nav={nav}
+          headerAction={
+            <button onClick={onMobileClose} className="btn-ghost p-1.5" aria-label="Close menu">
+              <ChevronRight size={16} />
+            </button>
+          }
+        />
       </aside>
     </>
   );
@@ -319,10 +320,12 @@ function SidebarContent({
   collapsed,
   isActive,
   nav,
+  headerAction,
 }: {
   collapsed: boolean;
   isActive: (href: string) => boolean;
   nav: NavGroup[];
+  headerAction?: React.ReactNode;
 }) {
   const { user, profile, signOut } = useAuth();
   const { t } = useLanguage();
@@ -349,7 +352,7 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Logo */}
+      {/* Logo — the single brand header for desktop and mobile */}
       <div
         className={`flex items-center h-14 border-b border-border flex-shrink-0 ${
           collapsed ? 'justify-center px-2' : 'px-4 gap-2'
@@ -359,6 +362,7 @@ function SidebarContent({
         {!collapsed && (
           <span className="font-bold text-base text-lime-gradient truncate">Brokly</span>
         )}
+        {!collapsed && headerAction && <span className="ms-auto flex items-center">{headerAction}</span>}
       </div>
 
       {/* Nav groups */}

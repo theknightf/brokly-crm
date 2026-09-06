@@ -88,6 +88,8 @@ export interface Lead {
   adminName?: string | null;
   lastContact?: string;
   followUpDue?: string;
+  /** True when the lead has a call log or follow-up created today. Stamped by leadsService.getPage; display-only. */
+  contactedToday?: boolean;
   createdAt?: string;
   notes?: string;
   location?: string;
