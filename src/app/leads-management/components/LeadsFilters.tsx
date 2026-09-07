@@ -190,25 +190,40 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
         />
       </div>
 
-      {/* Contacted — three-state toggle, never a status/stage change */}
+      {/* Action Taken — replaces Contacted. Covers call, note, stage, follow-up (last_action_at). */}
       <div
         className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 h-9"
         role="group"
-        aria-label="Contacted filter"
+        aria-label="Action taken filter"
       >
         {(
           [
-            { value: '', label: 'All' },
-            { value: 'today', label: 'Contacted Today' },
-            { value: 'not-today', label: 'Not Contacted' },
+            { value: '', label: 'All Leads' },
+            { value: 'today', label: 'Action Taken' },
+            { value: 'no-action', label: 'No Action Taken' },
           ] as const
         ).map((opt) => {
-          const active = filters.contacted === opt.value;
+          // Map deprecated contacted to the new keys for active state
+          const cur =
+            filters.actionTaken || (filters.contacted === 'today' ? 'today' : filters.contacted === 'not-today' ? 'no-action' : '');
+          const active = cur === opt.value;
+          const nextVal = opt.value as FilterState['actionTaken'];
           return (
             <button
               key={opt.value || 'all'}
               type="button"
-              onClick={() => update('contacted', opt.value)}
+              onClick={() => {
+                const next: FilterState = {
+                  ...filters,
+                  actionTaken: nextVal,
+                  contacted: '' as FilterState['contacted'],
+                };
+                if (nextVal !== 'today') {
+                  next.actionFrom = '';
+                  next.actionTo = '';
+                }
+                onChange(next);
+              }}
               aria-pressed={active}
               className={`h-8 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
                 active
@@ -221,6 +236,42 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
           );
         })}
       </div>
+
+      {/* Date range refinement — visible when Action Taken is active */}
+      {(filters.actionTaken === 'today' || !!filters.actionFrom || !!filters.actionTo) && filters.actionTaken !== 'no-action' && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={filters.actionFrom}
+            onChange={(e) => update('actionFrom', e.target.value)}
+            className="input-base h-9 text-xs px-2 w-[150px]"
+            aria-label="Action from date"
+            title="From date — filter Action Taken in range"
+          />
+          <span className="text-xs text-muted-foreground">–</span>
+          <input
+            type="date"
+            value={filters.actionTo}
+            onChange={(e) => update('actionTo', e.target.value)}
+            className="input-base h-9 text-xs px-2 w-[150px]"
+            aria-label="Action to date"
+            title="To date — filter Action Taken in range"
+          />
+          {(filters.actionFrom || filters.actionTo) && (
+            <button
+              type="button"
+              onClick={() => {
+                update('actionFrom', '');
+                update('actionTo', '');
+              }}
+              className="h-9 px-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-secondary"
+              title="Clear date range"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

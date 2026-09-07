@@ -556,10 +556,40 @@
   padding-top: max(12px, env(safe-area-inset-top));
 }
 /* Hide bottom nav + FAB when any modal/drawer is open — prevents overlap
-   Modal.tsx adds `modal-open` to <body> while open; CSS hides chrome. */
+    Modal.tsx adds `modal-open` to <body> while open; CSS hides chrome. */
 body.modal-open .mobile-bottom-nav,
 body.modal-open [data-fab="mobile-add-lead"] {
   display: none !important;
+}
+
+/* ── Stages dropdown — Android PWA viewport containment ──
+   Portal'd via ViewportPopover, but keep defensive rules for any
+   remaining absolute dropdowns (ImportLeads stage picker) so the panel
+   never exceeds the viewport horizontally/vertically and long stage
+   names wrap instead of truncating. */
+.stage-dropdown-panel {
+  max-width: min(100%, calc(100vw - 16px));
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  overscroll-behavior: contain;
+}
+.stage-pill {
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 640px) {
+  .stage-dropdown-panel {
+    max-width: calc(100vw - 16px);
+    width: min(280px, calc(100vw - 16px)) !important;
+  }
+  /* Prevent the pill row itself from clipping the portal anchor */
+  [data-stage-row] {
+    overflow: visible !important;
+  }
 }
 
 @keyframes pwaPageIn {

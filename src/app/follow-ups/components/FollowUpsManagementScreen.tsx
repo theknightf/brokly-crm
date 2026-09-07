@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Plus,
   Search,
@@ -26,6 +26,7 @@ import {
 import { isAdminRole } from '@/lib/roles';
 import Modal from '@/components/ui/Modal';
 import { toast } from 'sonner';
+import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 import { FollowUpStatusBadge, PriorityBadge } from './FollowUpStatusBadge';
 import FollowUpForm from './FollowUpForm';
 import {
@@ -132,6 +133,27 @@ export default function FollowUpsManagementScreen() {
   const [profileSearch, setProfileSearch] = useState('');
   const [scheduleFromProfile, setScheduleFromProfile] = useState<CustomerProfile | null>(null);
 
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [fuData, teamData] = await Promise.all([
+        followUpsService.getAll(),
+        teamService.getAll(),
+      ]);
+      setFollowUps(fuData as FollowUp[]);
+      const activeAgents = (teamData as any[])
+        .filter((m) => m.status === 'Active')
+        .map((m) => m.name);
+      setAgentList(activeAgents);
+    } catch {
+      // silently fall back to empty
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFollowUpSync(loadData);
+
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -152,25 +174,6 @@ export default function FollowUpsManagementScreen() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [fuData, teamData] = await Promise.all([
-        followUpsService.getAll(),
-        teamService.getAll(),
-      ]);
-      setFollowUps(fuData as FollowUp[]);
-      const activeAgents = (teamData as any[])
-        .filter((m) => m.status === 'Active')
-        .map((m) => m.name);
-      setAgentList(activeAgents);
-    } catch (err: any) {
-      // silently fall back to empty
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const today = new Date().toISOString().split('T')[0];
 

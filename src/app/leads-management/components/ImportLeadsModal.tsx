@@ -446,7 +446,10 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   />
                 </button>
                 {sourceOpen && (
-                  <div className={`absolute z-50 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl ${dropUpKey === 'source' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}>
+                  <div
+                    className={`absolute z-50 w-full max-w-[calc(100vw-16px)] box-border overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl overscroll-contain ${dropUpKey === 'source' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}
+                    style={{ maxWidth: 'min(100%, calc(100vw - 16px))', boxSizing: 'border-box' }}
+                  >
                     <div className="max-h-52 overflow-y-auto overscroll-contain py-1">
                       {sources.length === 0 && (
                         <p className="px-3 py-3 text-xs text-zinc-500 text-center">No sources yet — add one below</p>
@@ -552,7 +555,10 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   />
                 </button>
                 {stageOpen && (
-                  <div className={`absolute z-50 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl ${dropUpKey === 'stage' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}>
+                  <div
+                    className={`absolute z-50 w-full max-w-[calc(100vw-16px)] box-border overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl overscroll-contain ${dropUpKey === 'stage' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}
+                    style={{ maxWidth: 'min(100%, calc(100vw - 16px))', boxSizing: 'border-box' }}
+                  >
                     <div className="max-h-52 overflow-y-auto overscroll-contain py-1">
                       {stages.length === 0 && (
                         <p className="px-3 py-3 text-xs text-zinc-500 text-center">No stages yet — add one below</p>
@@ -721,7 +727,10 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   />
                 </button>
                 {assigneeOpen && (
-                  <div className={`absolute z-50 w-full overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl ${dropUpKey === 'assignee' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}>
+                  <div
+                    className={`absolute z-50 w-full max-w-[calc(100vw-16px)] box-border overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl overscroll-contain ${dropUpKey === 'assignee' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}
+                    style={{ maxWidth: 'min(100%, calc(100vw - 16px))', boxSizing: 'border-box' }}
+                  >
                     <div className="max-h-60 overflow-y-auto overscroll-contain py-1">
                       {/* Option 1 — Pool */}
                       <button

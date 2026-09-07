@@ -88,8 +88,13 @@ export interface Lead {
   adminName?: string | null;
   lastContact?: string;
   followUpDue?: string;
-  /** True when the lead has a call log or follow-up created today. Stamped by leadsService.getPage; display-only. */
+  /** @deprecated — use actionTakenToday. Kept for backward compat during rollout. */
   contactedToday?: boolean;
+  /** Canonical "Action Taken" timestamp: updated on call, note, status, follow-up. */
+  lastActionAt?: string | null;
+  lastActionBy?: string | null;
+  /** Derived at query time: lastActionAt is today (local day). Display-only. */
+  actionTakenToday?: boolean;
   createdAt?: string;
   notes?: string;
   location?: string;

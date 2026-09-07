@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Pencil,
   Trash2,
@@ -21,6 +21,7 @@ import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ContactedBadge from './ContactedBadge';
+import ViewportPopover from '@/components/ui/ViewportPopover';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileLeadCardProps {
@@ -99,6 +100,7 @@ export default function MobileLeadCard({
 }: MobileLeadCardProps) {
   const { user } = useAuth();
   const [statusOpen, setStatusOpen] = useState(false);
+  const stageAnchorRef = useRef<HTMLButtonElement>(null);
   const initials = getInitials(lead.name || '', lead.id?.toString().slice(0, 2));
   const overdue = isOverdue(lead.followUpDue);
   const budgetText = formatEgyBudget(lead.budgetMin, lead.budgetMax);
@@ -201,7 +203,7 @@ export default function MobileLeadCard({
               <span className="truncate">{lead.location || '—'}</span>
             </p>
             <div className="mt-1.5">
-              <ContactedBadge contactedToday={lead.contactedToday} compact />
+              <ContactedBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
             </div>
           </div>
         </button>
@@ -232,59 +234,66 @@ export default function MobileLeadCard({
 
       {/* 2. Status & Pipeline Pills Row */}
       <div className="px-4 pt-3 flex items-center gap-2 flex-wrap">
-        {/* Stage selector dropdown pill — light bright green */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setStatusOpen((o) => !o)}
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-bold border active:scale-[0.98] transition-transform bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-            aria-label={`Stage: ${lead.status || 'Fresh Leads'}`}
-          >
-            <span className="truncate max-w-[110px]">{lead.status || 'Fresh Leads'}</span>
-            <ChevronDown size={13} className="flex-shrink-0" />
-          </button>
-          {statusOpen && (
-            <>
-              <div className="fixed inset-0 z-30" onClick={() => setStatusOpen(false)} aria-hidden />
-              <div className="absolute left-0 top-full mt-1 z-40 flex flex-col bg-card dark:bg-card border border-border rounded-xl shadow-xl min-w-[240px] py-1 max-h-80 overflow-y-auto">
-                <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  Pipeline
-                </p>
-                {PIPELINE_STAGES.map((s) => (
-                  <button
-                    key={`mob-pipe-${lead.id}-${s}`}
-                    onClick={() => {
-                      onStatusChange(lead.id, s as LeadStatus);
-                      setStatusOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center min-h-[44px] ${
-                      s === lead.status ? 'bg-emerald-50' : ''
-                    }`}
-                  >
-                    <StatusBadge status={s} showDot />
-                  </button>
-                ))}
-                <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  Outcomes
-                </p>
-                {OUTCOME_STAGES.map((s) => (
-                  <button
-                    key={`mob-out-${lead.id}-${s}`}
-                    onClick={() => {
-                      onStatusChange(lead.id, s as LeadStatus);
-                      setStatusOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center min-h-[44px] ${
-                      s === lead.status ? 'bg-emerald-50' : ''
-                    }`}
-                  >
-                    <StatusBadge status={s} showDot />
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        {/* Stage selector dropdown pill — light bright green (portal'd, viewport-clamped, bottom-sheet on Android PWA) */}
+        <button
+          ref={stageAnchorRef}
+          type="button"
+          onClick={() => setStatusOpen((o) => !o)}
+          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-bold border active:scale-[0.98] transition-transform bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 max-w-full"
+          aria-label={`Stage: ${lead.status || 'Fresh Leads'}`}
+          aria-expanded={statusOpen}
+          aria-haspopup="listbox"
+        >
+          <span className="whitespace-nowrap truncate max-w-[140px]">{lead.status || 'Fresh Leads'}</span>
+          <ChevronDown size={13} className="flex-shrink-0" />
+        </button>
+        <ViewportPopover
+          open={statusOpen}
+          onClose={() => setStatusOpen(false)}
+          anchorRef={stageAnchorRef}
+          minWidth={240}
+          preferredMaxHeight={380}
+          zIndex={70}
+          role="listbox"
+          aria-label="Select stage"
+        >
+          <div className="py-1">
+            <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Pipeline</p>
+            {PIPELINE_STAGES.map((s) => (
+              <button
+                key={`mob-pipe-${lead.id}-${s}`}
+                role="option"
+                aria-selected={s === lead.status}
+                onClick={() => {
+                  onStatusChange(lead.id, s as LeadStatus);
+                  setStatusOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center min-h-[44px] whitespace-normal break-words box-border ${
+                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
+                }`}
+              >
+                <StatusBadge status={s} showDot />
+              </button>
+            ))}
+            <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Outcomes</p>
+            {OUTCOME_STAGES.map((s) => (
+              <button
+                key={`mob-out-${lead.id}-${s}`}
+                role="option"
+                aria-selected={s === lead.status}
+                onClick={() => {
+                  onStatusChange(lead.id, s as LeadStatus);
+                  setStatusOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center min-h-[44px] whitespace-normal break-words box-border ${
+                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
+                }`}
+              >
+                <StatusBadge status={s} showDot />
+              </button>
+            ))}
+          </div>
+        </ViewportPopover>
 
         {/* Status badge — darker green pill with lightning */}
         <span

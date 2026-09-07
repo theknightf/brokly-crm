@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CalendarClock,
@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { followUpsService } from '@/lib/services/crmService';
 import { QuickNoteSheet } from '@/components/mobile/QuickNoteSheet';
 import { useCallOutcome, CallItem, CallChannel } from '@/components/mobile/CallOutcomeSheet';
+import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 
 interface Item {
   id: string;
@@ -54,33 +55,33 @@ export default function MobileTodayFollowUps() {
     );
   };
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [overdue, pending] = await Promise.all([
-          followUpsService.getOverdue(5),
-          followUpsService.getTodayAndPending(5),
-        ]);
-        if (!alive) return;
-        const seen = new Set<string>();
-        const merged = [...overdue, ...pending].filter((f) => {
-          if (seen.has(f.id)) return false;
-          seen.add(f.id);
-          return true;
-        });
-        merged.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-        setItems(merged as Item[]);
-      } catch {
-        // ignore
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [overdue, pending] = await Promise.all([
+        followUpsService.getOverdue(5),
+        followUpsService.getTodayAndPending(5),
+      ]);
+      const seen = new Set<string>();
+      const merged = [...overdue, ...pending].filter((f) => {
+        if (seen.has(f.id)) return false;
+        seen.add(f.id);
+        return true;
+      });
+      merged.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      setItems(merged as Item[]);
+    } catch {
+      // ignore — keep previous items
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useFollowUpSync(load);
 
   return (
     <div className="lg:hidden">

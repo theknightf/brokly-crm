@@ -2,34 +2,45 @@
 import React from 'react';
 
 /**
- * Contacted-today indicator. Display-only: a green dot when the lead has a
- * call log or follow-up created today, gray otherwise. Never changes status.
+ * Action Taken indicator (replaces Contacted). Display-only: green when the
+ * lead has had any key action today (call, note, stage, follow-up), gray
+ * otherwise. Back-compat: also accepts `contactedToday`.
+ * Never changes status — view filter only.
  */
 export default function ContactedBadge({
   contactedToday,
+  actionTakenToday,
   compact = false,
 }: {
   contactedToday?: boolean;
+  actionTakenToday?: boolean;
   compact?: boolean;
 }) {
-  const contacted = !!contactedToday;
+  const active = !!(actionTakenToday ?? contactedToday);
   return (
     <span
-      title={contacted ? 'Contacted today (call or follow-up logged)' : 'Not contacted today'}
+      title={
+        active
+          ? 'Action taken today (call, note, stage change, or follow-up scheduled)'
+          : 'No action taken today'
+      }
       className={`inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap ${
         compact ? 'text-[10px] px-1.5 py-px' : 'text-[11px] px-2 py-0.5'
       } ${
-        contacted
+        active
           ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
           : 'bg-muted text-muted-foreground'
       }`}
     >
       <span
         className={`rounded-full ${compact ? 'w-1.5 h-1.5' : 'w-2 h-2'} ${
-          contacted ? 'bg-emerald-500' : 'bg-muted-foreground/50'
+          active ? 'bg-emerald-500' : 'bg-muted-foreground/50'
         }`}
       />
-      {contacted ? 'Contacted today' : 'Not contacted'}
+      {active ? 'Action taken' : 'No action'}
     </span>
   );
 }
+
+/** Alias for new call sites. */
+export const ActionTakenBadge = ContactedBadge;

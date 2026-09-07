@@ -1,8 +1,9 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, Phone, Clock, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { followUpsService } from '@/lib/services/crmService';
+import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 
 interface OverdueItem {
   id: string;
@@ -19,15 +20,20 @@ export default function OverdueFollowUps() {
   const [items, setItems] = useState<OverdueItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    followUpsService
+  const load = useCallback(() => {
+    setLoading(true);
+    return followUpsService
       .getOverdue(5)
-      .then((data: any[]) => {
-        setItems(data || []);
-      })
+      .then((data: any[]) => setItems(data || []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useFollowUpSync(load);
 
   const getUrgencyClass = (priority: string) => {
     if (priority === 'High') return 'border-red-100 bg-red-50/40';

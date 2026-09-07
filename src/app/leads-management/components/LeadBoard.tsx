@@ -60,7 +60,7 @@ function BoardCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground text-sm truncate">{lead.name || 'Lead'}</p>
           <div className="mt-1">
-            <ContactedBadge contactedToday={lead.contactedToday} compact />
+            <ContactedBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
           </div>
         </div>
         <button

@@ -305,21 +305,23 @@ export async function POST(request: Request) {
       saved = data;
     }
 
-    // Best-effort: reflect the call outcome on the lead's pipeline stage.
+    // Best-effort: reflect the call outcome on the lead's pipeline stage
+    // and stamp the Action Taken tracker (trigger also covers call_logs insert,
+    // but this ensures stage-only updates also bump last_action).
     if (entity_type === 'lead' && entity_id) {
       const nextStatus = OUTCOME_TO_STATUS[(outcome || '').trim()];
+      const patch: any = {
+        last_action_at: new Date().toISOString(),
+        last_action_by: user.id,
+      };
       if (nextStatus) {
-        try {
-          await supabase
-            .from('leads')
-            .update({
-              crm_status: nextStatus,
-              lead_status: STATUS_TO_LEGACY[nextStatus] || 'New',
-            })
-            .eq('id', entity_id);
-        } catch {
-          // ignore — the call is already logged; the pipeline sync is best-effort
-        }
+        patch.crm_status = nextStatus;
+        patch.lead_status = STATUS_TO_LEGACY[nextStatus] || 'New';
+      }
+      try {
+        await supabase.from('leads').update(patch).eq('id', entity_id);
+      } catch {
+        // ignore — the call is already logged; the pipeline sync is best-effort
       }
     }
 

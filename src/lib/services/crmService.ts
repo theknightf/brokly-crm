@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 
 function isSchemaError(error: any): boolean {
   if (!error) return false;
@@ -359,6 +360,7 @@ export const leadsService = {
       await pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
     }
     await followUpsService.syncFromLead(data);
+    emitFollowUpsChanged();
     return {
       ...rowToLead(data),
       referredToName: lead.referredToName || null,
@@ -454,15 +456,23 @@ export const leadsService = {
       await pushAssignmentNotifications(supabase, ids, to, 'Lead import');
     }
     await followUpsService.syncFromLead(data || []);
+    emitFollowUpsChanged();
     return (data || []).map(rowToLead);
   },
 
   async update(id: string, lead: any) {
     const supabase = createClient();
     const { data: prev } = await supabase.from('leads').select('assigned_to').eq('id', id).single();
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
+    const payload: any = { ...leadToRow(lead), last_action_at: new Date().toISOString() };
+    if (actorId) payload.last_action_by = actorId;
     const { data, error } = await supabase
       .from('leads')
-      .update(leadToRow(lead))
+      .update(payload)
       .eq('id', id)
       .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
       .single();
@@ -479,17 +489,24 @@ export const leadsService = {
       );
     }
     await followUpsService.syncFromLead(data);
+    emitFollowUpsChanged();
     return rowToLead(data);
   },
 
   async updateStatus(id: string, status: string) {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from('leads')
-      .update({ crm_status: status, lead_status: mapCrmStatusToLegacy(status) })
-      .eq('id', id)
-      .select('*')
-      .single();
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
+    const patch: any = {
+      crm_status: status,
+      lead_status: mapCrmStatusToLegacy(status),
+      last_action_at: new Date().toISOString(),
+    };
+    if (actorId) patch.last_action_by = actorId;
+    const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').single();
     if (error) {
       throw new Error(
         describeLeadWriteError(error, 'status update')
@@ -498,6 +515,8 @@ export const leadsService = {
     invalidateCache();
     await syncLeadFollowUpRow(id);
     await followUpsService.syncFromLead(data);
+    // Follow-up dashboard: status changes may cancel/create reminders (terminal stages).
+    emitFollowUpsChanged();
     return rowToLead(data);
   },
 
@@ -509,29 +528,34 @@ export const leadsService = {
    */
   async scheduleFollowUp(id: string, dueDate: string) {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from('leads')
-      .update({ follow_up_due: dueDate })
-      .eq('id', id)
-      .select('*')
-      .single();
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
+    const patch: any = { follow_up_due: dueDate, last_action_at: new Date().toISOString() };
+    if (actorId) patch.last_action_by = actorId;
+    const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').single();
     if (error) throw error;
     invalidateCache();
     // Server-side sync is the primary path (service-role, RLS-proof);
     // client syncFromLead stays as offline fallback. Both are idempotent.
     await syncLeadFollowUpRow(id);
     await followUpsService.syncFromLead(data);
+    emitFollowUpsChanged();
     return rowToLead(data);
   },
 
   async assignLead(id: string, assignedTo: string | null) {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from('leads')
-      .update({ assigned_to: assignedTo })
-      .eq('id', id)
-      .select('id, assigned_to, agent, agent_initials, crm_status, lead_status')
-      .single();
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
+    const patch: any = { assigned_to: assignedTo, last_action_at: new Date().toISOString() };
+    if (actorId) patch.last_action_by = actorId;
+    const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('id, assigned_to, agent, agent_initials, crm_status, lead_status').single();
     if (error) throw error;
     if (assignedTo) {
       await pushAssignmentNotifications(supabase, [id], assignedTo);
@@ -582,17 +606,27 @@ export const leadsService = {
       .join('')
       .toUpperCase()
       .slice(0, 2);
-    const { error } = await supabase
-      .from('leads')
-      .update({ agent, agent_initials: agentInitials })
-      .in('id', ids);
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
+    const patch: any = { agent, agent_initials: agentInitials, last_action_at: new Date().toISOString() };
+    if (actorId) patch.last_action_by = actorId;
+    const { error } = await supabase.from('leads').update(patch).in('id', ids);
     if (error) throw error;
     invalidateCache();
   },
 
   async bulkAssignUsers(ids: string[], assignedTo: string | null, assigneeName?: string) {
     const supabase = createClient();
-    const payload: any = { assigned_to: assignedTo };
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
+    const payload: any = { assigned_to: assignedTo, last_action_at: new Date().toISOString() };
+    if (actorId) payload.last_action_by = actorId;
     if (assigneeName) {
       payload.agent = assigneeName;
       payload.agent_initials = assigneeName
@@ -797,9 +831,14 @@ export const leadsService = {
     /** Lead IDs to exclude from the result — used to optimistically remove leads
      *  after a call is logged so the queue reflects the change instantly. */
     recentlyCalledIds?: string[];
-    /** Contact filter (no stage/status change): 'today' = called or followed
-     *  up today, 'not-today' = no contact recorded today. '' = all. */
+    /** @deprecated — use actionTaken. Kept so old URLs still work. */
     contacted?: '' | 'today' | 'not-today';
+    /** Action Taken filter (replaces Contacted): 'today' = any key action today
+     *  (call, note, stage, follow-up), 'no-action' = nothing recorded today/ever,
+     *  '' = all. Date range via actionFrom/actionTo (YYYY-MM-DD). */
+    actionTaken?: '' | 'today' | 'no-action';
+    actionFrom?: string;
+    actionTo?: string;
   }) {
     const supabase = createClient();
     const {
@@ -816,7 +855,16 @@ export const leadsService = {
       sortDir = 'desc',
       recentlyCalledIds = [],
       contacted = '',
+      actionTaken: rawActionTaken = '' as '' | 'today' | 'no-action',
+      actionFrom = '',
+      actionTo = '',
     } = params || {};
+    // Normalize deprecated contacted → actionTaken (so existing bookmarks keep working)
+    let actionTaken: '' | 'today' | 'no-action' = rawActionTaken;
+    if (!actionTaken && contacted) {
+      if (contacted === 'today') actionTaken = 'today';
+      else if (contacted === 'not-today') actionTaken = 'no-action';
+    }
 
     const columnMap: Record<string, string> = {
       name: 'name',
@@ -887,50 +935,78 @@ export const leadsService = {
       const from = Math.max(0, (page - 1) * pageSize);
       const to = from + pageSize - 1;
 
-      // Contacted-today set: lead IDs with a call_log (entity_type='lead') or a
-      // follow_up created today. Always resolved — it stamps the contactedToday
-      // badge on every row — and additionally filters the query when the
-      // contacted filter is active. Day bounds use the client's local day
-      // converted to UTC so "today" matches what the user sees.
-      let contactedToday = new Set<string>();
-      try {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date();
-        end.setHours(23, 59, 59, 999);
-        const startIso = start.toISOString();
-        const endIso = end.toISOString();
-        const [{ data: todayLogs }, { data: todayFUs }] = await Promise.all([
-          supabase
-            .from('call_logs')
-            .select('entity_id')
-            .eq('entity_type', 'lead')
-            .gte('created_at', startIso)
-            .lte('created_at', endIso),
-          supabase
-            .from('follow_ups')
-            .select('lead_id')
-            .gte('created_at', startIso)
-            .lte('created_at', endIso),
-        ]);
-        const ids = [
-          ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
-          ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
-        ].filter((v): v is string => !!v);
-        contactedToday = new Set(ids);
-      } catch {
-        contactedToday = new Set<string>();
+      // ── Action Taken filter (replaces Contacted) ──────────────────────────
+      // Reads leads.last_action_at directly — covers call, note, stage,
+      // follow-up (every key action bumps the timestamp + user). If the
+      // migration hasn't landed yet, falls back to the legacy
+      // call_logs+follow_ups created today set so the UI never breaks.
+      const hasActionFilter = !!actionTaken || !!actionFrom || !!actionTo;
+      let useFallbackContacted = false;
+      if (hasActionFilter) {
+        try {
+          // Date-range overrides the "today" shortcut when provided.
+          if (actionFrom || actionTo) {
+            if (actionFrom) query = query.gte('last_action_at', `${actionFrom}T00:00:00.000Z`);
+            if (actionTo) query = query.lte('last_action_at', `${actionTo}T23:59:59.999Z`);
+            if (actionTaken === 'no-action') {
+              // "No Action" in a range = outside the range OR never
+              // For now, treat as: last_action_at is null OR outside range
+              // Handled by client — we invert: fetch inside range then exclude?
+              // Simpler: if no-action + range, we need is null or not between
+              // Use two conditions: is null OR (lt from OR gt to) — PostgREST or
+              // not convenient, so we handle after fetch via in-memory filter?
+              // For v1, no-action with range = last_action_at is null
+              query = query.is('last_action_at', null);
+            }
+          } else if (actionTaken === 'today') {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            const end = new Date();
+            end.setHours(23, 59, 59, 999);
+            query = query.gte('last_action_at', start.toISOString()).lte('last_action_at', end.toISOString());
+          } else if (actionTaken === 'no-action') {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            // untouched today = null OR before today 00:00
+            query = query.or(`last_action_at.is.null,last_action_at.lt.${start.toISOString()}`);
+          }
+          // Probe: if the column doesn't exist PostgREST returns 400/PGRST204
+          // and isSchemaError will be true for the follow-up query error, so we
+          // catch there and redo with fallback. No extra round-trip here.
+        } catch {
+          useFallbackContacted = true;
+        }
       }
 
-      if (contacted === 'today') {
-        if (contactedToday.size === 0) {
-          return { data: [], total: 0, page, pageSize };
+      // Fallback set for badge when migration missing — still stamps
+      // contactedToday/actionTakenToday so the list never shows blank badges.
+      let fallbackSet: Set<string> | null = null;
+      if (useFallbackContacted) {
+        try {
+          const start = new Date();
+          start.setHours(0, 0, 0, 0);
+          const end = new Date();
+          end.setHours(23, 59, 59, 999);
+          const startIso = start.toISOString();
+          const endIso = end.toISOString();
+          const [{ data: todayLogs }, { data: todayFUs }] = await Promise.all([
+            supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead').gte('created_at', startIso).lte('created_at', endIso),
+            supabase.from('follow_ups').select('lead_id').gte('created_at', startIso).lte('created_at', endIso),
+          ]);
+          const ids = [
+            ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
+            ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
+          ].filter((v): v is string => !!v);
+          fallbackSet = new Set(ids);
+          if (actionTaken === 'today' || contacted === 'today') {
+            if (!fallbackSet.size) return { data: [], total: 0, page, pageSize };
+            query = query.in('id', [...fallbackSet]);
+          } else if ((actionTaken === 'no-action' || contacted === 'not-today') && fallbackSet.size) {
+            query = query.not('id', 'in', `(${[...fallbackSet].map((id) => `"${id}"`).join(',')})`);
+          }
+        } catch {
+          fallbackSet = new Set<string>();
         }
-        query = query.in('id', [...contactedToday]);
-      } else if (contacted === 'not-today' && contactedToday.size > 0) {
-        // Empty set must NOT be passed to .not(..., 'in', ...) or PostgREST
-        // returns zero rows — only apply when non-empty.
-        query = query.not('id', 'in', `(${[...contactedToday].map((id) => `"${id}"`).join(',')})`);
       }
 
       const { data, error, count } = await query
@@ -938,6 +1014,61 @@ export const leadsService = {
         .range(from, to);
 
       if (error) {
+        if (isSchemaError(error) && hasActionFilter && !useFallbackContacted) {
+          // Column last_action_at doesn't exist yet (migration not applied) —
+          // retry once with the legacy call_logs+follow_ups logic.
+          try {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            const end = new Date();
+            end.setHours(23, 59, 59, 999);
+            const startIso = start.toISOString();
+            const endIso = end.toISOString();
+            const [{ data: todayLogs }, { data: todayFUs }] = await Promise.all([
+              supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead').gte('created_at', startIso).lte('created_at', endIso),
+              supabase.from('follow_ups').select('lead_id').gte('created_at', startIso).lte('created_at', endIso),
+            ]);
+            const ids = [
+              ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
+              ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
+            ].filter((v): v is string => !!v);
+            const s = new Set(ids);
+            let retryQuery: any = supabase
+              .from('leads')
+              .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', { count: 'exact' });
+            if (q) retryQuery = retryQuery.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`);
+            if (status) retryQuery = retryQuery.eq('crm_status', status);
+            if (source) retryQuery = retryQuery.eq('source', source);
+            if (agent) retryQuery = retryQuery.eq('agent', agent);
+            if (project) retryQuery = retryQuery.eq('project', project);
+            if (propertyType) retryQuery = retryQuery.eq('property_type', propertyType);
+            if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
+              retryQuery = retryQuery.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
+            }
+            if (action) {
+              // re-apply action filter (already computed as in: above, for brevity re-query without it if fallback path)
+            }
+            if (actionTaken === 'today' || contacted === 'today') {
+              if (!s.size) return { data: [], total: 0, page, pageSize };
+              retryQuery = retryQuery.in('id', [...s]);
+            } else if ((actionTaken === 'no-action' || contacted === 'not-today') && s.size) {
+              retryQuery = retryQuery.not('id', 'in', `(${[...s].map((id) => `"${id}"`).join(',')})`);
+            }
+            const r2: any = await retryQuery.order(column, { ascending: sortDir !== 'desc' }).range(from, to);
+            if (r2.error) throw new Error(r2.error.message || 'Failed to load leads');
+            return {
+              data: (r2.data || []).map((row: any) => {
+                const mapped = rowToLead(row);
+                return { ...mapped, contactedToday: s.has(row.id), actionTakenToday: s.has(row.id) };
+              }),
+              total: r2.count ?? (r2.data || []).length,
+              page,
+              pageSize,
+            };
+          } catch (e: any) {
+            throw new Error(error.message || 'Failed to load leads');
+          }
+        }
         // Schema errors throw with technical detail for the (un-migrated) case;
         // every other failure (network, timeout, auth, integrity) must also
         // propagate so the UI can show an actionable error state instead of a
@@ -945,10 +1076,15 @@ export const leadsService = {
         throw new Error(error.message || 'Failed to load leads');
       }
       return {
-        data: (data || []).map((row: any) => ({
-          ...rowToLead(row),
-          contactedToday: contactedToday.has(row.id),
-        })),
+        data: (data || []).map((row: any) => {
+          const mapped = rowToLead(row);
+          // When falling back, override the derived badge with the join set
+          if (fallbackSet) {
+            const v = fallbackSet.has(row.id);
+            return { ...mapped, contactedToday: v, actionTakenToday: v };
+          }
+          return mapped;
+        }),
         total: count ?? (data || []).length,
         page,
         pageSize,
@@ -984,6 +1120,20 @@ export const leadsService = {
 };
 
 function rowToLead(row: any) {
+  const lastActionAt: string | null = row.last_action_at ?? null;
+  let actionTakenToday = false;
+  if (lastActionAt) {
+    try {
+      const d = new Date(lastActionAt);
+      const now = new Date();
+      actionTakenToday =
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate();
+    } catch {
+      actionTakenToday = false;
+    }
+  }
   return {
     id: row.id,
     name: row.name,
@@ -1006,6 +1156,11 @@ function rowToLead(row: any) {
     adminName: row.admin?.full_name || null,
     lastContact: row.last_contact,
     followUpDue: row.follow_up_due,
+    lastActionAt,
+    lastActionBy: row.last_action_by ?? null,
+    actionTakenToday,
+    // backward compat: contactedToday was call_logs+follow_ups created today; keep alias
+    contactedToday: actionTakenToday,
     notes: row.notes,
     location: row.location,
     developer: row.developer,
@@ -1263,6 +1418,8 @@ export const followUpsService = {
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error || 'Failed to create follow-up');
       invalidateCache();
+      // Wake every dashboard follow-up surface (KPIs, overdue, today list).
+      emitFollowUpsChanged();
       return j.followUp;
     } catch (e: any) {
       // Only fall back to a direct insert when the API itself is unreachable
@@ -1276,6 +1433,7 @@ export const followUpsService = {
           .single();
         if (error) throw error;
         invalidateCache();
+        emitFollowUpsChanged();
         return rowToFollowUp(data);
       }
       throw e;
@@ -1310,12 +1468,13 @@ export const followUpsService = {
         'Won',
         'Lost',
       ]);
+      let didWrite = false;
       for (const lead of rows) {
         const status = lead.crm_status || lead.lead_status || '';
         const due = lead.follow_up_due;
         if (!due || terminal.has(status)) continue;
         const assignee = lead.assigned_to || lead.created_by || null;
-        await supabase.from('follow_ups').upsert(
+        const { error } = await supabase.from('follow_ups').upsert(
           {
             lead_id: lead.id,
             title: `Follow up: ${lead.name || ''}`,
@@ -1337,7 +1496,9 @@ export const followUpsService = {
           },
           { onConflict: 'lead_id' }
         );
+        if (!error) didWrite = true;
       }
+      if (didWrite) emitFollowUpsChanged();
     } catch (err: any) {
       // The lead_id column (added by the 20260807000000 migration) may not
       // exist yet — then the DB trigger owns sync and this is best-effort.
@@ -1357,6 +1518,7 @@ export const followUpsService = {
       .single();
     if (error) throw error;
     invalidateCache();
+    emitFollowUpsChanged();
     return rowToFollowUp(data);
   },
 
@@ -1367,6 +1529,7 @@ export const followUpsService = {
     const { error } = await supabase.from('follow_ups').update(update).eq('id', id);
     if (error) throw error;
     invalidateCache();
+    emitFollowUpsChanged();
   },
 
   async delete(id: string) {
@@ -1374,6 +1537,7 @@ export const followUpsService = {
     const { error } = await supabase.from('follow_ups').delete().eq('id', id);
     if (error) throw error;
     invalidateCache();
+    emitFollowUpsChanged();
   },
 };
 

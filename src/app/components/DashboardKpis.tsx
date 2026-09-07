@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   UserPlus,
@@ -15,6 +15,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { leadsService, followUpsService, siteVisitsService } from '@/lib/services/crmService';
+import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 
 interface Stats {
   total: number;
@@ -79,30 +80,35 @@ export default function DashboardKpis() {
   const [visits, setVisits] = useState({ scheduled: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([
+  const load = useCallback(() => {
+    return Promise.all([
       leadsService.getDashboardStats(),
       followUpsService.getDashboardCounts(),
       siteVisitsService.getCounts(),
     ])
       .then(([s, f, v]) => {
-        if (!mounted) return;
         setStats(s || EMPTY);
         setFuCounts(f || { overdue: 0, dueToday: 0 });
         setVisits(v || { scheduled: 0, completed: 0 });
       })
-      .catch(() => {
-        if (!mounted) return;
-        setStats(EMPTY);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+      .catch(() => setStats(EMPTY))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const wrapped = () => {
+      if (!mounted) return Promise.resolve();
+      return load();
+    };
+    wrapped();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [load]);
+
+  // Real-time: any follow-up schedule/update/delete wakes this widget without a hard reload.
+  useFollowUpSync(load);
 
   if (loading) {
     return (

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ChevronUp,
   ChevronDown,
@@ -26,6 +26,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
 import ContactedBadge from './ContactedBadge';
+import ViewportPopover from '@/components/ui/ViewportPopover';
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -78,55 +79,67 @@ function StatusDropdown({
   onStatusChange: (id: string, s: LeadStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement>(null);
   return (
-    <div className="relative">
+    <>
       <button
+        ref={anchorRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5"
+        className="inline-flex items-center gap-1.5 max-w-full"
         aria-label={`Change status from ${currentStatus}`}
+        aria-expanded={open}
+        aria-haspopup="listbox"
       >
-        <StatusBadge status={currentStatus} />
-        <ChevronDown size={12} className="text-muted-foreground" />
+        <span className="min-w-0">
+          <StatusBadge status={currentStatus} />
+        </span>
+        <ChevronDown size={12} className="text-muted-foreground flex-shrink-0" />
       </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-40 flex flex-col bg-card border border-border rounded-xl shadow-modal min-w-[240px] py-1 fade-in max-h-72 overflow-y-auto">
-            <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Pipeline
-            </p>
-            {PIPELINE_STAGES.map((s) => (
-              <button
-                key={`status-opt-${leadId}-${s}`}
-                onClick={() => {
-                  onStatusChange(leadId, s as LeadStatus);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
-              >
-                <StatusBadge status={s} showDot />
-              </button>
-            ))}
-            <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Outcomes
-            </p>
-            {OUTCOME_STAGES.map((s) => (
-              <button
-                key={`status-opt-${leadId}-${s}`}
-                onClick={() => {
-                  onStatusChange(leadId, s as LeadStatus);
-                  setOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${s === currentStatus ? 'bg-secondary/50' : ''}`}
-              >
-                <StatusBadge status={s} showDot />
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+      <ViewportPopover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={anchorRef}
+        minWidth={240}
+        preferredMaxHeight={360}
+        zIndex={70}
+        role="listbox"
+        aria-label="Select stage"
+      >
+        <div className="py-1">
+          <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Pipeline</p>
+          {PIPELINE_STAGES.map((s) => (
+            <button
+              key={`status-opt-${leadId}-${s}`}
+              role="option"
+              aria-selected={s === currentStatus}
+              onClick={() => {
+                onStatusChange(leadId, s as LeadStatus);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors whitespace-normal break-words box-border ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+            >
+              <StatusBadge status={s} showDot />
+            </button>
+          ))}
+          <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Outcomes</p>
+          {OUTCOME_STAGES.map((s) => (
+            <button
+              key={`status-opt-${leadId}-${s}`}
+              role="option"
+              aria-selected={s === currentStatus}
+              onClick={() => {
+                onStatusChange(leadId, s as LeadStatus);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors whitespace-normal break-words box-border ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+            >
+              <StatusBadge status={s} showDot />
+            </button>
+          ))}
+        </div>
+      </ViewportPopover>
+    </>
   );
 }
 
@@ -331,7 +344,7 @@ export default function LeadsTable({
                         <a href={`/leads/${lead.id}`} className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block">
                           {lead.name || `Lead ${lead.id}`}
                         </a>
-                        <ContactedBadge contactedToday={lead.contactedToday} compact />
+                        <ContactedBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                           <MapPin size={10} />
                           {lead.location || '—'}

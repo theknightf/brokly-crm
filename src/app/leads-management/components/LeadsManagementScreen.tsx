@@ -73,8 +73,12 @@ export interface FilterState {
   project: string;
   propertyType: PropertyType | '';
   action: LeadAction | '';
-  /** '' = all leads (default, nothing hidden), 'today' = contacted today, 'not-today' = not contacted today. */
+  /** @deprecated — use actionTaken */
   contacted: '' | 'today' | 'not-today';
+  /** Action Taken filter (replaces Contacted): Today vs No Action. */
+  actionTaken: '' | 'today' | 'no-action';
+  actionFrom: string;
+  actionTo: string;
 }
 
 /**
@@ -258,6 +262,9 @@ export default function LeadsManagementScreen({
     propertyType: '',
     action: '',
     contacted: '',
+    actionTaken: '',
+    actionFrom: '',
+    actionTo: '',
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -415,6 +422,9 @@ export default function LeadsManagementScreen({
         propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
         contacted: filters.contacted || undefined,
+        actionTaken: filters.actionTaken || undefined,
+        actionFrom: filters.actionFrom || undefined,
+        actionTo: filters.actionTo || undefined,
         sortKey,
         sortDir,
         // Exclude leads that were optimistically removed after call logging
@@ -814,6 +824,9 @@ export default function LeadsManagementScreen({
         propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
         contacted: filters.contacted || undefined,
+        actionTaken: filters.actionTaken || undefined,
+        actionFrom: filters.actionFrom || undefined,
+        actionTo: filters.actionTo || undefined,
       });
       const rows = (res.data || []).map((l: any) => [
         l.name,
@@ -838,7 +851,7 @@ export default function LeadsManagementScreen({
         l.followUpDue,
         l.createdAt,
       ]);
-      const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(',')).join('\n');
+      const csv = [headers, ...rows].map((r) => r.map((v: any) => `"${v}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -876,6 +889,9 @@ export default function LeadsManagementScreen({
       propertyType: '',
       action: '',
       contacted: '',
+      actionTaken: '',
+      actionFrom: '',
+      actionTo: '',
     });
     setCurrentPage(1);
   };
