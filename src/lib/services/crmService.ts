@@ -1317,18 +1317,58 @@ function mapCrmStatusToLegacy(crmStatus: string): string {
 
 export const followUpsService = {
   async getAll() {
+    // Preferred path: RLS-proof server read via GET /api/follow-ups, whose
+    // canonical contract is `{ followUps, count }` (same as
+    // /api/workspace/follow-ups). Accept `{ data }` / `{ data: { data } }`
+    // defensively too, so a contract drift can never silently empty the page
+    // with `undefined`. Falls back to the direct query below on network failure.
+    try {
+      const res = await fetch('/api/follow-ups', { cache: 'no-store' });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j && typeof j === 'object') {
+        if (typeof (j as any).error === 'string' && (j as any).error) {
+          console.error('[crmService.followUpsService.getAll] API error:', (j as any).error);
+        }
+        const list =
+          (j as any).followUps ??
+          (j as any).followups ??
+          (j as any).data?.data ??
+          (j as any).data ??
+          null;
+        if (Array.isArray(list)) {
+          console.log('[crmService.followUpsService.getAll] via API:', list.length);
+          // API rows are already camelCase; map only raw snake_case rows.
+          return list.map((r: any) =>
+            r && typeof r === 'object' && 'contact_name' in r ? rowToFollowUp(r) : r
+          );
+        }
+      } else if (res.status === 401) {
+        console.error('[crmService.followUpsService.getAll] API unauthorized');
+      }
+    } catch (e) {
+      console.error(
+        '[crmService.followUpsService.getAll] API fetch failed, falling back to direct query:',
+        e
+      );
+    }
     const supabase = createClient();
     try {
+      console.log('[crmService.followUpsService.getAll] executing direct query...');
       const { data, error } = await supabase
         .from('follow_ups')
         .select('*')
         .order('due_date', { ascending: true });
+      console.log('[crmService.followUpsService.getAll] raw data:', data, 'error:', error);
       if (error) {
+        console.error('[crmService.followUpsService.getAll] supabase error:', error);
         if (isSchemaError(error)) throw error;
         return [];
       }
-      return (data || []).map(rowToFollowUp);
+      const mapped = (data || []).map(rowToFollowUp);
+      console.log('[crmService.followUpsService.getAll] mapped followUps:', mapped);
+      return mapped;
     } catch (err: any) {
+      console.error('[crmService.followUpsService.getAll] caught exception:', err);
       if (isSchemaError(err)) throw err;
       return [];
     }

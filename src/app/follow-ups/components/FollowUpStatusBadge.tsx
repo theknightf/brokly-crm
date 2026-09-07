@@ -30,7 +30,9 @@ interface PriorityBadgeProps {
 }
 
 export function PriorityBadge({ priority }: PriorityBadgeProps) {
-  const cfg = priorityConfig[priority];
+  // Fall back to 'Medium' so one unexpected/NULL priority value can never
+  // throw and blank the entire list.
+  const cfg = priorityConfig[priority] || priorityConfig.Medium;
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${cfg.bg} ${cfg.text}`}

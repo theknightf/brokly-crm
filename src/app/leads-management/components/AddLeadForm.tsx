@@ -121,10 +121,17 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       teamsService.getAssignableUsers().catch(() => []),
       leadSourcesService.getActive().catch(() => []),
     ]).then(([teamData, projectData, assignableUsers, sources]) => {
+      const userNames = (assignableUsers as { id: string; name: string }[])
+        .map((u) => u.name?.trim())
+        .filter(Boolean);
       const activeAgents = (teamData as any[])
         .filter((m) => m.status === 'Active')
-        .map((m) => m.name);
-      setAgentList(activeAgents);
+        .map((m) => m.name?.trim())
+        .filter(Boolean);
+      const combinedAgents = Array.from(new Set([...userNames, ...activeAgents])).sort((a, b) =>
+        a.localeCompare(b)
+      );
+      setAgentList(combinedAgents);
 
       const devMap = new Map<string, string>();
       (projectData as any[]).forEach((p) => {
