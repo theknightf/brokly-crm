@@ -9,9 +9,8 @@ const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
 const DashboardKpis = dynamic(() => import('./components/DashboardKpis'));
 const MyTargetsTasks = dynamic(() => import('./components/MyTargetsTasks'));
 const DashboardCharts = dynamic(() => import('./components/DashboardCharts'));
-const OverdueFollowUps = dynamic(() => import('./components/OverdueFollowUps'));
+const SalesFollowUpsWidget = dynamic(() => import('./components/SalesFollowUpsWidget'));
 const RecentActivity = dynamic(() => import('./components/RecentActivity'));
-const MobileTodayFollowUps = dynamic(() => import('./components/MobileTodayFollowUps'));
 const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
 const GettingStarted = dynamic(() => import('./components/GettingStarted'));
 const UnifiedMasterDashboard = dynamic(() => import('./components/UnifiedMasterDashboard'));
@@ -48,10 +47,7 @@ export default function DashboardPage() {
           <DashboardHeader />
         </div>
         <div className="order-2">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <MobileTodayFollowUps />
-            <div className="hidden xl:block"><OverdueFollowUps /></div>
-          </div>
+          <SalesFollowUpsWidget />
         </div>
         <div className="order-3">
           <DashboardKpis />

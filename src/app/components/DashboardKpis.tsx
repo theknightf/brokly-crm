@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Wallet,
   Clock,
+  CalendarClock,
   AlertCircle,
   MapPin,
   ArrowUpRight,
@@ -76,7 +77,7 @@ function KpiCard({ icon, iconBg, label, value, sub, href }: KpiCardProps) {
 
 export default function DashboardKpis() {
   const [stats, setStats] = useState<Stats>(EMPTY);
-  const [fuCounts, setFuCounts] = useState({ overdue: 0, dueToday: 0 });
+  const [fuCounts, setFuCounts] = useState({ overdue: 0, dueToday: 0, upcoming: 0 });
   const [visits, setVisits] = useState({ scheduled: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -88,7 +89,7 @@ export default function DashboardKpis() {
     ])
       .then(([s, f, v]) => {
         setStats(s || EMPTY);
-        setFuCounts(f || { overdue: 0, dueToday: 0 });
+        setFuCounts(f || { overdue: 0, dueToday: 0, upcoming: 0 });
         setVisits(v || { scheduled: 0, completed: 0 });
       })
       .catch(() => setStats(EMPTY))
@@ -187,6 +188,13 @@ export default function DashboardKpis() {
         label="Follow-ups due today"
         value={fuCounts.dueToday.toLocaleString()}
         href="/follow-ups?tab=today"
+      />
+      <KpiCard
+        icon={<CalendarClock size={16} className="text-teal" />}
+        iconBg="bg-teal-soft"
+        label="Upcoming follow-ups"
+        value={fuCounts.upcoming.toLocaleString()}
+        href="/follow-ups?tab=upcoming"
       />
       <KpiCard
         icon={<MapPin size={16} className="text-dusk" />}

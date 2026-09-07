@@ -488,9 +488,59 @@ export default function LeadsManagementScreen({
     const prevLeads = leads;
     const prevView = viewLead;
     try {
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: newStatus } : l)));
-      setViewLead((prev) => (prev?.id === id ? { ...prev, status: newStatus } : prev));
+      setLeads((prev) =>
+        prev.map((l) =>
+          l.id === id
+            ? { ...l, status: newStatus, actionTakenToday: true, contactedToday: true }
+            : l
+        )
+      );
+      setViewLead((prev) =>
+        prev?.id === id
+          ? { ...prev, status: newStatus, actionTakenToday: true, contactedToday: true }
+          : prev
+      );
       await leadsService.updateStatus(id, newStatus);
+      // Unified fix: status "Following Up" must also guarantee a follow_ups row.
+      // If the lead has no due date, default to tomorrow (08/09/26 example) so the
+      // Follow-ups screen (which reads from follow_ups, not leads) is not empty.
+      const needsFollowUp = new Set(['Following Up', 'Pending Leads', 'Interested', 'Meeting', 'Reservation']).has(newStatus);
+      if (needsFollowUp) {
+        const src = prevLeads.find((x) => x.id === id) || prevView;
+        if (!src?.followUpDue) {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const dueDate = tomorrow.toISOString().split('T')[0];
+          const dueTime = '09:00';
+          // optimistic
+          setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, followUpDue: dueDate } : l)));
+          setViewLead((prev) => (prev?.id === id ? { ...prev, followUpDue: dueDate } : prev));
+          // dual write: leads column (trigger) + canonical follow_ups row (time/notes)
+          leadsService.scheduleFollowUp(id, dueDate).catch(() => {});
+          followUpsService
+            .create(
+              {
+                title: `Follow up: ${src?.name || 'Lead'}`,
+                contactName: src?.name || 'Lead',
+                contactPhone: src?.phone || '',
+                contactEmail: (src as any)?.email || '',
+                type: 'Call',
+                status: 'Pending',
+                priority: 'Medium',
+                dueDate,
+                dueTime,
+                agent: (src as any)?.agent || '',
+                agentInitials: (src as any)?.agentInitials || '',
+                notes: (src as any)?.notes || '',
+                propertyInterest: (src as any)?.propertyType || (src as any)?.project || '',
+                relationshipStatus: 'New',
+                leadId: id,
+              },
+              user?.id || ''
+            )
+            .catch(() => {});
+        }
+      }
       toast.success(`Lead status updated to ${newStatus}`);
     } catch (err: any) {
       setLeads((prev) =>
@@ -538,12 +588,18 @@ export default function LeadsManagementScreen({
     } catch {}
     const prev = viewLead;
     setScheduleSaving(true);
-    // Optimistic: reflect date immediately on card/list + drawer
-    setViewLead((v) => (v?.id === id ? { ...v, followUpDue: dueDate } : v));
-    setLeads((prevLeads) => prevLeads.map((l) => (l.id === id ? { ...l, followUpDue: dueDate } : l)));
+    // Optimistic: reflect date immediately on card/list + drawer, and mark action taken
+    setViewLead((v) =>
+      v?.id === id ? { ...v, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : v
+    );
+    setLeads((prevLeads) =>
+      prevLeads.map((l) =>
+        l.id === id ? { ...l, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : l
+      )
+    );
     try {
-      // 1) Keep legacy lead column in sync (drives DB trigger + old clients)
-      await leadsService.scheduleFollowUp(id, dueDate).catch(() => {});
+      // 1) Keep legacy lead column in sync and mark last_action_at / last_action_by
+      await leadsService.scheduleFollowUp(id, dueDate, user?.id).catch(() => {});
       // 2) Canonical create: validates, upserts on lead_id, preserves time+notes,
       //    and drives the dashboard widget + follow-up partition via emit.
       await followUpsService.create(
@@ -569,18 +625,31 @@ export default function LeadsManagementScreen({
       toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
     } catch (err: any) {
       setViewLead(prev ?? null);
-      setLeads((prevLeads) => prevLeads.map((l) => (l.id === id ? { ...l, followUpDue: prev?.followUpDue || '' } : l)));
+      setLeads((prevLeads) =>
+        prevLeads.map((l) =>
+          l.id === id
+            ? { ...l, followUpDue: prev?.followUpDue || '', actionTakenToday: prev?.actionTakenToday }
+            : l
+        )
+      );
       toast.error(err?.message || 'Failed to schedule follow-up');
     } finally {
       setScheduleSaving(false);
     }
   };
+
   // Legacy 2-arg shim for older call sites (LogCallModal etc. still call with id+date)
   const handleScheduleFollowUpLegacy = async (id: string, dueDate: string) => {
     if (!dueDate) return;
+    const target = leads.find((l) => l.id === id) || (viewLead?.id === id ? viewLead : null);
+    if (!target) {
+      await leadsService.scheduleFollowUp(id, dueDate, user?.id).catch(() => {});
+      return;
+    }
     setScheduleDate(dueDate);
     setScheduleTime('09:00');
     setScheduleNotes('');
+    if (!viewLead || viewLead.id !== id) setViewLead(target);
     // Defer to the canonical handler on next tick so state settles
     setTimeout(() => handleScheduleFollowUp(), 0);
   };
@@ -1284,7 +1353,16 @@ export default function LeadsManagementScreen({
               setCurrentPage(1);
             }}
             onOpenLogCall={(lead) => setLogCallLead(lead)}
-            onAddNote={(lead) => setViewLead(lead)}
+            onAddNote={(lead) => {
+              setLeads((prev) =>
+                prev.map((l) =>
+                  l.id === lead.id ? { ...l, actionTakenToday: true, contactedToday: true } : l
+                )
+              );
+              setViewLead((prev) =>
+                prev?.id === lead.id ? { ...prev, actionTakenToday: true, contactedToday: true } : prev
+              );
+            }}
             onPostCall={handlePostCallTrigger}
           />
         )}
