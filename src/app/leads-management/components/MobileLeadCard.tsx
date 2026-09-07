@@ -23,6 +23,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
 import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileLeadCardProps {
