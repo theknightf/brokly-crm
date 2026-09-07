@@ -124,7 +124,17 @@ async function enforceRadius(
   supabase: any,
   lat: number | null,
   lng: number | null
-): Promise<{ ok: true } | { ok: false; status: number; error: string; distanceM?: number; radiusM?: number }> {
+): Promise<
+  | { ok: true }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      distanceM?: number;
+      radiusM?: number;
+      locationLabel?: string;
+    }
+> {
   // Manual (no GPS) check-ins cannot be radius-validated.
   if (lat == null || lng == null) return { ok: true };
   const loc = await getWorkLocation(supabase);

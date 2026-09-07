@@ -26,6 +26,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
 import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
+import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 
 interface LeadsTableProps {
@@ -361,6 +362,7 @@ export default function LeadsTable({
                           {lead.name || `Lead ${lead.id}`}
                         </a>
                         <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
+                        <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                           <MapPin size={10} />
                           {lead.location || '—'}

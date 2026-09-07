@@ -95,6 +95,9 @@ export interface Lead {
   lastActionBy?: string | null;
   /** Derived at query time: lastActionAt is today (local day). Display-only. */
   actionTakenToday?: boolean;
+  /** Called vs Not Called — derived from call_logs, display-only. */
+  hasBeenCalled?: boolean;
+  lastCallAt?: string | null;
   createdAt?: string;
   notes?: string;
   location?: string;

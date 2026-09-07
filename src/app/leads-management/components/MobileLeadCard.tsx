@@ -20,9 +20,9 @@ import { toast } from 'sonner';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 import StatusBadge from '@/components/ui/StatusBadge';
-import ContactedBadge from './ContactedBadge';
+import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
+import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
-import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileLeadCardProps {
@@ -211,8 +211,9 @@ export default function MobileLeadCard({
               <MapPin size={12} className="flex-shrink-0" />
               <span className="truncate">{lead.location || '—'}</span>
             </p>
-            <div className="mt-1.5">
+            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
               <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
+              <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
             </div>
           </div>
         </button>

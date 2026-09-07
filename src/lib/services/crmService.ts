@@ -258,7 +258,13 @@ export const leadsService = {
         if (isSchemaError(error)) throw error;
         return null;
       }
-      return rowToLead(data);
+      const lead = rowToLead(data);
+      // Stamp hasBeenCalled for detail view
+      try {
+        const { data: callRow } = await supabase.from('call_logs').select('id').eq('entity_type', 'lead').eq('entity_id', id).limit(1).maybeSingle();
+        (lead as any).hasBeenCalled = !!callRow;
+      } catch {}
+      return lead;
     } catch (err: any) {
       if (isSchemaError(err)) throw err;
       return null;
@@ -840,6 +846,10 @@ export const leadsService = {
     actionTaken?: '' | 'today' | 'no-action';
     actionFrom?: string;
     actionTo?: string;
+    /** Called filter: did sales log a call? ''=all, 'called'=has call, 'not-called'=never called. Date range via calledFrom/calledTo. */
+    called?: '' | 'called' | 'not-called';
+    calledFrom?: string;
+    calledTo?: string;
   }) {
     const supabase = createClient();
     const {
@@ -859,6 +869,9 @@ export const leadsService = {
       actionTaken: rawActionTaken = '' as '' | 'today' | 'no-action',
       actionFrom = '',
       actionTo = '',
+      called = '' as '' | 'called' | 'not-called',
+      calledFrom = '',
+      calledTo = '',
     } = params || {};
     // Normalize deprecated contacted → actionTaken (so existing bookmarks keep working)
     let actionTaken: '' | 'today' | 'no-action' = rawActionTaken;
@@ -1010,6 +1023,32 @@ export const leadsService = {
         }
       }
 
+      // ── Called filter: has sales logged a call? (ever or in range) ──────────
+      const hasCalledFilter = !!called || !!calledFrom || !!calledTo;
+      let calledSet: Set<string> | null = null;
+      if (hasCalledFilter) {
+        try {
+          let qLogs: any = supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead');
+          if (calledFrom) qLogs = qLogs.gte('created_at', `${calledFrom}T00:00:00.000Z`);
+          if (calledTo) qLogs = qLogs.lte('created_at', `${calledTo}T23:59:59.999Z`);
+          const { data: callRows } = await qLogs;
+          const ids = ((callRows || []).map((r: any) => r.entity_id) as (string | null | undefined)[]).filter((v): v is string => !!v);
+          calledSet = new Set(ids);
+          if (called === 'called') {
+            if (!calledSet.size) return { data: [], total: 0, page, pageSize };
+            query = query.in('id', [...calledSet]);
+          } else if (called === 'not-called') {
+            if (calledSet.size) query = query.not('id', 'in', `(${[...calledSet].map((id) => `"${id}"`).join(',')})`);
+          } else if (calledFrom || calledTo) {
+            // date range without explicit called value => show called in range
+            if (!calledSet.size) return { data: [], total: 0, page, pageSize };
+            query = query.in('id', [...calledSet]);
+          }
+        } catch {
+          calledSet = new Set<string>();
+        }
+      }
+
       const { data, error, count } = await query
         .order(column, { ascending: sortDir !== 'desc' })
         .range(from, to);
@@ -1060,7 +1099,7 @@ export const leadsService = {
             return {
               data: (r2.data || []).map((row: any) => {
                 const mapped = rowToLead(row);
-                return { ...mapped, contactedToday: s.has(row.id), actionTakenToday: s.has(row.id) };
+                return { ...mapped, contactedToday: s.has(row.id), actionTakenToday: s.has(row.id), hasBeenCalled: s.has(row.id) };
               }),
               total: r2.count ?? (r2.data || []).length,
               page,
@@ -1076,15 +1115,28 @@ export const leadsService = {
         // misleading empty table.
         throw new Error(error.message || 'Failed to load leads');
       }
+      // Stamp hasBeenCalled badge for current page (even when no called filter)
+      let pageCalledSet: Set<string> | null = calledSet;
+      if (!hasCalledFilter && (data || []).length) {
+        try {
+          const ids = (data || []).map((r: any) => r.id);
+          const { data: pageCalls } = await supabase.from('call_logs').select('entity_id').in('entity_id', ids).eq('entity_type', 'lead');
+          const s = new Set(((pageCalls || []).map((r: any) => r.entity_id) as string[]).filter(Boolean));
+          pageCalledSet = s;
+        } catch {
+          pageCalledSet = new Set<string>();
+        }
+      }
       return {
         data: (data || []).map((row: any) => {
           const mapped = rowToLead(row);
           // When falling back, override the derived badge with the join set
           if (fallbackSet) {
             const v = fallbackSet.has(row.id);
-            return { ...mapped, contactedToday: v, actionTakenToday: v };
+            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : undefined };
           }
-          return mapped;
+          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : undefined;
+          return { ...mapped, hasBeenCalled };
         }),
         total: count ?? (data || []).length,
         page,

@@ -6,6 +6,7 @@ import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
 import { isAdminRole } from '@/lib/roles';
 import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
+import CalledBadge from './CalledBadge';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 
 interface LeadBoardProps {
@@ -60,8 +61,9 @@ function BoardCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground text-sm truncate">{lead.name || 'Lead'}</p>
-          <div className="mt-1">
+          <div className="mt-1 flex items-center gap-1 flex-wrap">
             <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
+            <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
           </div>
         </div>
         <button

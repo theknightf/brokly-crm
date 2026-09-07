@@ -5,8 +5,8 @@ import { isAdminRole } from '@/lib/roles';
 export const dynamic = 'force-dynamic';
 
 const STATUSES = [
-  'All Leads','Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Leaders Pending','Following Up','Meeting',
-  'Following Up After Meeting','Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number',
+  'All Leads','Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting',
+  'Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number',
   'No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'
 ];
 
@@ -33,36 +33,45 @@ export async function GET(request: Request) {
     assignedFilter = agentId;
   }
 
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
-  const prevFrom = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,10);
-  const prevTo = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0,10);
+  // Cairo timezone helpers (consistent with attendanceLogic.ts)
+  const cairoDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  const cairoMonthStart = (offset=0) => {
+    const now = new Date();
+    const cairoNowStr = cairoDate(now);
+    const [y,m] = cairoNowStr.split('-').map(Number);
+    const base = new Date(Date.UTC(y, m-1, 1, 0,0,0));
+    // adjust offset
+    base.setUTCMonth(base.getUTCMonth()+offset);
+    const y2 = base.getUTCFullYear();
+    const m2 = String(base.getUTCMonth()+1).padStart(2,'0');
+    return `${y2}-${m2}-01`;
+  };
+  const from = cairoMonthStart(0);
+  const prevFrom = cairoMonthStart(-1);
+  const prevTo = (()=>{ const d=new Date(from+'T00:00:00'); d.setDate(0); return d.toISOString().slice(0,10); })();
 
   const db:any = supabase;
-  // Build base query
-  let q = db.from('leads').select('id, crm_status, lead_status, assigned_to, team, created_at');
-  if (assignedFilter) q = q.eq('assigned_to', assignedFilter);
-  if (teamId) q = q.eq('team', teamId);
-  const { data: leads } = await q.limit(5000);
-
-  const countBy = (arr:any[], stage:string) => {
-    if (stage==='All Leads') return arr.length;
-    if (stage==='Duplicate Leads') return arr.filter((l:any)=> l.crm_status==='Duplicate').length;
-    return arr.filter((l:any)=> (l.crm_status||l.lead_status)===stage).length;
+  // Accurate counts without 5000 truncation — count per stage via head:true
+  const countStage = async (stage:string, fromDate?:string, toDate?:string) => {
+    let q:any = db.from('leads').select('id', { count: 'exact', head: true });
+    if (assignedFilter) q = q.eq('assigned_to', assignedFilter);
+    if (teamId) q = q.eq('team', teamId);
+    if (stage !== 'All Leads') {
+      if (stage === 'Duplicate Leads') q = q.eq('crm_status', 'Duplicate Leads');
+      else q = q.or(`crm_status.eq.${stage},and(crm_status.is.null,lead_status.eq.${stage})`);
+    }
+    if (fromDate) q = q.gte('created_at', fromDate);
+    if (toDate) q = q.lte('created_at', toDate+'T23:59:59.999Z');
+    const { count } = await q;
+    return Number(count||0);
   };
 
-  // Trend vs prev month
-  let prevLeads:any[] = [];
-  if (isAdminRole(actor.role)) {
-    let pq = db.from('leads').select('crm_status').gte('created_at', prevFrom).lte('created_at', prevTo);
-    if (teamId) pq = pq.eq('team', teamId);
-    const { data } = await pq.limit(5000);
-    prevLeads = data||[];
-  }
+  const currCounts = await Promise.all(STATUSES.map(s=> countStage(s, from, undefined)));
+  const prevCounts = isAdminRole(actor.role) ? await Promise.all(STATUSES.map(s=> countStage(s, prevFrom, prevTo))) : STATUSES.map(()=>0);
 
-  const cards = STATUSES.map(stage=>{
-    const curr = countBy(leads||[], stage);
-    const prev = countBy(prevLeads, stage);
+  const cards = STATUSES.map((stage, i)=>{
+    const curr = currCounts[i];
+    const prev = prevCounts[i];
     const trend = prev ? Math.round(((curr-prev)/Math.max(1,prev))*1000)/10 : 0;
     return { stage, count: curr, trend: `${trend>=0?'↑':'↓'} ${Math.abs(trend)}%`, trendValue: trend };
   });
@@ -87,5 +96,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ cards, teams, agents, period: { from, to: now.toISOString().slice(0,10) } });
+  return NextResponse.json({ cards, teams, agents, period: { from, to: cairoDate(new Date()) } });
 }

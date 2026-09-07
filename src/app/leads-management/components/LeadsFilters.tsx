@@ -290,6 +290,77 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
             ) : null}
           </div>
         )}
+
+      {/* Called — has sales logged a call? */}
+      <div
+        className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 min-h-[44px] h-11 max-w-full overflow-x-auto"
+        role="group"
+        aria-label="Called filter"
+      >
+        {(
+          [
+            { value: '', label: 'All' },
+            { value: 'called', label: 'Called' },
+            { value: 'not-called', label: 'Not Called' },
+          ] as const
+        ).map((opt) => {
+          const active = filters.called === opt.value;
+          const nextVal = opt.value as FilterState['called'];
+          return (
+            <button
+              key={opt.value || 'all-called'}
+              type="button"
+              onClick={() => {
+                const next: FilterState = { ...filters, called: nextVal };
+                if (nextVal !== 'called') {
+                  next.calledFrom = '';
+                  next.calledTo = '';
+                }
+                onChange(next);
+              }}
+              aria-pressed={active}
+              className={`min-h-[36px] h-9 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                active
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Called date range — visible when Called is active */}
+      {(filters.called === 'called' || !!filters.calledFrom || !!filters.calledTo) && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium">Called From:</span>
+          <input
+            type="date"
+            value={filters.calledFrom}
+            onChange={(e) => update('calledFrom', e.target.value)}
+            className="input-base h-9 text-xs px-2 w-[140px]"
+            aria-label="Called from date"
+          />
+          <span className="text-xs text-muted-foreground font-medium">To:</span>
+          <input
+            type="date"
+            value={filters.calledTo}
+            onChange={(e) => update('calledTo', e.target.value)}
+            className="input-base h-9 text-xs px-2 w-[140px]"
+            aria-label="Called to date"
+          />
+          {(filters.calledFrom || filters.calledTo) ? (
+            <button
+              type="button"
+              onClick={() => onChange({ ...filters, calledFrom: '', calledTo: '' })}
+              className="h-9 px-2.5 rounded-lg text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

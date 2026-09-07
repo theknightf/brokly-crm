@@ -80,6 +80,10 @@ export interface FilterState {
   actionTaken: '' | 'today' | 'no-action';
   actionFrom: string;
   actionTo: string;
+  /** Called filter: has sales logged a call? */
+  called: '' | 'called' | 'not-called';
+  calledFrom: string;
+  calledTo: string;
 }
 
 /**
@@ -266,6 +270,9 @@ export default function LeadsManagementScreen({
     actionTaken: '',
     actionFrom: '',
     actionTo: '',
+    called: '',
+    calledFrom: '',
+    calledTo: '',
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -436,6 +443,9 @@ export default function LeadsManagementScreen({
         actionTaken: filters.actionTaken || undefined,
         actionFrom: filters.actionFrom || undefined,
         actionTo: filters.actionTo || undefined,
+        called: filters.called || undefined,
+        calledFrom: filters.calledFrom || undefined,
+        calledTo: filters.calledTo || undefined,
         sortKey,
         sortDir,
         // Exclude leads that were optimistically removed after call logging
@@ -965,6 +975,9 @@ export default function LeadsManagementScreen({
         actionTaken: filters.actionTaken || undefined,
         actionFrom: filters.actionFrom || undefined,
         actionTo: filters.actionTo || undefined,
+        called: filters.called || undefined,
+        calledFrom: filters.calledFrom || undefined,
+        calledTo: filters.calledTo || undefined,
       });
       const rows = (res.data || []).map((l: any) => [
         l.name,
@@ -1030,6 +1043,9 @@ export default function LeadsManagementScreen({
       actionTaken: '',
       actionFrom: '',
       actionTo: '',
+      called: '',
+      calledFrom: '',
+      calledTo: '',
     });
     setCurrentPage(1);
   };
