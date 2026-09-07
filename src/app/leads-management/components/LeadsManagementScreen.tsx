@@ -51,7 +51,7 @@ import {
   pipelineIndex,
   ALL_REAL_STATUSES,
 } from './leadStages';
-import { leadsService } from '@/lib/services/crmService';
+import { leadsService, followUpsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -288,6 +288,16 @@ export default function LeadsManagementScreen({
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [viewLead, setViewLead] = useState<Lead | null>(null);
   const [editLead, setEditLead] = useState<Lead | null>(null);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('09:00');
+  const [scheduleNotes, setScheduleNotes] = useState('');
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  useEffect(() => {
+    if (viewLead?.followUpDue) setScheduleDate(viewLead.followUpDue);
+    else setScheduleDate('');
+    setScheduleTime('09:00');
+    setScheduleNotes('');
+  }, [viewLead?.id]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
@@ -500,21 +510,79 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleScheduleFollowUp = async (id: string, dueDate: string) => {
-    if (!dueDate) return;
-    const prev = viewLead;
-    // Optimistically update the picker so the UI feels instant.
-    setViewLead((v) => (v?.id === id ? { ...v, followUpDue: dueDate } : v));
-    setLeads((prevLeads) =>
-      prevLeads.map((l) => (l.id === id ? { ...l, followUpDue: dueDate } : l))
-    );
+  const handleScheduleFollowUp = async () => {
+    if (!viewLead) return;
+    const id = viewLead.id;
+    const dueDate = scheduleDate.trim();
+    const dueTime = scheduleTime.trim() || '09:00';
+    const notes = scheduleNotes.trim();
+    if (!dueDate) {
+      toast.error('Pick a follow-up date');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      toast.error('Valid date (YYYY-MM-DD) required');
+      return;
+    }
+    if (!/^\d{1,2}:\d{2}$/.test(dueTime)) {
+      toast.error('Valid time (HH:MM) required');
+      return;
+    }
+    // Past guard: same 15m grace as FollowUpForm
     try {
-      await leadsService.scheduleFollowUp(id, dueDate);
-      toast.success(`Follow-up scheduled for ${dueDate}`);
+      const slot = new Date(`${dueDate}T${dueTime}:00`);
+      if (!Number.isNaN(slot.getTime()) && slot.getTime() < Date.now() - 15 * 60 * 1000) {
+        toast.error('Pick a future slot');
+        return;
+      }
+    } catch {}
+    const prev = viewLead;
+    setScheduleSaving(true);
+    // Optimistic: reflect date immediately on card/list + drawer
+    setViewLead((v) => (v?.id === id ? { ...v, followUpDue: dueDate } : v));
+    setLeads((prevLeads) => prevLeads.map((l) => (l.id === id ? { ...l, followUpDue: dueDate } : l)));
+    try {
+      // 1) Keep legacy lead column in sync (drives DB trigger + old clients)
+      await leadsService.scheduleFollowUp(id, dueDate).catch(() => {});
+      // 2) Canonical create: validates, upserts on lead_id, preserves time+notes,
+      //    and drives the dashboard widget + follow-up partition via emit.
+      await followUpsService.create(
+        {
+          title: `Follow up: ${viewLead.name || 'Lead'}`,
+          contactName: viewLead.name || 'Lead',
+          contactPhone: viewLead.phone || '',
+          contactEmail: viewLead.email || '',
+          type: 'Call',
+          status: 'Pending',
+          priority: 'Medium',
+          dueDate,
+          dueTime,
+          agent: viewLead.agent || '',
+          agentInitials: viewLead.agentInitials || '',
+          notes: notes || viewLead.notes || '',
+          propertyInterest: viewLead.propertyType || viewLead.project || '',
+          relationshipStatus: 'New',
+          leadId: id,
+        },
+        user?.id || ''
+      );
+      toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
     } catch (err: any) {
       setViewLead(prev ?? null);
+      setLeads((prevLeads) => prevLeads.map((l) => (l.id === id ? { ...l, followUpDue: prev?.followUpDue || '' } : l)));
       toast.error(err?.message || 'Failed to schedule follow-up');
+    } finally {
+      setScheduleSaving(false);
     }
+  };
+  // Legacy 2-arg shim for older call sites (LogCallModal etc. still call with id+date)
+  const handleScheduleFollowUpLegacy = async (id: string, dueDate: string) => {
+    if (!dueDate) return;
+    setScheduleDate(dueDate);
+    setScheduleTime('09:00');
+    setScheduleNotes('');
+    // Defer to the canonical handler on next tick so state settles
+    setTimeout(() => handleScheduleFollowUp(), 0);
   };
 
   const handleDeleteLead = async (id: string) => {
@@ -1534,19 +1602,46 @@ export default function LeadsManagementScreen({
                 ))}
               </div>
 
-              {/* Schedule follow-up */}
-              <div className="bg-muted/40 rounded-xl px-4 py-2">
-                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+              {/* Schedule follow-up — synced to dashboard + follow-up partition */}
+              <div className="bg-muted/40 rounded-xl px-4 py-3 space-y-2">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <CalendarClock size={12} /> Schedule follow-up
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <input
                     type="date"
-                    className="input-base h-9"
-                    value={viewLead.followUpDue || ''}
-                    onChange={(e) => handleScheduleFollowUp(viewLead.id, e.target.value)}
+                    className="input-base h-9 text-sm"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    aria-label="Follow-up date"
+                  />
+                  <input
+                    type="time"
+                    className="input-base h-9 text-sm"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    aria-label="Follow-up time"
                   />
                 </div>
+                <textarea
+                  className="input-base min-h-[56px] text-sm resize-none"
+                  placeholder="Notes (optional) — e.g. call about 2BHK in Sohna Road"
+                  value={scheduleNotes}
+                  onChange={(e) => setScheduleNotes(e.target.value)}
+                  rows={2}
+                />
+                <button
+                  type="button"
+                  onClick={handleScheduleFollowUp}
+                  disabled={scheduleSaving || !scheduleDate}
+                  className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {scheduleSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  {scheduleSaving ? 'Scheduling…' : 'Schedule follow-up'}
+                </button>
+                {viewLead.followUpDue && (
+                  <p className="text-[11px] text-muted-foreground">Current: {viewLead.followUpDue} · queue auto-syncs to dashboard</p>
+                )}
               </div>
 
               {/* Reservation / Done Deal quick actions */}

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, CalendarClock, Loader2, PhoneCall, PhoneOff } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { leadsService } from '@/lib/services/crmService';
+import { leadsService, followUpsService } from '@/lib/services/crmService';
 import type { Lead } from './mockLeads';
 
 const OUTCOMES = [
@@ -76,6 +76,29 @@ export default function LogCallModal({ lead, onClose, onDone, onCallLogged }: Lo
       }
       if (followUp && outcome === 'Callback Later') {
         await leadsService.scheduleFollowUp(lead.id, followUp).catch(() => {});
+        // Canonical follow-up row so dashboard + follow-up partition stay linked
+        await followUpsService
+          .create(
+            {
+              title: `Follow up: ${lead.name || 'Lead'}`,
+              contactName: lead.name || 'Lead',
+              contactPhone: lead.phone || '',
+              contactEmail: (lead as any).email || '',
+              type: 'Call',
+              status: 'Pending',
+              priority: 'Medium',
+              dueDate: followUp,
+              dueTime: '09:00',
+              agent: (lead as any).agent || '',
+              agentInitials: (lead as any).agentInitials || '',
+              notes: notes.trim() || '',
+              propertyInterest: (lead as any).propertyType || (lead as any).project || '',
+              relationshipStatus: 'New',
+              leadId: lead.id,
+            },
+            ''
+          )
+          .catch(() => {});
       }
       // If the call resulted in a closed number, persist the tag against the lead
       // so it surfaces on the lead's timeline + the column filter in the board.

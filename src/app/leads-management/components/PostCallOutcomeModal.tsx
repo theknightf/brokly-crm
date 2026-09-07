@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, PhoneOff, ThumbsUp, ThumbsDown, CalendarClock, CalendarCheck, AlertTriangle, Ban, X, Loader2, PhoneCall } from 'lucide-react';
 import { toast } from 'sonner';
-import { leadsService } from '@/lib/services/crmService';
+import { leadsService, followUpsService } from '@/lib/services/crmService';
 import type { Lead } from './mockLeads';
 
 export type PostCallOutcome = 'Answered' | 'No Answer' | 'Interested' | 'Not Interested' | 'Follow-up' | 'Schedule Meeting' | 'Wrong Phone' | 'Closed Number';
@@ -222,12 +222,35 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
         throw new Error(j.error || 'Failed to log call');
       }
 
-      // Schedule follow-up/meeting if needed
+      // Schedule follow-up/meeting if needed — canonical path: POST /api/follow-ups so
+      // the top dashboard widget + follow-up partition see the same row (not just leads.follow_up_due)
       if (needsSchedule && nextFollowUpDate) {
         try {
-          await leadsService.scheduleFollowUp(lead.id, nextFollowUpDate);
+          await leadsService.scheduleFollowUp(lead.id, nextFollowUpDate).catch(() => {});
+        } catch {}
+        try {
+          await followUpsService.create(
+            {
+              title: outcome === 'Schedule Meeting' ? `Meeting: ${lead.name || 'Lead'}` : `Follow up: ${lead.name || 'Lead'}`,
+              contactName: lead.name || 'Lead',
+              contactPhone: lead.phone || '',
+              contactEmail: (lead as any).email || '',
+              type: outcome === 'Schedule Meeting' ? 'Meeting' : 'Call',
+              status: 'Pending',
+              priority: 'Medium',
+              dueDate: nextFollowUpDate,
+              dueTime: followUpTime || '12:00',
+              agent: (lead as any).agent || '',
+              agentInitials: (lead as any).agentInitials || '',
+              notes: notes.trim() || '',
+              propertyInterest: (lead as any).propertyType || (lead as any).project || '',
+              relationshipStatus: 'New',
+              leadId: lead.id,
+            },
+            '' // user id is resolved service-side from session; empty is fine
+          );
         } catch {
-          // ignore — call log already saved
+          // ignore — leads.scheduleFollowUp already kept a fallback row
         }
       }
 

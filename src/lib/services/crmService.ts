@@ -1374,75 +1374,50 @@ export const followUpsService = {
     }
   },
 
-  /** Only follow-ups that are still actionable (used by the dashboard). */
+  /** Only follow-ups that are still actionable (used by the dashboard). RLS-proof via GET /api/follow-ups. */
   async getOverdue(limit = 8) {
-    const supabase = createClient();
-    const today = new Date().toISOString().split('T')[0];
     try {
-      const { data, error } = await supabase
-        .from('follow_ups')
-        .select('*')
-        .lt('due_date', today)
-        .not('follow_up_status', 'in', '("Completed","Cancelled")')
-        .order('due_date', { ascending: true })
-        .limit(limit);
-      if (error) {
-        if (isSchemaError(error)) throw error;
-        return [];
-      }
-      return (data || []).map(rowToFollowUp);
-    } catch (err: any) {
-      if (isSchemaError(err)) throw err;
+      const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
+      const today = new Date().toISOString().split('T')[0];
+      return (all || [])
+        .filter((f: any) => f.dueDate < today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .sort((a: any, b: any) => a.dueDate.localeCompare(b.dueDate))
+        .slice(0, limit);
+    } catch {
       return [];
     }
   },
 
-  /** Due today or later, still actionable (mobile dashboard). */
+  /** Due today or later, still actionable (mobile dashboard). RLS-proof via GET /api/follow-ups. */
   async getTodayAndPending(limit = 8) {
-    const supabase = createClient();
-    const today = new Date().toISOString().split('T')[0];
     try {
-      const { data, error } = await supabase
-        .from('follow_ups')
-        .select('*')
-        .gte('due_date', today)
-        .not('follow_up_status', 'in', '("Completed","Cancelled")')
-        .order('due_date', { ascending: true })
-        .limit(limit);
-      if (error) {
-        if (isSchemaError(error)) throw error;
-        return [];
-      }
-      return (data || []).map(rowToFollowUp);
-    } catch (err: any) {
-      if (isSchemaError(err)) throw err;
+      const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
+      const today = new Date().toISOString().split('T')[0];
+      return (all || [])
+        .filter((f: any) => f.dueDate >= today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .sort((a: any, b: any) => a.dueDate.localeCompare(b.dueDate))
+        .slice(0, limit);
+    } catch {
       return [];
     }
   },
 
-  /** Overdue + due-today counts for the dashboard KPI row (best-effort). */
+  /** Overdue + due-today counts for the dashboard KPI row. RLS-proof via GET /api/follow-ups. */
   async getDashboardCounts() {
-    const supabase = createClient();
-    const today = new Date().toISOString().split('T')[0];
-    const count = async (lt: boolean) => {
-      try {
-        let q: any = supabase
-          .from('follow_ups')
-          .select('id', { count: 'exact', head: true })
-          .not('follow_up_status', 'in', '("Completed","Cancelled")');
-        q = lt ? q.lt('due_date', today) : q.eq('due_date', today);
-        const r = await q;
-        if (r.error) {
-          if (isSchemaError(r.error)) throw r.error;
-          return 0;
-        }
-        return r.count || 0;
-      } catch {
-        return 0;
+    try {
+      const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
+      const today = new Date().toISOString().split('T')[0];
+      let overdue = 0;
+      let dueToday = 0;
+      for (const f of all || []) {
+        if (f.status === 'Completed' || f.status === 'Cancelled') continue;
+        if (f.dueDate < today) overdue++;
+        else if (f.dueDate === today) dueToday++;
       }
-    };
-    const [overdue, dueToday] = await Promise.all([count(true), count(false)]);
-    return { overdue, dueToday };
+      return { overdue, dueToday };
+    } catch {
+      return { overdue: 0, dueToday: 0 };
+    }
   },
 
   async create(fu: any, userId: string) {
