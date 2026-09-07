@@ -25,7 +25,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
-import ContactedBadge from './ContactedBadge';
+import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 
 interface LeadsTableProps {
@@ -45,8 +45,8 @@ interface LeadsTableProps {
   totalPages: number;
   pageSize: number;
   totalCount: number;
-  onPageChange: (p: number) => void;
-  onPageSizeChange: (s: number) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   /** Mobile-only: open the Log Call modal for a lead (e.g. header quick action) */
   onOpenLogCall?: (lead: Lead) => void;
   /** Mobile-only: open the Add Note sheet for a lead */
@@ -69,24 +69,28 @@ function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   );
 }
 
-function StatusDropdown({
-  currentStatus,
+function StageSelector({
   leadId,
+  currentStatus,
   onStatusChange,
 }: {
-  currentStatus: LeadStatus;
   leadId: string;
+  currentStatus: LeadStatus;
   onStatusChange: (id: string, s: LeadStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
+
   return (
     <>
       <button
         ref={anchorRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 max-w-full"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted/70 transition-colors text-left max-w-full"
         aria-label={`Change status from ${currentStatus}`}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -100,14 +104,17 @@ function StatusDropdown({
         open={open}
         onClose={() => setOpen(false)}
         anchorRef={anchorRef}
-        minWidth={240}
-        preferredMaxHeight={360}
-        zIndex={70}
+        minWidth={250}
+        preferredMaxHeight={380}
+        zIndex={100}
         role="listbox"
         aria-label="Select stage"
+        className="stage-dropdown-panel"
       >
         <div className="py-1">
-          <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Pipeline</p>
+          <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Pipeline
+          </p>
           {PIPELINE_STAGES.map((s) => (
             <button
               key={`status-opt-${leadId}-${s}`}
@@ -117,12 +124,17 @@ function StatusDropdown({
                 onStatusChange(leadId, s as LeadStatus);
                 setOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors whitespace-normal break-words box-border ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+              className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
+                s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
+              }`}
             >
               <StatusBadge status={s} showDot />
             </button>
           ))}
-          <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Outcomes</p>
+          <div className="my-1 border-t border-border/60" />
+          <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Outcomes
+          </p>
           {OUTCOME_STAGES.map((s) => (
             <button
               key={`status-opt-${leadId}-${s}`}
@@ -132,7 +144,9 @@ function StatusDropdown({
                 onStatusChange(leadId, s as LeadStatus);
                 setOpen(false);
               }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors whitespace-normal break-words box-border ${s === currentStatus ? 'bg-secondary/50' : ''}`}
+              className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
+                s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
+              }`}
             >
               <StatusBadge status={s} showDot />
             </button>
@@ -142,6 +156,8 @@ function StatusDropdown({
     </>
   );
 }
+
+const StatusDropdown = StageSelector;
 
 export default function LeadsTable({
   leads,
@@ -344,7 +360,7 @@ export default function LeadsTable({
                         <a href={`/leads/${lead.id}`} className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block">
                           {lead.name || `Lead ${lead.id}`}
                         </a>
-                        <ContactedBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
+                        <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                           <MapPin size={10} />
                           {lead.location || '—'}
@@ -422,7 +438,7 @@ export default function LeadsTable({
                           if (next && next !== lead.status) onStatusChange(lead.id, next);
                         }}
                         disabled={!nextPipelineStage(lead.status)}
-                        className="h-7 px-2.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap"
+                        className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap"
                         title={
                           nextPipelineStage(lead.status)
                             ? `One-click: move to ${nextPipelineStage(lead.status)}`
@@ -449,21 +465,21 @@ export default function LeadsTable({
                     <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
                       <button
                         onClick={() => onView?.(lead)}
-                        className="w-7 h-7 rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
                         title="View lead details"
                       >
                         <Eye size={14} />
                       </button>
                       <button
                         onClick={() => onEdit?.(lead)}
-                        className="w-7 h-7 rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
                         title="Edit lead"
                       >
                         <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => setDeletingId(lead.id)}
-                        className="w-7 h-7 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
                         title="Delete lead"
                       >
                         <Trash2 size={14} />
@@ -488,7 +504,7 @@ export default function LeadsTable({
               <select
                 value={pageSize}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="input-base h-7 text-xs py-0 px-2 w-16"
+                className="input-base min-h-[44px] h-9 text-xs py-0 px-2 w-16"
               >
                 {[10, 25, 50].map((s) => (
                   <option key={`pagesize-${s}`} value={s}>
@@ -502,7 +518,7 @@ export default function LeadsTable({
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               aria-label="Previous page"
             >
               <ChevronLeft size={14} />
@@ -511,7 +527,7 @@ export default function LeadsTable({
               p === '...' ? (
                 <span
                   key={`ellipsis-${i}`}
-                  className="w-8 text-center text-muted-foreground text-sm"
+                  className="w-11 min-w-[44px] text-center text-muted-foreground text-sm flex items-center justify-center"
                 >
                   …
                 </span>
@@ -519,7 +535,7 @@ export default function LeadsTable({
                 <button
                   key={`page-${p}`}
                   onClick={() => onPageChange(p as number)}
-                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
+                  className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-sm font-medium transition-colors ${currentPage === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
                 >
                   {p}
                 </button>
@@ -528,7 +544,7 @@ export default function LeadsTable({
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               aria-label="Next page"
             >
               <ChevronRight size={14} />

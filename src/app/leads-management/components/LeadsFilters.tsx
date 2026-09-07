@@ -71,15 +71,15 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
       </div>
 
       {/* Status */}
-      <div className="relative">
+      <div className="relative w-full sm:w-auto max-w-full box-border">
         <select
           value={filters.status}
           onChange={(e) => update('status', e.target.value as LeadStatus | '')}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[160px]"
+          className="input-base h-9 text-sm appearance-none pr-8 min-w-[160px] max-w-full w-full sm:w-auto box-border truncate"
         >
           <option value="">All Statuses</option>
           {ALL_STATUSES.map((s) => (
-            <option key={`filter-status-${s}`} value={s}>
+            <option key={`filter-status-${s}`} value={s} className="whitespace-normal">
               {s}
             </option>
           ))}
@@ -192,21 +192,38 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
 
       {/* Action Taken — replaces Contacted. Covers call, note, stage, follow-up (last_action_at). */}
       <div
-        className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 h-9"
+        className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 min-h-[44px] h-11 max-w-full overflow-x-auto"
         role="group"
         aria-label="Action taken filter"
       >
         {(
           [
             { value: '', label: 'All Leads' },
-            { value: 'today', label: 'Action Taken' },
+            {
+              value: 'today',
+              label:
+                filters.actionFrom || filters.actionTo
+                  ? 'Action Taken (Range)'
+                  : filters.actionTaken === 'today'
+                  ? 'Action Taken (Today)'
+                  : 'Action Taken (Today / Date Range)',
+            },
             { value: 'no-action', label: 'No Action Taken' },
           ] as const
         ).map((opt) => {
-          // Map deprecated contacted to the new keys for active state
           const cur =
-            filters.actionTaken || (filters.contacted === 'today' ? 'today' : filters.contacted === 'not-today' ? 'no-action' : '');
-          const active = cur === opt.value;
+            filters.actionTaken ||
+            (filters.contacted === 'today'
+              ? 'today'
+              : filters.contacted === 'not-today'
+              ? 'no-action'
+              : '');
+          const active =
+            opt.value === ''
+              ? !cur && !filters.actionFrom && !filters.actionTo
+              : opt.value === 'today'
+              ? cur === 'today' || !!filters.actionFrom || !!filters.actionTo
+              : cur === 'no-action';
           const nextVal = opt.value as FilterState['actionTaken'];
           return (
             <button
@@ -225,7 +242,7 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
                 onChange(next);
               }}
               aria-pressed={active}
-              className={`h-8 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+              className={`min-h-[36px] h-9 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
                 active
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
@@ -238,40 +255,41 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
       </div>
 
       {/* Date range refinement — visible when Action Taken is active */}
-      {(filters.actionTaken === 'today' || !!filters.actionFrom || !!filters.actionTo) && filters.actionTaken !== 'no-action' && (
-        <div className="flex items-center gap-1.5">
-          <input
-            type="date"
-            value={filters.actionFrom}
-            onChange={(e) => update('actionFrom', e.target.value)}
-            className="input-base h-9 text-xs px-2 w-[150px]"
-            aria-label="Action from date"
-            title="From date — filter Action Taken in range"
-          />
-          <span className="text-xs text-muted-foreground">–</span>
-          <input
-            type="date"
-            value={filters.actionTo}
-            onChange={(e) => update('actionTo', e.target.value)}
-            className="input-base h-9 text-xs px-2 w-[150px]"
-            aria-label="Action to date"
-            title="To date — filter Action Taken in range"
-          />
-          {(filters.actionFrom || filters.actionTo) && (
-            <button
-              type="button"
-              onClick={() => {
-                update('actionFrom', '');
-                update('actionTo', '');
-              }}
-              className="h-9 px-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-secondary"
-              title="Clear date range"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      )}
+      {(filters.actionTaken === 'today' || !!filters.actionFrom || !!filters.actionTo) &&
+        filters.actionTaken !== 'no-action' && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground font-medium">From:</span>
+            <input
+              type="date"
+              value={filters.actionFrom}
+              onChange={(e) => update('actionFrom', e.target.value)}
+              className="input-base h-9 text-xs px-2 w-[140px]"
+              aria-label="Action from date"
+              title="From date — filter Action Taken in range"
+            />
+            <span className="text-xs text-muted-foreground font-medium">To:</span>
+            <input
+              type="date"
+              value={filters.actionTo}
+              onChange={(e) => update('actionTo', e.target.value)}
+              className="input-base h-9 text-xs px-2 w-[140px]"
+              aria-label="Action to date"
+              title="To date — filter Action Taken in range"
+            />
+            {(filters.actionFrom || filters.actionTo) ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange({ ...filters, actionFrom: '', actionTo: '', actionTaken: 'today' });
+                }}
+                className="h-9 px-2.5 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                title="Reset to today"
+              >
+                Today Only
+              </button>
+            ) : null}
+          </div>
+        )}
     </div>
   );
 }

@@ -55,7 +55,7 @@ export default function ViewportPopover({
   recomputeKey,
   mobileSheet = true,
   sheetBreakpoint = 640,
-  zIndex = 60,
+  zIndex = 100,
   role,
   className = '',
   children,
@@ -193,11 +193,18 @@ export default function ViewportPopover({
           onClick={onClose}
           aria-hidden="true"
         />
-        <div className="absolute inset-x-0 bottom-0 bg-card rounded-t-2xl shadow-modal max-h-[85dvh] flex flex-col overflow-hidden slide-up-enter">
+        <div
+          className="absolute inset-x-0 bottom-0 bg-card rounded-t-2xl shadow-modal flex flex-col overflow-hidden slide-up-enter box-border"
+          style={{
+            maxHeight: 'min(82dvh, calc(100vh - 64px))',
+            paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+            overscrollBehavior: 'contain',
+          }}
+        >
           <div className="pt-3 pb-1.5 flex justify-center flex-shrink-0 cursor-pointer" onPointerDown={onClose}>
             <div className="w-10 h-1.5 rounded-full bg-muted" />
           </div>
-          <div className={`overflow-y-auto flex-1 ${className}`}>{children}</div>
+          <div className={`overflow-y-auto flex-1 box-border ${className}`}>{children}</div>
         </div>
       </div>,
       document.body
@@ -211,6 +218,8 @@ export default function ViewportPopover({
         top: rect.top,
         left: rect.left,
         width: rect.width,
+        maxWidth: 'calc(100vw - 16px)',
+        boxSizing: 'border-box',
         maxHeight: rect.maxHeight,
         zIndex,
       }
@@ -219,6 +228,8 @@ export default function ViewportPopover({
         top: 0,
         left: -99999,
         width: Math.max(anchorRef.current?.getBoundingClientRect().width ?? 0, minWidth),
+        maxWidth: 'calc(100vw - 16px)',
+        boxSizing: 'border-box',
         visibility: 'hidden',
         pointerEvents: 'none',
         zIndex,
@@ -229,7 +240,7 @@ export default function ViewportPopover({
       ref={contentRef}
       style={style}
       role={role}
-      className={`bg-card border border-border rounded-xl shadow-modal overflow-y-auto ${measured ? 'fade-in' : ''} ${className}`}
+      className={`bg-card border border-border rounded-xl shadow-modal overflow-y-auto box-border max-w-[calc(100vw-16px)] ${measured ? 'fade-in' : ''} ${className}`}
       aria-hidden={!measured}
     >
       {children}

@@ -5,7 +5,8 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
 import { isAdminRole } from '@/lib/roles';
-import ContactedBadge from './ContactedBadge';
+import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 
 interface LeadBoardProps {
   leads: Lead[];
@@ -60,7 +61,7 @@ function BoardCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground text-sm truncate">{lead.name || 'Lead'}</p>
           <div className="mt-1">
-            <ContactedBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
+            <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
           </div>
         </div>
         <button
@@ -120,17 +121,17 @@ function BoardCard({
               if (onPostCall) onPostCall(lead);
               else window.location.href = `tel:${lead.phone.replace(/[^0-9+,]/g, '')}`;
             }}
-            className="flex-1 h-8 rounded-lg bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary flex items-center justify-center gap-1 text-xs font-semibold hover:bg-primary/20 dark:hover:bg-primary/25 transition-colors"
+            className="flex-1 min-h-[44px] h-11 rounded-lg bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary flex items-center justify-center gap-1 text-xs font-semibold hover:bg-primary/20 dark:hover:bg-primary/25 transition-colors"
           >
             <Phone size={12} />
             Call
           </button>
           <a
-            href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
+            href={getWhatsAppLinkForLead(lead.phone, lead.name)}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400 flex items-center justify-center gap-1 text-xs font-semibold hover:bg-emerald-500/20 dark:hover:bg-emerald-500/25 transition-colors"
+            className="flex-1 min-h-[44px] h-11 rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400 flex items-center justify-center gap-1 text-xs font-semibold hover:bg-emerald-500/20 dark:hover:bg-emerald-500/25 transition-colors"
           >
             <MessageCircle size={12} />
             WA

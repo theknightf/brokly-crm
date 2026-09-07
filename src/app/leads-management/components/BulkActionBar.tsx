@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import { teamsService, messageLogsService } from '@/lib/services/crmService';
+import { sanitizeEgyptPhone } from '@/lib/whatsapp';
 
 interface AssignableUser {
   id: string;
@@ -65,7 +66,7 @@ interface BulkActionBarProps {
 }
 
 function waLink(phone?: string, message?: string): string {
-  const digits = (phone || '').replace(/[^0-9]/g, '');
+  const digits = sanitizeEgyptPhone(phone);
   if (!digits) return '#';
   const base = `https://wa.me/${digits}`;
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;

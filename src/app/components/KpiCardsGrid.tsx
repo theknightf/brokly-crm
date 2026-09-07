@@ -26,7 +26,17 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
       .finally(() => setLoading(false));
   }, [teamId, agentId]);
 
-  if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
+  if (loading) return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      {Array.from({length: 14}).map((_,i)=>(
+        <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 h-[92px] animate-pulse">
+          <div className="h-3 w-16 bg-zinc-200 dark:bg-zinc-800 rounded mb-3" />
+          <div className="h-7 w-12 bg-zinc-200 dark:bg-zinc-800 rounded mb-2" />
+          <div className="h-3 w-10 bg-zinc-100 dark:bg-zinc-800/60 rounded" />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">

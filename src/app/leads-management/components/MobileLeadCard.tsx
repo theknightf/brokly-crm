@@ -22,6 +22,7 @@ import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ContactedBadge from './ContactedBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileLeadCardProps {
@@ -126,6 +127,8 @@ export default function MobileLeadCard({
       toast.success('Note added');
       setNoteText('');
       setNoteOpen(false);
+      lead.actionTakenToday = true;
+      lead.contactedToday = true;
       onAddNote?.(lead);
     } catch {
       try {
@@ -134,6 +137,9 @@ export default function MobileLeadCard({
         toast.success('Note added');
         setNoteText('');
         setNoteOpen(false);
+        lead.actionTakenToday = true;
+        lead.contactedToday = true;
+        onAddNote?.(lead);
       } catch {
         toast.error('Could not save note');
       }
@@ -159,6 +165,9 @@ export default function MobileLeadCard({
       });
       if (!res.ok) throw new Error();
       toast.success(outcome);
+      lead.actionTakenToday = true;
+      lead.contactedToday = true;
+      onAddNote?.(lead);
     } catch {
       toast.error('Could not log status');
     }
@@ -203,7 +212,7 @@ export default function MobileLeadCard({
               <span className="truncate">{lead.location || '—'}</span>
             </p>
             <div className="mt-1.5">
-              <ContactedBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
+              <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
             </div>
           </div>
         </button>
@@ -213,14 +222,14 @@ export default function MobileLeadCard({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onEdit(lead)}
-              className="w-9 h-9 rounded-xl bg-muted/60 dark:bg-muted hover:bg-muted dark:hover:bg-muted/80 text-muted-foreground flex items-center justify-center active:scale-95 transition-transform"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-muted/60 dark:bg-muted hover:bg-muted dark:hover:bg-muted/80 text-muted-foreground flex items-center justify-center active:scale-95 transition-transform"
               aria-label="Edit lead"
             >
               <Pencil size={16} />
             </button>
             <button
               onClick={() => onDelete(lead.id)}
-              className="w-9 h-9 rounded-xl bg-muted/60 dark:bg-muted hover:bg-red-500/10 dark:hover:bg-red-500/20 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center active:scale-95 transition-transform"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-muted/60 dark:bg-muted hover:bg-red-500/10 dark:hover:bg-red-500/20 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center active:scale-95 transition-transform"
               aria-label="Delete lead"
             >
               <Trash2 size={16} />
@@ -233,32 +242,35 @@ export default function MobileLeadCard({
       </div>
 
       {/* 2. Status & Pipeline Pills Row */}
-      <div className="px-4 pt-3 flex items-center gap-2 flex-wrap">
-        {/* Stage selector dropdown pill — light bright green (portal'd, viewport-clamped, bottom-sheet on Android PWA) */}
+      <div className="px-4 pt-3 flex items-center gap-2 flex-wrap" data-stage-row>
+        {/* Stage selector dropdown pill — portal'd, viewport-clamped, bottom-sheet on Android PWA */}
         <button
           ref={stageAnchorRef}
           type="button"
           onClick={() => setStatusOpen((o) => !o)}
-          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full text-xs font-bold border active:scale-[0.98] transition-transform bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 max-w-full"
+          className="inline-flex items-center gap-1.5 min-h-[44px] h-11 px-3.5 rounded-full text-xs font-bold border active:scale-[0.98] transition-transform bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 max-w-full box-border"
           aria-label={`Stage: ${lead.status || 'Fresh Leads'}`}
           aria-expanded={statusOpen}
           aria-haspopup="listbox"
         >
-          <span className="whitespace-nowrap truncate max-w-[140px]">{lead.status || 'Fresh Leads'}</span>
+          <span className="truncate max-w-[220px]">{lead.status || 'Fresh Leads'}</span>
           <ChevronDown size={13} className="flex-shrink-0" />
         </button>
         <ViewportPopover
           open={statusOpen}
           onClose={() => setStatusOpen(false)}
           anchorRef={stageAnchorRef}
-          minWidth={240}
-          preferredMaxHeight={380}
-          zIndex={70}
+          minWidth={260}
+          preferredMaxHeight={400}
+          zIndex={100}
           role="listbox"
           aria-label="Select stage"
+          className="stage-dropdown-panel"
         >
           <div className="py-1">
-            <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Pipeline</p>
+            <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Pipeline Stages
+            </p>
             {PIPELINE_STAGES.map((s) => (
               <button
                 key={`mob-pipe-${lead.id}-${s}`}
@@ -268,14 +280,17 @@ export default function MobileLeadCard({
                   onStatusChange(lead.id, s as LeadStatus);
                   setStatusOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center min-h-[44px] whitespace-normal break-words box-border ${
-                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
+                className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
+                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
                 }`}
               >
                 <StatusBadge status={s} showDot />
               </button>
             ))}
-            <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Outcomes</p>
+            <div className="my-1 border-t border-border/60" />
+            <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Outcome Stages
+            </p>
             {OUTCOME_STAGES.map((s) => (
               <button
                 key={`mob-out-${lead.id}-${s}`}
@@ -285,8 +300,8 @@ export default function MobileLeadCard({
                   onStatusChange(lead.id, s as LeadStatus);
                   setStatusOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors flex items-center min-h-[44px] whitespace-normal break-words box-border ${
-                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/20' : ''
+                className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
+                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
                 }`}
               >
                 <StatusBadge status={s} showDot />
@@ -336,7 +351,7 @@ export default function MobileLeadCard({
           </button>
         )}
         <a
-          href={lead.phone ? `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}` : undefined}
+          href={lead.phone ? getWhatsAppLinkForLead(lead.phone, lead.name) : undefined}
           target={lead.phone ? '_blank' : undefined}
           rel={lead.phone ? 'noreferrer' : undefined}
           onClick={(e) => {

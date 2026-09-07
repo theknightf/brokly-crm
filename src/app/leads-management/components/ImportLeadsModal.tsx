@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import { teamsService, adminSettingsService } from '@/lib/services/crmService';
 import { parseLeadFile, type ParsedRow } from '@/lib/leadsImport';
 import { PIPELINE_STAGES } from './leadStages';
+import ViewportPopover from '@/components/ui/ViewportPopover';
 
 interface ImportLeadsModalProps {
   open: boolean;
@@ -93,6 +94,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const sourceBoxRef = useRef<HTMLDivElement>(null);
   const stageBoxRef = useRef<HTMLDivElement>(null);
   const assigneeBoxRef = useRef<HTMLDivElement>(null);
+  const stageAnchorRef = useRef<HTMLButtonElement>(null);
   const PANEL_SPACE: Record<'source' | 'stage' | 'assignee', number> = {
     source: 300,
     stage: 380,
@@ -539,26 +541,36 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
               </label>
               <div className="relative" data-cb="stage" ref={stageBoxRef}>
                 <button
+                  ref={stageAnchorRef}
                   type="button"
                   disabled={importing || loadingMeta}
-                  onClick={() => toggleDropdown('stage')}
-                  className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-3 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center gap-2 disabled:opacity-60"
+                  onClick={() => setStageOpen((o) => !o)}
+                  className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-3 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center gap-2 disabled:opacity-60 max-w-full box-border"
+                  aria-expanded={stageOpen}
+                  aria-haspopup="listbox"
                 >
                   <span
                     className="w-3 h-3 rounded-full shrink-0"
                     style={{ background: (stages.find((s) => s.name === stage) as any)?.color || '#84cc16' }}
                   />
-                  <span className="flex-1 font-medium truncate">{stage || 'Select stage…'}</span>
+                  <span className="flex-1 font-medium truncate min-w-0">{stage || 'Select stage…'}</span>
                   <ChevronDown
                     size={15}
                     className={`text-zinc-400 shrink-0 transition-transform ${stageOpen ? 'rotate-180' : ''}`}
                   />
                 </button>
-                {stageOpen && (
-                  <div
-                    className={`absolute z-50 w-full max-w-[calc(100vw-16px)] box-border overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl overscroll-contain ${dropUpKey === 'stage' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}
-                    style={{ maxWidth: 'min(100%, calc(100vw - 16px))', boxSizing: 'border-box' }}
-                  >
+                <ViewportPopover
+                  open={stageOpen}
+                  onClose={() => setStageOpen(false)}
+                  anchorRef={stageAnchorRef}
+                  minWidth={280}
+                  maxWidth={400}
+                  preferredMaxHeight={380}
+                  zIndex={70}
+                  role="listbox"
+                  aria-label="Select stage"
+                >
+                  <div className="py-1 stage-dropdown-panel" style={{ boxSizing: 'border-box', maxWidth: '100%' }}>
                     <div className="max-h-52 overflow-y-auto overscroll-contain py-1">
                       {stages.length === 0 && (
                         <p className="px-3 py-3 text-xs text-zinc-500 text-center">No stages yet — add one below</p>
@@ -665,6 +677,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                       )}
                     </div>
                   </div>
+                </ViewportPopover>
                 )}
               </div>
             </div>

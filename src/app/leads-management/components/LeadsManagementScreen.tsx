@@ -53,6 +53,7 @@ import {
 } from './leadStages';
 import { leadsService, followUpsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -1614,7 +1615,7 @@ export default function LeadsManagementScreen({
                       Call
                     </button>
                     <a
-                      href={`https://wa.me/${viewLead.phone.replace(/[^0-9]/g, '')}`}
+                      href={getWhatsAppLinkForLead(viewLead.phone, viewLead.name)}
                       target="_blank"
                       rel="noreferrer"
                       className="h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"

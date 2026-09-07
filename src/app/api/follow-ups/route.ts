@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,10 +60,21 @@ export async function GET() {
 
   try {
     const db: any = getSupabaseService();
-    const { data, error } = await db
-      .from('follow_ups')
-      .select('*')
-      .order('due_date', { ascending: true });
+    // Scope: admins see all, agents see only their own (RLS was USING true — tighten here)
+    let profileRole: string | null = null;
+    try {
+      const { data: p } = await serverClient.from('user_profiles').select('role').eq('id', user.id).maybeSingle();
+      profileRole = (p as any)?.role || null;
+    } catch {}
+    const isAdmin = isAdminRole(profileRole as any);
+    let query: any = db.from('follow_ups').select('*').order('due_date', { ascending: true }).limit(500);
+    if (!isAdmin) {
+      // Agent: only rows they created (covers lead-linked + standalone). Lead assignment
+      // is also visible via leadsService scoping elsewhere; this keeps the follow-up
+      // partition from leaking other teams' queues.
+      query = query.eq('created_by', user.id);
+    }
+    const { data, error } = await query;
     if (error) {
       // Same convention as /api/workspace/follow-ups: HTTP 200 with an empty
       // list + error text, so the UI can show the message instead of a blank page.
@@ -166,6 +178,19 @@ export async function POST(request: Request) {
           .single();
         if (reopened) saved = reopened;
       }
+
+      // Synchronize lead table: update follow_up_due and mark action_taken
+      try {
+        await db
+          .from('leads')
+          .update({
+            follow_up_due: dueDate,
+            last_action_at: now,
+            last_action_by: user.id,
+            last_activity_at: now,
+          })
+          .eq('id', leadId);
+      } catch {}
     } else {
       const { data, error } = await db.from('follow_ups').insert(row).select().single();
       if (error) throw new Error(error.message);

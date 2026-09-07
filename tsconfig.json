@@ -37,6 +37,14 @@
     ".next/next-build/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "realtyflow-main - Copy",
+    "realtyflow-main - Copy/**",
+    "scratch",
+    "scratch/**",
+    "mobile",
+    "mobile/**",
+    "mobile_flutter",
+    "mobile_flutter/**"
   ]
 }

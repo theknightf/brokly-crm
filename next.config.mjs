@@ -14,10 +14,10 @@ const nextConfig = {
     '@supabase/functions-js',
   ],
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: imageHosts,

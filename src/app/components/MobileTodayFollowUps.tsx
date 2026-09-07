@@ -13,6 +13,7 @@ import { followUpsService } from '@/lib/services/crmService';
 import { QuickNoteSheet } from '@/components/mobile/QuickNoteSheet';
 import { useCallOutcome, CallItem, CallChannel } from '@/components/mobile/CallOutcomeSheet';
 import { useFollowUpSync } from '@/hooks/useFollowUpSync';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 
 interface Item {
   id: string;
@@ -32,8 +33,8 @@ function dueLabel(due: string): { text: string; cls: string; overdue: boolean } 
   return { text: due, cls: 'bg-muted text-muted-foreground', overdue: false };
 }
 
-function waLink(phone: string): string {
-  return `https://wa.me/${phone.replace(/[^0-9]/g, '')}`;
+function waLink(phone: string, name?: string): string {
+  return getWhatsAppLinkForLead(phone, name);
 }
 
 export default function MobileTodayFollowUps() {
@@ -156,7 +157,7 @@ export default function MobileTodayFollowUps() {
                         <Phone size={19} />
                       </a>
                       <a
-                        href={waLink(item.contactPhone)}
+                        href={waLink(item.contactPhone, item.contactName)}
                         target="_blank"
                         rel="noreferrer"
                         onClick={() => armCall(item, 'WhatsApp')}

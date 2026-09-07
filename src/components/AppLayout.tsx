@@ -27,7 +27,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className={`pwa-shell flex h-screen bg-background overflow-hidden ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`pwa-shell flex min-h-screen bg-background overflow-hidden supports-[height:100dvh]:h-[100dvh] ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Mobile overlay */}
       {mobileSidebarOpen && (
         <div

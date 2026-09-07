@@ -241,14 +241,6 @@ export default function FollowUpsManagementScreen() {
     });
   }, [tabFiltered, filters]);
 
-  console.log('[FollowUpsManagementScreen] render state:', {
-    rawFollowUpsCount: followUps.length,
-    activeTab,
-    tabFilteredCount: tabFiltered.length,
-    filteredCount: filtered.length,
-    activeFilters: filters,
-  });
-
   const stats = useMemo(
     () => ({
       total: followUps.length,
@@ -890,7 +882,7 @@ export default function FollowUpsManagementScreen() {
                                 <button
                                   onClick={() => handleMarkComplete(fu.id)}
                                   title="Mark as completed"
-                                  className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors flex items-center justify-center"
                                 >
                                   <CheckCheck size={14} />
                                 </button>
@@ -899,7 +891,7 @@ export default function FollowUpsManagementScreen() {
                                 <button
                                   onClick={() => handleReopen(fu.id)}
                                   title="Reopen follow-up"
-                                  className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center"
                                 >
                                   <RotateCcw size={14} />
                                 </button>
@@ -907,14 +899,14 @@ export default function FollowUpsManagementScreen() {
                               <button
                                 onClick={() => setEditTarget(fu)}
                                 title="Edit follow-up"
-                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center"
                               >
                                 <Pencil size={14} />
                               </button>
                               <button
                                 onClick={() => setDeleteTarget(fu)}
                                 title="Delete follow-up"
-                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
+                                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors flex items-center justify-center"
                               >
                                 <Trash2 size={14} />
                               </button>

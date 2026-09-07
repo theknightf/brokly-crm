@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
+import { sanitizeEgyptPhone } from '@/lib/whatsapp';
 import {
   BadgeCheck,
   Building2,
@@ -202,7 +203,7 @@ export default function RecommendedUnitDetailsModal({
     const text = lines.join('\n');
     if (pickedLead?.phone) {
       window.open(
-        `https://wa.me/${pickedLead.phone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(text)}`,
+        `https://wa.me/${sanitizeEgyptPhone(pickedLead.phone)}?text=${encodeURIComponent(text)}`,
         '_blank'
       );
     } else {

@@ -15,13 +15,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { leadCommentsService } from '@/lib/services/crmService';
 import { QuickNoteSheet } from './QuickNoteSheet';
 import { useCallOutcome, CallChannel, CallOutcomeSheet, Direction, CallItem } from './CallOutcomeSheet';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 
 interface LeadQuickActionsProps {
   lead: { id: string; name: string; phone?: string; project?: string };
 }
 
-function waLink(phone: string): string {
-  return `https://wa.me/${phone.replace(/[^0-9]/g, '')}`;
+function waLink(phone: string, name?: string): string {
+  return getWhatsAppLinkForLead(phone, name);
 }
 
 const WA_QUICK: { label: string; icon: React.ReactNode; outcome: string; cls: string }[] = [
@@ -119,7 +120,7 @@ export function LeadQuickActions({ lead }: LeadQuickActionsProps) {
               </span>
             </a>
             <a
-              href={waLink(lead.phone)}
+              href={waLink(lead.phone, lead.name)}
               target="_blank"
               rel="noreferrer"
               onClick={() => armCall('WhatsApp')}

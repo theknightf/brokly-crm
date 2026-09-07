@@ -583,8 +583,8 @@ body.modal-open [data-fab="mobile-add-lead"] {
 }
 @media (max-width: 640px) {
   .stage-dropdown-panel {
-    max-width: calc(100vw - 16px);
-    width: min(280px, calc(100vw - 16px)) !important;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   /* Prevent the pill row itself from clipping the portal anchor */
   [data-stage-row] {

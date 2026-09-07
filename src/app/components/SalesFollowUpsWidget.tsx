@@ -18,6 +18,7 @@ import { followUpsService } from '@/lib/services/crmService';
 import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 import { QuickNoteSheet } from '@/components/mobile/QuickNoteSheet';
 import { useCallOutcome, CallChannel } from '@/components/mobile/CallOutcomeSheet';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { toast } from 'sonner';
 
 export interface FollowUpItem {
@@ -95,8 +96,8 @@ function dueStatus(due: string): { label: string; cls: string; isOverdue: boolea
   };
 }
 
-function waLink(phone: string): string {
-  return `https://wa.me/${phone.replace(/[^0-9]/g, '')}`;
+function waLink(phone: string, name?: string): string {
+  return getWhatsAppLinkForLead(phone, name);
 }
 
 export default function SalesFollowUpsWidget() {
@@ -228,7 +229,7 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('today')}
-          className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex-1 min-w-[100px] min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'today'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -250,7 +251,7 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('overdue')}
-          className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex-1 min-w-[100px] min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'overdue'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -272,7 +273,7 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('upcoming')}
-          className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex-1 min-w-[100px] min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'upcoming'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -294,7 +295,7 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('all')}
-          className={`hidden sm:flex flex-1 min-w-[80px] items-center justify-center gap-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`hidden sm:flex flex-1 min-w-[80px] min-h-[44px] items-center justify-center gap-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'all'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -408,18 +409,18 @@ export default function SalesFollowUpsWidget() {
                         <a
                           href={`tel:${item.contactPhone}`}
                           onClick={() => armCall(item, 'Call')}
-                          className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground active:scale-90 transition-all"
+                          className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-primary-foreground active:scale-90 transition-all"
                           title="Call contact"
                           aria-label="Call contact"
                         >
                           <Phone size={14} />
                         </a>
                         <a
-                          href={waLink(item.contactPhone)}
+                          href={waLink(item.contactPhone, item.contactName)}
                           target="_blank"
                           rel="noreferrer"
                           onClick={() => armCall(item, 'WhatsApp')}
-                          className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white active:scale-90 transition-all"
+                          className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white active:scale-90 transition-all"
                           title="Message on WhatsApp"
                           aria-label="Message on WhatsApp"
                         >
@@ -430,7 +431,7 @@ export default function SalesFollowUpsWidget() {
                     <button
                       type="button"
                       onClick={() => setNoteTarget(item)}
-                      className="h-8 px-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-semibold flex items-center gap-1 hover:bg-secondary/80 active:scale-95 transition-all"
+                      className="min-h-[44px] h-11 px-3 rounded-lg bg-secondary text-secondary-foreground text-xs font-semibold flex items-center gap-1 hover:bg-secondary/80 active:scale-95 transition-all"
                       title="Add note"
                     >
                       <StickyNote size={12} />
@@ -442,7 +443,7 @@ export default function SalesFollowUpsWidget() {
                     type="button"
                     onClick={() => handleComplete(item.id, item.contactName)}
                     disabled={isCompleting}
-                    className="h-8 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1 hover:bg-primary/90 disabled:opacity-50 active:scale-95 transition-all"
+                    className="min-h-[44px] h-11 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1 hover:bg-primary/90 disabled:opacity-50 active:scale-95 transition-all"
                   >
                     {isCompleting ? (
                       <Loader2 size={12} className="animate-spin" />

@@ -526,13 +526,14 @@ export const leadsService = {
    * `follow_ups` row in sync, which is what the Workspace Late/Today/Tomorrow
    * tabs read from.
    */
-  async scheduleFollowUp(id: string, dueDate: string) {
+  async scheduleFollowUp(id: string, dueDate: string, actorId?: string | null) {
     const supabase = createClient();
-    let actorId: string | null = null;
-    try {
-      const { data: au } = await supabase.auth.getUser();
-      actorId = au?.user?.id ?? null;
-    } catch {}
+    if (!actorId) {
+      try {
+        const { data: au } = await supabase.auth.getUser();
+        actorId = au?.user?.id || null;
+      } catch {}
+    }
     const patch: any = { follow_up_due: dueDate, last_action_at: new Date().toISOString() };
     if (actorId) patch.last_action_by = actorId;
     const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').single();
@@ -1336,36 +1337,31 @@ export const followUpsService = {
           (j as any).data ??
           null;
         if (Array.isArray(list)) {
-          console.log('[crmService.followUpsService.getAll] via API:', list.length);
           // API rows are already camelCase; map only raw snake_case rows.
           return list.map((r: any) =>
             r && typeof r === 'object' && 'contact_name' in r ? rowToFollowUp(r) : r
           );
         }
-      } else if (res.status === 401) {
+      } else if (res.status === 401 && process.env.NODE_ENV !== 'production') {
         console.error('[crmService.followUpsService.getAll] API unauthorized');
       }
     } catch (e) {
-      console.error(
-        '[crmService.followUpsService.getAll] API fetch failed, falling back to direct query:',
-        e
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[crmService.followUpsService.getAll] API fetch failed, falling back:', e);
+      }
     }
     const supabase = createClient();
     try {
-      console.log('[crmService.followUpsService.getAll] executing direct query...');
       const { data, error } = await supabase
         .from('follow_ups')
         .select('*')
         .order('due_date', { ascending: true });
-      console.log('[crmService.followUpsService.getAll] raw data:', data, 'error:', error);
       if (error) {
-        console.error('[crmService.followUpsService.getAll] supabase error:', error);
+        if (process.env.NODE_ENV !== 'production') console.error('[crmService.followUpsService.getAll] supabase error:', error);
         if (isSchemaError(error)) throw error;
         return [];
       }
       const mapped = (data || []).map(rowToFollowUp);
-      console.log('[crmService.followUpsService.getAll] mapped followUps:', mapped);
       return mapped;
     } catch (err: any) {
       console.error('[crmService.followUpsService.getAll] caught exception:', err);
@@ -1374,14 +1370,54 @@ export const followUpsService = {
     }
   },
 
-  /** Only follow-ups that are still actionable (used by the dashboard). RLS-proof via GET /api/follow-ups. */
+  /** Only follow-ups that are still actionable and overdue. RLS-proof via GET /api/follow-ups. */
   async getOverdue(limit = 8) {
     try {
       const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
       const today = new Date().toISOString().split('T')[0];
       return (all || [])
         .filter((f: any) => f.dueDate < today && f.status !== 'Completed' && f.status !== 'Cancelled')
-        .sort((a: any, b: any) => a.dueDate.localeCompare(b.dueDate))
+        .sort((a: any, b: any) => {
+          const dateCmp = a.dueDate.localeCompare(b.dueDate);
+          if (dateCmp !== 0) return dateCmp;
+          return (a.dueTime || '').localeCompare(b.dueTime || '');
+        })
+        .slice(0, limit);
+    } catch {
+      return [];
+    }
+  },
+
+  /** Only follow-ups that are due today and still actionable. RLS-proof via GET /api/follow-ups. */
+  async getToday(limit = 8) {
+    try {
+      const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
+      const today = new Date().toISOString().split('T')[0];
+      return (all || [])
+        .filter((f: any) => f.dueDate === today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .sort((a: any, b: any) => {
+          const timeCmp = (a.dueTime || '').localeCompare(b.dueTime || '');
+          if (timeCmp !== 0) return timeCmp;
+          return (a.contactName || '').localeCompare(b.contactName || '');
+        })
+        .slice(0, limit);
+    } catch {
+      return [];
+    }
+  },
+
+  /** Only follow-ups that are scheduled for the future (tomorrow onwards). RLS-proof via GET /api/follow-ups. */
+  async getUpcoming(limit = 8) {
+    try {
+      const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
+      const today = new Date().toISOString().split('T')[0];
+      return (all || [])
+        .filter((f: any) => f.dueDate > today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .sort((a: any, b: any) => {
+          const dateCmp = a.dueDate.localeCompare(b.dueDate);
+          if (dateCmp !== 0) return dateCmp;
+          return (a.dueTime || '').localeCompare(b.dueTime || '');
+        })
         .slice(0, limit);
     } catch {
       return [];
@@ -1395,28 +1431,34 @@ export const followUpsService = {
       const today = new Date().toISOString().split('T')[0];
       return (all || [])
         .filter((f: any) => f.dueDate >= today && f.status !== 'Completed' && f.status !== 'Cancelled')
-        .sort((a: any, b: any) => a.dueDate.localeCompare(b.dueDate))
+        .sort((a: any, b: any) => {
+          const dateCmp = a.dueDate.localeCompare(b.dueDate);
+          if (dateCmp !== 0) return dateCmp;
+          return (a.dueTime || '').localeCompare(b.dueTime || '');
+        })
         .slice(0, limit);
     } catch {
       return [];
     }
   },
 
-  /** Overdue + due-today counts for the dashboard KPI row. RLS-proof via GET /api/follow-ups. */
+  /** Overdue + due-today + upcoming counts for the dashboard widgets and KPI row. RLS-proof via GET /api/follow-ups. */
   async getDashboardCounts() {
     try {
       const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
       const today = new Date().toISOString().split('T')[0];
       let overdue = 0;
       let dueToday = 0;
+      let upcoming = 0;
       for (const f of all || []) {
         if (f.status === 'Completed' || f.status === 'Cancelled') continue;
         if (f.dueDate < today) overdue++;
         else if (f.dueDate === today) dueToday++;
+        else if (f.dueDate > today) upcoming++;
       }
-      return { overdue, dueToday };
+      return { overdue, dueToday, upcoming };
     } catch {
-      return { overdue: 0, dueToday: 0 };
+      return { overdue: 0, dueToday: 0, upcoming: 0 };
     }
   },
 
@@ -3146,6 +3188,17 @@ export const leadCommentsService = {
       )
       .single();
     if (error) throw error;
+    // Resilient fallback: ensure leads table records the action immediately
+    try {
+      await supabase
+        .from('leads')
+        .update({
+          last_action_at: new Date().toISOString(),
+          last_action_by: userId,
+          last_activity_at: new Date().toISOString(),
+        })
+        .eq('id', leadId);
+    } catch {}
     return {
       id: data.id,
       body: data.body,
