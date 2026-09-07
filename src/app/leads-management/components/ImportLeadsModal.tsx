@@ -678,7 +678,6 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                     </div>
                   </div>
                 </ViewportPopover>
-                )}
               </div>
             </div>
 
