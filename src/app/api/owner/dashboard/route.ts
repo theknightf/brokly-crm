@@ -118,9 +118,17 @@ export async function GET(request: Request) {
       supabase.from('leads').select('crm_status, lead_status'),
     ]);
 
+  const STATUSES_CANON_OWNER = ['Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number','No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'] as const;
+  const canonMapOwner = new Map<string,string>(STATUSES_CANON_OWNER.map(s=>[s.toLowerCase(), s]));
+  const toCanonicalOwner = (raw: any): string => {
+    const t = String(raw||'').trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+    if (t==='not intereted' || t==='not_interested' || t==='not-interested' || t==='lost') return 'Not Interested';
+    return canonMapOwner.get(t) || String(raw||'Unknown').trim() || 'Unknown';
+  };
   const leadsByStage: Record<string, number> = {};
   (leadsRes.data || []).forEach((lead: any) => {
-    const stage = String(lead.crm_status || lead.lead_status || 'Unknown');
+    const raw = lead.crm_status || lead.lead_status || 'Unknown';
+    const stage = toCanonicalOwner(raw);
     leadsByStage[stage] = (leadsByStage[stage] || 0) + 1;
   });
   const leadStageSummary = Object.entries(leadsByStage)
