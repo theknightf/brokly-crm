@@ -156,18 +156,33 @@ export async function GET(request: Request) {
   (expensesThisRes.data || []).forEach((e: any) => { byCategory[e.category] = (byCategory[e.category] || 0) + (Number(e.amount) || 0); });
   const categories = Object.entries(byCategory).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
 
+  const STATUSES_CANON = ['All Leads','Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number','No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'] as const;
+  const canonMap = new Map<string,string>(STATUSES_CANON.map(s=>[s.toLowerCase(), s]));
+  const normalizeStatus = (raw: any): string => {
+    const t = String(raw||'').trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+    if (t==='not intereted' || t==='not_interested' || t==='not-interested' || t==='lost') return 'not interested';
+    return t;
+  };
+  const toCanonical = (raw: any): string => {
+    const n = normalizeStatus(raw);
+    return canonMap.get(n) || (raw ? String(raw).trim() : 'Unknown');
+  };
   const leadsByStage: Record<string, number> = {};
+  const leadsByStageNorm: Record<string, number> = {};
   const leadSources: Record<string, number> = {};
   let doneDealRevenue = 0;
   (leadsRes.data || []).forEach((l: any) => {
-    const s = String(l.crm_status || l.lead_status || 'Unknown');
-    leadsByStage[s] = (leadsByStage[s] || 0) + 1;
+    const raw = String(l.crm_status || l.lead_status || 'Unknown');
+    const canon = toCanonical(raw);
+    leadsByStage[canon] = (leadsByStage[canon] || 0) + 1;
+    // keep normalized bucket for 19-stage real classification (exposes typo-fixed)
+    leadsByStageNorm[canon] = (leadsByStageNorm[canon] || 0) + 1;
     const src = String(l.source || 'Unknown');
     leadSources[src] = (leadSources[src] || 0) + 1;
-    const isDone = /done deal|d\.deal|won/i.test(s);
+    const isDone = /done deal|d\.deal|won/i.test(canon);
     if (isDone) doneDealRevenue += Number(l.final_price || l.total_price || 0);
   });
-  const leadSummary = { total: (leadsRes.data || []).length, byStage: Object.entries(leadsByStage).map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count), bySource: Object.entries(leadSources).map(([source, count]) => ({ source, count })).sort((a,b)=>b.count-a.count), doneDealRevenue };
+  const leadSummary = { total: (leadsRes.data || []).length, byStage: Object.entries(leadsByStage).map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count), byStageNormalized: leadsByStageNorm, bySource: Object.entries(leadSources).map(([source, count]) => ({ source, count })).sort((a,b)=>b.count-a.count), doneDealRevenue };
 
   // 7-stage KPI mapping per spec: New Fresh, New Cold, Leads Pending, Calls Answer, No Answer, Cancel, D.Deal
   function mapStage(s: string): keyof typeof stageCounts {
