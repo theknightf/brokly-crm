@@ -90,12 +90,13 @@ export async function GET(request: Request) {
       q = q.eq('team', teamId);
     }
     if (stage !== 'All Leads') {
-      if (stage === 'Duplicate Leads') q = q.or(`crm_status.ilike.Duplicate Leads,and(crm_status.is.null,lead_status.ilike.Duplicate Leads)`);
-      else if (stage === 'Not Interested') {
-        // Case-insensitive + trim + typo 'not intereted' + legacy Lost
-        q = q.or(`crm_status.ilike.Not Interested,crm_status.ilike.not intereted,crm_status.ilike.not_interested,and(crm_status.is.null,lead_status.ilike.Lost),and(crm_status.is.null,lead_status.ilike.Not Interested)`);
+      if (stage === 'Not Interested') {
+        // Case-insensitive + trim + typo 'not intereted' + legacy Lost (lead_status is enum → use eq, not ilike)
+        q = q.or(`crm_status.ilike.Not Interested,crm_status.ilike.not intereted,crm_status.ilike.not_interested`);
+        // legacy fallback for pre-migration rows where crm_status IS NULL and lead_status='Lost' (enum) – keep as separate eq if needed
+        // counted via crm_status now (crm_null=0), so no extra filter needed
       } else {
-        q = q.or(`crm_status.ilike.${stage},and(crm_status.is.null,lead_status.ilike.${stage})`);
+        q = q.ilike('crm_status', stage);
       }
     }
     if (fromDate) q = q.gte('created_at', fromDate);
@@ -108,9 +109,8 @@ export async function GET(request: Request) {
         if (assignedFilter) retry = retry.eq('assigned_to', assignedFilter);
         else if (teamMemberIds && teamMemberIds.length) retry = retry.in('assigned_to', teamMemberIds);
         if (stage !== 'All Leads') {
-          if (stage === 'Not Interested') retry = retry.or(`crm_status.ilike.Not Interested,crm_status.ilike.not intereted,crm_status.ilike.not_interested,and(crm_status.is.null,lead_status.ilike.Lost),and(crm_status.is.null,lead_status.ilike.Not Interested)`);
-          else if (stage !== 'Duplicate Leads') retry = retry.or(`crm_status.ilike.${stage},and(crm_status.is.null,lead_status.ilike.${stage})`);
-          else retry = retry.or(`crm_status.ilike.Duplicate Leads,and(crm_status.is.null,lead_status.ilike.Duplicate Leads)`);
+          if (stage === 'Not Interested') retry = retry.or(`crm_status.ilike.Not Interested,crm_status.ilike.not intereted,crm_status.ilike.not_interested`);
+          else retry = retry.ilike('crm_status', stage);
         }
         if (fromDate) retry = retry.gte('created_at', fromDate);
         if (toDate) retry = retry.lte('created_at', toDate+'T23:59:59.999Z');
