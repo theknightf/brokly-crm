@@ -9,6 +9,8 @@ import DelayList from '@/app/components/DelayList';
 import DashboardTeamFilter from '@/app/components/DashboardTeamFilter';
 import ActivityPerHourChart from '@/app/components/ActivityPerHourChart';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 
 interface UnifiedData {
   summary: any; leaderboard: any[]; leadSummary: any; expenses: any; timeline: any[];
@@ -21,6 +23,7 @@ type DashboardMode = 'sales' | 'leads';
 type PipelineView = 'kanban' | 'table';
 
 export default function UnifiedMasterDashboard() {
+  const { user, profile, loading: authLoading } = useAuth();
   const [range, setRange] = useState<'week'|'month'>('week');
   const [mode, setMode] = useState<DashboardMode>('sales');
   const [data, setData] = useState<UnifiedData | null>(null);
@@ -37,14 +40,21 @@ export default function UnifiedMasterDashboard() {
   const leaderboardRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
+    // Guard: wait for auth hydration and ensure Owner/Admin role
+    if (authLoading) return;
+    if (!user || !profile || !isAdminRole(profile.role)) {
+      setLoading(false);
+      if (!user) setError('');
+      return;
+    }
     setLoading(true); setError('');
     try {
-      const res = await fetch(`/api/dashboard/unified-master?range=${range}`, { cache: 'no-store' });
+      const res = await fetch(`/api/dashboard/unified-master?range=${range}`, { cache: 'no-store', credentials: 'same-origin' });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Failed');
       setData(j);
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-  }, [range]);
+  }, [range, authLoading, user?.id, profile?.role]);
 
   const loadPipelineLeads = useCallback(async () => {
     if (mode !== 'leads') return;
@@ -59,7 +69,15 @@ export default function UnifiedMasterDashboard() {
     } catch {} finally { setPipelineLoading(false); }
   }, [mode, pipelineSearch]);
 
-  useEffect(() => { load(); }, [load]);
+  // Re-fetch immediately when session/profile hydrates or range changes; also on focus/visibility
+  useEffect(() => { if (!authLoading) load(); }, [load, authLoading]);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible' && !authLoading && isAdminRole(profile?.role)) load(); };
+    const onFocus = () => { if (!authLoading && isAdminRole(profile?.role)) load(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onVisible); };
+  }, [load, authLoading, profile?.role]);
   useEffect(() => { loadPipelineLeads(); }, [loadPipelineLeads]);
   // debounce search
   useEffect(() => {
@@ -89,43 +107,43 @@ export default function UnifiedMasterDashboard() {
   const filteredLeads = pipelineLeads;
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen transition-colors duration-200 space-y-6 p-4 md:p-6 -m-4 md:-m-6">
-      {/* Header — clean dark aesthetic, no floating capsule */}
+    <div className="bg-background text-foreground min-h-screen transition-colors duration-200 space-y-6 p-4 md:p-6 -m-4 md:-m-6">
+      {/* Header — brand-aligned, uses design tokens */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-zinc-900 dark:text-white font-bold text-xl flex items-center gap-2">
+          <h1 className="text-foreground font-bold text-xl flex items-center gap-2">
             Executive Master Dashboard
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-900 dark:bg-zinc-800 border border-zinc-800 dark:border-zinc-700 text-[11px] font-medium text-zinc-400">
-              <span className="w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card border border-border text-[11px] font-medium text-muted-foreground">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               Live
             </span>
           </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-            {data.period?.from} — {data.period?.to} <span className="mx-1 text-zinc-400">•</span> {data.leadSummary?.total ?? 0} leads <span className="mx-1 text-zinc-400">•</span> {data.summary.totalEmployees} team
+          <p className="text-muted-foreground text-sm mt-1">
+            {data.period?.from} — {data.period?.to} <span className="mx-1 text-muted-foreground/60">•</span> {data.leadSummary?.total ?? 0} leads <span className="mx-1 text-muted-foreground/60">•</span> {data.summary.totalEmployees} team
           </p>
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          <button onClick={() => setRange('week')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='week' ? 'bg-zinc-900 dark:bg-zinc-800 text-white dark:text-white border-zinc-800 dark:border-zinc-700 shadow-sm' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>Week</button>
-          <button onClick={() => setRange('month')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='month' ? 'bg-zinc-900 dark:bg-zinc-800 text-white dark:text-white border-zinc-800 dark:border-zinc-700 shadow-sm' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}>Month</button>
-          <button onClick={load} className="w-8 h-8 rounded-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors"><RefreshCw size={14}/></button>
+          <button onClick={() => setRange('week')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
+          <button onClick={() => setRange('month')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
+          <button onClick={load} className="w-8 h-8 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors"><RefreshCw size={14}/></button>
         </div>
       </div>
 
-      {/* View Switcher — modern pill with subtle glow */}
-      <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full p-1 flex gap-1 w-full sm:w-auto">
+      {/* View Switcher — uses muted/card tokens with lime primary for active */}
+      <div className="bg-muted border border-border rounded-full p-1 flex gap-1 w-full sm:w-auto">
         <button
           onClick={() => setMode('sales')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-lime-500 text-zinc-950 font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-lime-400' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card/60 font-medium'}`}
         >
           <Users size={16}/> Sales & Team Performance
-          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='sales' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.leaderboard.length}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='sales' ? 'bg-card text-primary' : 'bg-muted text-muted-foreground'}`}>{data.leaderboard.length}</span>
         </button>
         <button
           onClick={() => setMode('leads')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-lime-500 text-zinc-950 font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-lime-400' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card/60 font-medium'}`}
         >
           <Target size={16}/> Leads Pipeline & Data Hub
-          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-zinc-900 text-lime-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}>{data.summary?.totalLeads ?? 0}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-card text-primary' : 'bg-muted text-muted-foreground'}`}>{data.summary?.totalLeads ?? 0}</span>
         </button>
       </div>
 
@@ -154,11 +172,11 @@ export default function UnifiedMasterDashboard() {
               { label: 'Expenses', value: `${data.expenses.totalThis}`, sub: `${data.expenses.changePct>=0?'+':''}${data.expenses.changePct}%`, icon: Banknote, color: 'text-amber-400 bg-amber-500/10' },
               { label: 'Pending Deductions', value: data.deductions.pending, sub: `${data.notifications.unread} unread alerts`, icon: Bell, color: 'text-red-400 bg-red-500/10' },
             ].map(card => (
-              <div key={card.label} className="bg-white dark:bg-[#16181d] dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm hover:border-zinc-300 dark:hover:border-zinc-700 transition-all">
+              <div key={card.label} className="bg-card border border-border rounded-2xl p-4 shadow-sm hover:border-primary/20 transition-all">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-2 ${card.color}`}><card.icon size={14}/></div>
-                <p className="text-zinc-600 dark:text-zinc-400 text-xs font-bold tracking-wider uppercase truncate">{card.label}</p>
-                <p className="text-2xl font-black text-zinc-900 dark:text-white mt-1">{card.value}</p>
-                {card.sub && <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-1 truncate">{card.sub}</p>}
+                <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase truncate">{card.label}</p>
+                <p className="text-2xl font-black text-foreground mt-1">{card.value}</p>
+                {card.sub && <p className="text-muted-foreground/80 text-xs mt-1 truncate">{card.sub}</p>}
               </div>
             ))}
           </div>

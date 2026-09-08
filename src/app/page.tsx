@@ -3,6 +3,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import AppLayout from '@/components/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 
 const DashboardHeader = dynamic(() => import('./components/DashboardHeader'));
 const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
@@ -15,23 +16,44 @@ const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
 const GettingStarted = dynamic(() => import('./components/GettingStarted'));
 const UnifiedMasterDashboard = dynamic(() => import('./components/UnifiedMasterDashboard'));
 
-export default function DashboardPage() {
-  const { profile, loading } = useAuth();
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+      <div className="h-10 bg-muted/60 rounded-2xl animate-pulse" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <div key={i} className="bg-card border border-border rounded-2xl p-4 h-[92px] animate-pulse">
+            <div className="h-3 w-16 bg-muted rounded mb-3" />
+            <div className="h-7 w-12 bg-muted rounded mb-2" />
+            <div className="h-3 w-10 bg-muted/60 rounded" />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 h-64 bg-card border border-border rounded-2xl animate-pulse" />
+        <div className="h-64 bg-card border border-border rounded-2xl animate-pulse" />
+      </div>
+      <div className="h-48 bg-card border border-border rounded-2xl animate-pulse" />
+    </div>
+  );
+}
 
-  if (loading) {
+export default function DashboardPage() {
+  const { profile, loading, user } = useAuth();
+
+  // Hydration guard: while auth is resolving OR user exists but profile (role) hasn't loaded yet,
+  // show a unified skeleton – prevents flash of Sales dashboard for Owner/Admin.
+  const isHydrating = loading || (!!user && !profile);
+  if (isHydrating) {
     return (
       <AppLayout>
-        <div className="flex flex-col gap-6">
-          <div className="h-12 bg-muted/60 rounded-2xl animate-pulse" />
-          <div className="h-24 bg-muted/60 rounded-2xl animate-pulse" />
-          <div className="h-24 bg-muted/60 rounded-2xl animate-pulse" />
-        </div>
+        <DashboardSkeleton />
       </AppLayout>
     );
   }
 
-  // Unified Executive Dashboard: identical for Admin & Owner per spec (ADMIN_OWNER)
-  const isUnified = profile?.role === 'owner' || profile?.role === 'admin';
+  // Role-normalized check (handles OWNER_ADMIN, Admin, owner_admin, etc.)
+  const isUnified = isAdminRole(profile?.role);
   if (isUnified) {
     return (
       <AppLayout>

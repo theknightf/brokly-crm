@@ -60,24 +60,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    getSupabase().auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      setLoading(false);
-    });
+    let mounted = true;
+    const init = async () => {
+      try {
+        const { data: { session } } = await getSupabase().auth.getSession();
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    init();
 
     const {
       data: { subscription },
-    } = getSupabase().auth.onAuthStateChange((_event, session) => {
+    } = getSupabase().auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      // Keep loading true while profile hydrates to prevent FOUC of wrong role view
+      if (session?.user) setLoading(true);
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setProfile(null);
-      setLoading(false);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+        if (mounted) setLoading(false);
+      } else {
+        setProfile(null);
+        if (mounted) setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, metadata: Record<string, any> = {}) => {
