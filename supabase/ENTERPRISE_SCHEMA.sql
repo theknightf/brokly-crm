@@ -13,6 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- Spec: User (id, name, email, phone, role: OWNER_ADMIN | SALES, baseSalary, targetKPIs)
 -- Actual: user_profiles (id UUID FK auth.users, full_name, email, phone, role, base_salary, employment_status, hire_date, is_active)
 -- Role mapping: OWNER_ADMIN unified dashboard role covers both owner & admin; SALES covers agent/broker/telecaller etc.
+-- Note: Role checks are case-insensitive + OWNER_ADMIN-tolerant (see is_admin_or_owner_v2 in migrations) — do not revert to case-sensitive IN ('admin','owner').
 CREATE TABLE IF NOT EXISTS public.user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
