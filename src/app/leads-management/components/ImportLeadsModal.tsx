@@ -217,14 +217,14 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     };
   }, [open ]);
 
-  // Close dropdowns on outside click
+  // Close dropdowns on outside click — stage is portaled via ViewportPopover, so its
+  // outside-click is handled inside that component; don't double-close here.
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
       if (!t.closest('[data-cb="source"]')) setSourceOpen(false);
-      if (!t.closest('[data-cb="stage"]')) setStageOpen(false);
       if (!t.closest('[data-cb="assignee"]')) setAssigneeOpen(false);
-      if (!t.closest('[data-cb]')) setDropUpKey(null);
+      if (!t.closest('[data-cb="source"]') && !t.closest('[data-cb="assignee"]')) setDropUpKey(null);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -544,7 +544,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   ref={stageAnchorRef}
                   type="button"
                   disabled={importing || loadingMeta}
-                  onClick={() => setStageOpen((o) => !o)}
+                  onClick={() => toggleDropdown('stage')}
                   className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-3 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center gap-2 disabled:opacity-60 max-w-full box-border"
                   aria-expanded={stageOpen}
                   aria-haspopup="listbox"
@@ -566,7 +566,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   minWidth={280}
                   maxWidth={400}
                   preferredMaxHeight={380}
-                  zIndex={70}
+                  zIndex={200}
                   role="listbox"
                   aria-label="Select stage"
                 >
