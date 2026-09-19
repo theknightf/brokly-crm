@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { FilterState } from './LeadsManagementScreen';
-import { teamsService, projectsService } from '@/lib/services/crmService';
+import { teamsService, projectsService, adminSettingsService } from '@/lib/services/crmService';
 import {
   ALL_STATUSES,
   ALL_SOURCES,
@@ -25,6 +25,7 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
 
   const [agentOptions, setAgentOptions] = useState<string[]>([]);
   const [projectOptions, setProjectOptions] = useState<string[]>([]);
+  const [statusOptions, setStatusOptions] = useState<string[]>(ALL_STATUSES);
 
   useEffect(() => {
     let alive = true;
@@ -46,6 +47,18 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
           .map((p: any) => (p?.name as string) || '')
           .filter(Boolean);
         setProjectOptions(Array.from(new Set(names)).sort((a, b) => a.localeCompare(b)));
+      })
+      .catch(() => {});
+    adminSettingsService
+      .getAll()
+      .then((g: any) => {
+        if (!alive) return;
+        const stages = (g.pipelineStages || [])
+          .filter((s: any) => s.active)
+          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+          .map((s: any) => String(s.name || '').trim())
+          .filter(Boolean);
+        if (stages.length) setStatusOptions(stages);
       })
       .catch(() => {});
     return () => {
@@ -78,7 +91,7 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
           className="input-base h-9 text-sm appearance-none pr-8 min-w-[160px] max-w-full w-full sm:w-auto box-border truncate"
         >
           <option value="">All Statuses</option>
-          {ALL_STATUSES.map((s) => (
+          {statusOptions.map((s) => (
             <option key={`filter-status-${s}`} value={s} className="whitespace-normal">
               {s}
             </option>

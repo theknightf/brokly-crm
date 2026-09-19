@@ -4,11 +4,27 @@ import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
-const STATUSES = [
+const FALLBACK_STATUSES = [
   'All Leads','Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting',
   'Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number',
   'No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'
 ];
+
+async function loadStatuses(db: any): Promise<string[]> {
+  try {
+    const { data, error } = await db
+      .from('admin_settings')
+      .select('name, sort_order')
+      .eq('category', 'pipelineStages')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (!error && data && data.length) {
+      const names = (data as any[]).map((r) => String(r.name || '').trim()).filter(Boolean);
+      if (names.length) return ['All Leads', ...names];
+    }
+  } catch {}
+  return FALLBACK_STATUSES;
+}
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -77,6 +93,7 @@ export async function GET(request: Request) {
   const prevTo = range === 'month' ? (()=>{ const d=new Date((from as string)+'T00:00:00'); d.setDate(0); return d.toISOString().slice(0,10); })() : undefined;
 
   const db:any = supabase;
+  const STATUSES = await loadStatuses(db);
   // Accurate counts without 5000 truncation — count per stage via head:true
   // Fixes: (1) no global assigned_to leak for Owner/Admin (role-scoped above), (2) no hidden month-gating unless ?range=month, (3) legacy Lost ↔ Not Interested sync, (4) team filter via membership not leads.team text
   const countStage = async (stage:string, fromDate?:string, toDate?:string) => {
