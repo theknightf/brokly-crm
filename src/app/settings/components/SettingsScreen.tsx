@@ -14,6 +14,8 @@ import {
   Moon,
   Sun,
   Monitor,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -437,14 +439,23 @@ function AppearanceTab() {
 function SecurityTab({ user }: { user: any }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [changeError, setChangeError] = useState('');
   const supabase = createClient();
+
+  const resetRedirect = () =>
+    `${process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/auth/callback?next=/reset-password`;
 
   const handlePasswordReset = async () => {
     if (!user?.email) return;
     setSending(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/sign-up-login`,
+        redirectTo: resetRedirect(),
       });
       if (error) throw error;
       setSent(true);
@@ -456,6 +467,34 @@ function SecurityTab({ user }: { user: any }) {
     }
   };
 
+  const handleDirectChange = async () => {
+    setChangeError('');
+    if (newPassword.length < 8) {
+      setChangeError('Password must be at least 8 characters');
+      return;
+    }
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])/.test(newPassword)) {
+      setChangeError('Password must include uppercase, lowercase, and a number');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setChangeError('Passwords do not match');
+      return;
+    }
+    setChanging(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Password changed successfully');
+    } catch (err: any) {
+      setChangeError(err?.message || 'Failed to change password');
+    } finally {
+      setChanging(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -464,9 +503,76 @@ function SecurityTab({ user }: { user: any }) {
       </div>
 
       <div className="p-5 bg-card border border-border rounded-xl">
+        <h3 className="text-sm font-semibold text-foreground">Change password</h3>
+        <p className="text-sm text-muted-foreground mt-0.5 mb-4">
+          Set a new password directly — no email needed.
+        </p>
+        {changeError && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg px-3 py-2 mb-4">
+            {changeError}
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="relative">
+            <input
+              type={showNew ? 'text' : 'password'}
+              value={newPassword}
+              autoComplete="new-password"
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                setChangeError('');
+              }}
+              placeholder="New password (min 8, Aa + 0-9)"
+              className="input-base w-full pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNew((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showNew ? 'Hide password' : 'Show password'}
+            >
+              {showNew ? <Eye size={16} /> : <EyeOff size={16} />}
+            </button>
+          </div>
+          <div className="relative">
+            <input
+              type={showConfirm ? 'text' : 'password'}
+              value={confirmPassword}
+              autoComplete="new-password"
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setChangeError('');
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleDirectChange(); }}
+              placeholder="Confirm new password"
+              className="input-base w-full pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showConfirm ? 'Hide password' : 'Show password'}
+            >
+              {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </div>
+        <div className="flex justify-end mt-3">
+          <button
+            onClick={handleDirectChange}
+            disabled={changing || !newPassword || !confirmPassword}
+            className="btn-primary flex items-center gap-2"
+          >
+            {changing ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+            Change password
+          </button>
+        </div>
+      </div>
+
+      <div className="p-5 bg-card border border-border rounded-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Password</h3>
+            <h3 className="text-sm font-semibold text-foreground">Password reset email</h3>
             <p className="text-sm text-muted-foreground mt-0.5">
               Send a password reset link to{' '}
               <span className="font-medium text-foreground">{user?.email}</span>

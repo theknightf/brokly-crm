@@ -376,6 +376,7 @@ function ChangePasswordModal({
       await onConfirm(password);
     } catch (err: any) {
       setErrors({ form: err?.message || 'Failed to change password' });
+    } finally {
       setSaving(false);
     }
   };

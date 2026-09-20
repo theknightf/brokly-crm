@@ -3114,8 +3114,11 @@ export const usersService = {
 
   async sendPasswordReset(email: string) {
     const supabase = createClient();
+    const base =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '');
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/sign-up-login`,
+      redirectTo: `${base}/auth/callback?next=/reset-password`,
     });
     if (error) throw error;
   },
