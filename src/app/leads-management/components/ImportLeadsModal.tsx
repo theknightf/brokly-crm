@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import { teamsService, adminSettingsService } from '@/lib/services/crmService';
 import { parseLeadFile, type ParsedRow } from '@/lib/leadsImport';
-import { PIPELINE_STAGES } from './leadStages';
+import { ALL_STATUSES } from '@/lib/ui';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 
 interface ImportLeadsModalProps {
@@ -167,13 +167,28 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
               .filter((s: any) => s.active)
               .map((s: any) => ({ id: s.id, name: s.name, color: s.color }))
           )
-          .catch(() => PIPELINE_STAGES.map((s) => ({ id: s, name: s }))),
+          .catch(() => ALL_STATUSES.map((s) => ({ id: s, name: s }))),
         // Live CRM users (permission-aware: admin sees all active, others see scope)
         teamsService.getAssignableUsers().catch(() => [] as any[]),
       ]);
       if (!alive) return;
       setSources(srcs);
-      const stagesToUse = stgs.length ? stgs : PIPELINE_STAGES.map((s) => ({ id: s, name: s }));
+      // Connected to dashboard cards: start from canonical ALL_STATUSES (same list
+      // as kpi-cards / Leads Filters / Add form) then merge custom admin_settings
+      // stages on top. New stages created here appear in cards via kpi-cards loadStatuses.
+      const seen = new Set(ALL_STATUSES.map((s) => s.toLowerCase()));
+      const merged: { id: string; name: string; color?: string }[] = ALL_STATUSES.map((s) => {
+        const custom = (stgs as any[]).find((c) => String(c.name || '').toLowerCase() === s.toLowerCase());
+        return custom ? { id: custom.id, name: s, color: custom.color } : { id: s, name: s };
+      });
+      for (const c of stgs as any[]) {
+        const key = String(c.name || '').trim().toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          merged.push({ id: c.id, name: String(c.name).trim(), color: c.color });
+        }
+      }
+      const stagesToUse = merged.length ? merged : ALL_STATUSES.map((s) => ({ id: s, name: s }));
       setStages(stagesToUse);
       if (!stagesToUse.find((s: { name: string }) => s.name === 'Fresh Leads') && stagesToUse.length) {
         setStage(stagesToUse[0].name);

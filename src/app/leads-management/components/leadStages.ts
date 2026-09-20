@@ -15,20 +15,22 @@ export const PIPELINE_STAGES: LeadStatus[] = [
   'Done Deal',
 ];
 
-/** Negative / terminal outcomes — reached via the "outcome" row, not the forward path. */
+/** Negative / terminal outcomes — reached via the "outcome" row, not the forward path.
+ * Includes 'Duplicate Leads' so ALL_REAL_STATUSES === ALL_STATUSES (single truth in @/lib/ui). */
 export const OUTCOME_STAGES: LeadStatus[] = [
   'Not Interested',
-  'Reschedule Meeting',
   'Cancellation',
+  'Duplicate Leads',
   'Wrong Number',
+  'Data Rotation',
+  'Closed Number',
   'No Answer',
   'No Answer At All',
-  'Closed Number',
   'Low Budget',
-  'Data Rotation',
+  'Reschedule Meeting',
 ];
 
-/** Every selectable status (filter-only 'Duplicate Leads' excluded). */
+/** Every selectable status — must stay in sync with ALL_STATUSES in @/lib/ui. */
 export const ALL_REAL_STATUSES: LeadStatus[] = [...PIPELINE_STAGES, ...OUTCOME_STAGES];
 
 export function pipelineIndex(status?: LeadStatus | null): number {

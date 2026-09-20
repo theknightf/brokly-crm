@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { ALL_STATUSES } from '@/lib/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -151,17 +152,13 @@ export async function GET(request: Request) {
     (a: any) => visibleAgentIds.has(a.user_id) && inRange(a.created_at)
   );
 
-  // Build Agent × Stage matrix from the fully-filtered leads
-  const ALL_STATUSES = [
-    'Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Interested','Not Interested',
-    'Cancellation','Done Deal','Duplicate Leads','Wrong Number','Data Rotation','Closed Number','No Answer',
-    'No Answer At All','Low Budget','Reschedule Meeting','Reservation',
-  ];
+  // Build Agent × Stage matrix — canonical order from @/lib/ui (same as cards + Import dropdown)
+  const ORDER = ALL_STATUSES;
 
   const stagesInData = Array.from(new Set(stageFilteredLeads.map((l: any) => l.crm_status || l.lead_status || 'Fresh Leads')));
   const stages = stagesInData.sort((a: any, b: any) => {
-    const ia = ALL_STATUSES.indexOf(a as string);
-    const ib = ALL_STATUSES.indexOf(b as string);
+    const ia = ORDER.indexOf(a as string);
+    const ib = ORDER.indexOf(b as string);
     if (ia === -1 && ib === -1) return String(a).localeCompare(String(b));
     return ia === -1 ? 1 : ib === -1 ? -1 : ia - ib;
   });
@@ -313,7 +310,7 @@ export async function GET(request: Request) {
           const p = profiles.find((x: any) => x.id === t.leader_id);
           return { id: t.leader_id, name: p?.full_name || 'Unknown', teamId: t.id, teamName: t.name };
         }),
-      stages: ALL_STATUSES,
+      stages: ORDER,
     },
   });
 }

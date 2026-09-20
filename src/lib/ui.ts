@@ -2,7 +2,11 @@
 // Keep color/style maps here instead of redefining them per screen so badges,
 // charts, reports and filters all stay visually consistent.
 
-/** Canonical pipeline stage/status order shown in filters, pickers and reports. */
+/** Canonical pipeline stage/status order — SINGLE SOURCE OF TRUTH.
+ * Used by: dashboard cards (kpi-cards route), Leads Filters, Add/Edit forms,
+ * Import dropdown, Reports, KpiBentoGrid. Do NOT duplicate this list elsewhere —
+ * import from here. Custom stages from admin_settings.pipelineStages are merged
+ * on top at runtime (see LeadsFilters / ImportLeadsModal / kpi-cards loadStatuses). */
 export const ALL_STATUSES: string[] = [
   'Fresh Leads',
   'Cold Calls',

@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
+import { ALL_STATUSES } from '@/lib/ui';
 
 export const dynamic = 'force-dynamic';
 
-const FALLBACK_STATUSES = [
-  'All Leads','Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting',
-  'Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number',
-  'No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'
-];
+// Single source of truth: canonical list from @/lib/ui (same as Import dropdown,
+// Leads Filters, Add/Edit forms). 'All Leads' is filter-only, prepended for cards.
+const FALLBACK_STATUSES = ['All Leads', ...ALL_STATUSES];
 
 async function loadStatuses(db: any): Promise<string[]> {
   try {
