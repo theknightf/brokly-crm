@@ -12,16 +12,27 @@ const FALLBACK_STATUSES = [
 
 async function loadStatuses(db: any): Promise<string[]> {
   try {
-    const { data, error } = await db
-      .from('admin_settings')
-      .select('name, sort_order')
-      .eq('category', 'pipelineStages')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-    if (!error && data && data.length) {
-      const names = (data as any[]).map((r) => String(r.name || '').trim()).filter(Boolean);
-      if (names.length) return ['All Leads', ...names];
+    const [settingsRes, leadsRes] = await Promise.all([
+      db.from('admin_settings').select('name, sort_order').eq('category', 'pipelineStages').eq('is_active', true).order('sort_order', { ascending: true }),
+      db.from('leads').select('crm_status').limit(2000),
+    ]);
+    const pipelineNames: string[] = !settingsRes.error && settingsRes.data?.length
+      ? (settingsRes.data as any[]).map((r) => String(r.name || '').trim()).filter(Boolean)
+      : [];
+    const distinctLeadStatuses: string[] = Array.from(
+      new Set((leadsRes.data || []).map((r: any) => String(r.crm_status || '').trim()).filter(Boolean) as string[])
+    );
+    // Merge: keep fallback order first, then append any pipeline/distinct names not already present (case-insensitive)
+    const seen = new Set(FALLBACK_STATUSES.map((s) => s.toLowerCase()));
+    const merged = [...FALLBACK_STATUSES];
+    for (const name of [...pipelineNames, ...distinctLeadStatuses]) {
+      const key = name.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(name);
+      }
     }
+    return merged;
   } catch {}
   return FALLBACK_STATUSES;
 }

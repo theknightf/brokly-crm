@@ -58,7 +58,18 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
           .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
           .map((s: any) => String(s.name || '').trim())
           .filter(Boolean);
-        if (stages.length) setStatusOptions(stages);
+        if (stages.length) {
+          // Merge fallback + pipeline stages so custom stages auto-appear without losing correct classification
+          const seen = new Set(ALL_STATUSES.map((s) => s.toLowerCase()));
+          const merged = [...ALL_STATUSES];
+          for (const name of stages) {
+            if (!seen.has(name.toLowerCase())) {
+              seen.add(name.toLowerCase());
+              merged.push(name);
+            }
+          }
+          setStatusOptions(merged);
+        }
       })
       .catch(() => {});
     return () => {
