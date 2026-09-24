@@ -305,6 +305,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
           collapsed={false}
           isActive={isActive}
           nav={nav}
+          onNavigate={onMobileClose}
           headerAction={
             <button onClick={onMobileClose} className="btn-ghost p-1.5" aria-label="Close menu">
               <ChevronRight size={16} />
@@ -321,11 +322,13 @@ function SidebarContent({
   isActive,
   nav,
   headerAction,
+  onNavigate,
 }: {
   collapsed: boolean;
   isActive: (href: string) => boolean;
   nav: NavGroup[];
   headerAction?: React.ReactNode;
+  onNavigate?: () => void;
 }) {
   const { user, profile, signOut } = useAuth();
   const { t } = useLanguage();

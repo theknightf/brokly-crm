@@ -27,6 +27,7 @@ const STATIC_ASSETS = [
   '/icons/icon-512-v2.png',
   '/icons/icon-maskable-512-v2.png',
   '/icons/apple-touch-icon-v2.png',
+  '/offline',
 ];
 
 self.addEventListener('install', (event) => {
@@ -127,7 +128,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() =>
-          caches.match('/').then((cached) => cached || caches.match(request).then((r) => r || Response.error()))
+          caches.match('/').then((cached) => cached || caches.match(request).then((r) => r || caches.match('/offline')).then((r) => r || Response.error()))
         )
     );
     return;
