@@ -274,7 +274,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           />
           {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Enter the phone number, then add the lead. Number and source are protected automatically.
+            Enter the phone number, select or add a lead source, then add the lead.
           </p>
         </div>
 
