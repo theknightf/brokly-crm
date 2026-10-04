@@ -21,6 +21,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
+*.log.txt
+build-log.txt
+lint.txt
 
 # OS-specific files
 .DS_Store
