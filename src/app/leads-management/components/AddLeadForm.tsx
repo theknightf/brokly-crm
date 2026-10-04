@@ -287,8 +287,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
               <div className="relative flex-1">
                 <select
                   id="add-source"
-                  disabled={!canEditProtectedFields}
-                  className={`${selectClass(!!errors.source)} ${!canEditProtectedFields ? 'bg-muted/60 text-muted-foreground cursor-not-allowed' : ''}`}
+                  className={selectClass(!!errors.source)}
                   {...register('source', { required: 'Lead source is required' })}
                 >
                   {sourceList.length ? sourceList.map((s) => (
@@ -299,25 +298,20 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               </div>
-              {canEditProtectedFields && (
-                <div className="flex gap-1">
-                  <input value={newSourceName} onChange={e=>setNewSourceName(e.target.value)} placeholder="New source" className="input-base h-9 text-xs w-28" />
-                  <button type="button" disabled={creatingSource || !newSourceName.trim()} onClick={async()=>{
-                    if(!newSourceName.trim()) return;
-                    setCreatingSource(true);
-                    try{
-                      const created = await leadSourcesService.create(newSourceName.trim());
-                      setSourceList(prev=> [...prev, {id: created.id, name: created.name}].sort((a,b)=>a.name.localeCompare(b.name)));
-                      setValue('source', created.name);
-                      setNewSourceName('');
-                    }catch(e:any){ alert(e.message); } finally{ setCreatingSource(false); }
-                  }} className="h-9 px-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1"><Plus size={12}/>{creatingSource?'…':'+'}</button>
-                </div>
-              )}
+              <div className="flex gap-1">
+                <input value={newSourceName} onChange={e=>setNewSourceName(e.target.value)} placeholder="New source" className="input-base h-9 text-xs w-28" />
+                <button type="button" disabled={creatingSource || !newSourceName.trim()} onClick={async()=>{
+                  if(!newSourceName.trim()) return;
+                  setCreatingSource(true);
+                  try{
+                    const created = await leadSourcesService.create(newSourceName.trim());
+                    setSourceList(prev=> [...prev, {id: created.id, name: created.name}].sort((a,b)=>a.name.localeCompare(b.name)));
+                    setValue('source', created.name);
+                    setNewSourceName('');
+                  }catch(e:any){ alert(e.message); } finally{ setCreatingSource(false); }
+                }} className="h-9 px-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1"><Plus size={12}/>{creatingSource?'…':'+'}</button>
+              </div>
             </div>
-            {!canEditProtectedFields && (
-              <p className="mt-1 text-[11px] text-muted-foreground">Only Admin and Owner can change it.</p>
-            )}
             {errors.source && <p className="mt-1 text-xs text-red-500">{errors.source.message}</p>}
           </div>
         </div>

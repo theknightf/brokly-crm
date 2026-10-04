@@ -24,13 +24,13 @@ export async function GET(request: Request) {
   return NextResponse.json({ sources: data || [] });
 }
 
-// POST /api/lead-sources — create (Admin/Owner only)
+// POST /api/lead-sources — create (authenticated users)
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { data: actor } = await supabase.from('user_profiles').select('role, is_active').eq('id', user.id).maybeSingle();
-  if (!actor || actor.is_active === false || !isAdminRole(actor.role)) return NextResponse.json({ error: 'Forbidden: Admin/Owner only' }, { status: 403 });
+  if (!actor || actor.is_active === false) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const body = await request.json().catch(() => null);
   const name = String(body?.name || '').trim();
