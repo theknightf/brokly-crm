@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { createClient, clearAuthStorage } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import { normalizeAuthError } from '@/lib/authErrors';
@@ -78,24 +78,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const {
       data: { subscription },
-    } = getSupabase().auth.onAuthStateChange(async (event, session) => {
+    } = getSupabase().auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
-
-      if (event === 'TOKEN_REFRESHED') {
-        setSession(session);
-        setUser(session?.user ?? null);
-        return;
-      }
-
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-        clearAuthStorage();
-        setLoading(false);
-        return;
-      }
-
       // Keep loading true while profile hydrates to prevent FOUC of wrong role view
       if (session?.user) setLoading(true);
       setSession(session);
@@ -182,16 +166,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const sid = typeof window !== 'undefined' ? localStorage.getItem('brokly_session_id') : null;
       if (sid && user?.id) {
         await fetch(`/api/auth/session?session_id=${sid}&user_id=${user.id}`, { method: 'DELETE' });
+        localStorage.removeItem('brokly_session_id');
       }
     } catch {
       /* best effort */
     }
-    clearAuthStorage();
-    try {
-      await getSupabase().auth.signOut();
-    } catch {}
-    setUser(null);
-    setSession(null);
+    const { error } = await getSupabase().auth.signOut();
+    if (error) throw error;
     setProfile(null);
     router.push('/sign-up-login');
     router.refresh();
