@@ -1349,16 +1349,43 @@ function rowToLead(row: any) {
 
 export const leadSourcesService = {
   async getActive() {
-    const res = await fetch('/api/lead-sources?active=true', { cache: 'no-store' });
-    if (!res.ok) return [];
-    const j = await res.json().catch(()=>null);
-    return j?.sources || [];
+    try {
+      const res = await fetch('/api/lead-sources?active=true', { cache: 'no-store' });
+      if (!res.ok) return [];
+      const j = await res.json().catch(() => null);
+      return j?.sources || [];
+    } catch {
+      return [];
+    }
+  },
+  async getAll() {
+    try {
+      const res = await fetch('/api/lead-sources?active=false', { cache: 'no-store' });
+      if (!res.ok) return [];
+      const j = await res.json().catch(() => null);
+      return j?.sources || [];
+    } catch {
+      return [];
+    }
   },
   async create(name: string) {
-    const res = await fetch('/api/lead-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
-    const j = await res.json().catch(()=>null);
+    const res = await fetch('/api/lead-sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const j = await res.json().catch(() => null);
     if (!res.ok) throw new Error(j?.error || 'Failed to create source');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('brokly:lead-sources-changed', { detail: j.source }));
+    }
     return j.source;
+  },
+  onSourcesChanged(callback: (source?: any) => void) {
+    if (typeof window === 'undefined') return () => {};
+    const handler = (e: Event) => callback((e as CustomEvent).detail);
+    window.addEventListener('brokly:lead-sources-changed', handler);
+    return () => window.removeEventListener('brokly:lead-sources-changed', handler);
   },
 };
 

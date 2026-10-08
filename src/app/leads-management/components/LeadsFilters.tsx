@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { FilterState } from './LeadsManagementScreen';
-import { teamsService, projectsService, adminSettingsService } from '@/lib/services/crmService';
+import { teamsService, projectsService, adminSettingsService, leadSourcesService } from '@/lib/services/crmService';
 import {
   ALL_STATUSES,
   ALL_SOURCES,
@@ -42,6 +42,49 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
   const [agentOptions, setAgentOptions] = useState<string[]>([]);
   const [projectOptions, setProjectOptions] = useState<string[]>([]);
   const [statusOptions, setStatusOptions] = useState<string[]>(ALL_STATUSES);
+  const [sourceOptions, setSourceOptions] = useState<string[]>(ALL_SOURCES);
+
+  // Dynamically fetch and synchronize lead sources from database
+  useEffect(() => {
+    let alive = true;
+
+    const loadSources = () => {
+      Promise.all([
+        leadSourcesService.getActive().catch(() => []),
+        adminSettingsService.getAll().catch(() => ({})),
+      ]).then(([apiSources, settings]) => {
+        if (!alive) return;
+        const fromApi = (Array.isArray(apiSources) ? apiSources : [])
+          .map((s: any) => String(s?.name || '').trim())
+          .filter(Boolean);
+        const fromSettings = ((settings as any)?.leadSources || [])
+          .filter((s: any) => s.active !== false)
+          .map((s: any) => String(s?.name || '').trim())
+          .filter(Boolean);
+
+        const seen = new Set<string>();
+        const merged: string[] = [];
+        [...fromApi, ...fromSettings, ...ALL_SOURCES].forEach((s) => {
+          const lower = s.toLowerCase();
+          if (!seen.has(lower)) {
+            seen.add(lower);
+            merged.push(s);
+          }
+        });
+        setSourceOptions(merged.sort((a, b) => a.localeCompare(b)));
+      });
+    };
+
+    loadSources();
+    const unsub = leadSourcesService.onSourcesChanged(() => {
+      if (alive) loadSources();
+    });
+
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -138,11 +181,15 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
           className="input-base h-9 text-sm appearance-none pr-8 min-w-[130px]"
         >
           <option value="">All Sources</option>
-          {ALL_SOURCES.map((s) => (
+          {sourceOptions.map((s) => (
             <option key={`filter-source-${s}`} value={s}>
               {s}
             </option>
           ))}
+          {/* Ensure currently selected custom source is visible even if not yet in options */}
+          {filters.source && !sourceOptions.includes(filters.source) && (
+            <option value={filters.source}>{filters.source}</option>
+          )}
         </select>
         <ChevronDown
           size={13}

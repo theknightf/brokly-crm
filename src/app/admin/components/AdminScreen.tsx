@@ -549,6 +549,9 @@ export default function AdminScreen() {
           created = (await adminSettingsService.create(activeTab, payload)) as AdminItem;
         }
         setSettings((prev) => ({ ...prev, [activeTabKey]: [...prev[activeTabKey], created] }));
+        if (activeTab === 'leadSources' && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('brokly:lead-sources-changed', { detail: created }));
+        }
         toast.success('Added successfully');
       }
     } catch (err: any) {
