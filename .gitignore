@@ -46,3 +46,7 @@ jest-test-results.json
 
 # Optional: if using TurboRepo or monorepo
 turbo/
+
+# Scratch & temporary backups
+aura/
+realtyflow-main/

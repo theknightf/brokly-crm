@@ -40,7 +40,10 @@ export interface FollowUpItem {
 
 type TabKey = 'today' | 'overdue' | 'upcoming' | 'all';
 
-const todayStr = () => new Date().toISOString().split('T')[0];
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 function formatDisplayDate(dateStr: string, timeStr?: string) {
   if (!dateStr) return '—';
@@ -130,10 +133,11 @@ export default function SalesFollowUpsWidget() {
 
   const today = todayStr();
 
-  // Active (non-completed/cancelled) follow-ups
-  const activeItems = allFollowUps.filter(
-    (f) => f.status !== 'Completed' && f.status !== 'Cancelled'
-  );
+  // Active (non-completed/cancelled) follow-ups with case-insensitive status matching
+  const activeItems = allFollowUps.filter((f) => {
+    const s = (f.status || '').trim().toLowerCase();
+    return s !== 'completed' && s !== 'cancelled';
+  });
 
   const overdueList = activeItems.filter((f) => f.dueDate < today);
   const todayList = activeItems.filter((f) => f.dueDate === today);

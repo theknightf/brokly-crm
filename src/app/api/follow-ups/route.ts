@@ -60,19 +60,56 @@ export async function GET() {
 
   try {
     const db: any = getSupabaseService();
-    // Scope: admins see all, agents see only their own (RLS was USING true — tighten here)
     let profileRole: string | null = null;
     try {
       const { data: p } = await serverClient.from('user_profiles').select('role').eq('id', user.id).maybeSingle();
       profileRole = (p as any)?.role || null;
     } catch {}
+
     const isAdmin = isAdminRole(profileRole as any);
+    const isTeamLeader = !isAdmin && (profileRole === 'team_leader' || profileRole === 'Team Lead' || profileRole === 'manager');
+
     let query: any = db.from('follow_ups').select('*').order('due_date', { ascending: true }).limit(500);
+
     if (!isAdmin) {
-      // Agent: only rows they created (covers lead-linked + standalone). Lead assignment
-      // is also visible via leadsService scoping elsewhere; this keeps the follow-up
-      // partition from leaking other teams' queues.
-      query = query.eq('created_by', user.id);
+      if (isTeamLeader) {
+        // Team Leader: view follow-ups belonging to self and all team members
+        let memberIds: string[] = [user.id];
+        try {
+          const { data: teams } = await db.from('teams').select('id').eq('leader_id', user.id);
+          const teamIds = (teams || []).map((t: any) => t.id);
+          if (teamIds.length > 0) {
+            const { data: members } = await db.from('team_memberships').select('user_id').in('team_id', teamIds);
+            if (members && members.length > 0) {
+              memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+            }
+          }
+        } catch {}
+
+        // Fetch leads assigned to or created by any team member
+        const { data: teamLeads } = await db.from('leads').select('id').or(
+          `assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`
+        );
+        const leadIds = (teamLeads || []).map((l: any) => l.id);
+
+        if (leadIds.length > 0) {
+          query = query.or(`created_by.in.(${memberIds.join(',')}),lead_id.in.(${leadIds.join(',')})`);
+        } else {
+          query = query.in('created_by', memberIds);
+        }
+      } else {
+        // Regular Agent: only follow-ups created by user or linked to leads assigned to / created by user
+        const { data: userLeads } = await db.from('leads').select('id').or(
+          `assigned_to.eq.${user.id},created_by.eq.${user.id}`
+        );
+        const leadIds = (userLeads || []).map((l: any) => l.id);
+
+        if (leadIds.length > 0) {
+          query = query.or(`created_by.eq.${user.id},lead_id.in.(${leadIds.join(',')})`);
+        } else {
+          query = query.eq('created_by', user.id);
+        }
+      }
     }
     const { data, error } = await query;
     if (error) {

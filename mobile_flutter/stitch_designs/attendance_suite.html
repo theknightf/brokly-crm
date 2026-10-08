@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Brokly CRM - Attendance &amp; Shift Hub</title>
+<!-- Tailwind CSS CDN with Forms & Container Queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Plus Jakarta Sans, JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- FontAwesome Icons for crisp UI symbols -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              lime: '#B4F234',
+              limeDark: '#93CE1E',
+              limeGlow: 'rgba(180, 242, 52, 0.28)',
+              darkBase: '#0F1216',
+              surface: '#181C22',
+              surfaceLight: '#222831',
+              border: '#2A323D',
+              borderSubtle: '#1F2630'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          boxShadow: {
+            'tactile-glow': '0 0 24px -2px rgba(180, 242, 52, 0.4), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35)',
+            'card-tactile': '0 4px 20px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
+            'subtle-inner': 'inset 0 2px 4px rgba(0,0,0,0.5)'
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Style Tokens -->
+<style data-purpose="custom-theme-tokens">
+    /* iOS Safe Area handling */
+    body {
+      background-color: #0c0f12;
+      color: #E6EDF3;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .safe-top {
+      padding-top: env(safe-area-inset-top, 44px);
+    }
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 34px);
+    }
+    /* Smooth Pulse Animation for Live GPS */
+    @keyframes pulseBeacon {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(180, 242, 52, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(180, 242, 52, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(180, 242, 52, 0); }
+    }
+    .beacon-active {
+      animation: pulseBeacon 2.2s infinite;
+    }
+    /* Monospace tabular numerals */
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Hide scrollbar for clean horizontal feeds */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+<!-- END: Custom Style Tokens -->
+</head>
+<body class="font-sans antialiased min-h-screen flex justify-center bg-[#07090b] text-slate-100">
+<!-- Mobile Viewport Shell (iPhone 16 Pro Max Aspect: max-w-md 440px wide) -->
+<div class="w-full max-w-[440px] bg-brand-darkBase min-h-screen flex flex-col relative border-x border-brand-border/40 shadow-2xl overflow-x-hidden pb-28">
+<!-- BEGIN: TopBar -->
+<header class="sticky top-0 z-40 bg-brand-darkBase/90 backdrop-blur-xl border-b border-brand-border/50 safe-top px-4 pb-3" data-purpose="top-navigation">
+<div class="flex items-center justify-between pt-2.5 pb-1">
+<div class="flex items-center space-x-2.5">
+<button aria-label="Go Back" class="w-9 h-9 rounded-xl bg-brand-surface/90 border border-brand-border/80 flex items-center justify-center text-slate-300 hover:text-white active:scale-95 transition-all shadow-sm shrink-0" type="button">
+<i class="fa-solid fa-chevron-left text-xs"></i>
+</button>
+<img alt="Brokly Logo" class="w-9 h-9 rounded-lg object-cover border border-brand-lime/30 shadow-[0_0_10px_rgba(180,242,52,0.2)] shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8e-UpSSvwbLf7JbfQWVyQR3kWKvnF6lHRfzwKUJJ55Dvd03rkPUPCSoY1i7pGhoK-GAkfICLUEsE4OrFZAj0xRoyvyVp1OVcu70hORsPk4dF-zNPq1MDNRfZIgWT7za6S-k975VXx8aqBNRQktEP2ooKVmbiKQayOHK5uMney-jCUebI3xNXByZA3-GnzDAROFHx3aia3DAoICAOF5qVXQHnlfF06TVkmzyfIoWFP7-sRIlh9tALjFM-P8vZYM13sw8w"/>
+<div>
+<div class="flex items-center space-x-2">
+<h1 class="text-sm font-extrabold tracking-tight text-white font-sans">Attendance &amp; Shift Suite</h1>
+<span class="text-[9px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded-full bg-brand-lime/15 text-brand-lime border border-brand-lime/40 shadow-[0_0_10px_rgba(180,242,52,0.25)]">LIVE SYNC</span>
+</div>
+<p class="text-[11px] text-slate-400 font-medium tracking-tight">Brokly Executive CRM • Shift v3.4 Enterprise</p>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<div class="flex items-center bg-brand-surface/90 border border-brand-border/80 rounded-xl px-2 py-1.5 space-x-1.5 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-emerald-400 beacon-active"></span>
+<span class="text-[10px] font-bold text-slate-200 tracking-tight">Office HQ</span>
+</div>
+<button class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-surfaceLight to-brand-surface border border-brand-border relative overflow-hidden flex items-center justify-center text-xs font-black text-brand-lime ring-1 ring-brand-lime/40 shadow-sm active:scale-95 shrink-0" type="button">
+<span>AZ</span>
+<span class="absolute inset-0 rounded-xl ring-1 ring-inset ring-brand-lime/20 pointer-events-none"></span>
+</button>
+</div>
+</div>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 pt-4 space-y-4">
+<!-- BEGIN: ShiftModeSwitcher -->
+<!-- Segmented tab for Team Shift Logger vs Personal Check-In -->
+<section aria-label="Shift Logger Segmented Control" class="bg-brand-surface p-1 rounded-2xl border border-brand-border flex items-center shadow-subtle-inner" data-purpose="mode-toggle">
+<button class="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-0.5 transition-all bg-gradient-to-r from-brand-lime to-[#9ce61c] text-black shadow-[0_4px_16px_rgba(180,242,52,0.35)] active:scale-[0.98] border border-white/20" type="button">
+<span class="text-[12px] font-extrabold tracking-tight leading-tight">Team Shift Logger</span>
+<span class="text-[9px] font-mono tracking-widest uppercase font-extrabold text-black/85">TEAM LOGGER • ADMIN</span>
+</button>
+<button class="flex-1 py-2.5 px-3 rounded-xl text-xs font-medium flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-slate-200 transition-all" type="button">
+<span class="text-[12px] font-semibold tracking-tight leading-tight text-slate-300">Personal Check-In</span>
+<span class="text-[9px] font-mono tracking-wider uppercase font-medium text-slate-500">INDIVIDUAL ATTENDANCE</span>
+</button>
+</section>
+<!-- END: ShiftModeSwitcher -->
+<!-- BEGIN: HeroShiftCard -->
+<!-- Tactile Card: Digital Monospace Real-time Clock, Geofence, Big Lime Check-in Button -->
+<section class="bg-gradient-to-b from-brand-surface to-[#12161c] rounded-3xl p-5 border border-brand-border shadow-card-tactile relative overflow-hidden" data-purpose="live-shift-checkin">
+<div class="absolute -top-16 -right-16 w-52 h-52 bg-brand-lime/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-16 -left-16 w-44 h-44 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-start justify-between border-b border-brand-border/60 pb-3 mb-4 relative z-10">
+<div>
+<div class="flex items-center space-x-1.5 text-slate-400 text-xs font-medium mb-1.5">
+<i class="fa-regular fa-calendar text-[11px] text-brand-lime"></i>
+<span class="font-medium text-slate-300" id="current-date">Thursday, Sep 24, 2026</span>
+<span class="text-[9px] px-1.5 py-0.2 rounded bg-brand-surfaceLight border border-brand-border font-mono text-brand-lime font-bold">W-39</span>
+</div>
+<div class="flex items-center space-x-2">
+<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-brand-surfaceLight border border-brand-border text-slate-300 uppercase tracking-wider">Shift</span>
+<span class="text-xs font-bold text-white tracking-tight">12:00 PM – 08:00 PM</span>
+<span class="text-[10px] text-emerald-400 font-mono font-semibold">(8h 00m)</span>
+</div>
+</div>
+<div class="text-right">
+<span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold shadow-sm">
+<i class="fa-solid fa-location-dot text-[9px]"></i>
+<span>GPS Verified</span>
+</span>
+<p class="text-[9.5px] text-slate-400 mt-1 font-mono">Radius &lt; 25m • HQ Floor 4</p>
+</div>
+</div>
+<div class="text-center py-2.5 relative z-10">
+<div class="font-mono text-[46px] leading-none font-extrabold text-white tracking-tight tabular-nums flex items-center justify-center space-x-1.5 drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]">
+<span id="clock-hours-mins">05:58</span>
+<span class="text-brand-lime animate-pulse font-light">:</span>
+<span class="text-2xl text-brand-lime font-semibold px-2 py-0.5 rounded-lg bg-brand-surfaceLight/80 border border-brand-border font-mono shadow-inner" id="clock-seconds">28</span>
+<span class="text-xs font-sans font-black text-slate-300 uppercase bg-brand-surfaceLight px-2 py-1 rounded-md border border-brand-border/60 ml-1">AM</span>
+</div>
+<div class="flex items-center justify-center space-x-2 mt-2.5">
+<div class="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-brand-surfaceLight/70 border border-brand-border/50 text-[10px] text-slate-300 font-mono">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-lime beacon-active"></span>
+<span>Server UTC+04:00</span>
+<span class="text-slate-500">•</span>
+<span class="text-brand-lime font-semibold">18ms Ping</span>
+</div>
+</div>
+</div>
+<div class="mt-5 relative z-10">
+<button class="w-full bg-gradient-to-r from-brand-lime via-[#bbf643] to-[#9ade20] hover:brightness-105 active:scale-[0.98] text-black font-extrabold text-base py-4 px-6 rounded-2xl shadow-[0_0_28px_rgba(180,242,52,0.45),inset_0_1px_1px_rgba(255,255,255,0.6)] flex items-center justify-between transition-all transform duration-150 border border-white/30" id="checkInBtn" type="button">
+<div class="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center border border-black/15 shadow-inner">
+<i class="fa-solid fa-fingerprint text-2xl text-black"></i>
+</div>
+<div class="text-center flex-1 px-3">
+<div class="text-base font-extrabold leading-tight text-black tracking-tight">INSTANT BIOMETRIC CHECK-IN</div>
+<div class="text-[11px] uppercase tracking-wider font-black text-black/85 mt-0.5 font-mono">ONE-TAP NFC &amp; GPS AUTHENTICATION</div>
+</div>
+<div class="w-9 h-9 rounded-xl bg-black/10 flex items-center justify-center border border-black/15">
+<i class="fa-solid fa-arrow-right-long text-black text-sm"></i>
+</div>
+</button>
+<div class="flex items-center justify-between px-1 mt-2.5 text-[10px] text-slate-400 font-medium">
+<div class="flex items-center space-x-1.5">
+<i class="fa-solid fa-shield-halved text-[9.5px] text-brand-lime"></i>
+<span>Encrypted Hardware Token</span>
+</div>
+<div class="flex items-center space-x-1 text-slate-400 font-mono">
+<i class="fa-solid fa-bolt text-[8px] text-amber-400"></i>
+<span>IP Match: 192.168.1.104</span>
+</div>
+</div>
+</div>
+</section>
+<!-- END: HeroShiftCard -->
+<!-- BEGIN: PerformanceMetricsStrip -->
+<!-- 3 Clean KPI Cards: Hours Today, Punctuality / Delay, Leave Balance -->
+<section class="grid grid-cols-3 gap-2.5" data-purpose="daily-performance-kpis">
+<!-- Card 1: Hours Today -->
+<div class="bg-brand-surface border border-brand-border p-3 rounded-2xl flex flex-col justify-between">
+<div class="flex items-center justify-between text-slate-400 mb-1">
+<span class="text-[10px] uppercase font-bold tracking-wider">Hours</span>
+<i class="fa-regular fa-clock text-xs text-brand-lime"></i>
+</div>
+<div class="font-mono text-lg font-bold text-white tabular-nums">06h 32m</div>
+<div class="text-[10px] text-emerald-400 font-medium flex items-center mt-1">
+<i class="fa-solid fa-arrow-trend-up mr-1 text-[8px]"></i>
+<span>Target: 8.0h</span>
+</div>
+</div>
+<!-- Card 2: Punctuality -->
+<div class="bg-brand-surface border border-brand-border p-3 rounded-2xl flex flex-col justify-between">
+<div class="flex items-center justify-between text-slate-400 mb-1">
+<span class="text-[10px] uppercase font-bold tracking-wider">Punctual</span>
+<i class="fa-solid fa-bolt text-xs text-amber-400"></i>
+</div>
+<div class="font-mono text-lg font-bold text-white tabular-nums">0m Delay</div>
+<div class="text-[10px] text-brand-lime font-medium flex items-center mt-1">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-lime inline-block mr-1"></span>
+<span>100% On Time</span>
+</div>
+</div>
+<!-- Card 3: Leave Balance -->
+<div class="bg-brand-surface border border-brand-border p-3 rounded-2xl flex flex-col justify-between">
+<div class="flex items-center justify-between text-slate-400 mb-1">
+<span class="text-[10px] uppercase font-bold tracking-wider">Balance</span>
+<i class="fa-regular fa-id-badge text-xs text-blue-400"></i>
+</div>
+<div class="font-mono text-lg font-bold text-white tabular-nums">18.5 d</div>
+<div class="text-[10px] text-slate-400 font-medium flex items-center mt-1">
+<span>Annual Paid</span>
+</div>
+</div>
+</section>
+<!-- END: PerformanceMetricsStrip -->
+<!-- BEGIN: WeeklyAttendanceOverview -->
+<!-- Visual 7-day mini attendance bar chart & weekly completion progress -->
+<section class="bg-brand-surface border border-brand-border rounded-2xl p-4 shadow-card-tactile" data-purpose="weekly-progress-breakdown">
+<div class="flex items-center justify-between mb-3">
+<div>
+<div class="flex items-center space-x-2">
+<h2 class="text-sm font-extrabold text-white">Weekly Shift &amp; Attendance Log</h2>
+<span class="text-[10px] text-brand-lime font-mono font-bold bg-brand-lime/10 px-2 py-0.5 rounded border border-brand-lime/30">Week 39</span>
+</div>
+<p class="text-[11px] text-slate-400 font-medium">Attendance Analytics &amp; Shift Compliance</p>
+</div>
+<div class="bg-brand-darkBase border border-brand-border p-0.5 rounded-lg flex text-[10px] font-semibold">
+<button class="px-2.5 py-0.5 rounded-md bg-brand-surfaceLight text-brand-lime font-bold shadow-sm" type="button">Week</button>
+<button class="px-2.5 py-0.5 rounded-md text-slate-400 hover:text-white" type="button">Month</button>
+</div>
+</div>
+<div class="mb-4 bg-gradient-to-r from-brand-surfaceLight/70 to-brand-surface/90 p-3 rounded-xl border border-brand-border/60 shadow-inner">
+<div class="flex justify-between items-center text-xs mb-1.5">
+<div class="flex items-center space-x-2">
+<span class="text-slate-300 font-semibold">Shift Target Progress</span>
+<span class="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">+2.5h Ahead</span>
+</div>
+<span class="font-mono font-bold text-white">32.5h <span class="text-slate-400 font-normal">/ 40.0h</span> <span class="text-brand-lime font-black ml-1">(81%)</span></span>
+</div>
+<div class="w-full h-2 rounded-full bg-brand-darkBase overflow-hidden p-0.5 border border-brand-border/40">
+<div class="h-full rounded-full bg-gradient-to-r from-emerald-400 via-brand-lime to-[#cbfd5c] transition-all duration-500 shadow-[0_0_8px_rgba(180,242,52,0.6)]" style="width: 81%;"></div>
+</div>
+</div>
+<div class="grid grid-cols-7 gap-1.5 text-center pt-1" data-purpose="weekly-dot-tracker">
+<div class="flex flex-col items-center space-y-1.5 bg-brand-surfaceLight/50 py-2.5 rounded-xl border border-brand-border/40">
+<span class="text-[10px] font-semibold text-slate-400">Mo</span>
+<div class="w-2.5 h-11 bg-brand-darkBase rounded-full flex flex-col justify-end p-0.5 shadow-inner">
+<div class="w-full bg-gradient-to-t from-emerald-400 to-brand-lime rounded-full" style="height: 100%;"></div>
+</div>
+<span class="text-[9px] font-mono font-semibold text-slate-200">8.2h</span>
+</div>
+<div class="flex flex-col items-center space-y-1.5 bg-brand-surfaceLight/50 py-2.5 rounded-xl border border-brand-border/40">
+<span class="text-[10px] font-semibold text-slate-400">Tu</span>
+<div class="w-2.5 h-11 bg-brand-darkBase rounded-full flex flex-col justify-end p-0.5 shadow-inner">
+<div class="w-full bg-gradient-to-t from-emerald-400 to-brand-lime rounded-full" style="height: 98%;"></div>
+</div>
+<span class="text-[9px] font-mono font-semibold text-slate-200">8.0h</span>
+</div>
+<div class="flex flex-col items-center space-y-1.5 bg-brand-surfaceLight/50 py-2.5 rounded-xl border border-brand-border/40">
+<span class="text-[10px] font-semibold text-slate-400">We</span>
+<div class="w-2.5 h-11 bg-brand-darkBase rounded-full flex flex-col justify-end p-0.5 shadow-inner">
+<div class="w-full bg-gradient-to-t from-emerald-400 to-brand-lime rounded-full" style="height: 95%;"></div>
+</div>
+<span class="text-[9px] font-mono font-semibold text-slate-200">7.8h</span>
+</div>
+<div class="flex flex-col items-center space-y-1.5 bg-brand-lime/15 py-2.5 rounded-xl border border-brand-lime/50 ring-1 ring-brand-lime/30 shadow-[0_0_12px_rgba(180,242,52,0.2)]">
+<span class="text-[10px] font-extrabold text-brand-lime">Th</span>
+<div class="w-2.5 h-11 bg-brand-darkBase rounded-full flex flex-col justify-end p-0.5 shadow-inner">
+<div class="w-full bg-gradient-to-t from-brand-lime to-[#ddff6f] rounded-full animate-pulse shadow-[0_0_6px_rgba(180,242,52,0.8)]" style="height: 80%;"></div>
+</div>
+<span class="text-[9px] font-mono text-brand-lime font-black">6.5h</span>
+</div>
+<div class="flex flex-col items-center space-y-1.5 bg-brand-surfaceLight/40 py-2.5 rounded-xl border border-brand-border/30 opacity-60">
+<span class="text-[10px] font-semibold text-slate-400">Fr</span>
+<div class="w-2.5 h-11 bg-brand-darkBase rounded-full flex flex-col justify-end p-0.5 shadow-inner">
+<div class="w-full bg-brand-border rounded-full" style="height: 15%;"></div>
+</div>
+<span class="text-[9px] font-mono text-slate-400">-</span>
+</div>
+<div class="flex flex-col items-center space-y-1.5 bg-brand-surfaceLight/20 py-2.5 rounded-xl border border-brand-border/20 opacity-40">
+<span class="text-[10px] font-medium text-slate-500">Sa</span>
+<div class="w-2.5 h-11 bg-brand-darkBase rounded-full flex flex-col justify-end p-0.5">
+<div class="w-full bg-transparent" style="height: 0%;"></div>
+</div>
+<span class="text-[9px] font-mono text-slate-500 font-bold">OFF</span>
+</div>
+<div class="flex flex-col items-center space-y-1.5 bg-brand-surfaceLight/20 py-2.5 rounded-xl border border-brand-border/20 opacity-40">
+<span class="text-[10px] font-medium text-slate-500">Su</span>
+<div class="w-2.5 h-11 bg-brand-darkBase rounded-full flex flex-col justify-end p-0.5">
+<div class="w-full bg-transparent" style="height: 0%;"></div>
+</div>
+<span class="text-[9px] font-mono text-slate-500 font-bold">OFF</span>
+</div>
+</div>
+</section>
+<!-- END: WeeklyAttendanceOverview -->
+<!-- BEGIN: MultiDayBatchLogger -->
+<!-- Batch Logging Drawer Trigger inspired by original Screenshot 15 -->
+<section class="bg-brand-surface border border-brand-border rounded-2xl p-3.5 flex items-center justify-between active:bg-brand-surfaceLight/80 transition-all cursor-pointer" data-purpose="batch-logger-drawer-trigger">
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 rounded-xl bg-brand-surfaceLight border border-brand-border flex items-center justify-center text-brand-lime">
+<i class="fa-solid fa-calendar-plus text-base"></i>
+</div>
+<div>
+<div class="flex items-center space-x-2">
+<h3 class="text-xs font-bold text-white">Weekly / Multi-Day Batch Logger</h3>
+<span class="text-[9px] bg-brand-lime/10 text-brand-lime px-1.5 py-0.5 rounded font-mono font-bold">Admin</span>
+</div>
+<p class="text-[11px] text-slate-400">Fill missing attendance days across a date range</p>
+</div>
+</div>
+<i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+</section>
+<!-- END: MultiDayBatchLogger -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: DockedBottomNav -->
+<!-- Native 5-Tab Bar with Lime Accent for Attendance -->
+<nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-brand-darkBase/95 backdrop-blur-xl border-t border-brand-border/80 safe-bottom px-3 py-2 z-50" data-purpose="docked-navigation-bar"><ul class="flex items-center justify-around"><li><a class="flex flex-col items-center text-slate-400 hover:text-slate-200 py-1 px-2.5 transition-all" href="#home"><i class="fa-solid fa-house-chimney text-base"></i><span class="text-[10px] font-medium mt-1">Home</span></a></li><li><a class="flex flex-col items-center text-slate-400 hover:text-slate-200 py-1 px-2.5 transition-all" href="#leads"><i class="fa-solid fa-user-group text-base"></i><span class="text-[10px] font-medium mt-1">Leads</span></a></li><li><a class="flex flex-col items-center text-brand-lime py-1 px-3 transition-all relative" href="#attendance"><div class="relative px-2 py-0.5 rounded-lg bg-brand-lime/10 border border-brand-lime/20 shadow-[0_0_12px_rgba(180,242,52,0.25)]"><i class="fa-solid fa-calendar-check text-base"></i><span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-brand-lime rounded-full beacon-active"></span></div><span class="text-[10px] font-extrabold mt-1 tracking-tight">Attendance</span></a></li><li><a class="flex flex-col items-center text-slate-400 hover:text-slate-200 py-1 px-2.5 transition-all" href="#follow-ups"><i class="fa-solid fa-phone-volume text-base"></i><span class="text-[10px] font-medium mt-1">Follow-ups</span></a></li><li><a class="flex flex-col items-center text-slate-400 hover:text-slate-200 py-1 px-2.5 transition-all" href="#menu"><i class="fa-solid fa-bars-staggered text-base"></i><span class="text-[10px] font-medium mt-1">Menu</span></a></li></ul></nav>
+<!-- END: DockedBottomNav -->
+</div>
+<!-- BEGIN: InteractiveClockScript -->
+<script data-purpose="live-digital-clock">
+    // Lightweight script to keep the monospace clock running live
+    function updateLiveClock() {
+      const now = new Date();
+      const hours = String(now.getHours() % 12 || 12).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      
+      const timeElem = document.getElementById('clock-hours-mins');
+      const secElem = document.getElementById('clock-seconds');
+      
+      if (timeElem) timeElem.textContent = `${hours}:${minutes}`;
+      if (secElem) secElem.textContent = seconds;
+    }
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+
+    // Subtle tactile feedback on Check-In button click
+    const btn = document.getElementById('checkInBtn');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        btn.classList.add('scale-95');
+        setTimeout(() => {
+          btn.classList.remove('scale-95');
+          alert('Check-In Verified: GPS On-site HQ Floor 4. Timestamp recorded.');
+        }, 150);
+      });
+    }
+  </script>
+<!-- END: InteractiveClockScript -->
+</body></html>

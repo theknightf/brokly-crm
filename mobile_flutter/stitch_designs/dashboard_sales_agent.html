@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Brokly CRM — Sales Broker Suite</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary": "#1f3700",
+            "inverse-on-surface": "#2e3037",
+            "surface-dim": "#10131a",
+            "on-error": "#690005",
+            "on-primary-container": "#416400",
+            "on-secondary-container": "#2c4900",
+            "surface-container-high": "#272a31",
+            "on-secondary-fixed-variant": "#304f00",
+            "background": "#10131a",
+            "surface-container-highest": "#32353c",
+            "tertiary-fixed-dim": "#e7b6f3",
+            "secondary-container": "#7ac100",
+            "surface-variant": "#32353c",
+            "on-primary-fixed": "#121f00",
+            "surface-tint": "#98da27",
+            "surface-container-low": "#191c22",
+            "surface": "#10131a",
+            "surface-bright": "#363940",
+            "secondary": "#94de2d",
+            "secondary-fixed-dim": "#91db2a",
+            "error-container": "#93000a",
+            "outline": "#8c947c",
+            "primary-fixed-dim": "#98da27",
+            "inverse-surface": "#e1e2eb",
+            "on-background": "#e1e2eb",
+            "on-tertiary-fixed": "#2f093d",
+            "primary-fixed": "#b2f746",
+            "on-surface-variant": "#c2cab0",
+            "surface-container-lowest": "#0b0e14",
+            "on-primary": "#213600",
+            "primary-container": "#a3e635",
+            "surface-container": "#1d2026",
+            "outline-variant": "#424936",
+            "tertiary-container": "#f3c1ff",
+            "on-tertiary": "#462153",
+            "tertiary-fixed": "#fad7ff",
+            "on-tertiary-fixed-variant": "#5e376b",
+            "on-primary-fixed-variant": "#334f00",
+            "inverse-primary": "#446900",
+            "on-secondary-fixed": "#102000",
+            "secondary-fixed": "#acf847",
+            "on-surface": "#e1e2eb",
+            "on-tertiary-container": "#734b80",
+            "on-error-container": "#ffdad6",
+            "tertiary": "#fee7ff",
+            "primary": "#ccff80",
+            "error": "#ffb4ab"
+          },
+          "borderRadius": {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "margin-mobile": "1rem",
+            "space-md": "1rem",
+            "gutter": "1.5rem",
+            "gutter-mobile": "0.75rem",
+            "space-xl": "2.5rem",
+            "space-lg": "1.5rem",
+            "margin": "2rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem"
+          },
+          "fontFamily": {
+            "headline-sm": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "headline-lg-mobile": ["Libre Caslon Text"],
+            "display-hero": ["Libre Caslon Text"],
+            "headline-md": ["Libre Caslon Text"],
+            "display-hero-mobile": ["Libre Caslon Text"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Libre Caslon Text"],
+            "body-sm": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "headline-sm": ["1.125rem", { "lineHeight": "1.5rem", "fontWeight": "600" }],
+            "label-md": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }],
+            "headline-lg-mobile": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "display-hero": ["3.5rem", { "lineHeight": "4rem", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+            "headline-md": ["1.5rem", { "lineHeight": "2rem", "fontWeight": "400" }],
+            "display-hero-mobile": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "label-lg": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "body-lg": ["1rem", { "lineHeight": "1.5rem", "fontWeight": "400" }],
+            "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "headline-lg": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "body-sm": ["0.75rem", { "lineHeight": "1rem", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size: 20px;
+      line-height: 1;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface antialiased font-body-md min-h-screen selection:bg-primary-container selection:text-surface-container-lowest pb-28">
+<!-- TOP APP BAR -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-3 py-2 bg-surface-container-lowest border-b border-outline-variant/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.85)] backdrop-blur-md bg-opacity-95">
+<div class="flex items-center gap-2 flex-1 mr-2">
+<!-- Menu Button & Logo -->
+<button class="text-on-surface hover:text-primary transition-colors flex items-center justify-center p-1">
+<span class="material-symbols-outlined text-[22px]">menu</span>
+</button>
+<div class="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center bg-surface-container border border-outline-variant/60">
+<img alt="Brokly Logo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhPAcESNTWzXo4GANUZqrPBFPORQcrSaPzfEBr1gtUry7aQeAtZTwVxFSrew9E9_oKcLVVl0axfbns4YPEQf0kh254GJDETVECYr9DjK3Um9Xfjzv14yVtOheAovnkTL6sKFGYdfvRiOQbPtI0vX9RmdU9OC-Is9xufeK2hw_OhEHsld7hM1OzP6dUobaB9p8326bsxAA0pqJtCT2fkkOhG3Di5npPOtD1z_ChSwrFLuqoxW3qfI-zOHLmUY24jJmp7HA"/>
+</div>
+<!-- Search Pill -->
+<div class="relative flex-1 max-w-[170px] flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-on-surface-variant text-[16px]">search</span>
+<input class="w-full bg-[#161a22] border border-outline-variant/50 rounded-full py-1 pl-8 pr-2.5 text-xs text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary transition-all" placeholder="Search..." type="text"/>
+</div>
+</div>
+<!-- Header Right Actions: Add (+) in Lime circle, Sun, Globe, Bell, FM Avatar -->
+<div class="flex items-center gap-1.5 flex-shrink-0">
+<!-- Quick Add Lead Action (Lime Button as in Screenshot) -->
+<button class="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-surface-container-lowest active:scale-95 transition-all shadow-[0_0_10px_rgba(204,255,128,0.4)]">
+<span class="material-symbols-outlined text-[18px] font-bold">add</span>
+</button>
+<!-- Dark Mode Toggle -->
+<button class="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[17px]">light_mode</span>
+</button>
+<!-- Globe -->
+<button class="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[17px]">language</span>
+</button>
+<!-- Notification Bell -->
+<button class="relative w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">notifications</span>
+<span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_#ccff80]"></span>
+</button>
+<!-- Profile Avatar FM -->
+<div class="relative ml-0.5">
+<div class="w-7 h-7 rounded-full bg-[#a3e635] text-surface-container-lowest font-bold text-xs flex items-center justify-center shadow-[0_0_8px_rgba(163,230,53,0.3)]">
+        FM
+      </div>
+</div>
+</div>
+</header>
+<!-- MAIN SCROLLABLE CONTENT CANVAS -->
+<main class="pt-16 px-space-md space-y-space-md max-w-md mx-auto">
+<!-- 1. PERSONAL GREETING & SHIFT READINESS -->
+<section class="space-y-space-sm pt-space-xs">
+<div class="flex items-start justify-between">
+<div>
+<div class="flex items-center gap-1.5">
+<h1 class="text-headline-md font-headline-md text-on-surface font-normal">Good morning, Sarah</h1>
+<span class="text-lg">☀️</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-0.5">Here is your daily action pipeline — Thursday, Sep 24</p>
+</div>
+</div>
+<!-- GPS Verified Clock-In Status Strip -->
+<div class="flex items-center justify-between p-space-sm rounded-DEFAULT bg-surface-container-low border border-outline-variant/60 shadow-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_#ccff80]"></div>
+<div class="flex flex-col">
+<span class="text-label-md font-label-md text-on-surface font-semibold">Clocked In at 08:45 AM</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant text-[11px]">GPS Verified (Office HQ Floor 4)</span>
+</div>
+</div>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant text-[11px] font-semibold text-primary transition-all">
+        Details
+      </button>
+</div>
+</section>
+<!-- 2. HIGH-PRIORITY ACTION QUEUE (Follow-ups Due Alert - NO CURRENCY) -->
+<section class="space-y-space-xs">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#ccff80]"></span>
+<h2 class="text-label-sm font-label-sm uppercase tracking-wider text-primary">Priority Follow-up Queue</h2>
+</div>
+<span class="text-[11px] font-semibold text-error px-2 py-0.5 rounded-full bg-error-container/20 border border-error/30">
+        2 Overdue
+      </span>
+</div>
+<!-- Urgent Lead Card -->
+<div class="p-space-md rounded-DEFAULT bg-surface-container-low border border-primary/40 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.65)] relative overflow-hidden group">
+<div class="absolute -top-12 -right-12 w-28 h-28 bg-primary/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-start justify-between">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="text-label-lg font-label-lg text-on-surface font-bold">Omar Al-Sayed</span>
+<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-container-high text-primary border border-outline-variant">VIP Buyer</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-primary">domain</span>
+            Downtown Sky Villa (Site Tour Requested)
+          </p>
+<div class="flex items-center gap-1.5 text-[11px] text-error font-medium pt-0.5">
+<span class="material-symbols-outlined text-[13px]">alarm</span>
+<span>Callback was scheduled 25 mins ago</span>
+</div>
+</div>
+<span class="px-2 py-1 rounded bg-error-container/25 text-error text-[10px] font-bold border border-error/20">URGENT</span>
+</div>
+<!-- Quick Actions -->
+<div class="grid grid-cols-2 gap-space-sm mt-space-md pt-space-xs border-t border-outline-variant/40">
+<a class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-primary-container text-surface-container-lowest font-label-md font-bold text-label-md hover:bg-secondary transition-all active:scale-95 shadow-[0_0_12px_rgba(163,230,53,0.3)]" href="tel:+97150000000">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>Call Now</span>
+</a>
+<a class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-surface-container-high border border-outline-variant text-primary font-label-md font-semibold text-label-md hover:border-primary active:scale-95 transition-all" href="https://wa.me/">
+<span class="material-symbols-outlined text-[16px]">chat</span>
+<span>WhatsApp</span>
+</a>
+</div>
+</div>
+</section>
+<!-- 3. PERFORMANCE STATS (Non-Monetary: Dial Counts, Site Meetings, SLA) -->
+<section class="space-y-space-xs">
+<div class="flex items-center justify-between">
+<h2 class="text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant">Daily Activity &amp; SLA</h2>
+<span class="text-label-md font-label-md text-primary font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">military_tech</span>
+        Top Performer #1
+      </span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<!-- Stat 1: Outbound Calls -->
+<div class="p-2.5 rounded-DEFAULT bg-surface-container-low border border-outline-variant/60 flex flex-col justify-between">
+<span class="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">Dials</span>
+<div class="my-1">
+<span class="text-lg font-bold text-on-surface">84</span>
+<span class="text-[10px] text-on-surface-variant">/120</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 70%;"></div>
+</div>
+</div>
+<!-- Stat 2: Site Tours -->
+<div class="p-2.5 rounded-DEFAULT bg-surface-container-low border border-outline-variant/60 flex flex-col justify-between">
+<span class="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">Site Tours</span>
+<div class="my-1">
+<span class="text-lg font-bold text-primary">3</span>
+<span class="text-[10px] text-on-surface-variant"> Done</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 100%;"></div>
+</div>
+</div>
+<!-- Stat 3: Response SLA -->
+<div class="p-2.5 rounded-DEFAULT bg-surface-container-low border border-outline-variant/60 flex flex-col justify-between">
+<span class="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">SLA Score</span>
+<div class="my-1">
+<span class="text-lg font-bold text-on-surface">98.4%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary-container h-full rounded-full" style="width: 98%;"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. AUTHENTIC BROKLY STAGE STATUS CARDS GRID (18 Exact Stages from Reference Screenshots) -->
+<section class="space-y-space-sm">
+<div class="flex items-center justify-between">
+<h2 class="text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant">Lead Stages &amp; Pipeline</h2>
+<span class="text-xs font-semibold text-primary flex items-center gap-0.5">
+        Overview
+        <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</span>
+</div>
+<!-- 2-Column Exact Card Grid Matching Reference Screenshots -->
+<div class="grid grid-cols-2 gap-3">
+<!-- 1. Fresh Leads -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#1f2e1e] flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">psychiatry</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Fresh Leads</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 2. Cold Calls -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#202738] flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[19px]">call</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Cold Calls</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 3. Pending Leads -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#2a2520] flex items-center justify-center text-[#e8b577]">
+<span class="material-symbols-outlined text-[20px]">hourglass_top</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Pending Leads</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 4. Following Up -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#1b2b36] flex items-center justify-center text-[#74c0fc]">
+<span class="material-symbols-outlined text-[20px]">sync</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Following Up</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 5. Meeting -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#2e2619] flex items-center justify-center text-[#fcc419]">
+<span class="material-symbols-outlined text-[20px]">handshake</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Meeting</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 6. Interested -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#2e2816] flex items-center justify-center text-[#ffe066]">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Interested</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 7. Not Interested -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#351a1a] flex items-center justify-center text-[#ff6b6b]">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Not Interested</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 8. Cancellation -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#341d1d] flex items-center justify-center text-[#fa5252]">
+<span class="material-symbols-outlined text-[20px]">block</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Cancellation</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 9. Done Deal -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-[#a3e635]/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all shadow-[0_0_16px_rgba(163,230,53,0.15)]">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#183318] flex items-center justify-center text-[#51cf66]">
+<span class="material-symbols-outlined text-[20px]">check_box</span>
+</div>
+<span class="text-[11px] font-semibold text-[#a3e635] bg-[#213018] px-2 py-0.5 rounded-full border border-[#a3e635]/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Done Deal</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 10. Duplicate Leads -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#27262c] flex items-center justify-center text-[#ced4da]">
+<span class="material-symbols-outlined text-[20px]">assignment</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Duplicate Leads</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 11. Wrong Number -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#351f22] flex items-center justify-center text-[#ff8787]">
+<span class="material-symbols-outlined text-[19px]">phone_disabled</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Wrong Number</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 12. Data Rotation -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#1b2b36] flex items-center justify-center text-[#4dabf7]">
+<span class="material-symbols-outlined text-[20px]">swap_horiz</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Data Rotation</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 13. Closed Number -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#2a241b] flex items-center justify-center text-[#ffd43b]">
+<span class="material-symbols-outlined text-[20px]">lock</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Closed Number</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 14. No Answer -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#2e2316] flex items-center justify-center text-[#ff922b]">
+<span class="material-symbols-outlined text-[20px]">phone_missed</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">No Answer</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 15. No Answer At All (Active with 1 and 100.0% Pill) -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#2f2218] flex items-center justify-center text-[#f76707]">
+<span class="material-symbols-outlined text-[20px]">notifications_off</span>
+</div>
+<span class="text-[11px] font-bold text-[#a3e635] bg-[#1c2e17] px-2.5 py-0.5 rounded-full border border-[#a3e635]/40">100.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">1</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">No Answer At All</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 16. Low Budget -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#27261a] flex items-center justify-center text-[#fab005]">
+<span class="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Low Budget</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 17. Scheduled Meeting -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#22242c] flex items-center justify-center text-[#ced4da]">
+<span class="material-symbols-outlined text-[20px]">calendar_month</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium truncate pr-1">Scheduled Meeting</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+<!-- 18. Reservation -->
+<div class="bg-[#141820] hover:bg-[#1a1f29] border border-outline-variant/40 rounded-2xl p-3.5 flex flex-col justify-between aspect-[1.3/1] transition-all">
+<div class="flex items-start justify-between">
+<div class="w-9 h-9 rounded-full bg-[#182729] flex items-center justify-center text-[#20c997]">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface bg-[#222733] px-2 py-0.5 rounded-full border border-outline-variant/30">0.0%</span>
+</div>
+<div class="text-2xl font-bold text-on-surface font-sans mt-2">0</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-on-surface font-medium">Reservation</span>
+<span class="text-on-surface-variant text-sm font-light leading-none">↗</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. AGENT QUICK TOOLBOX -->
+<section class="space-y-space-xs pt-1">
+<h2 class="text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant">Broker Quick Tools</h2>
+<div class="flex gap-space-sm overflow-x-auto no-scrollbar pb-1">
+<button class="flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface-container-low border border-outline-variant hover:border-primary active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary text-[18px]">calculate</span>
+<span class="text-label-md font-label-md text-on-surface">Unit Calculator</span>
+</button>
+<button class="flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface-container-low border border-outline-variant hover:border-primary active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary text-[18px]">share</span>
+<span class="text-label-md font-label-md text-on-surface">Send Brochure</span>
+</button>
+<button class="flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface-container-low border border-outline-variant hover:border-primary active:scale-95 transition-all">
+<span class="material-symbols-outlined text-primary text-[18px]">apartment</span>
+<span class="text-label-md font-label-md text-on-surface">Search Inventory</span>
+</button>
+</div>
+</section>
+</main>
+<!-- DOCKED BOTTOM NAVIGATION BAR (Home, Leads, Attendance, Follow-ups, Menu) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex items-center justify-around px-gutter-mobile py-space-xs bg-surface-container-lowest border-t border-outline-variant">
+<!-- Tab 1: Home (ACTIVE with Lime Indicator) -->
+<a class="relative flex flex-col items-center justify-center text-primary font-label-sm text-label-sm pt-space-xs before:content-[''] before:absolute before:top-0 before:w-8 before:h-[2px] before:bg-primary before:shadow-[0_0_12px_#ccff80]" href="#">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="mt-1 font-bold">Home</span>
+</a>
+<!-- Tab 2: Leads -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-sm text-label-sm pt-space-xs hover:text-primary transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[22px]">group</span>
+<span class="mt-1 font-normal">Leads</span>
+</a>
+<!-- Tab 3: Attendance -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-sm text-label-sm pt-space-xs hover:text-primary transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[22px]">calendar_today</span>
+<span class="mt-1 font-normal">Attendance</span>
+</a>
+<!-- Tab 4: Follow-ups -->
+<a class="relative flex flex-col items-center justify-center text-on-surface-variant font-label-sm text-label-sm pt-space-xs hover:text-primary transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[22px]">event_repeat</span>
+<span class="mt-1 font-normal">Follow-ups</span>
+<span class="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-error"></span>
+</a>
+<!-- Tab 5: Menu -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant font-label-sm text-label-sm pt-space-xs hover:text-primary transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[22px]">menu</span>
+<span class="mt-1 font-normal">Menu</span>
+</a>
+</nav>
+</body></html>

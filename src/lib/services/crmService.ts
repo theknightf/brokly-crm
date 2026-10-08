@@ -2,6 +2,20 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
+import { isAdminRole } from '@/lib/roles';
+
+export function getLocalTodayDateString(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function isFollowUpActive(status?: string | null): boolean {
+  const s = String(status || '').trim().toLowerCase();
+  return s !== 'completed' && s !== 'cancelled';
+}
 
 function isSchemaError(error: any): boolean {
   if (!error) return false;
@@ -230,10 +244,44 @@ export const leadsService = {
   async getAll() {
     const supabase = createClient();
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads')
-        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
-        .order('created_at', { ascending: false });
+        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
+
+      // Apply role-based query isolation for privacy
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          const role = profile?.role;
+          if (!isAdminRole(role)) {
+            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
+              // Team Leader: fetch members of teams led by this user
+              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
+              const teamIds = (teams || []).map((t: any) => t.id);
+              let memberIds = [user.id];
+              if (teamIds.length > 0) {
+                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
+                if (members && members.length > 0) {
+                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+                }
+              }
+              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
+            } else {
+              // Regular Agent: only leads assigned to or created by current user
+              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+            }
+          }
+        }
+      } catch {
+        // Fall back to RLS enforcement
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) {
         if (isSchemaError(error)) throw error;
         return [];
@@ -1426,11 +1474,11 @@ export const followUpsService = {
   async getOverdue(limit = 8) {
     try {
       const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalTodayDateString();
       return (all || [])
-        .filter((f: any) => f.dueDate < today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .filter((f: any) => f.dueDate < today && isFollowUpActive(f.status))
         .sort((a: any, b: any) => {
-          const dateCmp = a.dueDate.localeCompare(b.dueDate);
+          const dateCmp = (a.dueDate || '').localeCompare(b.dueDate || '');
           if (dateCmp !== 0) return dateCmp;
           return (a.dueTime || '').localeCompare(b.dueTime || '');
         })
@@ -1444,9 +1492,9 @@ export const followUpsService = {
   async getToday(limit = 8) {
     try {
       const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalTodayDateString();
       return (all || [])
-        .filter((f: any) => f.dueDate === today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .filter((f: any) => f.dueDate === today && isFollowUpActive(f.status))
         .sort((a: any, b: any) => {
           const timeCmp = (a.dueTime || '').localeCompare(b.dueTime || '');
           if (timeCmp !== 0) return timeCmp;
@@ -1462,11 +1510,11 @@ export const followUpsService = {
   async getUpcoming(limit = 8) {
     try {
       const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalTodayDateString();
       return (all || [])
-        .filter((f: any) => f.dueDate > today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .filter((f: any) => f.dueDate > today && isFollowUpActive(f.status))
         .sort((a: any, b: any) => {
-          const dateCmp = a.dueDate.localeCompare(b.dueDate);
+          const dateCmp = (a.dueDate || '').localeCompare(b.dueDate || '');
           if (dateCmp !== 0) return dateCmp;
           return (a.dueTime || '').localeCompare(b.dueTime || '');
         })
@@ -1480,11 +1528,11 @@ export const followUpsService = {
   async getTodayAndPending(limit = 8) {
     try {
       const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalTodayDateString();
       return (all || [])
-        .filter((f: any) => f.dueDate >= today && f.status !== 'Completed' && f.status !== 'Cancelled')
+        .filter((f: any) => f.dueDate >= today && isFollowUpActive(f.status))
         .sort((a: any, b: any) => {
-          const dateCmp = a.dueDate.localeCompare(b.dueDate);
+          const dateCmp = (a.dueDate || '').localeCompare(b.dueDate || '');
           if (dateCmp !== 0) return dateCmp;
           return (a.dueTime || '').localeCompare(b.dueTime || '');
         })
@@ -1498,12 +1546,12 @@ export const followUpsService = {
   async getDashboardCounts() {
     try {
       const all: any[] = await (followUpsService.getAll() as Promise<any[]>);
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalTodayDateString();
       let overdue = 0;
       let dueToday = 0;
       let upcoming = 0;
       for (const f of all || []) {
-        if (f.status === 'Completed' || f.status === 'Cancelled') continue;
+        if (!isFollowUpActive(f.status)) continue;
         if (f.dueDate < today) overdue++;
         else if (f.dueDate === today) dueToday++;
         else if (f.dueDate > today) upcoming++;
