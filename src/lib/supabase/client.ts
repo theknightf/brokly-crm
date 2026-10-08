@@ -80,54 +80,145 @@ const getToken = () =>
   (canUseCookies() ? fromCookies() : fromStorage()).find((c) => c.name.includes('auth-token'))
     ?.value ?? null;
 
+export const clearAuthStorage = () => {
+  if (typeof document !== 'undefined') {
+    fromCookies().forEach((c) => {
+      if (c.name.includes('auth-token') || c.name.includes('sb-')) {
+        deleteCookie(c.name);
+      }
+    });
+  }
+  if (typeof localStorage !== 'undefined') {
+    try {
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith(PFX) || k.includes('auth-token') || k.includes('brokly_session')) {
+          localStorage.removeItem(k);
+        }
+      });
+    } catch {}
+  }
+};
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+
+let browserClientInstance: ReturnType<typeof createBrowserClient> | null = null;
+
+export function createClient() {
+  if (browserClientInstance) return browserClientInstance;
+
+  const client = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+    cookies: {
+      getAll: () => (canUseCookies() ? fromCookies() : fromStorage()),
+      setAll(cookiesToSet) {
+        if (typeof document === 'undefined') return;
+        if (canUseCookies()) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            value ? setCookie(name, value, options) : deleteCookie(name)
+          );
+        } else {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            try {
+              if (value) {
+                localStorage.setItem(`${PFX}${name}`, value);
+              } else {
+                localStorage.removeItem(`${PFX}${name}`);
+              }
+            } catch {
+              // localStorage unavailable — fall back to cookie below
+            }
+            if (value) setCookie(name, value, options);
+          });
+        }
+      },
+    },
+  });
+
+  browserClientInstance = client;
+  return client;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Automatic Silent Token Refresh Interceptor for Fetch
+// ─────────────────────────────────────────────────────────────────────────────
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const client = createClient();
+      const { data, error } = await client.auth.refreshSession();
+      if (error || !data?.session) {
+        // Refresh token invalid or expired
+        return null;
+      }
+      return data.session.access_token || null;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 if (typeof window !== 'undefined' && !(window as any).__sb_patched__) {
   (window as any).__sb_patched__ = true;
   const orig = window.fetch.bind(window);
-  window.fetch = (input, init) => {
-    const token = getToken();
+
+  window.fetch = async (input, init) => {
+    let token = getToken();
     const url =
       typeof input === 'string'
         ? input
         : input instanceof URL
           ? input.href
           : (input as Request).url;
-    if (token && (url.startsWith('/') || url.startsWith(window.location.origin))) {
-      init = { ...(init || {}), headers: { ...(init?.headers || {}), 'x-sb-token': token } };
+
+    const isSameOriginOrApi =
+      url.startsWith('/') ||
+      url.startsWith(window.location.origin) ||
+      (SUPABASE_URL && url.startsWith(SUPABASE_URL));
+
+    let modifiedInit = init ? { ...init } : {};
+    if (token && isSameOriginOrApi) {
+      modifiedInit.headers = {
+        ...(modifiedInit.headers || {}),
+        'x-sb-token': token,
+      };
     }
-    return orig(input, init);
+
+    let response = await orig(input, modifiedInit);
+
+    // If 401 Unauthorized received on an authenticated same-origin API endpoint
+    if (response.status === 401 && isSameOriginOrApi && !url.includes('/api/auth/session') && !url.includes('/auth/v1/token')) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        // Retry the request transparently with the freshly minted token
+        const retryHeaders = {
+          ...(modifiedInit.headers || {}),
+          'x-sb-token': getToken() || newToken,
+          Authorization: `Bearer ${newToken}`,
+        };
+        response = await orig(input, { ...modifiedInit, headers: retryHeaders });
+      } else {
+        // Fallback: refresh genuinely failed or token was revoked
+        // Only redirect if user was previously authenticated and is not on auth pages
+        if (token && !window.location.pathname.startsWith('/sign-up-login')) {
+          clearAuthStorage();
+          window.location.href = '/sign-up-login';
+        }
+      }
+    }
+
+    return response;
   };
-}
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
-
-export function createClient() {
-  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        getAll: () => (canUseCookies() ? fromCookies() : fromStorage()),
-        setAll(cookiesToSet) {
-          if (typeof document === 'undefined') return;
-          if (canUseCookies()) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              value ? setCookie(name, value, options) : deleteCookie(name)
-            );
-          } else {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              try {
-                if (value) {
-                  localStorage.setItem(`${PFX}${name}`, value);
-                } else {
-                  localStorage.removeItem(`${PFX}${name}`);
-                }
-              } catch {
-                // localStorage unavailable — fall back to cookie below
-              }
-              if (value) setCookie(name, value, options);
-            });
-          }
-        },
-      },
-    }
-  );
 }
