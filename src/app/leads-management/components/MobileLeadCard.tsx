@@ -25,6 +25,7 @@ import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 
 interface MobileLeadCardProps {
   lead: Lead;
@@ -229,13 +230,15 @@ export default function MobileLeadCard({
             >
               <Pencil size={16} />
             </button>
-            <button
-              onClick={() => onDelete(lead.id)}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-muted/60 dark:bg-muted hover:bg-red-500/10 dark:hover:bg-red-500/20 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center active:scale-95 transition-transform"
-              aria-label="Delete lead"
-            >
-              <Trash2 size={16} />
-            </button>
+            {isAdminRole(user?.role) && (
+              <button
+                onClick={() => onDelete(lead.id)}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-muted/60 dark:bg-muted hover:bg-red-500/10 dark:hover:bg-red-500/20 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center active:scale-95 transition-transform"
+                aria-label="Delete lead"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
           <p className="text-sm font-bold text-foreground tabular-nums" dir="ltr">
             {budgetText}

@@ -22,6 +22,8 @@ import Modal from '@/components/ui/Modal';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import { teamsService, messageLogsService } from '@/lib/services/crmService';
 import { sanitizeEgyptPhone } from '@/lib/whatsapp';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 
 interface AssignableUser {
   id: string;
@@ -85,6 +87,8 @@ export default function BulkActionBar({
   onAssignTeam,
   onClear,
 }: BulkActionBarProps) {
+  const { user } = useAuth();
+  const canDelete = isAdminRole(user?.role);
   const [open, setOpen] = useState<'none' | 'whatsapp' | 'team'>('none');
   const [composer, setComposer] = useState<'none' | 'email' | 'sms'>('none');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -392,37 +396,40 @@ export default function BulkActionBar({
 
           <div className="h-4 w-px bg-background/20 flex-shrink-0" />
 
-          {/* Delete */}
-          {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-red-400 hover:text-red-300 transition-colors flex-shrink-0"
-            >
-              <Trash2 size={15} />
-              Remove lead
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-xs text-red-400">Remove this lead?</span>
-              <button
-                onClick={() => {
-                  onDelete();
-                  setConfirmDelete(false);
-                }}
-                  className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold hover:bg-red-400 transition-colors"
+          {/* Delete (Owner and Admin only) */}
+          {canDelete && (
+            <>
+              {!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex items-center gap-1.5 text-sm font-medium text-red-400 hover:text-red-300 transition-colors flex-shrink-0"
                 >
-                  Remove
+                  <Trash2 size={15} />
+                  Remove lead
                 </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="text-xs text-background/60 hover:text-background transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-red-400">Remove this lead?</span>
+                  <button
+                    onClick={() => {
+                      onDelete();
+                      setConfirmDelete(false);
+                    }}
+                    className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg font-semibold hover:bg-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="text-xs text-background/60 hover:text-background transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+              <div className="h-4 w-px bg-background/20 flex-shrink-0" />
+            </>
           )}
-
-          <div className="h-4 w-px bg-background/20 flex-shrink-0" />
 
           {/* Clear */}
           <button

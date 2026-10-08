@@ -823,7 +823,34 @@ export const duplicateLeadsService = {
         status: 'flagged',
       });
       if (error) return false;
-      // Notify admins via activity_log (feeds the notification bell).
+
+      // Fetch details of original lead (who first had it: creator or assignee)
+      let firstOwner = 'Unknown';
+      let matchedLeadName = 'Lead';
+      try {
+        const { data: origLead } = await supabase
+          .from('leads')
+          .select('name, created_by, assigned_to, created_by_profile:user_profiles!leads_created_by_fkey(full_name), assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)')
+          .eq('id', input.matchedLeadId)
+          .maybeSingle();
+        if (origLead) {
+          matchedLeadName = origLead.name || 'Lead';
+          firstOwner = origLead.assigned_to_profile?.[0]?.full_name || origLead.created_by_profile?.[0]?.full_name || 'Original Agent';
+        }
+      } catch {}
+
+      // Get user who attempted adding the duplicate
+      let attemptedByName = 'Agent';
+      if (user?.id) {
+        const { data: attProfile } = await supabase
+          .from('user_profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (attProfile?.full_name) attemptedByName = attProfile.full_name;
+      }
+
+      // Notify owner and admins via activity_log (feeds the notification bell)
       const { data: admins } = await supabase
         .from('user_profiles')
         .select('id')
@@ -836,7 +863,14 @@ export const duplicateLeadsService = {
             action_type: 'Duplicate Lead Flagged',
             entity_type: 'lead',
             entity_id: input.matchedLeadId,
-            detail: 'Duplicate phone detected: ' + input.attemptedPhone,
+            detail: `Duplicate: "${matchedLeadName}" (${input.attemptedPhone}) added by ${attemptedByName}. First owned by ${firstOwner}.`,
+            meta: JSON.stringify({
+              attemptedBy: attemptedByName,
+              attemptedById: user?.id,
+              firstOwner,
+              phone: input.attemptedPhone,
+              matchedLeadName,
+            }),
           }))
         );
       }

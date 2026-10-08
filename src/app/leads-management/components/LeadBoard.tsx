@@ -34,6 +34,7 @@ function BoardCard({
   onStatusChange,
   onDelete,
   onPostCall,
+  canDelete = false,
 }: {
   lead: Lead;
   onView: (lead: Lead) => void;
@@ -41,6 +42,7 @@ function BoardCard({
   onStatusChange: (id: string, status: LeadStatus) => void;
   onDelete: (id: string) => void;
   onPostCall?: (lead: Lead) => void;
+  canDelete?: boolean;
 }) {
   const inPipeline = pipelineIndex(lead.status) >= 0;
   const prev = inPipeline ? prevPipelineStage(lead.status) : undefined;
@@ -76,16 +78,18 @@ function BoardCard({
         >
           <Pencil size={13} />
         </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(lead.id);
-          }}
-          className="w-7 h-7 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          aria-label="Delete lead"
-        >
-          <Trash2 size={13} />
-        </button>
+        {canDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(lead.id);
+            }}
+            className="w-7 h-7 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Delete lead"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -209,7 +213,7 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDel
                 ) : (
                   colLeads.map((lead, i) => (
                     <div key={lead.id} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}>
-                      <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} onDelete={setDeletingId} onPostCall={onPostCall} />
+                      <BoardCard lead={lead} onView={onView} onEdit={onEdit} onStatusChange={onStatusChange} onDelete={setDeletingId} onPostCall={onPostCall} canDelete={isAdmin} />
                     </div>
                   ))
                 )}

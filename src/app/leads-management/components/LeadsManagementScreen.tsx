@@ -666,6 +666,10 @@ export default function LeadsManagementScreen({
   };
 
   const handleDeleteLead = async (id: string) => {
+    if (!isAdminRole(user?.role)) {
+      toast.error('Only owner and admin can delete leads.');
+      return;
+    }
     try {
       await leadsService.delete(id);
       setLeads((prev) => prev.filter((l) => l.id !== id));
@@ -746,6 +750,10 @@ export default function LeadsManagementScreen({
   );
 
   const handleBulkDelete = async () => {
+    if (!isAdminRole(user?.role)) {
+      toast.error('Only owner and admin can delete leads.');
+      return;
+    }
     const ids = Array.from(selectedIds);
     try {
       await leadsService.bulkDelete(ids);
@@ -823,8 +831,15 @@ export default function LeadsManagementScreen({
     }
     setDupChecking(false);
 
-    // Strong duplicate detection: warn before silently creating a duplicate.
+    // Strong duplicate detection: alert owner/admin and warn user before creating
     if (existing) {
+      if (existing.id) {
+        // Automatically log attempt so owner and admin get notified who added it and who first owned it
+        duplicateLeadsService.logAttempt({
+          matchedLeadId: existing.id,
+          attemptedPhone: lead.phone || '',
+        }).catch(() => {});
+      }
       setDupWarning({ existing, pendingLead: lead });
       return;
     }

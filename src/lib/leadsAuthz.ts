@@ -27,28 +27,6 @@ export async function canDeleteLead(
   actor: { id: string; role: string },
   lead: { id: string; created_by?: string | null; assigned_to?: string | null }
 ): Promise<boolean> {
-  if (isAdminRole(actor.role)) return true;
-  if (lead.created_by === actor.id) return true;
-  if (lead.assigned_to === actor.id) return true;
-
-  if (lead.assigned_to) {
-    try {
-      const { data: teams } = await service.from('teams').select('id').eq('leader_id', actor.id);
-      if (teams && teams.length > 0) {
-        const { data: member } = await service
-          .from('team_memberships')
-          .select('id')
-          .in(
-            'team_id',
-            teams.map((t: any) => t.id)
-          )
-          .eq('user_id', lead.assigned_to)
-          .maybeSingle();
-        if (member) return true;
-      }
-    } catch {
-      /* fall through to false */
-    }
-  }
-  return false;
+  // Only owner and admin can delete leads; sales/agents cannot delete.
+  return isAdminRole(actor.role);
 }

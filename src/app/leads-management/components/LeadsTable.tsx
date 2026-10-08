@@ -28,6 +28,8 @@ import MobileLeadCard from './MobileLeadCard';
 import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
 import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -182,11 +184,13 @@ export default function LeadsTable({
   onAddNote,
   onPostCall,
 }: LeadsTableProps) {
+  const { user } = useAuth();
+  const canDelete = isAdminRole(user?.role);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
 
   const handleDeleteConfirm = () => {
-    if (deletingId) {
+    if (deletingId && canDelete) {
       onDelete(deletingId);
       setDeletingId(null);
     }
@@ -479,13 +483,15 @@ export default function LeadsTable({
                       >
                         <Pencil size={14} />
                       </button>
-                      <button
-                        onClick={() => setDeletingId(lead.id)}
-                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
-                        title="Delete lead"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() => setDeletingId(lead.id)}
+                          className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
+                          title="Delete lead"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

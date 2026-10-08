@@ -1,14 +1,15 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing, MapPin, AlertTriangle, Wallet } from 'lucide-react';
+import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing, MapPin, AlertTriangle, Wallet, Copy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { createClient } from '@/lib/supabase/client';
+import { isAdminRole } from '@/lib/roles';
 import { toast } from 'sonner';
 
 export interface AppNotification {
   id: string;
-  type: 'assignment' | 'reminder' | 'task' | 'action' | 'deduction';
+  type: 'assignment' | 'reminder' | 'task' | 'action' | 'deduction' | 'duplicate';
   title: string;
   text: string;
   entityType: string;
@@ -245,6 +246,41 @@ export default function NotificationBell() {
         }
       } catch {}
 
+      // 4) Duplicate lead alerts — visible to Owner and Admin only
+      if (isAdminRole(user.role)) {
+        try {
+          const { data: dupLogs } = await client
+            .from('activity_log')
+            .select('id, action_type, detail, entity_id, created_at, meta')
+            .eq('action_type', 'Duplicate Lead Flagged')
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          for (const log of dupLogs || []) {
+            let metaObj: any = null;
+            try {
+              metaObj = log.meta ? JSON.parse(log.meta) : null;
+            } catch {}
+
+            const addedBy = metaObj?.attemptedBy || 'Unknown';
+            const firstOwner = metaObj?.firstOwner || 'Unknown';
+            const phone = metaObj?.phone || '';
+            const leadName = metaObj?.matchedLeadName || 'Lead';
+
+            list.push({
+              id: `dup-${log.id}`,
+              type: 'duplicate',
+              title: `Duplicate Lead Detected`,
+              text: `${leadName} (${phone}): Added by ${addedBy} • First held by ${firstOwner}`,
+              entityType: 'lead',
+              entityId: log.entity_id,
+              createdAt: log.created_at || new Date().toISOString(),
+              referenceLink: `/leads-management?leadId=${log.entity_id}`,
+            });
+          }
+        } catch {}
+      }
+
       // 4) Field actions: today's minutes/site-visit log for this user so the
       //    bell doubles as a lightweight activity feed (e.g. "Started a site visit").
       const { data: mySiteVisits } = await client
@@ -362,6 +398,8 @@ export default function NotificationBell() {
       <Wallet size={16} className="text-red-500 flex-shrink-0" />
     ) : type === 'assignment' ? (
       <UserPlus size={16} className="text-primary flex-shrink-0" />
+    ) : type === 'duplicate' ? (
+      <Copy size={16} className="text-amber-500 flex-shrink-0" />
     ) : type === 'task' || type === 'action' ? (
       <MapPin size={16} className="text-violet-500 flex-shrink-0" />
     ) : (
