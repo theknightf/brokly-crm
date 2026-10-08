@@ -307,7 +307,7 @@ export default function LeadsManagementScreen({
     setScheduleNotes('');
   }, [viewLead?.id]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(500);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [showFilters, setShowFilters] = useState(true);
   const [viewTab, setViewTab] = useState<'overview' | 'activity' | 'units' | 'comments'>('overview');
@@ -818,6 +818,30 @@ export default function LeadsManagementScreen({
       setSelectedIds(new Set());
     } catch (err: any) {
       toast.error(err?.message || 'Failed to assign leads to team');
+    }
+  };
+
+  const handleBulkRefer = async (referredToUserId: string, referredToName: string) => {
+    const ids = Array.from(selectedIds);
+    try {
+      await leadsService.bulkReferUsers(ids, referredToUserId, user?.id);
+      setLeads((prev) =>
+        prev.map((l) =>
+          selectedIds.has(l.id)
+            ? {
+                ...l,
+                referredTo: referredToUserId,
+                referredToName,
+                referredBy: user?.id || null,
+                referredByName: user?.name || null,
+              }
+            : l
+        )
+      );
+      toast.success(`Referred ${ids.length} leads to ${referredToName}`);
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to refer leads');
     }
   };
 
@@ -1407,6 +1431,7 @@ export default function LeadsManagementScreen({
         onDelete={handleBulkDelete}
         onAssignMany={handleBulkAssignMany}
         onAssignTeam={handleBulkAssignTeam}
+        onRefer={handleBulkRefer}
         onClear={() => setSelectedIds(new Set())}
       />
 

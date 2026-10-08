@@ -305,9 +305,8 @@ export async function POST(request: Request) {
       saved = data;
     }
 
-    // Best-effort: reflect the call outcome on the lead's pipeline stage
-    // and stamp the Action Taken tracker (trigger also covers call_logs insert,
-    // but this ensures stage-only updates also bump last_action).
+    // Best-effort: reflect the call outcome on the lead's pipeline stage,
+    // schedule follow-ups/meetings if requested, and stamp the Action Taken tracker.
     if (entity_type === 'lead' && entity_id) {
       const nextStatus = OUTCOME_TO_STATUS[(outcome || '').trim()];
       const patch: any = {
@@ -318,10 +317,49 @@ export async function POST(request: Request) {
         patch.crm_status = nextStatus;
         patch.lead_status = STATUS_TO_LEGACY[nextStatus] || 'New';
       }
+      if (body.next_follow_up_date) {
+        patch.follow_up_due = body.next_follow_up_date;
+      }
       try {
         await supabase.from('leads').update(patch).eq('id', entity_id);
       } catch {
         // ignore — the call is already logged; the pipeline sync is best-effort
+      }
+
+      // Schedule follow-up / meeting row if requested
+      if (body.next_follow_up_date) {
+        try {
+          const isMeeting = outcome === 'Schedule Meeting';
+          await supabase.from('follow_ups').insert({
+            lead_id: entity_id,
+            user_id: user.id,
+            title: isMeeting ? `Meeting: ${contact_name || 'Lead'}` : `Follow up: ${contact_name || 'Lead'}`,
+            contact_name: contact_name || 'Lead',
+            contact_phone: contact_phone || '',
+            type: isMeeting ? 'Meeting' : 'Call',
+            status: 'Pending',
+            priority: 'Medium',
+            due_date: body.next_follow_up_date,
+            due_time: body.followUpDateTime?.split('T')[1]?.slice(0, 5) || '12:00',
+            notes: notes || '',
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      // Handle Closed Number / Wrong Phone tags
+      if (outcome === 'Closed Number' || outcome === 'Wrong Phone' || outcome === 'Wrong Number') {
+        try {
+          const tagToAdd = outcome === 'Closed Number' ? 'closed_number' : 'wrong_number';
+          const { data: leadRow } = await supabase.from('leads').select('tags').eq('id', entity_id).maybeSingle();
+          const existingTags: string[] = Array.isArray(leadRow?.tags) ? leadRow.tags : [];
+          if (!existingTags.includes(tagToAdd)) {
+            await supabase.from('leads').update({ tags: [...existingTags, tagToAdd] }).eq('id', entity_id);
+          }
+        } catch {
+          // ignore
+        }
       }
     }
 

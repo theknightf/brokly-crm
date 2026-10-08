@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Trash2,
   UserCheck,
+  UserPlus,
   X,
   ChevronDown,
   Loader2,
@@ -64,6 +65,7 @@ interface BulkActionBarProps {
   onDelete: () => void;
   onAssignMany: (users: AssignableUser[]) => Promise<void>;
   onAssignTeam: (teamName: string) => void;
+  onRefer?: (userId: string, userName: string) => Promise<void>;
   onClear: () => void;
 }
 
@@ -85,6 +87,7 @@ export default function BulkActionBar({
   onDelete,
   onAssignMany,
   onAssignTeam,
+  onRefer,
   onClear,
 }: BulkActionBarProps) {
   const { user } = useAuth();
@@ -105,6 +108,10 @@ export default function BulkActionBar({
   const [results, setResults] = useState<{ sent: number; failed: number } | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [referModalOpen, setReferModalOpen] = useState(false);
+  const [selectedReferralUserId, setSelectedReferralUserId] = useState<string>('');
+  const [referring, setReferring] = useState(false);
+  const [referError, setReferError] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
 
@@ -119,20 +126,27 @@ export default function BulkActionBar({
     }
   }, [assignModalOpen]);
 
+  useEffect(() => {
+    if (referModalOpen) {
+      setSelectedReferralUserId('');
+      setReferError(null);
+    }
+  }, [referModalOpen]);
+
   const selectedUsers = users.filter((u) => selectedUserIds.has(u.id));
   const distribution = distributeRoundRobin(selectedLeads.length, selectedUsers.length);
   const distByUserId = new Map<string, number>();
   selectedUsers.forEach((u, i) => distByUserId.set(u.id, distribution[i] ?? 0));
 
   useEffect(() => {
-    if (!assignModalOpen || users.length > 0) return;
+    if ((!assignModalOpen && !referModalOpen) || users.length > 0) return;
     setLoadingUsers(true);
     teamsService
       .getAssignableUsers()
       .then((data) => setUsers(data as AssignableUser[]))
       .catch(() => setUsers([]))
       .finally(() => setLoadingUsers(false));
-  }, [assignModalOpen, users.length]);
+  }, [assignModalOpen, referModalOpen, users.length]);
 
   useEffect(() => {
     if (open !== 'team' || teams.length > 0) return;
@@ -305,19 +319,35 @@ export default function BulkActionBar({
           <div className="flex-shrink-0">
             <button
               onClick={() => setAssignModalOpen(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors min-h-[44px] px-2"
             >
               <UserCheck size={15} />
               Assign lead
             </button>
           </div>
 
+          <div className="h-4 w-px bg-background/20 flex-shrink-0" />
+
+          {/* Referral lead */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => setReferModalOpen(true)}
+              className="flex items-center gap-1.5 text-sm font-medium text-amber-300 hover:text-amber-200 transition-colors min-h-[44px] px-2"
+              title="Refer selected leads to a team member"
+            >
+              <UserPlus size={15} />
+              Referral Lead
+            </button>
+          </div>
+
+          <div className="h-4 w-px bg-background/20 flex-shrink-0" />
+
           {/* Assign team */}
           <div className="relative flex-shrink-0">
             <button
               ref={teamBtnRef}
               onClick={() => setOpen((o) => (o === 'team' ? 'none' : 'team'))}
-              className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors min-h-[44px] px-2"
             >
               <Users size={15} />
               Assign team
@@ -662,6 +692,92 @@ export default function BulkActionBar({
                 {assigning
                   ? 'Assigning…'
                   : `Assign leads`}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Referral lead modal */}
+      {referModalOpen && (
+        <Modal
+          open={referModalOpen}
+          onClose={() => setReferModalOpen(false)}
+          title={`Refer ${selectedCount} lead${selectedCount !== 1 ? 's' : ''}`}
+          size="sm"
+        >
+          <div className="p-6 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Select a team member to refer these leads to. The referral will record you as the referrer and keep tracking visible to both agents.
+            </p>
+
+            {loadingUsers ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 size={18} className="animate-spin text-primary" />
+              </div>
+            ) : users.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No agents available</p>
+            ) : (
+              <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-xl p-1.5">
+                {users.map((u) => {
+                  const selected = selectedReferralUserId === u.id;
+                  return (
+                    <button
+                      key={`refer-user-${u.id}`}
+                      onClick={() => setSelectedReferralUserId(u.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors rounded-lg min-h-[44px] ${
+                        selected ? 'bg-primary/10 text-primary font-medium' : ''
+                      }`}
+                    >
+                      <span className="truncate">{u.name}</span>
+                      {selected && <Check size={16} className="text-primary flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {referError && (
+              <div className="flex items-start gap-2 rounded-xl bg-destructive/10 text-destructive px-3 py-2 text-xs">
+                <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                <span>{referError}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setReferModalOpen(false)}
+                disabled={referring}
+                className="btn-secondary min-h-[44px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!selectedReferralUserId) return;
+                  const targetUser = users.find((u) => u.id === selectedReferralUserId);
+                  if (!targetUser) return;
+                  setReferring(true);
+                  setReferError(null);
+                  try {
+                    if (onRefer) {
+                      await onRefer(targetUser.id, targetUser.name);
+                    }
+                    setReferModalOpen(false);
+                    setSelectedReferralUserId('');
+                  } catch (err: any) {
+                    setReferError(err?.message || 'Could not refer leads');
+                  } finally {
+                    setReferring(false);
+                  }
+                }}
+                disabled={referring || !selectedReferralUserId}
+                className="btn-primary flex items-center gap-2 min-h-[44px]"
+              >
+                {referring && <Loader2 size={14} className="animate-spin" />}
+                {referring ? 'Referring…' : 'Refer Leads'}
               </button>
             </div>
           </div>

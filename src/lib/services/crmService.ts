@@ -673,6 +673,26 @@ export const leadsService = {
     invalidateCache();
   },
 
+  async bulkReferUsers(ids: string[], referredToUserId: string, referrerUserId?: string) {
+    const supabase = createClient();
+    let actorId: string | null = referrerUserId || null;
+    if (!actorId) {
+      try {
+        const { data: au } = await supabase.auth.getUser();
+        actorId = au?.user?.id ?? null;
+      } catch {}
+    }
+    const patch: any = {
+      referred_to: referredToUserId,
+      referred_by: actorId,
+      last_action_at: new Date().toISOString(),
+    };
+    if (actorId) patch.last_action_by = actorId;
+    const { error } = await supabase.from('leads').update(patch).in('id', ids);
+    if (error) throw error;
+    invalidateCache();
+  },
+
   async bulkAssignUsers(ids: string[], assignedTo: string | null, assigneeName?: string) {
     const supabase = createClient();
     let actorId: string | null = null;

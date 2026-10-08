@@ -194,120 +194,73 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
   const handleSave = async () => {
     if (!lead || !outcome || saving) return;
     setSaving(true);
-    try {
-      const nextFollowUpDate = needsSchedule ? (followUpDate || addDays(formatToday(), 1)) : undefined;
-      const nextFollowUpDateTime = needsSchedule && followUpTime ? `${nextFollowUpDate}T${followUpTime}:00` : nextFollowUpDate;
-      // Prefer native CallTracker duration (CallLog) when available
-      const durationSeconds = nativeDuration != null ? nativeDuration : 0;
 
-      const res = await fetch('/api/call-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          entity_type: 'lead',
-          entity_id: lead.id,
-          contact_name: lead.name || '',
-          contact_phone: lead.phone || '',
-          channel: 'Call',
-          direction: 'outgoing',
-          outcome,
-          notes: notes.trim() || '',
-          duration_seconds: durationSeconds,
-          followUpDateTime: nextFollowUpDateTime,
-          next_follow_up_date: nextFollowUpDate,
-        }),
+    const nextFollowUpDate = needsSchedule ? (followUpDate || addDays(formatToday(), 1)) : undefined;
+    const nextFollowUpDateTime = needsSchedule && followUpTime ? `${nextFollowUpDate}T${followUpTime}:00` : nextFollowUpDate;
+    const durationSeconds = nativeDuration != null ? nativeDuration : 0;
+    const nextStatus = OUTCOME_TO_STATUS[outcome];
+
+    // 1. Optimistic feedback: immediately inform parent and close modal without blocking user
+    const updatedLead = {
+      ...lead,
+      actionTakenToday: true,
+      contactedToday: true,
+      hasBeenCalled: true,
+      ...(nextStatus ? { status: nextStatus as any } : {}),
+      ...(nextFollowUpDate ? { followUpDue: nextFollowUpDate } : {}),
+    };
+
+    if (needsSchedule && nextFollowUpDate) {
+      toast.success(`Logged: ${outcome}`, {
+        description:
+          outcome === 'No Answer'
+            ? `Retry reminder set for ${nextFollowUpDate}${followUpTime ? ` at ${followUpTime}` : ''} — find it in Follow-ups & Workspace.`
+            : outcome === 'Schedule Meeting'
+              ? `Meeting set for ${nextFollowUpDate} — see Calendar.`
+              : `Follow-up set for ${nextFollowUpDate}.`,
+        duration: 4000,
       });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || 'Failed to log call');
-      }
-
-      // Schedule follow-up/meeting if needed — canonical path: POST /api/follow-ups so
-      // the top dashboard widget + follow-up partition see the same row (not just leads.follow_up_due)
-      if (needsSchedule && nextFollowUpDate) {
-        try {
-          await leadsService.scheduleFollowUp(lead.id, nextFollowUpDate).catch(() => {});
-        } catch {}
-        try {
-          await followUpsService.create(
-            {
-              title: outcome === 'Schedule Meeting' ? `Meeting: ${lead.name || 'Lead'}` : `Follow up: ${lead.name || 'Lead'}`,
-              contactName: lead.name || 'Lead',
-              contactPhone: lead.phone || '',
-              contactEmail: (lead as any).email || '',
-              type: outcome === 'Schedule Meeting' ? 'Meeting' : 'Call',
-              status: 'Pending',
-              priority: 'Medium',
-              dueDate: nextFollowUpDate,
-              dueTime: followUpTime || '12:00',
-              agent: (lead as any).agent || '',
-              agentInitials: (lead as any).agentInitials || '',
-              notes: notes.trim() || '',
-              propertyInterest: (lead as any).propertyType || (lead as any).project || '',
-              relationshipStatus: 'New',
-              leadId: lead.id,
-            },
-            '' // user id is resolved service-side from session; empty is fine
-          );
-        } catch {
-          // ignore — leads.scheduleFollowUp already kept a fallback row
-        }
-      }
-
-      // Persist lead status update (best-effort, mirrors DB trigger)
-      const nextStatus = OUTCOME_TO_STATUS[outcome];
-      if (nextStatus) {
-        try {
-          await leadsService.updateStatus(lead.id, nextStatus);
-        } catch {
-          // ignore
-        }
-      }
-
-      // Closed number tagging
-      if (outcome === 'Closed Number') {
-        try {
-          const tags = Array.from(new Set([...(((lead as any).tags as string[] | undefined) || []), 'closed_number']));
-          await leadsService.update(lead.id, { tags } as any);
-        } catch {
-          /* non-fatal */
-        }
-      }
-
-      // Wrong phone tagging
-      if (outcome === 'Wrong Phone') {
-        try {
-          const tags = Array.from(new Set([...(((lead as any).tags as string[] | undefined) || []), 'wrong_number']));
-          await leadsService.update(lead.id, { tags } as any);
-        } catch {
-          /* non-fatal */
-        }
-      }
-
-      if (needsSchedule && nextFollowUpDate) {
-        toast.success(`Logged: ${outcome}`, {
-          description:
-            outcome === 'No Answer'
-              ? `Retry reminder set for ${nextFollowUpDate}${followUpTime ? ` at ${followUpTime}` : ''} — find it in Follow-ups & Workspace.`
-              : outcome === 'Schedule Meeting'
-                ? `Meeting set for ${nextFollowUpDate} — see Calendar.`
-                : `Follow-up set for ${nextFollowUpDate}.`,
-          duration: 5000,
-        });
-      } else {
-        toast.success(`Logged: ${outcome}`);
-      }
-      try {
-        onSaved?.(lead, outcome);
-      } catch {
-        /* parent handler errors must not break modal */
-      }
-      onClose();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to save log');
-    } finally {
-      setSaving(false);
+    } else {
+      toast.success(`Logged: ${outcome}`);
     }
+
+    try {
+      onSaved?.(updatedLead, outcome);
+    } catch {
+      /* ignore */
+    }
+    onClose();
+
+    // 2. Background persistence: POST to /api/call-log (which now atomically persists status, follow-up, and tags)
+    fetch('/api/call-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entity_type: 'lead',
+        entity_id: lead.id,
+        contact_name: lead.name || '',
+        contact_phone: lead.phone || '',
+        channel: 'Call',
+        direction: 'outgoing',
+        outcome,
+        notes: notes.trim() || '',
+        duration_seconds: durationSeconds,
+        followUpDateTime: nextFollowUpDateTime,
+        next_follow_up_date: nextFollowUpDate,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || 'Failed to save call log');
+        }
+      })
+      .catch((err) => {
+        toast.error(err?.message || 'Failed to save call log');
+      })
+      .finally(() => {
+        setSaving(false);
+      });
   };
 
   const modalContent = (

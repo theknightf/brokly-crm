@@ -134,14 +134,22 @@ export default function ViewportPopover({
     setRect(next);
   }, [anchorRef, align, gutter, minWidth, maxWidth, preferredMaxHeight, sideOffset]);
 
-  // Measure + position on open, and reposition on scroll / resize.
+  // Measure + position on open, and reposition on scroll / resize with RAF throttling.
   useEffect(() => {
     if (!open || isMobile || !anchorRef.current) return;
     compute();
-    const onReposition = () => compute();
+    let rafId: number | null = null;
+    const onReposition = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        compute();
+        rafId = null;
+      });
+    };
     window.addEventListener('scroll', onReposition, { capture: true, passive: true });
     window.addEventListener('resize', onReposition);
     return () => {
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
       window.removeEventListener('scroll', onReposition, true);
       window.removeEventListener('resize', onReposition);
     };
@@ -164,6 +172,7 @@ export default function ViewportPopover({
   // Outside click + Escape to close.
   useEffect(() => {
     if (!open) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Node | null;
       if (!target) return;
@@ -174,9 +183,15 @@ export default function ViewportPopover({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    document.addEventListener('pointerdown', onPointerDown);
+
+    // Attach after the current event tick completes so the opening click/pointerdown does not immediately trigger onClose
+    timer = setTimeout(() => {
+      document.addEventListener('pointerdown', onPointerDown);
+    }, 10);
     document.addEventListener('keydown', onKey);
+
     return () => {
+      if (timer) clearTimeout(timer);
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKey);
     };

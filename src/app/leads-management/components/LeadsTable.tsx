@@ -162,6 +162,213 @@ function StageSelector({
 
 const StatusDropdown = StageSelector;
 
+const formatBudget = (min?: number, max?: number) => {
+  if (min == null && max == null) return '—';
+  const parts: string[] = [];
+  if (min != null) parts.push(min.toLocaleString());
+  if (max != null) parts.push(max.toLocaleString());
+  return `${parts.join('–')} ج.م`;
+};
+
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-');
+  return `${m}/${d}/${y?.slice(2)}`;
+};
+
+const isOverdue = (dueDate?: string) => {
+  if (!dueDate) return false;
+  const due = new Date(dueDate);
+  const today = new Date();
+  return due < today;
+};
+
+interface LeadTableRowProps {
+  lead: Lead;
+  isSelected: boolean;
+  canDelete: boolean;
+  onSelectRow: (id: string, checked: boolean) => void;
+  onStatusChange: (id: string, status: LeadStatus) => void;
+  onView?: (lead: Lead) => void;
+  onEdit?: (lead: Lead) => void;
+  onDeletePrompt: (id: string) => void;
+}
+
+const LeadTableRow = React.memo(function LeadTableRow({
+  lead,
+  isSelected,
+  canDelete,
+  onSelectRow,
+  onStatusChange,
+  onView,
+  onEdit,
+  onDeletePrompt,
+}: LeadTableRowProps) {
+  return (
+    <tr
+      className={`hover:bg-muted/30 transition-colors group ${isSelected ? 'bg-secondary/20' : ''}`}
+    >
+      <td className="table-td">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => onSelectRow(lead.id, e.target.checked)}
+          className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
+          aria-label={`Select ${lead.name || lead.id}`}
+        />
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {(lead.name || lead.id)
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .slice(0, 2)}
+          </div>
+          <div className="min-w-0">
+            <a
+              href={`/leads/${lead.id}`}
+              className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block"
+            >
+              {lead.name || `Lead ${lead.id}`}
+            </a>
+            <ActionTakenBadge
+              actionTakenToday={lead.actionTakenToday ?? lead.contactedToday}
+              compact
+            />
+            <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+              <MapPin size={10} />
+              {lead.location || '—'}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td className="table-td">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Phone size={10} className="flex-shrink-0" />
+            <span className="font-mono-data">{lead.phone}</span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Mail size={10} className="flex-shrink-0" />
+            <span className="truncate max-w-[150px]">{lead.email || '—'}</span>
+          </div>
+        </div>
+      </td>
+      <td className="table-td">
+        <span className="text-sm text-foreground">{lead.propertyType || '—'}</span>
+      </td>
+      <td className="table-td">
+        <span className="font-mono-data text-sm text-foreground tabular-nums">
+          {formatBudget(lead.budgetMin, lead.budgetMax)}
+        </span>
+      </td>
+      <td className="table-td">
+        <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
+          {lead.source || '—'}
+        </span>
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {lead.agentInitials || '—'}
+          </div>
+          <span className="text-sm text-foreground truncate max-w-[100px]">
+            {lead.agent?.split(' ')[0] || '—'}
+          </span>
+        </div>
+      </td>
+      <td className="table-td">
+        {lead.assignedToName || lead.adminName ? (
+          <div className="flex flex-col gap-0.5">
+            {lead.assignedToName && (
+              <div className="flex items-center gap-1.5">
+                <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
+                <span className="text-xs text-foreground truncate max-w-[100px]">
+                  {lead.assignedToName}
+                </span>
+              </div>
+            )}
+            {lead.adminName && (
+              <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+                {lead.assignedToName ? 'admin: ' : ''}
+                {lead.adminName}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        )}
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-1.5">
+          <StatusDropdown
+            currentStatus={lead.status || 'Fresh Leads'}
+            leadId={lead.id}
+            onStatusChange={onStatusChange}
+          />
+          <button
+            onClick={() => {
+              const next = nextPipelineStage(lead.status);
+              if (next && next !== lead.status) onStatusChange(lead.id, next);
+            }}
+            disabled={!nextPipelineStage(lead.status)}
+            className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap"
+            title={
+              nextPipelineStage(lead.status)
+                ? `One-click: move to ${nextPipelineStage(lead.status)}`
+                : 'At final pipeline stage'
+            }
+            aria-label="Advance lead status one step"
+          >
+            <Zap size={13} />
+            {nextPipelineStage(lead.status) || 'Done'}
+          </button>
+        </div>
+      </td>
+      <td className="table-td">
+        <span
+          className={`font-mono-data text-sm tabular-nums ${isOverdue(lead.followUpDue) ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}
+        >
+          {formatDate(lead.followUpDue)}
+          {isOverdue(lead.followUpDue) && (
+            <span className="ml-1 text-xs text-red-400">overdue</span>
+          )}
+        </span>
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
+          <button
+            onClick={() => onView?.(lead)}
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+            title="View lead details"
+          >
+            <Eye size={14} />
+          </button>
+          <button
+            onClick={() => onEdit?.(lead)}
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+            title="Edit lead"
+          >
+            <Pencil size={14} />
+          </button>
+          {canDelete && (
+            <button
+              onClick={() => onDeletePrompt(lead.id)}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
+              title="Delete lead"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 export default function LeadsTable({
   leads,
   selectedIds,
@@ -194,27 +401,6 @@ export default function LeadsTable({
       onDelete(deletingId);
       setDeletingId(null);
     }
-  };
-
-  const formatBudget = (min?: number, max?: number) => {
-    if (min == null && max == null) return '—';
-    const parts: string[] = [];
-    if (min != null) parts.push(min.toLocaleString());
-    if (max != null) parts.push(max.toLocaleString());
-    return `${parts.join('–')} ج.م`;
-  };
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '—';
-    const [y, m, d] = dateStr.split('-');
-    return `${m}/${d}/${y?.slice(2)}`;
-  };
-
-  const isOverdue = (dueDate?: string) => {
-    if (!dueDate) return false;
-    const due = new Date(dueDate);
-    const today = new Date();
-    return due < today;
   };
 
   const sortableCol = (label: string, key: keyof Lead) => (
@@ -339,162 +525,17 @@ export default function LeadsTable({
               </tr>
             ) : (
               leads.map((lead) => (
-                <tr
+                <LeadTableRow
                   key={lead.id}
-                  className={`hover:bg-muted/30 transition-colors group ${selectedIds.has(lead.id) ? 'bg-secondary/20' : ''}`}
-                >
-                  <td className="table-td">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(lead.id)}
-                      onChange={(e) => onSelectRow(lead.id, e.target.checked)}
-                      className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
-                      aria-label={`Select ${lead.name || lead.id}`}
-                    />
-                  </td>
-                  <td className="table-td">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {(lead.name || lead.id)
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)}
-                      </div>
-                      <div className="min-w-0">
-                        <a href={`/leads/${lead.id}`} className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block">
-                          {lead.name || `Lead ${lead.id}`}
-                        </a>
-                        <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
-                        <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
-                        <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                          <MapPin size={10} />
-                          {lead.location || '—'}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="table-td">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Phone size={10} className="flex-shrink-0" />
-                        <span className="font-mono-data">{lead.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Mail size={10} className="flex-shrink-0" />
-                        <span className="truncate max-w-[150px]">{lead.email || '—'}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="table-td">
-                    <span className="text-sm text-foreground">{lead.propertyType || '—'}</span>
-                  </td>
-                  <td className="table-td">
-                    <span className="font-mono-data text-sm text-foreground tabular-nums">
-                      {formatBudget(lead.budgetMin, lead.budgetMax)}
-                    </span>
-                  </td>
-                  <td className="table-td">
-                    <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
-                      {lead.source || '—'}
-                    </span>
-                  </td>
-                  <td className="table-td">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-6 h-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {lead.agentInitials || '—'}
-                      </div>
-                      <span className="text-sm text-foreground truncate max-w-[100px]">
-                        {lead.agent?.split(' ')[0] || '—'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="table-td">
-                    {lead.assignedToName || lead.adminName ? (
-                      <div className="flex flex-col gap-0.5">
-                        {lead.assignedToName && (
-                          <div className="flex items-center gap-1.5">
-                            <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
-                            <span className="text-xs text-foreground truncate max-w-[100px]">
-                              {lead.assignedToName}
-                            </span>
-                          </div>
-                        )}
-                        {lead.adminName && (
-                          <span className="text-xs text-muted-foreground truncate max-w-[100px]">
-                            {lead.assignedToName ? 'admin: ' : ''}
-                            {lead.adminName}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="table-td">
-                    <div className="flex items-center gap-1.5">
-                      <StatusDropdown
-                        currentStatus={lead.status || 'Fresh Leads'}
-                        leadId={lead.id}
-                        onStatusChange={onStatusChange}
-                      />
-                      <button
-                        onClick={() => {
-                          const next = nextPipelineStage(lead.status);
-                          if (next && next !== lead.status) onStatusChange(lead.id, next);
-                        }}
-                        disabled={!nextPipelineStage(lead.status)}
-                        className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap"
-                        title={
-                          nextPipelineStage(lead.status)
-                            ? `One-click: move to ${nextPipelineStage(lead.status)}`
-                            : 'At final pipeline stage'
-                        }
-                        aria-label="Advance lead status one step"
-                      >
-                        <Zap size={13} />
-                        {nextPipelineStage(lead.status) || 'Done'}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="table-td">
-                    <span
-                      className={`font-mono-data text-sm tabular-nums ${isOverdue(lead.followUpDue) ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}
-                    >
-                      {formatDate(lead.followUpDue)}
-                      {isOverdue(lead.followUpDue) && (
-                        <span className="ml-1 text-xs text-red-400">overdue</span>
-                      )}
-                    </span>
-                  </td>
-                  <td className="table-td">
-                    <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
-                      <button
-                        onClick={() => onView?.(lead)}
-                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-                        title="View lead details"
-                      >
-                        <Eye size={14} />
-                      </button>
-                      <button
-                        onClick={() => onEdit?.(lead)}
-                        className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-                        title="Edit lead"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      {canDelete && (
-                        <button
-                          onClick={() => setDeletingId(lead.id)}
-                          className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
-                          title="Delete lead"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                  lead={lead}
+                  isSelected={selectedIds.has(lead.id)}
+                  canDelete={canDelete}
+                  onSelectRow={onSelectRow}
+                  onStatusChange={onStatusChange}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDeletePrompt={(id) => setDeletingId(id)}
+                />
               ))
             )}
           </tbody>
@@ -512,9 +553,9 @@ export default function LeadsTable({
               <select
                 value={pageSize}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="input-base min-h-[44px] h-9 text-xs py-0 px-2 w-16"
+                className="input-base min-h-[44px] h-9 text-xs py-0 px-2 w-20"
               >
-                {[10, 25, 50].map((s) => (
+                {[10, 25, 50, 100, 250, 500].map((s) => (
                   <option key={`pagesize-${s}`} value={s}>
                     {s}
                   </option>
