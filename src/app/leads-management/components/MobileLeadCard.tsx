@@ -89,7 +89,7 @@ const QUICK_CHIPS: {
   { key: 'follow', label: 'Follow-up', icon: <CalendarClock size={14} />, outcome: 'WhatsApp Follow-up' },
 ];
 
-export default function MobileLeadCard({
+function MobileLeadCardInner({
   lead,
   selected,
   onSelect,
@@ -452,3 +452,12 @@ export default function MobileLeadCard({
     </div>
   );
 }
+
+const MobileLeadCard = React.memo(MobileLeadCardInner, (prev, next) => {
+  return (
+    prev.lead === next.lead &&
+    prev.selected === next.selected
+  );
+});
+
+export default MobileLeadCard;

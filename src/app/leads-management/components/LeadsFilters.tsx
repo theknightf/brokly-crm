@@ -20,6 +20,22 @@ interface LeadsFiltersProps {
 }
 
 export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
+  const [localSearch, setLocalSearch] = useState(filters.search);
+
+  // Sync incoming search prop (e.g. from URL or clear)
+  useEffect(() => {
+    setLocalSearch(filters.search);
+  }, [filters.search]);
+
+  // Debounce search update to parent (300ms)
+  useEffect(() => {
+    if (localSearch === filters.search) return;
+    const timer = setTimeout(() => {
+      onChange({ ...filters, search: localSearch });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch, filters, onChange]);
+
   const update = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
     onChange({ ...filters, [key]: value });
 
@@ -88,8 +104,8 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
         <input
           type="search"
           placeholder="Search by name, email, phone, city…"
-          value={filters.search}
-          onChange={(e) => update('search', e.target.value)}
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
           className="input-base pl-8 h-9 text-sm"
         />
       </div>

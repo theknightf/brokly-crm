@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/lib/supabase/client';
+import dynamic from 'next/dynamic';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
 import LeadBoard from './LeadBoard';
@@ -42,7 +43,6 @@ import LeadsFilters from './LeadsFilters';
 import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
-import ImportLeadsModal from './ImportLeadsModal';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction } from './mockLeads';
 import {
@@ -61,10 +61,12 @@ import { isAdminRole } from '@/lib/roles';
 import LeadCommentsSection from './LeadCommentsSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
 import LeadTimeline from './LeadTimeline';
-import DealStatusModal from './DealStatusModal';
-import QuickPaymentPlanModal from './QuickPaymentPlanModal';
-import LogCallModal from './LogCallModal';
 import PostCallOutcomeModal from './PostCallOutcomeModal';
+
+const ImportLeadsModal = dynamic(() => import('./ImportLeadsModal'), { ssr: false });
+const DealStatusModal = dynamic(() => import('./DealStatusModal'), { ssr: false });
+const QuickPaymentPlanModal = dynamic(() => import('./QuickPaymentPlanModal'), { ssr: false });
+const LogCallModal = dynamic(() => import('./LogCallModal'), { ssr: false });
 
 export interface FilterState {
   search: string;
@@ -482,14 +484,17 @@ export default function LeadsManagementScreen({
 
   const totalPages = Math.ceil(total / pageSize);
 
-  const handleSort = (key: keyof Lead) => {
-    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortKey(key);
+  const handleSort = useCallback((key: keyof Lead) => {
+    setSortKey((prevKey) => {
+      if (prevKey === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return key;
+      }
       setSortDir('asc');
-    }
+      return key;
+    });
     setCurrentPage(1);
-  };
+  }, []);
 
   const handleStatusChange = async (id: string, newStatus: LeadStatus) => {
     if (statusPendingRef.current.has(id)) return;
@@ -1055,19 +1060,19 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleSelectAll = (checked: boolean) => {
+  const handleSelectAll = useCallback((checked: boolean) => {
     if (checked) setSelectedIds(new Set(leads.map((l) => l.id)));
     else setSelectedIds(new Set());
-  };
+  }, [leads]);
 
-  const handleSelectRow = (id: string, checked: boolean) => {
+  const handleSelectRow = useCallback((id: string, checked: boolean) => {
     setSelectedIds((prev) => {
       const n = new Set(prev);
       if (checked) n.add(id);
       else n.delete(id);
       return n;
     });
-  };
+  }, []);
 
   const clearFilters = () => {
     setFilters({

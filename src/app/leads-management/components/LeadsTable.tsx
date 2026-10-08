@@ -367,6 +367,12 @@ const LeadTableRow = React.memo(function LeadTableRow({
       </td>
     </tr>
   );
+}, (prev, next) => {
+  return (
+    prev.lead === next.lead &&
+    prev.isSelected === next.isSelected &&
+    prev.canDelete === next.canDelete
+  );
 });
 
 export default function LeadsTable({
