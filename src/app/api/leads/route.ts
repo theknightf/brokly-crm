@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,6 +126,33 @@ export async function GET(request: Request) {
   const pageSize = Math.min(100, Math.max(5, Number(url.searchParams.get('pageSize') || 25)));
 
   let query: any = supabase.from('leads').select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)', { count: 'exact' });
+
+  // Privacy isolation: only team leaders and admins can see other members' leads
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    const role = (profile as any)?.role;
+    if (!isAdminRole(role)) {
+      if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
+        const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
+        const teamIds = (teams || []).map((t: any) => t.id);
+        let memberIds = [user.id];
+        if (teamIds.length > 0) {
+          const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
+          if (members && members.length > 0) {
+            memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+          }
+        }
+        query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
+      } else {
+        // Regular Agent: only leads assigned to or created by current user
+        query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+      }
+    }
+  } catch {}
 
   if (search) {
     const q = search.trim();

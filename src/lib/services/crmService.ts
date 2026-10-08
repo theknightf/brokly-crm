@@ -946,6 +946,39 @@ export const leadsService = {
           count: 'exact',
         });
 
+      // Role-based privacy isolation: only team leaders and admins can see other members' leads
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          const role = profile?.role;
+          if (!isAdminRole(role)) {
+            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
+              // Team Leader: fetch members of teams led by this user
+              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
+              const teamIds = (teams || []).map((t: any) => t.id);
+              let memberIds = [user.id];
+              if (teamIds.length > 0) {
+                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
+                if (members && members.length > 0) {
+                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+                }
+              }
+              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
+            } else {
+              // Regular Agent: only leads assigned to or created by current user
+              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+            }
+          }
+        }
+      } catch {
+        // Fall back to DB RLS
+      }
+
       // Action filter: restrict to leads touched by a specific activity-log
       // action (e.g. "Lead Assigned"). Respects activity_log RLS which keeps
       // agents on their own actions and admins on everything.
