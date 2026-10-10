@@ -103,17 +103,18 @@ function StageSelector({
         </span>
         <ChevronDown size={12} className="text-muted-foreground flex-shrink-0" />
       </button>
-      <ViewportPopover
-        open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={anchorRef}
-        minWidth={250}
-        preferredMaxHeight={380}
-        zIndex={100}
-        role="listbox"
-        aria-label="Select stage"
-        className="stage-dropdown-panel"
-      >
+      {open && (
+        <ViewportPopover
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={anchorRef}
+          minWidth={250}
+          preferredMaxHeight={380}
+          zIndex={100}
+          role="listbox"
+          aria-label="Select stage"
+          className="stage-dropdown-panel"
+        >
         <div className="py-1">
           <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Pipeline
@@ -155,7 +156,8 @@ function StageSelector({
             </button>
           ))}
         </div>
-      </ViewportPopover>
+        </ViewportPopover>
+      )}
     </>
   );
 }
@@ -435,6 +437,47 @@ export default function LeadsTable({
     return pages;
   };
 
+  const [renderLimit, setRenderLimit] = useState(50);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // Reset render window whenever page or dataset changes
+  useEffect(() => {
+    setRenderLimit(50);
+  }, [leads, currentPage]);
+
+  // Sentinel ref for infinite-window loading as user scrolls
+  const sentinelCallback = useCallback((node: HTMLElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    if (!node) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setRenderLimit(leads.length);
+      return;
+    }
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setRenderLimit((prev) => Math.min(prev + 50, leads.length));
+        }
+      },
+      { rootMargin: '600px' }
+    );
+    observerRef.current.observe(node);
+  }, [leads.length]);
+
+  const visibleLeads = leads.slice(0, renderLimit);
+
+  // Stable callbacks to avoid breaking React.memo on 500 rows
+  const handleDeletePrompt = useCallback((id: string) => {
+    setDeletingId(id);
+  }, []);
+
+  const emptyFn = useCallback(() => {}, []);
+  const safeOnView = onView ?? emptyFn;
+  const safeOnEdit = onEdit ?? emptyFn;
+
   return (
     <>
       {deletingId && (
@@ -473,21 +516,30 @@ export default function LeadsTable({
             description="No leads match your current filters. Try adjusting your search criteria or add a new lead."
           />
         ) : (
-          leads.map((lead) => (
+          visibleLeads.map((lead) => (
             <MobileLeadCard
               key={lead.id}
               lead={lead}
               selected={selectedIds.has(lead.id)}
               onSelect={onSelectRow}
-              onView={onView ?? (() => {})}
-              onEdit={onEdit ?? (() => {})}
-              onDelete={(id) => setDeletingId(id)}
+              onView={safeOnView}
+              onEdit={safeOnEdit}
+              onDelete={handleDeletePrompt}
               onStatusChange={onStatusChange}
               onOpenLogCall={onOpenLogCall}
               onAddNote={onAddNote}
               onPostCall={onPostCall}
             />
           ))
+        )}
+        {visibleLeads.length < leads.length && (
+          <div
+            ref={sentinelCallback}
+            className="py-3 text-center text-xs text-muted-foreground flex items-center justify-center gap-2"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+            Showing {visibleLeads.length} of {leads.length} leads...
+          </div>
         )}
       </div>
 
@@ -530,7 +582,7 @@ export default function LeadsTable({
                 </td>
               </tr>
             ) : (
-              leads.map((lead) => (
+              visibleLeads.map((lead) => (
                 <LeadTableRow
                   key={lead.id}
                   lead={lead}
@@ -538,11 +590,21 @@ export default function LeadsTable({
                   canDelete={canDelete}
                   onSelectRow={onSelectRow}
                   onStatusChange={onStatusChange}
-                  onView={onView}
-                  onEdit={onEdit}
-                  onDeletePrompt={(id) => setDeletingId(id)}
+                  onView={safeOnView}
+                  onEdit={safeOnEdit}
+                  onDeletePrompt={handleDeletePrompt}
                 />
               ))
+            )}
+            {visibleLeads.length < leads.length && (
+              <tr ref={sentinelCallback}>
+                <td colSpan={12} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                    Showing {visibleLeads.length} of {leads.length} leads — scroll for more
+                  </span>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

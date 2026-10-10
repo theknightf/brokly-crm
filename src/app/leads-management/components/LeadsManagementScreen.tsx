@@ -342,6 +342,10 @@ export default function LeadsManagementScreen({
   // removed from the local list and excluded from the next fetchLeads() result
   // so the sales agent's queue is instantly refreshed without a page reload.
   const recentlyCalledRef = useRef<Set<string>>(new Set());
+  const leadsRef = useRef(leads);
+  leadsRef.current = leads;
+  const viewLeadRef = useRef(viewLead);
+  viewLeadRef.current = viewLead;
 
   // Lock body scroll when View Lead drawer is open (Add Lead modal handled by Modal portal)
   useEffect(() => {
@@ -496,13 +500,13 @@ export default function LeadsManagementScreen({
     setCurrentPage(1);
   }, []);
 
-  const handleStatusChange = async (id: string, newStatus: LeadStatus) => {
+  const handleStatusChange = useCallback(async (id: string, newStatus: LeadStatus) => {
     if (statusPendingRef.current.has(id)) return;
     statusPendingRef.current.add(id);
     // Snapshot the previous status so we can roll the UI back if the server
     // rejects the change (prevents the preview from lying about the stage).
-    const prevLeads = leads;
-    const prevView = viewLead;
+    const prevLeads = leadsRef.current;
+    const prevView = viewLeadRef.current;
     try {
       setLeads((prev) =>
         prev.map((l) =>
@@ -574,7 +578,7 @@ export default function LeadsManagementScreen({
     } finally {
       statusPendingRef.current.delete(id);
     }
-  };
+  }, [user?.id]);
 
   const handleScheduleFollowUp = async () => {
     if (!viewLead) return;
@@ -670,7 +674,7 @@ export default function LeadsManagementScreen({
     setTimeout(() => handleScheduleFollowUp(), 0);
   };
 
-  const handleDeleteLead = async (id: string) => {
+  const handleDeleteLead = useCallback(async (id: string) => {
     if (!isAdminRole(user?.role)) {
       toast.error('Only owner and admin can delete leads.');
       return;
@@ -688,7 +692,36 @@ export default function LeadsManagementScreen({
     } catch (err: any) {
       toast.error(err?.message || 'Failed to delete lead');
     }
-  };
+  }, [user?.role]);
+
+  const handleViewLead = useCallback((lead: Lead) => {
+    setViewLead(lead);
+    setViewTab('overview');
+  }, []);
+
+  const handleEditLead = useCallback((lead: Lead) => {
+    setEditLead(lead);
+  }, []);
+
+  const handleOpenLogCall = useCallback((lead: Lead) => {
+    setLogCallLead(lead);
+  }, []);
+
+  const handleAddNote = useCallback((lead: Lead) => {
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === lead.id ? { ...l, actionTakenToday: true, contactedToday: true } : l
+      )
+    );
+    setViewLead((prev) =>
+      prev?.id === lead.id ? { ...prev, actionTakenToday: true, contactedToday: true } : prev
+    );
+  }, []);
+
+  const handlePageSizeChange = useCallback((s: number) => {
+    setPageSize(s);
+    setCurrentPage(1);
+  }, []);
 
   /**
    * Called by LogCallModal after the backend confirms a successful save.
@@ -1399,31 +1432,16 @@ export default function LeadsManagementScreen({
             onSelectRow={handleSelectRow}
             onStatusChange={handleStatusChange}
             onDelete={handleDeleteLead}
-            onView={(lead) => {
-              setViewLead(lead);
-              setViewTab('overview');
-            }}
-            onEdit={(lead) => setEditLead(lead)}
+            onView={handleViewLead}
+            onEdit={handleEditLead}
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={pageSize}
             totalCount={total}
             onPageChange={setCurrentPage}
-            onPageSizeChange={(s) => {
-              setPageSize(s);
-              setCurrentPage(1);
-            }}
-            onOpenLogCall={(lead) => setLogCallLead(lead)}
-            onAddNote={(lead) => {
-              setLeads((prev) =>
-                prev.map((l) =>
-                  l.id === lead.id ? { ...l, actionTakenToday: true, contactedToday: true } : l
-                )
-              );
-              setViewLead((prev) =>
-                prev?.id === lead.id ? { ...prev, actionTakenToday: true, contactedToday: true } : prev
-              );
-            }}
+            onPageSizeChange={handlePageSizeChange}
+            onOpenLogCall={handleOpenLogCall}
+            onAddNote={handleAddNote}
             onPostCall={handlePostCallTrigger}
           />
         )}

@@ -27,7 +27,7 @@ const formatBudget = (min?: number, max?: number) => {
   return `₹${parts.join('–')}`;
 };
 
-function BoardCard({
+const BoardCard = React.memo(function BoardCard({
   lead,
   onView,
   onEdit,
@@ -172,7 +172,7 @@ function BoardCard({
       </div>
     </div>
   );
-}
+}, (prev, next) => prev.lead === next.lead && prev.canDelete === next.canDelete);
 
 export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDelete, isAdmin = false, onPostCall }: LeadBoardProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);

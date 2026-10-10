@@ -261,59 +261,61 @@ function MobileLeadCardInner({
           <span className="truncate max-w-[220px]">{lead.status || 'Fresh Leads'}</span>
           <ChevronDown size={13} className="flex-shrink-0" />
         </button>
-        <ViewportPopover
-          open={statusOpen}
-          onClose={() => setStatusOpen(false)}
-          anchorRef={stageAnchorRef}
-          minWidth={260}
-          preferredMaxHeight={400}
-          zIndex={100}
-          role="listbox"
-          aria-label="Select stage"
-          className="stage-dropdown-panel"
-        >
-          <div className="py-1">
-            <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Pipeline Stages
-            </p>
-            {PIPELINE_STAGES.map((s) => (
-              <button
-                key={`mob-pipe-${lead.id}-${s}`}
-                role="option"
-                aria-selected={s === lead.status}
-                onClick={() => {
-                  onStatusChange(lead.id, s as LeadStatus);
-                  setStatusOpen(false);
-                }}
-                className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
-                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
-                }`}
-              >
-                <StatusBadge status={s} showDot />
-              </button>
-            ))}
-            <div className="my-1 border-t border-border/60" />
-            <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Outcome Stages
-            </p>
-            {OUTCOME_STAGES.map((s) => (
-              <button
-                key={`mob-out-${lead.id}-${s}`}
-                role="option"
-                aria-selected={s === lead.status}
-                onClick={() => {
-                  onStatusChange(lead.id, s as LeadStatus);
-                  setStatusOpen(false);
-                }}
-                className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
-                  s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
-                }`}
-              >
-                <StatusBadge status={s} showDot />
-              </button>
-            ))}
-          </div>
-        </ViewportPopover>
+        {statusOpen && (
+          <ViewportPopover
+            open={statusOpen}
+            onClose={() => setStatusOpen(false)}
+            anchorRef={stageAnchorRef}
+            minWidth={260}
+            preferredMaxHeight={400}
+            zIndex={100}
+            role="listbox"
+            aria-label="Select stage"
+            className="stage-dropdown-panel"
+          >
+            <div className="py-1">
+              <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Pipeline Stages
+              </p>
+              {PIPELINE_STAGES.map((s) => (
+                <button
+                  key={`mob-pipe-${lead.id}-${s}`}
+                  role="option"
+                  aria-selected={s === lead.status}
+                  onClick={() => {
+                    onStatusChange(lead.id, s as LeadStatus);
+                    setStatusOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
+                    s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
+                  }`}
+                >
+                  <StatusBadge status={s} showDot />
+                </button>
+              ))}
+              <div className="my-1 border-t border-border/60" />
+              <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Outcome Stages
+              </p>
+              {OUTCOME_STAGES.map((s) => (
+                <button
+                  key={`mob-out-${lead.id}-${s}`}
+                  role="option"
+                  aria-selected={s === lead.status}
+                  onClick={() => {
+                    onStatusChange(lead.id, s as LeadStatus);
+                    setStatusOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
+                    s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
+                  }`}
+                >
+                  <StatusBadge status={s} showDot />
+                </button>
+              ))}
+            </div>
+          </ViewportPopover>
+        )}
 
         {/* Status badge — darker green pill with lightning */}
         <span
