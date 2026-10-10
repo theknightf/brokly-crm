@@ -39,7 +39,12 @@ jobs:
           cd mobile_flutter
           chmod +x android/gradlew
           flutter doctor -v
-          flutter build apk --debug
+          flutter build apk --debug || {
+            echo "Direct flutter build apk failed, attempting gradlew assembleDebug..."
+            cd android
+            ./gradlew assembleDebug --stacktrace
+            cd ..
+          }
           cd ..
           mkdir -p final_apk
           find build -name "*.apk" -exec cp -v {} final_apk/app-debug.apk \; || true
