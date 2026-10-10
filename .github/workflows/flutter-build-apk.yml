@@ -37,24 +37,16 @@ jobs:
       - name: Build Flutter APK
         run: |
           cd mobile_flutter
+          flutter pub get
           chmod +x android/gradlew
-          flutter doctor -v
-          flutter build apk --debug || {
-            echo "Direct flutter build apk failed, attempting gradlew assembleDebug..."
-            cd android
-            ./gradlew assembleDebug --stacktrace
-            cd ..
-          }
+          cd android
+          ./gradlew assembleDebug --no-daemon
           cd ..
-          mkdir -p final_apk
-          find build -name "*.apk" -exec cp -v {} final_apk/app-debug.apk \; || true
-          find mobile_flutter -name "*.apk" -exec cp -v {} final_apk/app-debug.apk \; || true
-          ls -lh final_apk/
 
       - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
         with:
           name: brokly-flutter-app-apk
-          path: final_apk/app-debug.apk
+          path: mobile_flutter/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
