@@ -1221,9 +1221,22 @@ export const leadsService = {
       if (!hasCalledFilter && (data || []).length) {
         try {
           const ids = (data || []).map((r: any) => r.id);
-          const { data: pageCalls } = await supabase.from('call_logs').select('entity_id').in('entity_id', ids).eq('entity_type', 'lead');
-          const s = new Set(((pageCalls || []).map((r: any) => r.entity_id) as string[]).filter(Boolean));
-          pageCalledSet = s;
+          const chunks: string[][] = [];
+          for (let i = 0; i < ids.length; i += 100) {
+            chunks.push(ids.slice(i, i + 100));
+          }
+          const chunkResults = await Promise.all(
+            chunks.map((chunk) =>
+              supabase.from('call_logs').select('entity_id').in('entity_id', chunk).eq('entity_type', 'lead')
+            )
+          );
+          const found = new Set<string>();
+          chunkResults.forEach((res) => {
+            (res.data || []).forEach((r: any) => {
+              if (r.entity_id) found.add(r.entity_id);
+            });
+          });
+          pageCalledSet = found;
         } catch {
           pageCalledSet = new Set<string>();
         }

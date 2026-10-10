@@ -438,34 +438,32 @@ export default function LeadsTable({
   };
 
   const [renderLimit, setRenderLimit] = useState(50);
-  const observerRef = useRef<IntersectionObserver | null>(null);
 
   // Reset render window whenever page or dataset changes
   useEffect(() => {
     setRenderLimit(50);
   }, [leads, currentPage]);
 
-  // Sentinel ref for infinite-window loading as user scrolls
-  const sentinelCallback = useCallback((node: HTMLElement | null) => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
-    if (!node) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      setRenderLimit(leads.length);
-      return;
-    }
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
+  // Window-scroll progressive expansion (smooth 60fps windowing without recursive observer loops)
+  useEffect(() => {
+    if (renderLimit >= leads.length) return;
+    let ticking = false;
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        const viewportHeight = window.innerHeight;
+        const fullHeight = document.documentElement.scrollHeight;
+        if (fullHeight - (scrollY + viewportHeight) < 700) {
           setRenderLimit((prev) => Math.min(prev + 50, leads.length));
         }
-      },
-      { rootMargin: '600px' }
-    );
-    observerRef.current.observe(node);
-  }, [leads.length]);
+      });
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [renderLimit, leads.length]);
 
   const visibleLeads = leads.slice(0, renderLimit);
 
@@ -533,12 +531,18 @@ export default function LeadsTable({
           ))
         )}
         {visibleLeads.length < leads.length && (
-          <div
-            ref={sentinelCallback}
-            className="py-3 text-center text-xs text-muted-foreground flex items-center justify-center gap-2"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-            Showing {visibleLeads.length} of {leads.length} leads...
+          <div className="py-3 text-center flex flex-col items-center justify-center gap-2">
+            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+              Showing {visibleLeads.length} of {leads.length} leads
+            </span>
+            <button
+              type="button"
+              onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
+              className="text-xs text-primary font-medium hover:underline py-1 px-3 rounded-lg border border-primary/20 bg-primary/5 active:scale-95 transition-all"
+            >
+              Load more leads (+50)
+            </button>
           </div>
         )}
       </div>
@@ -597,12 +601,21 @@ export default function LeadsTable({
               ))
             )}
             {visibleLeads.length < leads.length && (
-              <tr ref={sentinelCallback}>
+              <tr>
                 <td colSpan={12} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                    Showing {visibleLeads.length} of {leads.length} leads — scroll for more
-                  </span>
+                  <div className="inline-flex items-center gap-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                      Showing {visibleLeads.length} of {leads.length} leads — scroll or click to load more
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
+                      className="text-xs text-primary font-medium hover:underline py-0.5 px-2.5 rounded-md border border-primary/20 bg-primary/5 active:scale-95 transition-all"
+                    >
+                      Load more (+50)
+                    </button>
+                  </div>
                 </td>
               </tr>
             )}
