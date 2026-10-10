@@ -39,25 +39,17 @@ jobs:
           cd mobile_flutter
           chmod +x android/gradlew
           flutter doctor -v
-          flutter build apk --debug 2>&1 | tee build_output.log || {
-            echo "## Build Failure Log" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            tail -n 150 build_output.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            exit 1
-          }
-
-      - name: Stage APK for Upload
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/apk_dist
-          find $GITHUB_WORKSPACE -name "*.apk" -type f
-          find $GITHUB_WORKSPACE -name "*.apk" -type f -exec cp -v {} $GITHUB_WORKSPACE/apk_dist/app-debug.apk \;
-          ls -lh $GITHUB_WORKSPACE/apk_dist/
+          flutter build apk --debug
+          cd ..
+          mkdir -p final_apk
+          find build -name "*.apk" -exec cp -v {} final_apk/app-debug.apk \; || true
+          find mobile_flutter -name "*.apk" -exec cp -v {} final_apk/app-debug.apk \; || true
+          ls -lh final_apk/
 
       - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
         with:
           name: brokly-flutter-app-apk
-          path: apk_dist/app-debug.apk
+          path: final_apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
