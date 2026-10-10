@@ -50,13 +50,13 @@ jobs:
       - name: Stage APK for Upload
         run: |
           mkdir -p apk_output
-          find . -name "*.apk" -exec cp {} apk_output/ \;
-          ls -la apk_output/
+          find . -name "*.apk" -exec cp -v {} apk_output/app-debug.apk \;
+          ls -lh apk_output/
 
       - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
         with:
           name: brokly-flutter-app-apk
-          path: apk_output/
+          path: apk_output/app-debug.apk
           if-no-files-found: error
           retention-days: 14
