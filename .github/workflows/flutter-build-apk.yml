@@ -37,7 +37,8 @@ jobs:
       - name: Build Flutter APK
         run: |
           cd mobile_flutter
-          flutter build apk --debug --verbose
+          chmod +x android/gradlew
+          flutter build apk --debug
 
       - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
