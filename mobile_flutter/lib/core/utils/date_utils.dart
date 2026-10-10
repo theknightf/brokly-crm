@@ -64,6 +64,20 @@ class AppDateUtils {
     return dt.isBefore(DateTime.now());
   }
 
+  /// Check if a date string/DateTime is due today
+  static bool isDueToday(dynamic date) {
+    if (date == null) return false;
+    DateTime? dt;
+    if (date is DateTime) {
+      dt = date;
+    } else if (date is String) {
+      dt = DateTime.tryParse(date);
+    }
+    if (dt == null) return false;
+    final now = DateTime.now();
+    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  }
+
   /// Returns today's date formatted as YYYY-MM-DD
   static String todayDateString() {
     final now = DateTime.now();

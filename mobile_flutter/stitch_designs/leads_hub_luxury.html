@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Brokly CRM - Leads Hub &amp; Management</title>
+<!-- Tailwind CSS CDN with Forms & Container Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Plus Jakarta Sans for UI & Fraunces for premium numbers/branding -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- FontAwesome Icons for crisp Native UI buttons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              lime: '#a3e635',       // Primary vibrant tactile lime
+              darklime: '#65a30d',   // Deep lime for active states
+              charcoal: '#0d0f12',   // Primary canvas dark
+              card: '#161920',       // Tactile Card surface
+              surface: '#1e222b',    // Interactive surface
+              border: '#282d38',     // Subtle border
+              whatsapp: '#25D366',   // Direct WhatsApp brand green
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            serif: ['Fraunces', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-scrollbars-and-touch">
+    /* Native App feel and hidden scrollbars */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    * {
+      -webkit-tap-highlight-color: transparent;
+      scrollbar-width: none;
+    }
+    body {
+      background-color: #0b0d10;
+      user-select: none;
+    }
+  </style>
+<style data-purpose="glow-and-tactile-effects">
+    .glow-lime {
+      box-shadow: 0 0 16px -2px rgba(163, 230, 53, 0.35);
+    }
+    .glow-card {
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+    }
+    .pulse-dot {
+      animation: pulseAnimation 2s infinite ease-in-out;
+    }
+    @keyframes pulseAnimation {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.6; }
+    }
+  </style>
+</head>
+<body class="bg-brand-charcoal text-slate-100 font-sans antialiased min-h-screen flex justify-center selection:bg-brand-lime selection:text-black">
+<!-- Mobile Screen Shell (iOS Frame Max Width) -->
+<div class="w-full max-w-[440px] bg-brand-charcoal min-h-screen flex flex-col relative pb-28 border-x border-slate-800/40 shadow-2xl">
+<!-- BEGIN: TopBar -->
+<header class="sticky top-0 z-40 bg-brand-charcoal/90 backdrop-blur-md border-b border-brand-border/60 px-4 pt-4 pb-3" data-purpose="header-navigation"><div class="flex items-center justify-between gap-2">
+<div class="flex items-center gap-2.5">
+<div class="relative flex items-center justify-center">
+<img alt="Brokly Logo" class="w-9 h-9 rounded-xl object-cover border border-brand-lime/40 shadow-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8e-UpSSvwbLf7JbfQWVyQR3kWKvnF6lHRfzwKUJJ55Dvd03rkPUPCSoY1i7pGhoK-GAkfICLUEsE4OrFZAj0xRoyvyVp1OVcu70hORsPk4dF-zNPq1MDNRfZIgWT7za6S-k975VXx8aqBNRQktEP2ooKVmbiKQayOHK5uMney-jCUebI3xNXByZA3-GnzDAROFHx3aia3DAoICAOF5qVXQHnlfF06TVkmzyfIoWFP7-sRIlh9tALjFM-P8vZYM13sw8w"/>
+<span class="pulse-dot absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-brand-lime border-2 border-brand-charcoal"></span>
+</div>
+<div class="leading-none">
+<div class="flex items-center gap-1.5">
+<span class="font-serif font-extrabold text-[17px] tracking-widest text-white">BROKLY</span>
+<span class="px-1.5 py-0.2 rounded bg-brand-lime/10 border border-brand-lime/30 text-[9px] font-mono font-bold text-brand-lime tracking-wide">PRO</span>
+</div>
+<span class="text-[9px] block font-semibold text-slate-400 tracking-widest uppercase mt-0.5">Private Client Suite</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button aria-label="Add new lead" class="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-lime to-brand-darklime text-slate-950 flex items-center justify-center font-bold text-xs shadow-md active:scale-95 transition-all glow-lime" type="button">
+<i class="fa-solid fa-plus text-xs"></i>
+</button>
+<button class="w-8 h-8 rounded-xl bg-brand-surface/70 border border-brand-border text-slate-300 flex items-center justify-center text-xs relative active:scale-95 hover:text-white" type="button">
+<i class="fa-regular fa-bell"></i>
+<span class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-brand-lime rounded-full glow-lime"></span>
+</button>
+<div class="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-800 to-brand-card p-[1px] border border-brand-lime/50 shadow-inner flex items-center justify-center">
+<div class="w-full h-full rounded-[7px] bg-brand-surface flex items-center justify-center font-bold text-xs text-brand-lime">
+        AK
+      </div>
+</div>
+</div>
+</div></header>
+<!-- END: TopBar -->
+<!-- BEGIN: LeadsHeaderSummary -->
+<section class="px-4 pt-4 pb-2" data-purpose="leads-summary">
+<div class="flex items-end justify-between">
+<div>
+<div class="flex items-center gap-1.5 text-xs text-slate-400 font-medium mb-0.5">
+<i class="fa-solid fa-arrow-left text-[10px] text-slate-500"></i>
+<span>Workspace</span>
+<span class="text-slate-600">/</span>
+<span class="text-slate-200">Active Pipeline</span>
+</div>
+<h1 class="text-2xl font-bold tracking-tight text-white font-serif flex items-center gap-2">
+            Leads Hub
+            <span class="text-xs font-sans px-2 py-0.5 bg-brand-lime/10 text-brand-lime border border-brand-lime/30 rounded-full font-semibold">239 Total</span>
+</h1>
+</div>
+<!-- View Controls & Bulk Action triggers -->
+<div class="flex items-center gap-1.5">
+<button class="p-2 rounded-lg bg-brand-surface border border-brand-border text-slate-300 hover:text-white text-xs">
+<i class="fa-solid fa-file-export"></i>
+</button>
+<button class="p-2 rounded-lg bg-brand-surface border border-brand-border text-slate-300 hover:text-white text-xs">
+<i class="fa-solid fa-cloud-arrow-up"></i>
+</button>
+<div class="flex p-0.5 bg-brand-surface rounded-lg border border-brand-border">
+<button class="p-1.5 rounded-md bg-brand-lime text-slate-950 text-xs shadow-sm">
+<i class="fa-solid fa-list-ul"></i>
+</button>
+<button class="p-1.5 rounded-md text-slate-400 hover:text-white text-xs">
+<i class="fa-solid fa-grip-vertical"></i>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- END: LeadsHeaderSummary -->
+<!-- BEGIN: SearchAndFilters -->
+<section class="px-4 py-2 space-y-3" data-purpose="search-and-filters">
+<!-- Search Input Field -->
+<div class="relative">
+<i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+<input class="w-full bg-brand-surface border border-brand-border rounded-xl pl-9 pr-10 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-brand-lime focus:ring-1 focus:ring-brand-lime transition-all" placeholder="Search name, phone, project, unit..." type="text"/>
+<button class="absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-1 bg-brand-charcoal text-slate-400 border border-brand-border rounded-md text-[10px] hover:text-brand-lime flex items-center gap-1">
+<i class="fa-solid fa-sliders text-[9px]"></i>
+<span>Filter</span>
+</button>
+</div>
+<!-- Quick Filter Pills: Horizontal Scroll -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5" data-purpose="status-pills">
+<button class="px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap bg-brand-lime text-slate-950 shadow-sm flex items-center gap-1.5 transition-transform active:scale-95">
+<span>All Leads</span>
+<span class="px-1.5 py-0.2 bg-black/20 rounded-full text-[10px]">239</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-brand-surface border border-brand-border text-slate-300 hover:text-white flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+<span>Action Today</span>
+<span class="text-[10px] text-slate-400">(14)</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-brand-surface border border-brand-border text-slate-300 hover:text-white flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+<span>Called</span>
+<span class="text-[10px] text-slate-400">(41)</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-brand-surface border border-brand-border text-slate-300 hover:text-white flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+<span>Not Called</span>
+<span class="text-[10px] text-slate-400">(28)</span>
+</button>
+</div>
+<!-- Compact Criteria Dropdown Chips -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+<div class="relative">
+<button class="px-2.5 py-1 bg-brand-surface border border-brand-border/80 rounded-lg text-[11px] text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
+<span class="text-slate-400">Project:</span>
+<span class="font-medium text-white">All Projects</span>
+<i class="fa-solid fa-chevron-down text-[8px] text-slate-400"></i>
+</button>
+</div>
+<div class="relative">
+<button class="px-2.5 py-1 bg-brand-surface border border-brand-border/80 rounded-lg text-[11px] text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
+<span class="text-slate-400">Agent:</span>
+<span class="font-medium text-white">All Agents</span>
+<i class="fa-solid fa-chevron-down text-[8px] text-slate-400"></i>
+</button>
+</div>
+<div class="relative">
+<button class="px-2.5 py-1 bg-brand-surface border border-brand-border/80 rounded-lg text-[11px] text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
+<span class="text-slate-400">Type:</span>
+<span class="font-medium text-white">Villa &amp; Penthouse</span>
+<i class="fa-solid fa-chevron-down text-[8px] text-slate-400"></i>
+</button>
+</div>
+</div>
+</section>
+<!-- END: SearchAndFilters -->
+<!-- BEGIN: LeadsFeed -->
+<main class="px-4 py-3 space-y-3.5 flex-1" data-purpose="leads-card-container"><!-- LEAD CARD 1: Omar Al-Sayed (High Priority) -->
+<article class="bg-brand-card border border-brand-border/80 rounded-2xl p-4 shadow-2xl glow-card relative overflow-hidden transition-all duration-150 active:border-brand-lime/60">
+<!-- Ambient Linear Accent Border Top -->
+<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-lime via-brand-darklime to-transparent"></div>
+<!-- Top Identity Header -->
+<div class="flex items-start justify-between gap-2 pt-1 mb-3">
+<div class="flex items-start gap-3">
+<div class="relative">
+<div class="w-11 h-11 rounded-xl bg-slate-800/90 border border-brand-border flex items-center justify-center text-brand-lime shadow-inner">
+<i class="fa-solid fa-user-tie text-base"></i>
+</div>
+<span class="pulse-dot absolute -top-1 -right-1 w-3 h-3 rounded-full bg-brand-lime border-2 border-brand-card"></span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="text-sm font-bold text-white tracking-tight">Omar Al-Sayed</h2>
+<span class="px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-semibold text-emerald-400">Verified Lead</span>
+<span class="px-1.5 py-0.2 rounded-full bg-amber-400/10 border border-amber-400/30 text-[9px] font-bold text-amber-400 uppercase tracking-wider">High Net</span>
+</div>
+<p class="text-xs text-slate-300 font-medium flex items-center gap-1.5 mt-1">
+<i class="fa-solid fa-city text-[10px] text-brand-lime"></i>
+<span>Downtown Sky Villa (3 Bed Duplex)</span>
+</p>
+<div class="flex items-center gap-2 mt-1.5 text-[11px]">
+<span class="font-serif font-bold text-brand-lime text-[13px] tracking-wide">4,200,000 EGP</span>
+<span class="text-slate-600">•</span>
+<span class="text-amber-400 flex items-center gap-1 font-semibold text-[10px]">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Action Today
+          </span>
+</div>
+</div>
+</div>
+<!-- Quick Actions -->
+<div class="flex items-center gap-1 text-slate-400">
+<button class="w-7 h-7 rounded-lg hover:bg-brand-surface flex items-center justify-center hover:text-white transition-colors" title="Edit Lead">
+<i class="fa-regular fa-pen-to-square text-xs"></i>
+</button>
+<button class="w-7 h-7 rounded-lg hover:bg-brand-surface flex items-center justify-center hover:text-rose-400 transition-colors" title="Archive">
+<i class="fa-regular fa-trash-can text-xs"></i>
+</button>
+</div>
+</div>
+<!-- Middle Tags: Attribution & Marketing Source -->
+<div class="flex flex-wrap items-center gap-1.5 mb-3.5 text-[10px]">
+<span class="px-2 py-0.5 rounded-md bg-emerald-950/70 border border-emerald-800/80 text-emerald-300 font-medium flex items-center gap-1">
+<i class="fa-solid fa-arrows-rotate text-[9px]"></i>
+      Data Rotation
+    </span>
+<span class="px-2 py-0.5 rounded-md bg-brand-surface border border-brand-border text-slate-300 flex items-center gap-1">
+<i class="fa-brands fa-facebook text-[10px] text-blue-400"></i>
+      Meta Ads • Sky View Luxury
+    </span>
+<span class="px-2 py-0.5 rounded-md bg-brand-surface border border-brand-border text-slate-400 font-mono text-[9px]">
+      Broker: Karim E.
+    </span>
+</div>
+<!-- Primary Action Buttons: Bespoke Tactical Gradients -->
+<div class="grid grid-cols-2 gap-2.5 mb-3">
+<a class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-lime to-brand-darklime text-slate-950 font-bold text-xs shadow-md active:scale-98 transition-all hover:bg-lime-300 glow-lime" href="tel:+201000000000">
+<i class="fa-solid fa-phone-volume text-xs"></i>
+<span class="tracking-wide">Call Now</span>
+</a>
+<a class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-[#25D366] text-white font-bold text-xs shadow-md active:scale-98 transition-all hover:bg-emerald-500" href="https://wa.me/201000000000" target="_blank">
+<i class="fa-brands fa-whatsapp text-sm"></i>
+<span class="tracking-wide">WhatsApp</span>
+</a>
+</div>
+<!-- Disposition Logging State Selector -->
+<div class="flex items-center justify-between gap-1 p-1 bg-brand-surface/70 rounded-xl border border-brand-border/70 mb-3">
+<button class="flex-1 py-1.5 rounded-lg text-[10px] font-semibold text-slate-300 hover:text-white hover:bg-slate-700/50 flex items-center justify-center gap-1 transition-all">
+<i class="fa-solid fa-check text-[9px] text-sky-400"></i>
+<span>Sent Brochure</span>
+</button>
+<button class="flex-1 py-1.5 rounded-lg text-[10px] font-semibold text-slate-300 hover:text-white hover:bg-slate-700/50 flex items-center justify-center gap-1 transition-all">
+<i class="fa-regular fa-thumbs-up text-[9px] text-emerald-400"></i>
+<span>Replied</span>
+</button>
+<button class="flex-1 py-1.5 rounded-lg text-[10px] font-semibold text-slate-300 hover:text-white hover:bg-slate-700/50 flex items-center justify-center gap-1 transition-all">
+<i class="fa-regular fa-circle-xmark text-[9px] text-rose-400"></i>
+<span>No Answer</span>
+</button>
+</div>
+<!-- Footer: Schedule & Quick Note Action -->
+<div class="flex items-center justify-between pt-2 border-t border-brand-border/50 text-[11px]">
+<div class="flex items-center gap-1.5 text-slate-400">
+<i class="fa-regular fa-clock text-brand-lime text-[10px]"></i>
+<span>Next Follow-up:</span>
+<span class="font-mono font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 text-[10px]">23/09/26 • 04:30 PM</span>
+</div>
+<button class="text-brand-lime hover:text-lime-300 font-semibold flex items-center gap-1 text-[11px] active:scale-95 transition-all">
+<i class="fa-solid fa-square-plus text-xs"></i>
+<span>Add Note</span>
+</button>
+</div>
+</article>
+<!-- LEAD CARD 2: Nour El-Din Mansour (Premium Penthouse Lead with Audio Note) -->
+<article class="bg-brand-card border border-brand-border/80 rounded-2xl p-4 shadow-2xl glow-card relative overflow-hidden transition-all duration-150 active:border-brand-lime/60">
+<!-- Accent Ambient Top Bar -->
+<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-700 to-transparent"></div>
+<!-- Top Section -->
+<div class="flex items-start justify-between gap-2 pt-1 mb-3">
+<div class="flex items-start gap-3">
+<div class="relative">
+<div class="w-11 h-11 rounded-xl bg-slate-800/90 border border-brand-border flex items-center justify-center text-teal-300 shadow-inner font-bold text-sm">
+<i class="fa-solid fa-building-user text-base"></i>
+</div>
+<span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-brand-card"></span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="text-sm font-bold text-white tracking-tight">Nour El-Din Mansour</h2>
+<span class="px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-semibold text-emerald-400">Verified Lead</span>
+<span class="px-1.5 py-0.2 rounded-full bg-purple-950/80 border border-purple-800/80 text-[9px] font-bold text-purple-300 flex items-center gap-1">
+<i class="fa-solid fa-crown text-[8px]"></i> VIP
+          </span>
+</div>
+<p class="text-xs text-slate-300 font-medium flex items-center gap-1.5 mt-1">
+<i class="fa-solid fa-gem text-[10px] text-teal-400"></i>
+<span>Palm Horizon Penthouse (Duplex)</span>
+</p>
+<div class="flex items-center gap-2 mt-1.5 text-[11px]">
+<span class="font-serif font-bold text-brand-lime text-[13px] tracking-wide">8,500,000 AED</span>
+<span class="text-slate-600">•</span>
+<span class="text-emerald-400 flex items-center gap-1 font-semibold text-[10px]">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Qualified Lead
+          </span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1 text-slate-400">
+<button class="w-7 h-7 rounded-lg hover:bg-brand-surface flex items-center justify-center hover:text-white transition-colors" title="Edit Lead">
+<i class="fa-regular fa-pen-to-square text-xs"></i>
+</button>
+<button class="w-7 h-7 rounded-lg hover:bg-brand-surface flex items-center justify-center hover:text-rose-400 transition-colors" title="Archive">
+<i class="fa-regular fa-trash-can text-xs"></i>
+</button>
+</div>
+</div>
+<!-- Middle Tags -->
+<div class="flex flex-wrap items-center gap-1.5 mb-3 text-[10px]">
+<span class="px-2 py-0.5 rounded-md bg-purple-950/70 border border-purple-800/80 text-purple-300 font-medium flex items-center gap-1">
+<i class="fa-solid fa-crown text-[9px]"></i>
+      Ultra HNW Investor
+    </span>
+<span class="px-2 py-0.5 rounded-md bg-brand-surface border border-brand-border text-slate-300 flex items-center gap-1">
+<i class="fa-brands fa-google text-[9px] text-rose-400"></i>
+      Google Premier Search
+    </span>
+<span class="px-2 py-0.5 rounded-md bg-brand-surface border border-brand-border text-slate-400 font-mono text-[9px]">
+      Advisor: Sara T.
+    </span>
+</div>
+<!-- Luxury Audio Waveform Note Snippet -->
+<div class="p-2.5 rounded-xl bg-brand-surface/90 border border-brand-border mb-3 flex items-center justify-between gap-3 shadow-inner">
+<div class="flex items-center gap-2.5 flex-1">
+<button aria-label="Play voice note" class="w-7 h-7 rounded-full bg-brand-lime text-slate-950 flex items-center justify-center text-xs shadow-md active:scale-95 transition-transform glow-lime">
+<i class="fa-solid fa-play ml-0.5 text-[9px]"></i>
+</button>
+<div class="flex-1">
+<div class="flex items-center justify-between text-[11px] mb-1">
+<span class="font-semibold text-white flex items-center gap-1">
+<span>Voice Brief</span>
+<span class="text-[10px] text-slate-400 font-mono">(0:24)</span>
+</span>
+<span class="text-[9px] font-mono text-brand-lime">Today 11:20 AM</span>
+</div>
+<!-- Waveform Simulation Bars -->
+<div class="flex items-center gap-1 h-3">
+<span class="w-1 h-1.5 bg-brand-lime rounded-full"></span>
+<span class="w-1 h-3 bg-brand-lime rounded-full"></span>
+<span class="w-1 h-2 bg-brand-lime rounded-full"></span>
+<span class="w-1 h-3 bg-brand-lime rounded-full"></span>
+<span class="w-1 h-1 bg-slate-600 rounded-full"></span>
+<span class="w-1 h-2.5 bg-slate-600 rounded-full"></span>
+<span class="w-1 h-1.5 bg-slate-600 rounded-full"></span>
+<span class="w-1 h-2 bg-slate-600 rounded-full"></span>
+<span class="w-1 h-1 bg-slate-600 rounded-full"></span>
+<span class="text-[9px] text-slate-400 ml-1 font-medium truncate">"Requires 5-year structured payment plan"</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Primary Action Trigger Row -->
+<div class="grid grid-cols-2 gap-2.5 mb-3">
+<a class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-lime to-brand-darklime text-slate-950 font-bold text-xs shadow-md active:scale-98 transition-all hover:bg-lime-300 glow-lime" href="tel:+971500000000">
+<i class="fa-solid fa-phone-volume text-xs"></i>
+<span class="tracking-wide">Call Lead</span>
+</a>
+<a class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-[#25D366] text-white font-bold text-xs shadow-md active:scale-98 transition-all hover:bg-emerald-500" href="https://wa.me/971500000000" target="_blank">
+<i class="fa-brands fa-whatsapp text-sm"></i>
+<span class="tracking-wide">WhatsApp</span>
+</a>
+</div>
+<!-- Card Footer: VIP Meeting Scheduled -->
+<div class="flex items-center justify-between pt-2 border-t border-brand-border/50 text-[11px]">
+<div class="flex items-center gap-1.5 text-slate-400">
+<i class="fa-regular fa-calendar-check text-brand-lime text-[10px]"></i>
+<span>VIP Viewing:</span>
+<span class="font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[10px]">Tomorrow • 02:00 PM</span>
+</div>
+<button class="text-brand-lime hover:text-lime-300 font-semibold flex items-center gap-1 text-[11px] active:scale-95 transition-all">
+<i class="fa-solid fa-ellipsis"></i>
+<span>Dossier</span>
+</button>
+</div>
+</article></main>
+<!-- END: LeadsFeed -->
+<!-- BEGIN: DockedBottomNav -->
+<nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] bg-brand-charcoal/95 backdrop-blur-lg border-t border-brand-border/80 px-2 py-2.5 z-50 shadow-2xl" data-purpose="bottom-navigation">
+<div class="flex items-center justify-around">
+<!-- Tab 1: Home -->
+<button class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors w-16" type="button">
+<i class="fa-solid fa-house-chimney text-base"></i>
+<span class="text-[10px] font-medium tracking-tight">Home</span>
+</button>
+<!-- Tab 2: Leads (Active Tactile Lime Tab) -->
+<button class="flex flex-col items-center gap-1 text-brand-lime relative w-16" type="button">
+<div class="relative">
+<i class="fa-solid fa-user-group text-lg"></i>
+<span class="absolute -top-1 -right-2 px-1 py-0.2 bg-brand-lime text-slate-950 font-extrabold text-[8px] rounded-full leading-tight">239</span>
+</div>
+<span class="text-[10px] font-bold tracking-tight">Leads</span>
+<!-- Active Pill Indicator below label -->
+<span class="w-4 h-1 rounded-full bg-brand-lime glow-lime"></span>
+</button>
+<!-- Tab 3: Attendance -->
+<button class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors w-16" type="button">
+<i class="fa-regular fa-id-badge text-base"></i>
+<span class="text-[10px] font-medium tracking-tight">Attendance</span>
+</button>
+<!-- Tab 4: Follow-ups -->
+<button class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors w-16" type="button">
+<div class="relative">
+<i class="fa-regular fa-calendar-days text-base"></i>
+<span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400"></span>
+</div>
+<span class="text-[10px] font-medium tracking-tight">Follow-ups</span>
+</button>
+<!-- Tab 5: Menu / Settings -->
+<button class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors w-16" type="button">
+<i class="fa-solid fa-bars text-base"></i>
+<span class="text-[10px] font-medium tracking-tight">Menu</span>
+</button>
+</div>
+</nav>
+<!-- END: DockedBottomNav -->
+</div>
+</body></html>

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Brokly CRM - Follow-ups</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-dim": "#0b0e14",
+            "surface-dark": "#0f1115",
+            "surface-card": "#161b22",
+            "surface-container": "#1a1f26",
+            "surface-container-high": "#222731",
+            "border-subtle": "#21262d",
+            "border-medium": "#2d333b",
+            "primary": "#a3e635",
+            "primary-bright": "#b8f526",
+            "primary-hover": "#84cc16",
+            "on-primary": "#0e1601",
+            "text-main": "#f0f6fc",
+            "text-muted": "#8b949e",
+            "text-secondary": "#c9d1d9",
+            "urgency-red": "#ef4444",
+            "urgency-orange": "#f59e0b",
+            "urgency-blue": "#38bdf8",
+            "whatsapp": "#22c55e"
+          },
+          borderRadius: {
+            "xl": "1rem",
+            "2xl": "1.25rem",
+            "3xl": "1.75rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            "sans": ["'Plus Jakarta Sans'", "sans-serif"],
+            "serif": ["'Fraunces'", "serif"]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#090c10] text-text-main antialiased font-sans selection:bg-primary selection:text-black">
+<!-- Main Mobile Shell Container -->
+<div class="max-w-md mx-auto min-h-screen bg-[#0b0e14] relative pb-28 flex flex-col border-x border-border-subtle shadow-2xl">
+<!-- ========================================== -->
+<!-- TOP APP BAR                                -->
+<!-- ========================================== -->
+<header class="sticky top-0 z-40 bg-[#0b0e14]/95 backdrop-blur-md px-4 py-2.5 border-b border-border-subtle flex items-center justify-between transition-all">
+<div class="flex items-center gap-2.5">
+<button aria-label="Open navigation menu" class="w-9 h-9 rounded-full flex items-center justify-center text-text-secondary hover:bg-surface-card hover:text-text-main transition-colors active:scale-95">
+<span class="material-symbols-outlined text-[22px]">menu</span>
+</button>
+<!-- Brokly Brand Mark & Logo -->
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-xl bg-[#161b22] border border-border-subtle flex items-center justify-center p-1 shadow-sm overflow-hidden">
+<img alt="Brokly" class="w-full h-full object-contain rounded-lg" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACXH0StDMTIayXTgrJ_95XLY6ynEr9f18ued_0WJH1gz4Fh7o9sL2CBLEtAIa9jvHWvZ_gEyI5kCSqU-eI_pes_9HMZMcppd6CugUNzuxqWm17LspiuBYcWt5fzZIKzAhiBI4hShd9_evE3ZRKLdwOXgal24dv280xYZ2zKF920fk8xNMmLfzMHLxkRJhDkRP8kCQWiRKEui3zj3tPKaLybysSM0IrYfi2lCMMGhPYdUmMmOrgypMd701wEXXBZ1mG6uQ"/>
+</div>
+<span class="text-base font-bold text-text-main tracking-tight font-sans">Brokly</span>
+</div>
+</div>
+<!-- Right Controls: Quick Add (+), Theme, Notifications, Avatar -->
+<div class="flex items-center gap-1.5">
+<!-- Quick add follow-up icon button -->
+<button class="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 text-primary flex items-center justify-center hover:bg-primary hover:text-black transition-all active:scale-95" title="Quick Add">
+<span class="material-symbols-outlined text-[18px] font-bold">add</span>
+</button>
+<!-- Notifications -->
+<button class="w-8 h-8 rounded-full flex items-center justify-center text-text-secondary hover:bg-surface-card hover:text-text-main transition-colors relative active:scale-95">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-urgency-red ring-2 ring-[#0b0e14]"></span>
+</button>
+<!-- User Avatar FM -->
+<div class="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 text-primary font-bold text-xs flex items-center justify-center cursor-pointer hover:border-primary transition-all active:scale-95">
+        FM
+      </div>
+</div>
+</header>
+<!-- ========================================== -->
+<!-- PAGE HEADER & TITLE                        -->
+<!-- ========================================== -->
+<section class="px-4 pt-4 pb-2">
+<div class="flex items-start justify-between">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="text-[11px] uppercase tracking-wider text-text-muted font-bold">Pipeline Engine</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/10 border border-primary/30 text-primary">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+            Live queue
+          </span>
+</div>
+<h1 class="text-2xl font-bold font-sans text-text-main tracking-tight">
+          Follow-ups
+        </h1>
+<p class="text-xs text-text-muted mt-0.5">
+          24 actionable client interactions pending today
+        </p>
+</div>
+<button class="w-9 h-9 rounded-full bg-surface-card border border-border-subtle hover:border-primary text-text-secondary hover:text-primary transition-all flex items-center justify-center active:scale-95 shadow-sm" title="Refresh queue">
+<span class="material-symbols-outlined text-[19px]">sync</span>
+</button>
+</div>
+<!-- Curved KPI Pill Cards Strip -->
+<div class="grid grid-cols-4 gap-2 mt-4">
+<!-- Total -->
+<div class="bg-surface-card border border-border-subtle rounded-2xl p-2.5 flex flex-col items-center justify-center text-center">
+<span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Total</span>
+<span class="text-lg font-bold text-text-main font-sans mt-0.5">24</span>
+</div>
+<!-- Overdue / Late -->
+<div class="bg-surface-card border border-urgency-red/30 rounded-2xl p-2.5 flex flex-col items-center justify-center text-center relative overflow-hidden">
+<span class="text-[10px] font-bold text-urgency-red uppercase tracking-wider">Overdue</span>
+<span class="text-lg font-bold text-urgency-red font-sans mt-0.5">12</span>
+</div>
+<!-- Today -->
+<div class="bg-surface-card border border-urgency-orange/30 rounded-2xl p-2.5 flex flex-col items-center justify-center text-center">
+<span class="text-[10px] font-bold text-urgency-orange uppercase tracking-wider">Today</span>
+<span class="text-lg font-bold text-urgency-orange font-sans mt-0.5">8</span>
+</div>
+<!-- Coming -->
+<div class="bg-surface-card border border-urgency-blue/30 rounded-2xl p-2.5 flex flex-col items-center justify-center text-center">
+<span class="text-[10px] font-bold text-urgency-blue uppercase tracking-wider">Coming</span>
+<span class="text-lg font-bold text-urgency-blue font-sans mt-0.5">4</span>
+</div>
+</div>
+<!-- Search & Filter Bar -->
+<div class="mt-3 flex items-center gap-2">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-[19px]">search</span>
+<input class="w-full bg-[#12161d] border border-border-subtle rounded-full pl-10 pr-4 py-2 text-xs text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors" placeholder="Search follow-ups, leads, projects..." type="text"/>
+</div>
+<button aria-label="Filters" class="h-9 w-9 rounded-full bg-surface-card border border-border-subtle text-text-secondary hover:text-primary hover:border-primary flex items-center justify-center transition-all active:scale-95 shrink-0">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</button>
+</div>
+</section>
+<!-- ========================================== -->
+<!-- SEGMENTED TIME TABS & FILTER PILLS         -->
+<!-- ========================================== -->
+<section class="px-4 py-1">
+<!-- Main Status Segmenter (Rounded-full pill bar) -->
+<div class="flex items-center gap-1.5 p-1 bg-[#12161d] border border-border-subtle rounded-full">
+<!-- Late / Overdue Pill Active -->
+<button class="flex-1 py-1.5 px-3 rounded-full flex items-center justify-center gap-1.5 text-xs font-semibold bg-urgency-red/15 text-urgency-red border border-urgency-red/30 shadow-sm transition-all">
+<span class="w-1.5 h-1.5 rounded-full bg-urgency-red animate-pulse"></span>
+<span>Late</span>
+<span class="px-1.5 py-0.2 rounded-full bg-urgency-red text-black text-[10px] font-bold">12</span>
+</button>
+<!-- Today Pill -->
+<button class="flex-1 py-1.5 px-3 rounded-full flex items-center justify-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-main transition-colors">
+<span>Today</span>
+<span class="px-1.5 py-0.2 rounded-full bg-urgency-orange/20 text-urgency-orange text-[10px] font-bold">8</span>
+</button>
+<!-- Coming / Upcoming Pill -->
+<button class="flex-1 py-1.5 px-3 rounded-full flex items-center justify-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-main transition-colors">
+<span class="material-symbols-outlined text-[14px] text-urgency-blue">schedule</span>
+<span>Coming</span>
+<span class="text-[10px] text-urgency-blue font-bold">4</span>
+</button>
+</div>
+<!-- Secondary Filter Chips (Rounded-full horizontal scroll) -->
+<div class="flex items-center gap-2 mt-2.5 overflow-x-auto no-scrollbar pb-1">
+<!-- Re-engagement Toggle Chip -->
+<button class="whitespace-nowrap px-3 py-1 rounded-full text-[11px] font-semibold bg-urgency-orange/10 border border-urgency-orange/40 text-urgency-orange flex items-center gap-1.5 hover:bg-urgency-orange/20 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[13px]">history</span>
+<span>Not interested from 1 month ago</span>
+<span class="w-1.5 h-1.5 rounded-full bg-urgency-orange"></span>
+</button>
+<!-- VIP Chip -->
+<button class="whitespace-nowrap px-3 py-1 rounded-full text-[11px] font-medium bg-surface-card border border-border-subtle text-text-secondary hover:text-primary hover:border-primary/40 flex items-center gap-1.5 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[13px] text-primary">verified</span>
+<span>High Priority VIP</span>
+</button>
+<!-- Hot Buyers Chip -->
+<button class="whitespace-nowrap px-3 py-1 rounded-full text-[11px] font-medium bg-surface-card border border-border-subtle text-text-secondary hover:text-urgency-red hover:border-urgency-red/40 flex items-center gap-1.5 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[13px] text-urgency-red">local_fire_department</span>
+<span>Hot Buyers</span>
+</button>
+</div>
+</section>
+<!-- ========================================== -->
+<!-- FOLLOW-UP QUEUE CARDS                      -->
+<!-- ========================================== -->
+<main class="px-4 py-2 space-y-3 flex-1">
+<!-- CARD 1: Omar Al-Sayed (Overdue Urgent) -->
+<article class="bg-surface-card border border-border-subtle hover:border-urgency-red/60 rounded-3xl p-4 shadow-lg transition-all relative overflow-hidden">
+<!-- Subtle top urgent accent line -->
+<div class="absolute top-0 left-6 right-6 h-[2px] bg-gradient-to-r from-transparent via-urgency-red to-transparent opacity-75"></div>
+<!-- Header: Avatar + Lead Info + Urgency Pill -->
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="relative">
+<div class="w-11 h-11 rounded-full bg-[#12161d] border-2 border-urgency-red text-urgency-red font-bold text-sm flex items-center justify-center">
+              OA
+            </div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-urgency-red rounded-full border-2 border-surface-card flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-white font-bold">priority_high</span>
+</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5 flex-wrap">
+<h3 class="text-sm font-bold text-text-main leading-tight font-sans">Omar Al-Sayed</h3>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/25">VIP BUYER</span>
+</div>
+<button class="text-[11px] text-text-muted hover:text-primary flex items-center gap-0.5 mt-0.5 transition-colors">
+<span>View Profile</span>
+<span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Overdue Pill -->
+<div class="px-2.5 py-1 rounded-full bg-urgency-red/15 border border-urgency-red/30 text-urgency-red text-[11px] font-bold flex items-center gap-1 shrink-0">
+<span class="material-symbols-outlined text-[13px]">alarm</span>
+<span>Overdue 2h</span>
+</div>
+</div>
+<!-- Project & Note Details -->
+<div class="mt-3.5 pt-3 border-t border-border-subtle/80 space-y-2">
+<div class="flex items-center justify-between text-xs">
+<span class="text-text-secondary flex items-center gap-1.5 truncate pr-2">
+<span class="material-symbols-outlined text-[16px] text-primary shrink-0">apartment</span>
+<span class="truncate">Downtown Sky Villa (3 Bed Duplex)</span>
+</span>
+<span class="font-bold text-text-main shrink-0">EGP 4,200,000</span>
+</div>
+<div class="p-2.5 rounded-2xl bg-[#0e1217] border border-border-subtle text-xs text-text-muted flex items-start gap-2">
+<span class="material-symbols-outlined text-[15px] text-urgency-red shrink-0 mt-0.5">announcement</span>
+<p class="leading-relaxed">Last touch: <span class="text-text-main font-medium">Client missed morning site visit callback</span></p>
+</div>
+</div>
+<!-- Dual Action Buttons Matching SCREEN_5 -->
+<div class="mt-3.5 space-y-2.5">
+<div class="grid grid-cols-2 gap-2">
+<a class="py-2 px-3 rounded-full bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-primary-hover active:scale-95 transition-all shadow-[0_0_12px_rgba(163,230,53,0.3)]" href="tel:+201000000000">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>Call Lead</span>
+</a>
+<a class="py-2 px-3 rounded-full bg-[#13231b] border border-whatsapp/40 text-whatsapp font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-[#183125] active:scale-95 transition-all" href="https://wa.me/">
+<span class="material-symbols-outlined text-[16px]">chat</span>
+<span>WhatsApp</span>
+</a>
+</div>
+<!-- Footer Actions in Rounded-full links -->
+<div class="flex items-center justify-between gap-1 pt-1 border-t border-border-subtle/60 text-[11px]">
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span>Reschedule</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">edit_note</span>
+<span>Add Note</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-primary hover:bg-primary/10 flex items-center gap-1 font-semibold transition-all">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>Mark Done</span>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD 2: Karim Mostafa (Overdue 1 Day) -->
+<article class="bg-surface-card border border-border-subtle hover:border-urgency-red/50 rounded-3xl p-4 shadow-lg transition-all relative overflow-hidden">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-full bg-[#12161d] border border-border-medium text-text-secondary font-bold text-sm flex items-center justify-center">
+            KM
+          </div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="text-sm font-bold text-text-main leading-tight font-sans">Karim Mostafa</h3>
+<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1d232c] text-text-muted">INVESTOR</span>
+</div>
+<button class="text-[11px] text-text-muted hover:text-primary flex items-center gap-0.5 mt-0.5 transition-colors">
+<span>View Profile</span>
+<span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-full bg-urgency-red/15 border border-urgency-red/30 text-urgency-red text-[11px] font-bold flex items-center gap-1 shrink-0">
+<span class="material-symbols-outlined text-[13px]">warning</span>
+<span>Overdue 1d</span>
+</div>
+</div>
+<div class="mt-3.5 pt-3 border-t border-border-subtle/80 space-y-2">
+<div class="flex items-center justify-between text-xs">
+<span class="text-text-secondary flex items-center gap-1.5 truncate pr-2">
+<span class="material-symbols-outlined text-[16px] text-primary shrink-0">domain</span>
+<span class="truncate">Palm Horizon Penthouse</span>
+</span>
+<span class="font-bold text-text-main shrink-0">EGP 8,500,000</span>
+</div>
+<div class="p-2.5 rounded-2xl bg-[#0e1217] border border-border-subtle text-xs text-text-muted flex items-start gap-2">
+<span class="material-symbols-outlined text-[15px] text-urgency-orange shrink-0 mt-0.5">description</span>
+<p class="leading-relaxed">Note: <span class="text-text-main">Requested payment milestone schedule revision</span></p>
+</div>
+</div>
+<div class="mt-3.5 space-y-2.5">
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 px-3 rounded-full bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-primary-hover active:scale-95 transition-all shadow-[0_0_12px_rgba(163,230,53,0.3)]">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>Call Lead</span>
+</button>
+<button class="py-2 px-3 rounded-full bg-[#13231b] border border-whatsapp/40 text-whatsapp font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-[#183125] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">chat</span>
+<span>WhatsApp</span>
+</button>
+</div>
+<div class="flex items-center justify-between gap-1 pt-1 border-t border-border-subtle/60 text-[11px]">
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span>Reschedule</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">edit_note</span>
+<span>Add Note</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-primary hover:bg-primary/10 flex items-center gap-1 font-semibold transition-all">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>Mark Done</span>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD 3: Nour El-Din Mansour (Re-engagement / Today) -->
+<article class="bg-surface-card border border-urgency-orange/30 hover:border-urgency-orange/60 rounded-3xl p-4 shadow-lg transition-all relative overflow-hidden">
+<!-- Special Top Re-engagement Banner Pill -->
+<div class="mb-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-urgency-orange/15 border border-urgency-orange/30 text-urgency-orange">
+<span class="material-symbols-outlined text-[13px]">autorenew</span>
+<span>Re-engagement (Not Interested 30d ago)</span>
+</div>
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-full bg-[#12161d] border-2 border-urgency-orange text-urgency-orange font-bold text-sm flex items-center justify-center">
+            NM
+          </div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="text-sm font-bold text-text-main leading-tight font-sans">Nour El-Din Mansour</h3>
+</div>
+<button class="text-[11px] text-text-muted hover:text-primary flex items-center gap-0.5 mt-0.5 transition-colors">
+<span>View Profile</span>
+<span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary text-[11px] font-bold flex items-center gap-1 shrink-0">
+<span class="material-symbols-outlined text-[13px]">alarm_on</span>
+<span>Today, 3:30 PM</span>
+</div>
+</div>
+<div class="mt-3.5 pt-3 border-t border-border-subtle/80 space-y-2">
+<div class="flex items-center justify-between text-xs">
+<span class="text-text-secondary flex items-center gap-1.5 truncate pr-2">
+<span class="material-symbols-outlined text-[16px] text-primary shrink-0">holiday_village</span>
+<span class="truncate">New Cairo Park Residences</span>
+</span>
+<span class="font-bold text-text-main shrink-0">EGP 3,100,000</span>
+</div>
+<div class="p-2.5 rounded-2xl bg-[#0e1217] border border-border-subtle text-xs text-text-muted flex items-start gap-2">
+<span class="material-symbols-outlined text-[15px] text-primary shrink-0 mt-0.5">tips_and_updates</span>
+<p class="leading-relaxed">Previous status: <span class="text-text-main font-medium">Cold lead reviving interest via campaign</span></p>
+</div>
+</div>
+<div class="mt-3.5 space-y-2.5">
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 px-3 rounded-full bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-primary-hover active:scale-95 transition-all shadow-[0_0_12px_rgba(163,230,53,0.3)]">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>Call Lead</span>
+</button>
+<button class="py-2 px-3 rounded-full bg-[#13231b] border border-whatsapp/40 text-whatsapp font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-[#183125] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">chat</span>
+<span>WhatsApp</span>
+</button>
+</div>
+<div class="flex items-center justify-between gap-1 pt-1 border-t border-border-subtle/60 text-[11px]">
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span>Reschedule</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">edit_note</span>
+<span>Add Note</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-primary hover:bg-primary/10 flex items-center gap-1 font-semibold transition-all">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>Mark Done</span>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD 4: Youssef El-Husseini (Today 5:00 PM) -->
+<article class="bg-surface-card border border-border-subtle hover:border-urgency-blue/50 rounded-3xl p-4 shadow-lg transition-all relative overflow-hidden">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-full bg-[#12161d] border border-border-medium text-text-secondary font-bold text-sm flex items-center justify-center">
+            YH
+          </div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="text-sm font-bold text-text-main leading-tight font-sans">Youssef El-Husseini</h3>
+</div>
+<button class="text-[11px] text-text-muted hover:text-primary flex items-center gap-0.5 mt-0.5 transition-colors">
+<span>View Profile</span>
+<span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-full bg-urgency-blue/15 border border-urgency-blue/30 text-urgency-blue text-[11px] font-bold flex items-center gap-1 shrink-0">
+<span class="material-symbols-outlined text-[13px]">schedule</span>
+<span>Today, 5:00 PM</span>
+</div>
+</div>
+<div class="mt-3.5 pt-3 border-t border-border-subtle/80 space-y-2">
+<div class="flex items-center justify-between text-xs">
+<span class="text-text-secondary flex items-center gap-1.5 truncate pr-2">
+<span class="material-symbols-outlined text-[16px] text-primary shrink-0">beach_access</span>
+<span class="truncate">North Coast Chalet</span>
+</span>
+<span class="font-bold text-text-main shrink-0">EGP 2,450,000</span>
+</div>
+</div>
+<div class="mt-3.5 space-y-2.5">
+<div class="grid grid-cols-2 gap-2">
+<button class="py-2 px-3 rounded-full bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-primary-hover active:scale-95 transition-all shadow-[0_0_12px_rgba(163,230,53,0.3)]">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span>Call Lead</span>
+</button>
+<button class="py-2 px-3 rounded-full bg-[#13231b] border border-whatsapp/40 text-whatsapp font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-[#183125] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">chat</span>
+<span>WhatsApp</span>
+</button>
+</div>
+<div class="flex items-center justify-between gap-1 pt-1 border-t border-border-subtle/60 text-[11px]">
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span>Reschedule</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-text-muted hover:text-text-main hover:bg-[#12161d] flex items-center gap-1 transition-all">
+<span class="material-symbols-outlined text-[14px]">edit_note</span>
+<span>Add Note</span>
+</button>
+<button class="py-1 px-2.5 rounded-full text-primary hover:bg-primary/10 flex items-center gap-1 font-semibold transition-all">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>Mark Done</span>
+</button>
+</div>
+</div>
+</article>
+</main>
+<!-- ========================================== -->
+<!-- BOTTOM NAVIGATION BAR (Exact SCREEN_5 style) -->
+<!-- ========================================== -->
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex items-center justify-around px-3 py-2 bg-[#0b0e14]/95 backdrop-blur-lg border-t border-border-subtle shadow-2xl">
+<!-- Item 1: Home -->
+<a class="flex flex-col items-center justify-center text-text-muted hover:text-primary transition-all active:scale-95" href="#home">
+<span class="material-symbols-outlined text-[22px]">dashboard</span>
+<span class="text-[10px] font-medium mt-1">Home</span>
+</a>
+<!-- Item 2: Leads -->
+<a class="flex flex-col items-center justify-center text-text-muted hover:text-primary transition-all active:scale-95" href="#leads">
+<span class="material-symbols-outlined text-[22px]">group</span>
+<span class="text-[10px] font-medium mt-1">Leads</span>
+</a>
+<!-- Item 3: Attendance -->
+<a class="flex flex-col items-center justify-center text-text-muted hover:text-primary transition-all active:scale-95" href="#attendance">
+<span class="material-symbols-outlined text-[22px]">fact_check</span>
+<span class="text-[10px] font-medium mt-1">Attendance</span>
+</a>
+<!-- Item 4: Follow-ups (ACTIVE) -->
+<a class="relative flex flex-col items-center justify-center text-primary transition-transform active:scale-95" href="#follow-ups">
+<!-- Glow active top bar/beacon -->
+<span class="absolute -top-2 w-8 h-[2px] bg-primary rounded-full shadow-[0_0_8px_#a3e635]"></span>
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">schedule</span>
+<span class="text-[10px] font-bold mt-1 text-primary">Follow-ups</span>
+</a>
+<!-- Item 5: Menu -->
+<a class="flex flex-col items-center justify-center text-text-muted hover:text-primary transition-all active:scale-95" href="#menu">
+<span class="material-symbols-outlined text-[22px]">menu</span>
+<span class="text-[10px] font-medium mt-1">Menu</span>
+</a>
+</nav>
+</div>
+</body></html>
