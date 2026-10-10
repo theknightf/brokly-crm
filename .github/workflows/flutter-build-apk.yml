@@ -38,7 +38,7 @@ jobs:
         run: |
           cd mobile_flutter
           chmod +x android/gradlew
-          flutter build apk --debug
+          flutter build apk --debug 2>&1 | tee build_output.log || (echo "=== BUILD LOG ==="; tail -n 120 build_output.log; exit 1)
 
       - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
