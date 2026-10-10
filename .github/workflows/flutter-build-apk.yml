@@ -50,15 +50,13 @@ jobs:
       - name: Stage APK for Upload
         run: |
           mkdir -p output_apk
-          find . -name "*.apk" -exec cp -vf {} output_apk/brokly-app-debug.apk \;
-          pwd
+          find mobile_flutter -name "*.apk" -exec cp -vf {} output_apk/brokly-flutter-debug.apk \;
           ls -lh output_apk/
-          echo "APK_EXISTS=$(test -f output_apk/brokly-app-debug.apk && echo 'true' || echo 'false')"
 
       - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
         with:
           name: brokly-flutter-app-apk
-          path: ${{ github.workspace }}/output_apk/brokly-app-debug.apk
-          if-no-files-found: warn
+          path: output_apk/brokly-flutter-debug.apk
+          if-no-files-found: error
           retention-days: 14
