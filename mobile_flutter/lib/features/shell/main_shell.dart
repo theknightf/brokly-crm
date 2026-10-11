@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../attendance/attendance_screen.dart';
+import '../calculator/unit_calculator_screen.dart';
 import '../call_logs/call_logs_screen.dart';
 import '../customers/customers_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../follow_ups/follow_ups_screen.dart';
 import '../leads/add_lead_screen.dart';
 import '../leads/leads_screen.dart';
+import '../notifications/notifications_sheet.dart';
 import '../settings/settings_screen.dart';
 import 'app_drawer.dart';
 import 'app_top_bar.dart';
@@ -28,6 +30,7 @@ class _MainShellState extends State<MainShell> {
   // 4: Call Logs (drawer access)
   // 5: Customers (drawer access)
   // 6: Settings (drawer access)
+  // 7: Unit Calculator (drawer & quick toolbox access)
   int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -47,6 +50,8 @@ class _MainShellState extends State<MainShell> {
         return 'Customers';
       case 6:
         return 'Settings';
+      case 7:
+        return 'Unit Calculator';
       default:
         return 'Brokly CRM';
     }
@@ -73,25 +78,27 @@ class _MainShellState extends State<MainShell> {
       const CallLogsScreen(),
       const CustomersScreen(),
       const SettingsScreen(),
+      const UnitCalculatorScreen(showAppBar: false),
     ];
 
     // Determine bottom nav active index (0..3, or none if accessing auxiliary drawer pages)
     final bottomNavActiveIndex = _currentIndex <= 3 ? _currentIndex : -1;
 
-    return Scaffold(
-      key: _scaffoldKey,
-      appBar: AppTopBar(
-        title: _currentTitle,
-        onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
-      ),
-      drawer: AppDrawer(
-        selectedIndex: _currentIndex,
-        onSelectTab: (index) => setState(() => _currentIndex = index),
-      ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
+    return RealTimeNotificationBannerHost(
+      child: Scaffold(
+        key: _scaffoldKey,
+        appBar: AppTopBar(
+          title: _currentTitle,
+          onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
+        drawer: AppDrawer(
+          selectedIndex: _currentIndex,
+          onSelectTab: (index) => setState(() => _currentIndex = index),
+        ),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: screens,
+        ),
       bottomNavigationBar: SafeArea(
         bottom: true,
         child: Container(
@@ -161,6 +168,7 @@ class _MainShellState extends State<MainShell> {
               },
             )
           : null,
+      ),
     );
   }
 

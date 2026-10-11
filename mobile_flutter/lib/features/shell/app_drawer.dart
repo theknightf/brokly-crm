@@ -209,8 +209,8 @@ class AppDrawer extends StatelessWidget {
                         color: Color(0xFF142407),
                       ),
                       onTap: () {
+                        onSelectTab(7);
                         Navigator.pop(context);
-                        _showUnitCalculator(context, isDark);
                       },
                     ),
                   ),
@@ -383,122 +383,6 @@ class AppDrawer extends StatelessWidget {
         ),
         onTap: onTap,
       ),
-    );
-  }
-
-  void _showUnitCalculator(BuildContext context, bool isDark) {
-    final priceController = TextEditingController(text: '3500000');
-    final downPaymentPercentController = TextEditingController(text: '10');
-    final yearsController = TextEditingController(text: '7');
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: isDark ? AppColors.darkCard : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final price = double.tryParse(priceController.text) ?? 0;
-            final downPercent = double.tryParse(downPaymentPercentController.text) ?? 10;
-            final years = double.tryParse(yearsController.text) ?? 7;
-
-            final downPayment = price * (downPercent / 100);
-            final remaining = price - downPayment;
-            final monthly = years > 0 ? remaining / (years * 12) : 0;
-            final quarterly = monthly * 3;
-
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Unit Installment Calculator',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                      ),
-                      IconButton(
-                        icon: const Icon(LucideIcons.x, size: 20),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: priceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Unit Total Price (EGP)'),
-                    onChanged: (_) => setModalState(() {}),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: downPaymentPercentController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Down Payment %'),
-                          onChanged: (_) => setModalState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: yearsController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Years'),
-                          onChanged: (_) => setModalState(() {}),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkBackground : AppColors.lightMuted,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        _calcRow('Down Payment', '${downPayment.toStringAsFixed(0)} EGP'),
-                        const SizedBox(height: 8),
-                        _calcRow('Quarterly Installment', '${quarterly.toStringAsFixed(0)} EGP'),
-                        const SizedBox(height: 8),
-                        _calcRow('Monthly Equivalent', '${monthly.toStringAsFixed(0)} EGP'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  static Widget _calcRow(String title, String val) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 13, color: Colors.grey)),
-        Text(val, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.neonLime)),
-      ],
     );
   }
 }

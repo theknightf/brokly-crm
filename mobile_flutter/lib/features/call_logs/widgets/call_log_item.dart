@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/whatsapp_utils.dart';
 import '../../../data/models/call_log_model.dart';
 
 class CallLogItem extends StatelessWidget {
@@ -17,12 +18,11 @@ class CallLogItem extends StatelessWidget {
     }
   }
 
-  Future<void> _openWhatsApp() async {
-    final cleanPhone = call.contactPhone.replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse('https://wa.me/$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  Future<void> _openWhatsApp(BuildContext context) async {
+    await WhatsAppUtils.openWhatsAppChat(
+      context,
+      phone: call.contactPhone,
+    );
   }
 
   @override
@@ -187,7 +187,7 @@ class CallLogItem extends StatelessWidget {
               TextButton.icon(
                 icon: const Icon(LucideIcons.messageCircle, size: 14, color: Color(0xFF25D366)),
                 label: const Text('WhatsApp', style: TextStyle(fontSize: 12, color: Color(0xFF25D366))),
-                onPressed: _openWhatsApp,
+                onPressed: () => _openWhatsApp(context),
               ),
             ],
           ),

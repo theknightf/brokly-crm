@@ -3,8 +3,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../state/auth_provider.dart';
+import '../../state/notifications_provider.dart';
 import '../../state/theme_provider.dart';
 import '../leads/add_lead_screen.dart';
+import '../notifications/notifications_sheet.dart';
 
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onOpenDrawer;
@@ -28,6 +30,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = context.watch<AuthProvider>();
     final theme = context.watch<ThemeProvider>();
+    final notifications = context.watch<NotificationsProvider>();
+    final unreadCount = notifications.unreadCount;
     final profile = auth.profile;
 
     final initials = profile != null && profile.fullName.trim().isNotEmpty
@@ -151,20 +155,43 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
           },
         ),
 
-        // Notification Bell
-        IconButton(
-          constraints: const BoxConstraints(maxWidth: 36),
-          padding: EdgeInsets.zero,
-          icon: const Icon(LucideIcons.bell, size: 19),
-          tooltip: 'Notifications',
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No new notifications'),
-                duration: Duration(seconds: 2),
+        // Notification Bell with Live Unread Badge
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              constraints: const BoxConstraints(maxWidth: 38),
+              padding: EdgeInsets.zero,
+              icon: const Icon(LucideIcons.bell, size: 19),
+              tooltip: 'Notifications',
+              onPressed: () => NotificationsSheet.show(context),
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                top: 8,
+                right: 4,
+                child: IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Text(
+                        unreadCount > 9 ? '9+' : '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            );
-          },
+          ],
         ),
 
         // User Avatar Circle with "FM" on Neon Green Badge

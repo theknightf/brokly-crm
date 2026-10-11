@@ -59,8 +59,16 @@ class CallLogsProvider extends ChangeNotifier {
     }
   }
 
-  Future<CallLogModel> logCall(CallLogModel call) async {
-    final saved = await _service.logCall(call);
+  Future<CallLogModel> logCall(
+    CallLogModel call, {
+    String? followUpDate,
+    String? followUpTime,
+  }) async {
+    final saved = await _service.logCall(
+      call,
+      followUpDate: followUpDate,
+      followUpTime: followUpTime,
+    );
     _calls.insert(0, saved);
     notifyListeners();
     return saved;

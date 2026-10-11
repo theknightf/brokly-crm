@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/utils/whatsapp_utils.dart';
 import '../../data/models/lead_model.dart';
 import '../../state/leads_provider.dart';
 import '../leads/lead_detail_screen.dart';
@@ -25,39 +25,60 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
   String _searchQuery = '';
 
   Future<void> _makeCall(BuildContext context, LeadModel lead) async {
-    final cleanPhone = lead.phone.replaceAll(RegExp(r'\s+'), '');
-    final uri = Uri.parse('tel:$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-      if (context.mounted) {
-        LogCallDialog.show(context, lead: lead, initialChannel: 'Call');
-      }
-    }
+    await LogCallDialog.dialAndTrack(context, lead: lead);
   }
 
   Future<void> _openWhatsApp(BuildContext context, LeadModel lead) async {
-    final cleanPhone = lead.phone.replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse('https://wa.me/$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (context.mounted) {
-        LogCallDialog.show(context, lead: lead, initialChannel: 'WhatsApp');
-      }
+    final launched = await WhatsAppUtils.openWhatsAppChat(
+      context,
+      phone: lead.phone,
+    );
+    if (launched && context.mounted) {
+      LogCallDialog.show(context, lead: lead, initialChannel: 'WhatsApp');
     }
   }
 
-  void _markDone(BuildContext context, LeadModel lead) {
-    context.read<LeadsProvider>().addNote(
+  Future<void> _markDone(BuildContext context, LeadModel lead) async {
+    final provider = context.read<LeadsProvider>();
+    await provider.addNote(
       lead.id,
       'Follow-up marked completed on ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Follow-up marked done for ${lead.name}'),
-        backgroundColor: AppColors.neonLime,
-        duration: const Duration(seconds: 2),
-      ),
+    try {
+      await provider.updateLead(lead.id, {'follow_up_due': null});
+    } catch (_) {}
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Follow-up marked done for ${lead.name}'),
+          backgroundColor: AppColors.neonLime,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _rescheduleFollowUp(BuildContext context, LeadModel lead) async {
+    final now = DateTime.now();
+    final initial = lead.followUpDateTime ?? now.add(const Duration(days: 1));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(now) ? now.add(const Duration(days: 1)) : initial,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
     );
+    if (picked != null && context.mounted) {
+      final dateStr = DateFormat('yyyy-MM-dd').format(picked);
+      await context.read<LeadsProvider>().updateLead(lead.id, {'follow_up_due': dateStr});
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rescheduled ${lead.name} to $dateStr'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -927,11 +948,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
                     children: [
                       // Reschedule
                       InkWell(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Reschedule flow')),
-                          );
-                        },
+                        onTap: () => _rescheduleFollowUp(context, lead),
                         borderRadius: BorderRadius.circular(8),
                         child: Row(
                           children: [

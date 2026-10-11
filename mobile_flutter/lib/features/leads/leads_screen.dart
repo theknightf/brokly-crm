@@ -53,6 +53,21 @@ class _LeadsScreenState extends State<LeadsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<LeadsProvider>();
 
+    // Build dynamic project filter list from live leads
+    final dynamicProjects = <String>{'All Projects'};
+    for (final l in provider.leads) {
+      if (l.project != null && l.project!.trim().isNotEmpty) {
+        dynamicProjects.add(l.project!.trim());
+      }
+    }
+    for (final p in _projectOptions) {
+      dynamicProjects.add(p);
+    }
+    final projectDropdownItems = dynamicProjects.toList();
+    if (!projectDropdownItems.contains(_selectedProject)) {
+      _selectedProject = 'All Projects';
+    }
+
     // Apply secondary filters on top of provider leads
     List<LeadModel> displayedLeads = provider.leads;
 
@@ -394,7 +409,7 @@ class _LeadsScreenState extends State<LeadsScreen> {
                     _buildDropdown(
                       label: 'Project:',
                       value: _selectedProject,
-                      items: _projectOptions,
+                      items: projectDropdownItems,
                       onChanged: (val) => setState(() => _selectedProject = val!),
                       isDark: isDark,
                     ),

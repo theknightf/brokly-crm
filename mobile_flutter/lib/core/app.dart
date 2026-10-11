@@ -5,6 +5,7 @@ import '../state/auth_provider.dart';
 import '../state/attendance_provider.dart';
 import '../state/call_logs_provider.dart';
 import '../state/leads_provider.dart';
+import '../state/notifications_provider.dart';
 import '../state/theme_provider.dart';
 import 'router/auth_state_listenable.dart';
 import 'router/router.dart';
@@ -44,6 +45,7 @@ class _BroklyAppState extends State<BroklyApp> {
         ChangeNotifierProvider(create: (_) => LeadsProvider()),
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ChangeNotifierProvider(create: (_) => CallLogsProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) {

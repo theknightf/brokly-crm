@@ -18,4 +18,18 @@ class CurrencyFormatter {
     if (max != null) parts.add(_formatter.format(max));
     return '${parts.join('–')} ج.م';
   }
+
+  /// Compact currency formatting (e.g., 1.5M EGP, 250K EGP)
+  static String formatCompact(num? amount) {
+    if (amount == null) return '—';
+    final abs = amount.abs();
+    if (abs >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(2)}M ج.م';
+    }
+    if (abs >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(0)}K ج.م';
+    }
+    return '${_formatter.format(amount.round())} ج.م';
+  }
 }
+

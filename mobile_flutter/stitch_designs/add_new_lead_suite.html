@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+
+<html class="dark" dir="ltr" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Brokly CRM - Add New Lead</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Plus Jakarta Sans & Libre Caslon Text -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "error": "#ffb4ab",
+            "inverse-on-surface": "#2e3037",
+            "on-secondary-fixed": "#102000",
+            "on-error-container": "#ffdad6",
+            "surface-container": "#1d2026",
+            "on-primary": "#213600",
+            "tertiary-fixed-dim": "#e7b6f3",
+            "surface-dim": "#10131a",
+            "tertiary-fixed": "#fad7ff",
+            "secondary": "#94de2d",
+            "primary-container": "#a3e635",
+            "secondary-fixed": "#acf847",
+            "primary": "#ccff80",
+            "surface-container-lowest": "#0b0e14",
+            "background": "#10131a",
+            "secondary-container": "#7ac100",
+            "on-tertiary-fixed": "#2f093d",
+            "on-tertiary-fixed-variant": "#5e376b",
+            "tertiary-container": "#f3c1ff",
+            "on-background": "#e1e2eb",
+            "on-primary-container": "#416400",
+            "surface-container-low": "#191c22",
+            "surface-tint": "#98da27",
+            "secondary-fixed-dim": "#91db2a",
+            "inverse-primary": "#446900",
+            "on-surface-variant": "#c2cab0",
+            "error-container": "#93000a",
+            "surface-variant": "#32353c",
+            "on-secondary-fixed-variant": "#304f00",
+            "tertiary": "#fee7ff",
+            "on-primary-fixed-variant": "#334f00",
+            "surface-container-high": "#272a31",
+            "on-error": "#690005",
+            "surface": "#10131a",
+            "inverse-surface": "#e1e2eb",
+            "surface-bright": "#363940",
+            "on-primary-fixed": "#121f00",
+            "primary-fixed": "#b2f746",
+            "outline": "#8c947c",
+            "on-secondary": "#1f3700",
+            "outline-variant": "#424936",
+            "surface-container-highest": "#32353c",
+            "primary-fixed-dim": "#98da27",
+            "on-tertiary-container": "#734b80",
+            "on-surface": "#e1e2eb",
+            "on-secondary-container": "#2c4900",
+            "on-tertiary": "#462153"
+          },
+          "borderRadius": {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "margin": "2rem",
+            "gutter-mobile": "0.75rem",
+            "space-sm": "0.5rem",
+            "margin-mobile": "1rem",
+            "space-xl": "2.5rem",
+            "space-md": "1rem",
+            "space-lg": "1.5rem",
+            "space-xs": "0.25rem",
+            "gutter": "1.5rem"
+          },
+          "fontFamily": {
+            "body-lg": ["Plus Jakarta Sans"],
+            "display-hero-mobile": ["Libre Caslon Text"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Libre Caslon Text"],
+            "headline-lg-mobile": ["Libre Caslon Text"],
+            "headline-md": ["Libre Caslon Text"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "display-hero": ["Libre Caslon Text"],
+            "label-md": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "mono": ["JetBrains Mono", "monospace"]
+          },
+          "fontSize": {
+            "body-lg": ["1rem", { "lineHeight": "1.5rem", "fontWeight": "400" }],
+            "display-hero-mobile": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "headline-sm": ["1.125rem", { "lineHeight": "1.5rem", "fontWeight": "600" }],
+            "headline-lg": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "headline-lg-mobile": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "headline-md": ["1.5rem", { "lineHeight": "2rem", "fontWeight": "400" }],
+            "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "body-sm": ["0.75rem", { "lineHeight": "1rem", "fontWeight": "400" }],
+            "display-hero": ["3.5rem", { "lineHeight": "4rem", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+            "label-md": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "label-lg": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .custom-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 9999px;
+      background: #ccff80;
+      box-shadow: 0 0 12px #a3e635;
+      cursor: pointer;
+      border: 2px solid #0b0e14;
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface antialiased min-h-screen flex justify-center selection:bg-primary-container selection:text-on-primary-container">
+<!-- Mobile Container Wrapper: 4-column layout on mobile, max-w-md centered -->
+<div class="w-full max-w-md bg-surface flex flex-col min-h-screen relative shadow-2xl border-x border-outline-variant/30">
+<!-- Ambient Beacon Glow at Top -->
+<div class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-64 h-24 bg-primary/10 blur-3xl -z-0"></div>
+<!-- 1. Header (Transactional Modal Bar: Suppressed Global Shell as per Destination Rule) -->
+<header class="sticky top-0 z-40 bg-surface-container-lowest/90 backdrop-blur-md px-space-md py-space-sm border-b border-outline-variant/40 flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<button aria-label="Close" class="w-9 h-9 rounded-full bg-surface-container-low border border-outline-variant/60 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors active:scale-95" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="close">close</span>
+</button>
+<div>
+<div class="flex items-center gap-1.5">
+<h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">Add New Lead</h1>
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant/80 block mt-0.5" dir="rtl">إضافة عميل جديد</span>
+</div>
+</div>
+<!-- Quick Action / Brand Anchor Cluster -->
+<div class="flex items-center gap-2">
+<!-- Official Brokly Logo Icon -->
+<div class="w-7 h-7 rounded-lg overflow-hidden border border-outline-variant/60 bg-surface-container-lowest flex items-center justify-center p-0.5">
+<img alt="Brokly" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD88gibkz7vB5kOK_0PfhCO_Bwsayy_Vs2iPekTwT62m9oyBej2miTJtdyhmxYeTL90tfr4WQhTEY05YdHc9tRWh-_bhe2FWS3kM2U6HqtXaL60kkRQnYwUE8d0ymebRVKDN-xRTGhvVrYnrZQHR7EBurBrHArdbcgfw6xcPxKy3PH9JRynPsHvNI4swlVvMpJAsSFhV8FMwbCca7xZoSH4NS1bVA6CAgkqx6eq0gXwjMwgi6Q5ccz_duXJOwBJU03Yvuc"/>
+</div>
+<!-- AI Card Scanner Pill Button -->
+<button class="flex items-center gap-1 bg-surface-container-high hover:bg-surface-container-highest border border-primary/30 px-2.5 py-1 rounded-full text-primary transition-all active:scale-95 shadow-[0_0_10px_rgba(163,230,53,0.15)]" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="document_scanner">document_scanner</span>
+<span class="font-label-sm text-label-sm tracking-wide uppercase">Scan Card</span>
+</button>
+</div>
+</header>
+<!-- Main Scrollable Form Canvas -->
+<main class="flex-1 px-gutter-mobile py-space-md space-y-space-lg pb-32">
+<!-- SECTION 1: Contact Information (بيانات العميل) -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-DEFAULT p-space-md relative overflow-hidden">
+<div class="flex items-center justify-between pb-space-sm mb-space-md border-b border-outline-variant/30">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-md bg-primary-container/10 border border-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]" data-icon="person">person</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold text-sm tracking-tight">Contact Information</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">بيانات العميل</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Essential</span>
+</div>
+<div class="space-y-space-md">
+<!-- Full Name Field -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Client Full Name <span class="text-primary">*</span></label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">الاسم بالكامل</span>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]" data-icon="badge">badge</span>
+<input class="w-full h-11 bg-surface-container-lowest border border-outline-variant/50 rounded-xl pl-10 pr-3.5 text-on-surface font-body-md text-body-md placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all" placeholder="e.g. Farooq Mansoor / فاروق منصور" type="text"/>
+</div>
+</div>
+<!-- Phone Number with Verification -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<div class="flex items-center gap-1.5">
+<label class="font-label-md text-label-md text-on-surface">Primary Phone <span class="text-primary">*</span></label>
+<!-- WhatsApp Verified Badge -->
+<span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-primary/10 border border-primary/30 text-[10px] text-primary font-label-sm font-semibold">
+<span class="material-symbols-outlined text-[12px] text-primary" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                  WhatsApp
+                </span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">رقم الهاتف الأساسي</span>
+</div>
+<div class="grid grid-cols-12 gap-2">
+<div class="col-span-4 relative">
+<select class="w-full h-11 bg-surface-container-lowest border border-outline-variant/50 rounded-xl pl-2.5 pr-6 text-on-surface font-mono text-body-md focus:border-primary focus:outline-none appearance-none transition-all">
+<option value="+971">🇦🇪 +971</option>
+<option selected="" value="+20">🇪🇬 +20</option>
+<option value="+966">🇸🇦 +966</option>
+<option value="+974">🇶🇦 +974</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px] pointer-events-none" data-icon="arrow_drop_down">arrow_drop_down</span>
+</div>
+<div class="col-span-8 relative">
+<input class="w-full h-11 bg-surface-container-lowest border border-outline-variant/50 rounded-xl px-3 text-on-surface font-mono text-body-md placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all" placeholder="102 345 6789" type="tel"/>
+<button aria-label="Verify WhatsApp" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-primary hover:text-secondary-fixed transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]" data-icon="chat">chat</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Secondary / Alternate Phone -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface-variant">Secondary Phone (Optional)</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">رقم هاتف بديل</span>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]" data-icon="phone_iphone">phone_iphone</span>
+<input class="w-full h-11 bg-surface-container-lowest border border-outline-variant/50 rounded-xl pl-10 pr-3.5 text-on-surface font-mono text-body-md placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none transition-all" placeholder="+20 111 987 6543" type="tel"/>
+</div>
+</div>
+<!-- Email Address -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Email Address</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">البريد الإلكتروني</span>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]" data-icon="alternate_email">alternate_email</span>
+<input class="w-full h-11 bg-surface-container-lowest border border-outline-variant/50 rounded-xl pl-10 pr-3.5 text-on-surface font-body-md text-body-md placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none transition-all" placeholder="f.mansoor@portfolio.ae" type="email"/>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: Property Preference & Requirements (اهتمامات العقار والميزانية) -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-DEFAULT p-space-md relative overflow-hidden">
+<div class="flex items-center justify-between pb-space-sm mb-space-md border-b border-outline-variant/30">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-md bg-primary-container/10 border border-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]" data-icon="apartment">apartment</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold text-sm tracking-tight">Property Requirements</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">اهتمامات العقار والميزانية</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]" data-icon="real_estate_agent">real_estate_agent</span>
+</div>
+<div class="space-y-space-md">
+<!-- Target Project / Development -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Project / Developer</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">المشروع / المطور</span>
+</div>
+<div class="relative">
+<select class="w-full h-11 bg-surface-container-lowest border border-outline-variant/50 rounded-xl pl-3.5 pr-8 text-on-surface font-body-md text-body-md focus:border-primary focus:outline-none appearance-none transition-all">
+<option value="sky-villa">Downtown Sky Villa - Emaar</option>
+<option selected="" value="palm-residence">Palm Residence Luxury Suites</option>
+<option value="sodic">New Zayed SODIC Estates</option>
+<option value="marassi">Marassi Marina Views</option>
+<option value="creek">Dubai Creek Horizon Tier 1</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none" data-icon="unfold_more">unfold_more</span>
+</div>
+</div>
+<!-- Property Type Selector Chips -->
+<div class="space-y-1.5">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Property Category</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">نوع العقار</span>
+</div>
+<div class="flex flex-wrap gap-1.5">
+<button class="px-3 py-1.5 rounded-full text-xs font-label-md border bg-primary/10 border-primary text-primary flex items-center gap-1 shadow-[0_0_8px_rgba(163,230,53,0.15)]" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="villa">villa</span> Villa
+              </button>
+<button class="px-3 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/50 text-on-surface-variant hover:text-on-surface flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="domain">domain</span> Penthouse
+              </button>
+<button class="px-3 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/50 text-on-surface-variant hover:text-on-surface flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="apartment">apartment</span> Apartment
+              </button>
+<button class="px-3 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/50 text-on-surface-variant hover:text-on-surface flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="storefront">storefront</span> Commercial
+              </button>
+<button class="px-3 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/50 text-on-surface-variant hover:text-on-surface flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="construction">construction</span> Off-Plan
+              </button>
+</div>
+</div>
+<!-- Target Budget Range: Editorial Caslon Metric Display + Sliders -->
+<div class="space-y-2 bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-3.5">
+<div class="flex justify-between items-baseline">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Allocated Budget Target</label>
+<span class="font-label-sm text-label-sm text-primary font-mono font-bold">AED / EGP</span>
+</div>
+<!-- Metric KPI Display -->
+<div class="flex items-baseline justify-between">
+<div>
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-primary font-headline-lg">7.5M</span>
+<span class="font-body-md text-body-md text-on-surface-variant ml-1 font-mono">AED</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Range: 5.0M – 10.0M</span>
+</div>
+<input class="w-full accent-primary h-1 bg-surface-container-high rounded-lg appearance-none cursor-pointer" max="25" min="1" step="0.5" type="range" value="7.5"/>
+<!-- Fast-Select Budget Quick Chips -->
+<div class="grid grid-cols-3 gap-1.5 pt-1">
+<button class="py-1 px-2 rounded-lg text-center text-xs font-mono bg-surface-container border border-outline-variant/40 text-on-surface-variant hover:border-primary/40 active:scale-95 transition-all" type="button">
+                3M - 5M
+              </button>
+<button class="py-1 px-2 rounded-lg text-center text-xs font-mono bg-primary/10 border border-primary text-primary font-semibold shadow-[0_0_8px_rgba(163,230,53,0.15)]" type="button">
+                5M - 10M
+              </button>
+<button class="py-1 px-2 rounded-lg text-center text-xs font-mono bg-surface-container border border-outline-variant/40 text-on-surface-variant hover:border-primary/40 active:scale-95 transition-all" type="button">
+                10M+ Ultra
+              </button>
+</div>
+</div>
+<!-- Bedroom / Unit Configuration -->
+<div class="space-y-1.5">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Bedrooms &amp; Layout</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">عدد الغرف</span>
+</div>
+<div class="grid grid-cols-4 gap-2">
+<button class="h-9 rounded-xl border border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant font-label-md text-xs hover:border-primary/50 transition-all" type="button">
+                1 BR
+              </button>
+<button class="h-9 rounded-xl border border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant font-label-md text-xs hover:border-primary/50 transition-all" type="button">
+                2 BR
+              </button>
+<button class="h-9 rounded-xl border border-primary bg-primary/10 text-primary font-label-md text-xs font-bold shadow-[0_0_8px_rgba(163,230,53,0.2)]" type="button">
+                3 BR
+              </button>
+<button class="h-9 rounded-xl border border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant font-label-md text-xs hover:border-primary/50 transition-all" type="button">
+                4+ BR
+              </button>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: Pipeline & Attribution (المصدر والمسار البيعي) -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-DEFAULT p-space-md relative overflow-hidden">
+<div class="flex items-center justify-between pb-space-sm mb-space-md border-b border-outline-variant/30">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-md bg-primary-container/10 border border-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]" data-icon="hub">hub</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold text-sm tracking-tight">Pipeline &amp; Attribution</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">المصدر والمسار البيعي</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Step 3 of 4</span>
+</div>
+<div class="space-y-space-md">
+<!-- Initial Funnel Stage -->
+<div class="space-y-1.5">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Initial Funnel Stage</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">المرحلة المبدئية</span>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<button class="flex items-center gap-2 p-2 rounded-xl border border-primary bg-primary/10 text-left transition-all" type="button">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+<div>
+<div class="font-label-md text-label-md text-primary font-bold">Fresh Lead</div>
+<div class="text-[10px] text-primary/80" dir="rtl">عميل جديد فوري</div>
+</div>
+</button>
+<button class="flex items-center gap-2 p-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-left opacity-75 hover:opacity-100 transition-all" type="button">
+<span class="w-2 h-2 rounded-full bg-on-surface-variant/40"></span>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Cold Outreach</div>
+<div class="text-[10px] text-on-surface-variant" dir="rtl">تواصل بارد</div>
+</div>
+</button>
+<button class="flex items-center gap-2 p-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-left opacity-75 hover:opacity-100 transition-all" type="button">
+<span class="w-2 h-2 rounded-full bg-on-surface-variant/40"></span>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Follow-up Queue</div>
+<div class="text-[10px] text-on-surface-variant" dir="rtl">قائمة المتابعة</div>
+</div>
+</button>
+<button class="flex items-center gap-2 p-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-left opacity-75 hover:opacity-100 transition-all" type="button">
+<span class="w-2 h-2 rounded-full bg-on-surface-variant/40"></span>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Meeting Scheduled</div>
+<div class="text-[10px] text-on-surface-variant" dir="rtl">تحديد موعد جلسة</div>
+</div>
+</button>
+</div>
+</div>
+<!-- Lead Source Chips with Icons -->
+<div class="space-y-1.5">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Lead Source</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">مصدر العميل الإعلاني</span>
+</div>
+<div class="flex flex-wrap gap-1.5">
+<button class="px-2.5 py-1.5 rounded-full text-xs font-label-md border bg-primary/10 border-primary text-primary flex items-center gap-1.5 shadow-[0_0_8px_rgba(163,230,53,0.15)]" type="button">
+<span class="material-symbols-outlined text-[15px]" data-icon="campaign">campaign</span> Meta Ads
+              </button>
+<button class="px-2.5 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/40 text-on-surface-variant hover:text-on-surface flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[15px]" data-icon="travel_explore">travel_explore</span> Google Ads
+              </button>
+<button class="px-2.5 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/40 text-on-surface-variant hover:text-on-surface flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[15px]" data-icon="smart_display">smart_display</span> TikTok
+              </button>
+<button class="px-2.5 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/40 text-on-surface-variant hover:text-on-surface flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[15px]" data-icon="handshake">handshake</span> Referral
+              </button>
+<button class="px-2.5 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/40 text-on-surface-variant hover:text-on-surface flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[15px]" data-icon="call">call</span> Cold Dial
+              </button>
+<button class="px-2.5 py-1.5 rounded-full text-xs font-label-md border bg-surface-container-lowest border-outline-variant/40 text-on-surface-variant hover:text-on-surface flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[15px]" data-icon="directions_walk">directions_walk</span> Walk-in
+              </button>
+</div>
+</div>
+<!-- Assigned Sales Broker with Avatar Pill -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Assign Account Executive</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">تعيين مسؤول المبيعات</span>
+</div>
+<div class="p-2 bg-surface-container-lowest border border-outline-variant/50 rounded-xl flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-full bg-primary/20 border border-primary/50 text-primary flex items-center justify-center font-bold text-xs tracking-wider">
+                  FM
+                </div>
+<div>
+<div class="font-label-lg text-label-lg text-on-surface font-semibold flex items-center gap-1.5">
+                    Farooq Mansoor
+                    <span class="material-symbols-outlined text-primary text-[14px]" data-icon="verified" data-weight="fill" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant text-[11px]">Senior Broker Director • #DXB-98421</div>
+</div>
+</div>
+<button class="px-2.5 py-1 rounded-lg text-xs bg-surface-container-high hover:bg-surface-container-highest text-primary font-label-sm border border-outline-variant/40" type="button">
+                Change
+              </button>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 4: Initial Interaction & Follow-up (الملاحظات وتحديد الموعد) -->
+<section class="bg-surface-container-low border border-outline-variant/40 rounded-DEFAULT p-space-md relative overflow-hidden">
+<div class="flex items-center justify-between pb-space-sm mb-space-md border-b border-outline-variant/30">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-md bg-primary-container/10 border border-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]" data-icon="schedule">schedule</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold text-sm tracking-tight">Initial Engagement</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">الملاحظات وتحديد الموعد</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="notifications_active">notifications_active</span>
+</div>
+<div class="space-y-space-md">
+<!-- Schedule First Follow-up -->
+<div class="space-y-2">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Auto-Schedule First Touch</span>
+<span class="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">Prompt Required</span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<button class="py-2 px-1 rounded-xl border border-primary bg-primary/10 text-primary text-center font-label-md text-xs shadow-[0_0_8px_rgba(163,230,53,0.15)]" type="button">
+                Today <span class="block text-[10px] opacity-75 font-mono">16:30 PM</span>
+</button>
+<button class="py-2 px-1 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface-variant text-center font-label-md text-xs hover:border-primary/40" type="button">
+                Tomorrow <span class="block text-[10px] opacity-75 font-mono">11:00 AM</span>
+</button>
+<button class="py-2 px-1 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface-variant text-center font-label-md text-xs hover:border-primary/40 flex flex-col items-center justify-center" type="button">
+                Custom <span class="material-symbols-outlined text-[14px] mt-0.5" data-icon="calendar_month">calendar_month</span>
+</button>
+</div>
+</div>
+<!-- Interaction Notes Textarea -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<label class="font-label-md text-label-md text-on-surface">Initial Intake Notes &amp; Demands</label>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px]" dir="rtl">ملاحظات العميل الأولية</span>
+</div>
+<div class="relative">
+<textarea class="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-3 text-on-surface font-body-md text-body-md placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all" placeholder="Looking for 3BR with 7-year flexible payment plan, down payment ready, prefers sea-view balcony..." rows="3"></textarea>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- 3. Sticky Bottom Action Bar (Fintech CRM Kinetic Dock) -->
+<footer class="sticky bottom-0 z-50 bg-surface-container-lowest/95 backdrop-blur-xl border-t border-outline-variant/60 p-space-md shadow-[0_-8px_32px_rgba(0,0,0,0.85)]">
+<div class="flex items-center gap-2.5">
+<!-- Secondary Ghost Button: Save as Draft -->
+<button class="w-12 h-12 flex-shrink-0 rounded-full border border-outline-variant/80 bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:border-on-surface-variant flex items-center justify-center transition-all active:scale-95" title="Save as Draft / حفظ كمسودة" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="bookmark_add">bookmark_add</span>
+</button>
+<!-- Primary High-Contrast Kinetic Glowing Neon Button -->
+<button class="flex-1 h-12 rounded-full bg-primary-container hover:bg-[#84CC16] text-[#0B0E14] font-label-md text-label-md font-bold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(163,230,53,0.35)] active:scale-95 transition-all group" type="button">
+<span class="tracking-tight">Create Lead &amp; Start Outreach</span>
+<span class="font-bold">→</span>
+</button>
+<!-- WhatsApp Instant Blast Action -->
+<button class="w-12 h-12 flex-shrink-0 rounded-full bg-[#161B22] border border-primary/30 text-primary hover:bg-primary hover:text-[#0B0E14] flex items-center justify-center transition-all active:scale-95 shadow-[0_0_12px_rgba(163,230,53,0.15)]" title="Direct WhatsApp Start" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="send">send</span>
+</button>
+</div>
+<!-- Quick Subtext Indicator in Arabic & English -->
+<div class="flex justify-between items-center text-[10px] text-on-surface-variant/60 mt-2 px-1">
+<span>Brokly DXB Engine v4.2 • Secure E.164</span>
+<span dir="rtl">حفظ تلقائي للمعلومات وتحديث المسار</span>
+</div>
+</footer>
+</div>
+</body></html>

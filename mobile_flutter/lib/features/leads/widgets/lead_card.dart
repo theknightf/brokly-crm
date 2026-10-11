@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/whatsapp_utils.dart';
 import '../../../data/models/lead_model.dart';
 import '../../../state/leads_provider.dart';
 import '../edit_lead_screen.dart';
@@ -23,24 +23,16 @@ class LeadCard extends StatelessWidget {
   });
 
   Future<void> _makeCall(BuildContext context) async {
-    final cleanPhone = lead.phone.replaceAll(RegExp(r'\s+'), '');
-    final uri = Uri.parse('tel:$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-      if (context.mounted) {
-        LogCallDialog.show(context, lead: lead, initialChannel: 'Call');
-      }
-    }
+    await LogCallDialog.dialAndTrack(context, lead: lead);
   }
 
   Future<void> _openWhatsApp(BuildContext context) async {
-    final cleanPhone = lead.phone.replaceAll(RegExp(r'\D'), '');
-    final uri = Uri.parse('https://wa.me/$cleanPhone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (context.mounted) {
-        LogCallDialog.show(context, lead: lead, initialChannel: 'WhatsApp');
-      }
+    final launched = await WhatsAppUtils.openWhatsAppChat(
+      context,
+      phone: lead.phone,
+    );
+    if (launched && context.mounted) {
+      LogCallDialog.show(context, lead: lead, initialChannel: 'WhatsApp');
     }
   }
 

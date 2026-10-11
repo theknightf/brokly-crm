@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_utils.dart';
+import '../../core/utils/whatsapp_utils.dart';
 import '../../data/models/lead_model.dart';
 import '../../data/services/call_logs_service.dart';
 import '../../data/services/leads_service.dart';
@@ -57,23 +57,22 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> with SingleTickerPr
 
   Future<void> _makeCall() async {
     if (_lead == null) return;
-    final uri = Uri.parse('tel:${_lead!.phone.replaceAll(RegExp(r'\s+'), '')}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-      if (mounted) {
-        LogCallDialog.show(context, lead: _lead!, initialChannel: 'Call');
-      }
-    }
+    await LogCallDialog.dialAndTrack(
+      context,
+      lead: _lead!,
+      onCompleted: _loadLead,
+    );
   }
 
   Future<void> _openWhatsApp() async {
     if (_lead == null) return;
-    final uri = Uri.parse('https://wa.me/${_lead!.phone.replaceAll(RegExp(r'\D'), '')}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (mounted) {
-        LogCallDialog.show(context, lead: _lead!, initialChannel: 'WhatsApp');
-      }
+    final launched = await WhatsAppUtils.openWhatsAppChat(
+      context,
+      phone: _lead!.phone,
+    );
+    if (launched && mounted) {
+      await LogCallDialog.show(context, lead: _lead!, initialChannel: 'WhatsApp');
+      _loadLead();
     }
   }
 
@@ -375,110 +374,203 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> with SingleTickerPr
         }
 
         final calls = snapshot.data!;
-        if (calls.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  LucideIcons.phoneCall,
-                  size: 40,
-                  color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'No calls recorded for this lead',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  icon: const Icon(LucideIcons.plus, size: 16),
-                  label: const Text('Log First Touchpoint'),
-                  onPressed: () => LogCallDialog.show(context, lead: lead),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: calls.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final call = calls[index];
-            final outcomeColor = AppColors.getOutcomeColor(call.outcome);
-
-            return Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkCard : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                ),
-              ),
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    call.direction == 'incoming' ? LucideIcons.phoneIncoming : LucideIcons.phoneOutgoing,
-                    size: 18,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              call.channel,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: outcomeColor.withAlpha(25),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                call.outcome,
-                                style: TextStyle(
-                                  color: outcomeColor,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (call.notes != null && call.notes!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              call.notes!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                              ),
-                            ),
-                          ),
-                      ],
+                  Text(
+                    'Call History (${calls.length})',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
                     ),
                   ),
-                  Text(
-                    AppDateUtils.formatDuration(call.durationSeconds),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  TextButton.icon(
+                    icon: const Icon(LucideIcons.refreshCw, size: 14),
+                    label: const Text('Sync Device Calls', style: TextStyle(fontSize: 12)),
+                    onPressed: () async {
+                      final synced = await _callLogsService.syncDeviceCallLogs(
+                        limit: 40,
+                        filterLeadId: lead.id,
+                      );
+                      await _loadLead();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              synced > 0
+                                  ? 'Synced $synced call(s) from device history'
+                                  : 'Call history is up to date',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: calls.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            LucideIcons.phoneCall,
+                            size: 40,
+                            color:
+                                isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No calls recorded for this lead',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDark
+                                  ? AppColors.darkMutedForeground
+                                  : AppColors.lightMutedForeground,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            icon: const Icon(LucideIcons.plus, size: 16),
+                            label: const Text('Log First Touchpoint'),
+                            onPressed: () async {
+                              await LogCallDialog.show(context, lead: lead);
+                              _loadLead();
+                            },
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: calls.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final call = calls[index];
+                        final outcomeColor = AppColors.getOutcomeColor(call.outcome);
+                        final isIncoming = call.direction == 'incoming';
+                        final tsLabel = call.createdAt != null
+                            ? '${AppDateUtils.formatDate(call.createdAt)} • ${AppDateUtils.formatTime(call.createdAt)}'
+                            : 'Just now';
+
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.darkCard : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  isIncoming
+                                      ? LucideIcons.phoneIncoming
+                                      : LucideIcons.phoneOutgoing,
+                                  size: 16,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${call.channel} (${isIncoming ? "Incoming" : "Outgoing"})',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: outcomeColor.withAlpha(25),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            call.outcome,
+                                            style: TextStyle(
+                                              color: outcomeColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      tsLabel,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? AppColors.darkMutedForeground
+                                            : AppColors.lightMutedForeground,
+                                      ),
+                                    ),
+                                    if (call.notes != null && call.notes!.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 5),
+                                        child: Text(
+                                          call.notes!,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark
+                                                ? AppColors.darkForeground
+                                                : AppColors.lightForeground,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.white.withAlpha(12)
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  AppDateUtils.formatDuration(call.durationSeconds),
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
     );
