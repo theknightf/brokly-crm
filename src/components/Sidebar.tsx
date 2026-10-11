@@ -24,6 +24,7 @@ import {
   KeyRound,
   Handshake,
   Phone,
+  CopyCheck,
   CalendarCheck2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -168,6 +169,12 @@ const navGroups: NavGroup[] = [
         labelKey: 'common.expenses',
         icon: <Receipt size={18} />,
         href: '/expenses',
+      },
+      {
+        id: 'nav-duplicate-leads',
+        labelKey: 'common.duplicateLeads',
+        icon: <CopyCheck size={18} />,
+        href: '/duplicate-leads',
       },
       {
         id: 'nav-admin',
@@ -375,7 +382,7 @@ function SidebarContent({
             ...group,
             items: group.items.filter(
               (item) =>
-                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses')) &&
+                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses' && item.id !== 'nav-duplicate-leads')) &&
                 (canWatchTeams || item.id !== 'nav-teams')
             ),
           }))
