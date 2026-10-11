@@ -50,3 +50,9 @@ turbo/
 # Scratch & temporary backups
 aura/
 realtyflow-main/
+
+# Android release signing secrets
+key.properties
+**/key.properties
+*.jks
+*.keystore

@@ -3,6 +3,9 @@ name: Build Flutter Android APK
 on:
   push:
     branches: [main]
+    paths:
+      - 'mobile_flutter/**'
+      - '.github/workflows/flutter-build-apk.yml'
   workflow_dispatch:
 
 jobs:
@@ -26,26 +29,53 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Prepare Android Project
+      - name: Configure Release Signing
+        working-directory: mobile_flutter
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          cd mobile_flutter
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ] && [ -n "$KEY_ALIAS" ]; then
+            echo "Decoding release keystore..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n" \
+              "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+          else
+            echo "Release signing secrets not configured; falling back to debug signing key."
+          fi
+
+      - name: Install Flutter Dependencies
+        working-directory: mobile_flutter
+        run: |
           flutter config --no-analytics
-          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
           flutter pub get
 
-      - name: Build Flutter APK
+      - name: Analyze Flutter Code
+        working-directory: mobile_flutter
+        run: flutter analyze
+
+      - name: Build Release APK
+        working-directory: mobile_flutter
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          cd mobile_flutter
-          flutter pub get
-          chmod +x android/gradlew
-          cd android
-          ./gradlew assembleDebug --no-daemon
-          cd ..
+          DART_DEFINES=""
+          if [ -n "$SUPABASE_URL" ]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_URL=$SUPABASE_URL"
+          fi
+          if [ -n "$SUPABASE_ANON_KEY" ]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+          fi
+          flutter build apk --release $DART_DEFINES
 
       - name: Upload Flutter APK
         uses: actions/upload-artifact@v4
         with:
           name: brokly-flutter-app-apk
-          path: mobile_flutter/android/app/build/outputs/apk/debug/app-debug.apk
+          path: mobile_flutter/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+

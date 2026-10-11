@@ -19,3 +19,8 @@ Thumbs.db
 .env
 .env.*
 !*.example
+key.properties
+**/key.properties
+*.jks
+*.keystore
+android/local.properties
