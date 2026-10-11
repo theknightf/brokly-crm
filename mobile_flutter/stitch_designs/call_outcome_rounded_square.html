@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+
+<html class="dark" dir="ltr" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Brokly CRM - Call Outcome Logging</title>
+<!-- Google Fonts: Plus Jakarta Sans & Libre Caslon Text -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Noto+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary": "#1f3700",
+            "on-primary-fixed": "#121f00",
+            "surface-container": "#1d2026",
+            "primary-container": "#a3e635",
+            "surface-tint": "#98da27",
+            "secondary-fixed": "#acf847",
+            "secondary-container": "#7ac100",
+            "inverse-surface": "#e1e2eb",
+            "surface": "#10131a",
+            "background": "#10131a",
+            "on-error": "#690005",
+            "surface-container-low": "#191c22",
+            "surface-variant": "#32353c",
+            "secondary": "#94de2d",
+            "on-secondary-container": "#2c4900",
+            "on-secondary-fixed-variant": "#304f00",
+            "on-surface": "#e1e2eb",
+            "tertiary": "#fee7ff",
+            "error-container": "#93000a",
+            "on-primary-fixed-variant": "#334f00",
+            "primary": "#ccff80",
+            "on-error-container": "#ffdad6",
+            "secondary-fixed-dim": "#91db2a",
+            "primary-fixed": "#b2f746",
+            "on-tertiary-fixed-variant": "#5e376b",
+            "outline-variant": "#424936",
+            "surface-bright": "#363940",
+            "on-secondary-fixed": "#102000",
+            "on-tertiary-container": "#734b80",
+            "on-surface-variant": "#c2cab0",
+            "outline": "#8c947c",
+            "surface-container-lowest": "#0b0e14",
+            "on-background": "#e1e2eb",
+            "surface-container-highest": "#32353c",
+            "on-primary": "#213600",
+            "surface-dim": "#10131a",
+            "on-tertiary-fixed": "#2f093d",
+            "on-tertiary": "#462153",
+            "error": "#ffb4ab",
+            "inverse-on-surface": "#2e3037",
+            "on-primary-container": "#416400",
+            "surface-container-high": "#272a31",
+            "tertiary-fixed-dim": "#e7b6f3",
+            "primary-fixed-dim": "#98da27",
+            "inverse-primary": "#446900",
+            "tertiary-container": "#f3c1ff",
+            "tertiary-fixed": "#fad7ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xs": "0.25rem",
+            "space-md": "1rem",
+            "space-lg": "1.5rem",
+            "space-sm": "0.5rem",
+            "space-xl": "2.5rem",
+            "gutter-mobile": "0.75rem",
+            "gutter": "1.5rem",
+            "margin-mobile": "1rem",
+            "margin": "2rem"
+          },
+          "fontFamily": {
+            "body-md": ["Plus Jakarta Sans", "Noto Sans Arabic", "sans-serif"],
+            "display-hero": ["Libre Caslon Text", "serif"],
+            "headline-lg-mobile": ["Libre Caslon Text", "serif"],
+            "headline-sm": ["Plus Jakarta Sans", "Noto Sans Arabic", "sans-serif"],
+            "body-lg": ["Plus Jakarta Sans", "Noto Sans Arabic", "sans-serif"],
+            "headline-md": ["Libre Caslon Text", "serif"],
+            "headline-lg": ["Libre Caslon Text", "serif"],
+            "body-sm": ["Plus Jakarta Sans", "Noto Sans Arabic", "sans-serif"],
+            "label-sm": ["Plus Jakarta Sans", "Noto Sans Arabic", "sans-serif"],
+            "label-md": ["Plus Jakarta Sans", "Noto Sans Arabic", "sans-serif"],
+            "display-hero-mobile": ["Libre Caslon Text", "serif"],
+            "label-lg": ["Plus Jakarta Sans", "Noto Sans Arabic", "sans-serif"]
+          },
+          "fontSize": {
+            "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }],
+            "display-hero": ["3.5rem", { "lineHeight": "4rem", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+            "headline-lg-mobile": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "headline-sm": ["1.125rem", { "lineHeight": "1.5rem", "fontWeight": "600" }],
+            "body-lg": ["1rem", { "lineHeight": "1.5rem", "fontWeight": "400" }],
+            "headline-md": ["1.5rem", { "lineHeight": "2rem", "fontWeight": "400" }],
+            "headline-lg": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "body-sm": ["0.75rem", { "lineHeight": "1rem", "fontWeight": "400" }],
+            "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "label-md": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "display-hero-mobile": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "label-lg": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.01em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #424936;
+      border-radius: 9999px;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface antialiased overflow-x-hidden select-none min-h-screen relative font-body-md text-body-md">
+<!-- ========================================================= -->
+<!-- BACKGROUND LAYER (Defocused underlying CRM Mobile View) -->
+<!-- ========================================================= -->
+<div class="fixed inset-0 overflow-hidden pointer-events-none filter blur-sm scale-95 opacity-40">
+<!-- Sub-page Header Mockup -->
+<header class="px-space-md py-space-sm border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Queue Details</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-primary font-bold text-label-sm">FM</div>
+</header>
+<!-- Underlying Lead Details Card Mockup -->
+<div class="p-space-md space-y-space-md">
+<div class="p-space-lg rounded-DEFAULT bg-surface-container-low border border-outline-variant space-y-space-sm">
+<div class="flex justify-between items-start">
+<div>
+<span class="px-2 py-0.5 rounded-full text-label-sm bg-primary/10 text-primary border border-primary/20">Active Cadence</span>
+<h2 class="font-headline-md text-headline-md text-on-surface mt-1">ام هاشم جلال عبدالحليم</h2>
+<p class="font-label-md text-label-md text-on-surface-variant font-mono">01125315790 • New Cairo Portfolio</p>
+</div>
+<span class="text-label-md text-primary font-bold">VIP Buyer</span>
+</div>
+<div class="pt-space-md border-t border-outline-variant grid grid-cols-2 gap-space-sm text-center"><!-- 1. Answered / تم الرد (Selected State) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-primary/10 border-2 border-primary shadow-[0_0_16px_rgba(163,230,53,0.2)] active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">phone_callback</span>
+</div>
+<!-- Selection Radio Indicator -->
+<div class="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-on-primary shrink-0 shadow-[0_0_8px_rgba(163,230,53,0.4)]">
+<span class="material-symbols-outlined text-sm font-bold">check</span>
+</div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-primary leading-tight">Answered</span>
+<span class="font-label-md text-label-md text-primary/90 mt-0.5 font-medium" dir="rtl">تم الرد</span>
+</button>
+<!-- 2. No Answer / لم يتم الرد -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-surface-container-lowest/80 border border-outline-variant hover:border-outline hover:bg-surface-container active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center group-hover:text-on-surface shrink-0">
+<span class="material-symbols-outlined text-lg">phone_missed</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-outline-variant shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-on-surface leading-tight">No Answer</span>
+<span class="font-label-md text-label-md text-on-surface-variant mt-0.5" dir="rtl">لم يتم الرد</span>
+</button>
+<!-- 3. Interested / مهتم (Sky/Blue) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-sky-950/20 border border-sky-800/40 hover:border-sky-500/60 hover:bg-sky-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">thumb_up</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-sky-800/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-sky-300 leading-tight">Interested</span>
+<span class="font-label-md text-label-md text-sky-400/80 mt-0.5" dir="rtl">مهتم</span>
+</button>
+<!-- 4. Not Interested / غير مهتم (Rose/Red) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-rose-950/20 border border-rose-900/40 hover:border-rose-500/60 hover:bg-rose-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">thumb_down</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-rose-900/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-rose-300 leading-tight">Not Interested</span>
+<span class="font-label-md text-label-md text-rose-400/80 mt-0.5" dir="rtl">غير مهتم</span>
+</button>
+<!-- 5. Follow-up / متابعة (Amber/Gold) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-amber-950/20 border border-amber-800/40 hover:border-amber-500/60 hover:bg-amber-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">update</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-amber-800/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-amber-300 leading-tight">Follow-up</span>
+<span class="font-label-md text-label-md text-amber-400/80 mt-0.5" dir="rtl">متابعة</span>
+</button>
+<!-- 6. Schedule Meeting / تحديد موعد (Purple) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-purple-950/20 border border-purple-800/40 hover:border-purple-500/60 hover:bg-purple-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">handshake</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-purple-800/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-purple-300 leading-tight">Schedule Meeting</span>
+<span class="font-label-md text-label-md text-purple-400/80 mt-0.5" dir="rtl">تحديد موعد</span>
+</button>
+<!-- 7. Wrong Phone / رقم خاطئ (Orange) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-orange-950/20 border border-orange-900/40 hover:border-orange-500/60 hover:bg-orange-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">warning</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-orange-900/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-orange-300 leading-tight">Wrong Phone</span>
+<span class="font-label-md text-label-md text-orange-400/80 mt-0.5" dir="rtl">رقم خاطئ</span>
+</button>
+<!-- 8. Closed Number / رقم مغلق (Red/Crimson) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-red-950/25 border border-red-900/40 hover:border-red-500/60 hover:bg-red-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">power_settings_new</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-red-900/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-red-300 leading-tight">Closed Number</span>
+<span class="font-label-md text-label-md text-red-400/80 mt-0.5" dir="rtl">رقم مغلق</span>
+</button></div>
+</div>
+<!-- Historical Logs -->
+<div class="space-y-space-xs">
+<div class="p-space-md rounded-DEFAULT bg-surface-container border border-outline-variant flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary">phone_in_talk</span>
+<div>
+<p class="font-label-md text-label-md font-bold text-on-surface">Outbound Call (03:14)</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Connected with client regarding Palm Hills</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Yesterday</span>
+</div>
+</div>
+</div>
+</div>
+<!-- ========================================================= -->
+<!-- MODAL BACKDROP (Heavy dimming + intense frosted glass)    -->
+<!-- ========================================================= -->
+<div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col justify-end md:justify-center md:items-center p-0 md:p-gutter transition-all duration-300">
+<!-- ======================================================= -->
+<!-- BOTTOM SHEET / MODAL CONTAINER                         -->
+<!-- ======================================================= -->
+<div class="w-full md:max-w-lg bg-surface-container-low border border-outline-variant rounded-t-3xl md:rounded-3xl shadow-[0_-12px_40px_rgba(0,0,0,0.9)] max-h-[813px] flex flex-col relative overflow-hidden transition-all duration-300 animate-in slide-in-from-bottom-8">
+<!-- Top Glow Line Decoration -->
+<div class="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-primary/40 to-transparent"></div>
+<!-- Sheet Drag Handle -->
+<div class="w-full pt-3 pb-2 flex items-center justify-center shrink-0">
+<div class="w-12 h-1.5 rounded-full bg-outline-variant/70"></div>
+</div>
+<!-- Modal Scrollable Content Wrapper -->
+<div class="px-space-md pb-space-sm overflow-y-auto custom-scrollbar space-y-space-md">
+<!-- Header Section -->
+<div>
+<!-- Top Row -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shadow-[0_0_16px_rgba(163,230,53,0.25)] shrink-0">
+<span class="material-symbols-outlined text-primary text-xl">phone_in_talk</span>
+</div>
+<div>
+<div class="flex items-center gap-space-xs">
+<h1 class="font-headline-sm text-headline-sm font-bold text-on-surface tracking-tight">Call Outcome</h1>
+<span class="px-2 py-0.5 rounded-full bg-primary-container/20 border border-primary-container/30 text-primary font-label-sm text-[0.625rem] font-bold uppercase tracking-wider">Fast Log</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant font-mono">POST-CALL TELEPHONY SYNC</p>
+</div>
+</div>
+<!-- Close Button -->
+<button aria-label="Close dialog" class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors active:scale-95" type="button">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<!-- Lead Subheader Info Strip -->
+<div class="mt-space-sm p-space-sm rounded-DEFAULT bg-surface-container-lowest border border-outline-variant/60 flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs overflow-hidden">
+<span class="material-symbols-outlined text-primary text-lg shrink-0">person</span>
+<div class="truncate">
+<span class="font-headline-sm text-body-md font-bold text-on-surface" dir="rtl">ام هاشم جلال عبدالحليم</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm mx-1.5">•</span>
+<span class="text-primary font-label-md text-label-md font-mono tracking-tight">01125315790</span>
+</div>
+</div>
+<span class="shrink-0 px-2.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 font-label-sm text-label-sm font-bold">
+              VIP Buyer
+            </span>
+</div>
+</div>
+<!-- ===================================================== -->
+<!-- CORE SECTION: SELECT OUTCOME * (2-Column Grid)        -->
+<!-- ===================================================== -->
+<div class="space-y-space-xs">
+<div class="flex items-center justify-between">
+<label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider flex items-center gap-1 font-bold">
+<span>SELECT OUTCOME</span>
+<span class="text-primary font-bold">*</span>
+</label>
+<span class="font-label-sm text-label-sm text-primary font-mono">1/8 Selected</span>
+</div>
+<!-- 2-Column Grid of 8 Outcome Cards -->
+<div class="grid grid-cols-2 gap-space-sm"><!-- 1. Answered / تم الرد (Selected State) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-primary/10 border-2 border-primary shadow-[0_0_16px_rgba(163,230,53,0.2)] active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">phone_callback</span>
+</div>
+<!-- Selection Radio Indicator -->
+<div class="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-on-primary shrink-0 shadow-[0_0_8px_rgba(163,230,53,0.4)]">
+<span class="material-symbols-outlined text-sm font-bold">check</span>
+</div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-primary leading-tight">Answered</span>
+<span class="font-label-md text-label-md text-primary/90 mt-0.5 font-medium" dir="rtl">تم الرد</span>
+</button>
+<!-- 2. No Answer / لم يتم الرد -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-surface-container-lowest/80 border border-outline-variant hover:border-outline hover:bg-surface-container active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center group-hover:text-on-surface shrink-0">
+<span class="material-symbols-outlined text-lg">phone_missed</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-outline-variant shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-on-surface leading-tight">No Answer</span>
+<span class="font-label-md text-label-md text-on-surface-variant mt-0.5" dir="rtl">لم يتم الرد</span>
+</button>
+<!-- 3. Interested / مهتم (Sky/Blue) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-sky-950/20 border border-sky-800/40 hover:border-sky-500/60 hover:bg-sky-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">thumb_up</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-sky-800/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-sky-300 leading-tight">Interested</span>
+<span class="font-label-md text-label-md text-sky-400/80 mt-0.5" dir="rtl">مهتم</span>
+</button>
+<!-- 4. Not Interested / غير مهتم (Rose/Red) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-rose-950/20 border border-rose-900/40 hover:border-rose-500/60 hover:bg-rose-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">thumb_down</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-rose-900/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-rose-300 leading-tight">Not Interested</span>
+<span class="font-label-md text-label-md text-rose-400/80 mt-0.5" dir="rtl">غير مهتم</span>
+</button>
+<!-- 5. Follow-up / متابعة (Amber/Gold) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-amber-950/20 border border-amber-800/40 hover:border-amber-500/60 hover:bg-amber-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">update</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-amber-800/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-amber-300 leading-tight">Follow-up</span>
+<span class="font-label-md text-label-md text-amber-400/80 mt-0.5" dir="rtl">متابعة</span>
+</button>
+<!-- 6. Schedule Meeting / تحديد موعد (Purple) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-purple-950/20 border border-purple-800/40 hover:border-purple-500/60 hover:bg-purple-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">handshake</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-purple-800/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-purple-300 leading-tight">Schedule Meeting</span>
+<span class="font-label-md text-label-md text-purple-400/80 mt-0.5" dir="rtl">تحديد موعد</span>
+</button>
+<!-- 7. Wrong Phone / رقم خاطئ (Orange) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-orange-950/20 border border-orange-900/40 hover:border-orange-500/60 hover:bg-orange-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">warning</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-orange-900/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-orange-300 leading-tight">Wrong Phone</span>
+<span class="font-label-md text-label-md text-orange-400/80 mt-0.5" dir="rtl">رقم خاطئ</span>
+</button>
+<!-- 8. Closed Number / رقم مغلق (Red/Crimson) -->
+<button class="group relative flex flex-col items-start p-space-sm rounded-DEFAULT text-left transition-all duration-150 bg-red-950/25 border border-red-900/40 hover:border-red-500/60 hover:bg-red-950/30 active:scale-[0.98]" type="button">
+<div class="flex items-center justify-between w-full mb-1.5">
+<div class="w-8 h-8 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">power_settings_new</span>
+</div>
+<div class="w-4 h-4 rounded-full border border-red-900/60 shrink-0"></div>
+</div>
+<span class="font-headline-sm text-body-md font-bold text-red-300 leading-tight">Closed Number</span>
+<span class="font-label-md text-label-md text-red-400/80 mt-0.5" dir="rtl">رقم مغلق</span>
+</button></div>
+</div>
+<!-- ===================================================== -->
+<!-- NOTES & QUICK SNIPPETS SECTION                         -->
+<!-- ===================================================== -->
+<div class="space-y-space-xs pt-1">
+<div class="flex items-center justify-between">
+<label class="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider" for="call-notes">
+              Call Notes <span class="font-normal text-on-surface-variant/70 normal-case">(optional)</span>
+</label>
+<div class="flex items-center gap-space-xs text-primary cursor-pointer hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-sm">mic</span>
+<span class="font-label-sm text-label-sm font-semibold">Voice Dictate</span>
+</div>
+</div>
+<!-- Sunken Textarea -->
+<div class="relative">
+<textarea class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-space-sm font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-none shadow-inner" id="call-notes" placeholder="Quick remarks — e.g. wants 3BR in New Zayed, budget 2M, prefers payment plan 7 yrs..." rows="3"></textarea>
+<span class="absolute bottom-2.5 right-3 font-label-sm text-[0.625rem] text-on-surface-variant/50 font-mono">0/280</span>
+</div>
+<!-- Quick Snippet Chips -->
+<div class="flex flex-wrap gap-1.5 pt-1">
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 hover:bg-surface-container text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-all active:scale-95" type="button">
+              + Scheduled site visit
+            </button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 hover:bg-surface-container text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-all active:scale-95" type="button">
+              + Requested brochure on WhatsApp
+            </button>
+<button class="px-2.5 py-1 rounded-full bg-surface-container-lowest border border-outline-variant hover:border-primary/50 hover:bg-surface-container text-on-surface-variant hover:text-primary font-label-sm text-label-sm transition-all active:scale-95" type="button">
+              + Call back after 6 PM
+            </button>
+</div>
+</div>
+</div>
+<!-- ======================================================= -->
+<!-- BOTTOM FIXED FOOTER ACTION BAR                          -->
+<!-- ======================================================= -->
+<div class="p-space-md border-t border-outline-variant bg-surface-container-lowest shrink-0">
+<div class="flex items-center gap-space-sm">
+<!-- Cancel Button -->
+<button class="flex-1 py-3 px-space-md rounded-full border border-outline-variant bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md font-bold tracking-wide active:scale-95 transition-all text-center" type="button">
+            Cancel
+          </button>
+<!-- Save Log Button (Glowing Primary Kinetic) -->
+<button class="flex-[2] py-3 px-space-md rounded-full bg-primary hover:bg-secondary text-on-primary font-label-md text-label-md font-extrabold tracking-wide active:scale-95 transition-all shadow-[0_0_20px_rgba(163,230,53,0.35)] flex items-center justify-center gap-2" type="button">
+<span class="material-symbols-outlined text-lg font-bold">check_circle</span>
+<span>Save Log</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Micro-interaction for quick snippet chips & outcome toggles -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Snippet insertion to textarea
+      const textarea = document.getElementById('call-notes');
+      const snippetButtons = document.querySelectorAll('button:has(+ span), button:not([dir])');
+      
+      document.querySelectorAll('.flex-wrap button').forEach(button => {
+        button.addEventListener('click', () => {
+          const text = button.textContent.replace('+', '').trim();
+          if (textarea) {
+            textarea.value = textarea.value ? `${textarea.value}, ${text}` : text;
+            textarea.focus();
+          }
+        });
+      });
+    });
+  </script>
+</body></html>
