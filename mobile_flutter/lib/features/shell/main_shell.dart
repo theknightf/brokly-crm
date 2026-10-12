@@ -9,7 +9,6 @@ import '../dashboard/dashboard_screen.dart';
 import '../follow_ups/follow_ups_screen.dart';
 import '../leads/add_lead_screen.dart';
 import '../leads/leads_screen.dart';
-import '../notifications/notifications_sheet.dart';
 import '../settings/settings_screen.dart';
 import 'app_drawer.dart';
 import 'app_top_bar.dart';
@@ -84,21 +83,20 @@ class _MainShellState extends State<MainShell> {
     // Determine bottom nav active index (0..3, or none if accessing auxiliary drawer pages)
     final bottomNavActiveIndex = _currentIndex <= 3 ? _currentIndex : -1;
 
-    return RealTimeNotificationBannerHost(
-      child: Scaffold(
-        key: _scaffoldKey,
-        appBar: AppTopBar(
-          title: _currentTitle,
-          onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
-        drawer: AppDrawer(
-          selectedIndex: _currentIndex,
-          onSelectTab: (index) => setState(() => _currentIndex = index),
-        ),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: screens,
-        ),
+    return Scaffold(
+      key: _scaffoldKey,
+      appBar: AppTopBar(
+        title: _currentTitle,
+        onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
+      drawer: AppDrawer(
+        selectedIndex: _currentIndex,
+        onSelectTab: (index) => setState(() => _currentIndex = index),
+      ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: screens,
+      ),
       bottomNavigationBar: SafeArea(
         bottom: true,
         child: Container(
@@ -168,7 +166,6 @@ class _MainShellState extends State<MainShell> {
               },
             )
           : null,
-      ),
     );
   }
 

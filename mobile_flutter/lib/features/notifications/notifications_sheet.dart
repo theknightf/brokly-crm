@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import '../../core/router/router.dart';
+import '../../core/services/local_push_notification_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_utils.dart';
 import '../../data/models/app_notification_model.dart';
@@ -9,49 +11,76 @@ import '../../state/leads_provider.dart';
 import '../../state/notifications_provider.dart';
 import '../leads/lead_detail_screen.dart';
 
-/// Helper to navigate directly to the relevant LeadDetailScreen when clicking any notification
-void openNotificationTarget(
+/// Navigate directly to the relevant LeadDetailScreen when clicking any notification
+/// (from the floating push banner, NotificationsSheet, or OS system notification).
+Future<void> openNotificationTarget(
   BuildContext context,
   AppNotificationModel notification, {
   VoidCallback? onNavigateFallbackTab,
-}) {
-  context.read<NotificationsProvider>().markAsRead(notification.id);
+}) async {
+  final notifProvider = context.read<NotificationsProvider>();
+  final leadsProvider = context.read<LeadsProvider>();
+  notifProvider.markAsRead(notification.id);
 
   String? targetLeadId = notification.leadId;
 
-  // Fallback resolution against loaded leads if leadId wasn't directly stored
+  // 1) Check direct entityId if entityType is lead
   if (targetLeadId == null || targetLeadId.isEmpty) {
     if (notification.entityType == 'lead' && notification.entityId.isNotEmpty) {
       targetLeadId = notification.entityId;
-    } else {
-      final leads = context.read<LeadsProvider>().leads;
-      final bodyLower = notification.body.toLowerCase();
-      for (final lead in leads) {
-        if (lead.name.trim().isNotEmpty &&
-            bodyLower.contains(lead.name.trim().toLowerCase())) {
-          targetLeadId = lead.id;
-          break;
-        }
-      }
-      if ((targetLeadId == null || targetLeadId.isEmpty) && leads.isNotEmpty) {
-        targetLeadId = leads.first.id;
+    } else if (notification.entityId.startsWith('lead-')) {
+      targetLeadId = notification.entityId.replaceFirst('lead-', '');
+    }
+  }
+
+  // 2) Match against loaded leads in memory by name or phone
+  if (targetLeadId == null || targetLeadId.isEmpty) {
+    final allLeads = leadsProvider.allLeads;
+    final bodyLower = notification.body.toLowerCase();
+    for (final lead in allLeads) {
+      if (lead.name.trim().isNotEmpty &&
+          bodyLower.contains(lead.name.trim().toLowerCase())) {
+        targetLeadId = lead.id;
+        break;
       }
     }
   }
 
+  // 3) Async lookup in Supabase (e.g. follow_ups.lead_id or phone/name match)
+  if (targetLeadId == null || targetLeadId.isEmpty) {
+    targetLeadId = await notifProvider.resolveLeadId(notification);
+  }
+
+  // 4) Final fallback to first available lead if user has leads
+  if ((targetLeadId == null || targetLeadId.isEmpty) &&
+      leadsProvider.allLeads.isNotEmpty) {
+    targetLeadId = leadsProvider.allLeads.first.id;
+  }
+
   if (targetLeadId != null && targetLeadId.isNotEmpty) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LeadDetailScreen(leadId: targetLeadId!),
-      ),
-    );
+    final nav = rootNavigatorKey.currentState;
+    if (nav != null) {
+      nav.push(
+        MaterialPageRoute(
+          builder: (_) => LeadDetailScreen(leadId: targetLeadId!),
+        ),
+      );
+      return;
+    }
+    if (context.mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => LeadDetailScreen(leadId: targetLeadId!),
+        ),
+      );
+    }
   } else {
     onNavigateFallbackTab?.call();
   }
 }
 
-/// Host widget that listens to NotificationsProvider.alertStream and displays
-/// a floating push-style banner at the top of the screen for new lead assignments
+/// Host widget that listens to NotificationsProvider.alertStream AND OS deepLinkStream,
+/// displaying a floating push-style banner at the top of the screen for new lead assignments
 /// and upcoming/overdue follow-up reminders. Tapping opens LeadDetailScreen directly.
 class RealTimeNotificationBannerHost extends StatefulWidget {
   final Widget child;
@@ -68,16 +97,18 @@ class RealTimeNotificationBannerHost extends StatefulWidget {
 
 class _RealTimeNotificationBannerHostState
     extends State<RealTimeNotificationBannerHost> {
-  StreamSubscription<AppNotificationModel>? _sub;
+  StreamSubscription<AppNotificationModel>? _alertSub;
+  StreamSubscription<NotificationDeepLinkPayload>? _deepLinkSub;
   AppNotificationModel? _activeAlert;
   Timer? _dismissTimer;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_sub == null) {
+    if (_alertSub == null) {
       final provider = context.read<NotificationsProvider>();
-      _sub = provider.alertStream.listen(_showBanner);
+      _alertSub = provider.alertStream.listen(_showBanner);
+      _deepLinkSub = provider.deepLinkStream.listen(_handleOsDeepLink);
     }
   }
 
@@ -85,11 +116,46 @@ class _RealTimeNotificationBannerHostState
     if (!mounted) return;
     _dismissTimer?.cancel();
     setState(() => _activeAlert = alert);
-    _dismissTimer = Timer(const Duration(seconds: 7), () {
+    _dismissTimer = Timer(const Duration(seconds: 8), () {
       if (mounted) {
         setState(() => _activeAlert = null);
       }
     });
+  }
+
+  Future<void> _handleOsDeepLink(NotificationDeepLinkPayload payload) async {
+    if (!mounted) return;
+    final provider = context.read<NotificationsProvider>();
+    if (payload.notificationId.isNotEmpty) {
+      provider.markAsRead(payload.notificationId);
+    }
+
+    String? targetLeadId = payload.leadId;
+    if (targetLeadId.startsWith('lead-')) {
+      targetLeadId = targetLeadId.replaceFirst('lead-', '');
+    }
+
+    // Try matching existing notification item if leadId wasn't directly passed
+    if (targetLeadId.isEmpty && payload.notificationId.isNotEmpty) {
+      final match = provider.items
+          .where((n) => n.id == payload.notificationId)
+          .toList();
+      if (match.isNotEmpty) {
+        await openNotificationTarget(context, match.first);
+        return;
+      }
+    }
+
+    if (targetLeadId.isNotEmpty) {
+      final nav = rootNavigatorKey.currentState;
+      if (nav != null) {
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => LeadDetailScreen(leadId: targetLeadId!),
+          ),
+        );
+      }
+    }
   }
 
   void _dismissBanner() {
@@ -102,7 +168,8 @@ class _RealTimeNotificationBannerHostState
   @override
   void dispose() {
     _dismissTimer?.cancel();
-    _sub?.cancel();
+    _alertSub?.cancel();
+    _deepLinkSub?.cancel();
     super.dispose();
   }
 
@@ -129,18 +196,19 @@ class _RealTimeNotificationBannerHostState
                   openNotificationTarget(context, target);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1A202C) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: _colorForType(alert.type).withAlpha(140),
+                      color: _colorForType(alert.type).withAlpha(160),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withAlpha(65),
-                        blurRadius: 16,
+                        color: Colors.black.withAlpha(75),
+                        blurRadius: 18,
                         offset: const Offset(0, 6),
                       ),
                     ],
@@ -148,10 +216,10 @@ class _RealTimeNotificationBannerHostState
                   child: Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
-                          color: _colorForType(alert.type).withAlpha(30),
+                          color: _colorForType(alert.type).withAlpha(32),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
@@ -166,15 +234,47 @@ class _RealTimeNotificationBannerHostState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              alert.title,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        _colorForType(alert.type).withAlpha(30),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    alert.type == 'assignment'
+                                        ? 'NEW LEAD'
+                                        : (alert.type == 'overdue_reminder'
+                                            ? 'OVERDUE'
+                                            : 'REMINDER'),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: _colorForType(alert.type),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    alert.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 3),
                             Text(
                               alert.body,
                               maxLines: 2,
@@ -231,6 +331,7 @@ class NotificationsSheet extends StatefulWidget {
 
 class _NotificationsSheetState extends State<NotificationsSheet> {
   String _filter = 'all'; // 'all' | 'leads' | 'reminders'
+  bool _syncingPush = false;
 
   @override
   void initState() {
@@ -242,10 +343,19 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
     });
   }
 
+  Future<void> _handleEnablePush(NotificationsProvider provider) async {
+    setState(() => _syncingPush = true);
+    await provider.enableAndSyncPushNotifications();
+    if (mounted) {
+      setState(() => _syncingPush = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<NotificationsProvider>();
+    final leadsProvider = context.watch<LeadsProvider>();
     final allItems = provider.items;
 
     final filtered = allItems.where((n) {
@@ -258,7 +368,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.82,
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : Colors.white,
@@ -282,10 +392,11 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 16, 10),
+            padding: const EdgeInsets.fromLTRB(20, 14, 16, 8),
             child: Row(
               children: [
-                const Icon(LucideIcons.bellRing, size: 20, color: AppColors.neonLime),
+                const Icon(LucideIcons.bellRing,
+                    size: 20, color: AppColors.neonLime),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -309,25 +420,131 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
             ),
           ),
 
+          // Push Notification Permission & Token Sync Status Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: provider.isPushPermissionGranted
+                    ? const Color(0xFF10B981).withAlpha(isDark ? 25 : 18)
+                    : AppColors.amber.withAlpha(isDark ? 28 : 20),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: provider.isPushPermissionGranted
+                      ? const Color(0xFF10B981).withAlpha(90)
+                      : AppColors.amber.withAlpha(110),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    provider.isPushPermissionGranted
+                        ? LucideIcons.shieldCheck
+                        : LucideIcons.bellRing,
+                    size: 15,
+                    color: provider.isPushPermissionGranted
+                        ? const Color(0xFF10B981)
+                        : AppColors.amber,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      provider.isPushPermissionGranted
+                          ? 'Push notifications ON • Device token synced'
+                          : 'Enable push permissions for instant background alerts',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: provider.isPushPermissionGranted
+                            ? const Color(0xFF10B981)
+                            : AppColors.amber,
+                      ),
+                    ),
+                  ),
+                  if (!provider.isPushPermissionGranted)
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: AppColors.neonLime,
+                      ),
+                      onPressed: _syncingPush
+                          ? null
+                          : () => _handleEnablePush(provider),
+                      child: Text(
+                        _syncingPush ? 'Syncing...' : 'Enable',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF142407),
+                        ),
+                      ),
+                    )
+                  else
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        final firstLead = leadsProvider.allLeads.isNotEmpty
+                            ? leadsProvider.allLeads.first
+                            : null;
+                        Navigator.pop(context);
+                        provider.triggerInstantVerificationAlert(
+                          targetLeadId: firstLead?.id,
+                          leadName: firstLead?.name,
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white.withAlpha(18)
+                              : Colors.black.withAlpha(10),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Test Alert',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
           // Filter Chips
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                _buildFilterChip('all', 'All (${allItems.length})', isDark),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  'leads',
-                  'Assigned Leads (${allItems.where((i) => i.type == 'assignment').length})',
-                  isDark,
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
-                  'reminders',
-                  'Follow-ups (${allItems.where((i) => i.type == 'overdue_reminder' || i.type == 'upcoming_reminder').length})',
-                  isDark,
-                ),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip('all', 'All (${allItems.length})', isDark),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    'leads',
+                    'Assigned Leads (${allItems.where((i) => i.type == 'assignment').length})',
+                    isDark,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    'reminders',
+                    'Follow-ups (${allItems.where((i) => i.type == 'overdue_reminder' || i.type == 'upcoming_reminder').length})',
+                    isDark,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -373,7 +590,9 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) => Divider(
                           height: 1,
-                          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                          color: isDark
+                              ? AppColors.darkBorder
+                              : AppColors.lightBorder,
                         ),
                         itemBuilder: (context, index) {
                           final n = filtered[index];
@@ -408,7 +627,8 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
@@ -455,8 +675,10 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 color: isDark
-                                                    ? AppColors.darkMutedForeground
-                                                    : AppColors.lightMutedForeground,
+                                                    ? AppColors
+                                                        .darkMutedForeground
+                                                    : AppColors
+                                                        .lightMutedForeground,
                                               ),
                                             ),
                                             const SizedBox(width: 8),

@@ -76,7 +76,7 @@ class TelephonyService {
       final client = SupabaseService().client;
       final lead = await client
           .from('leads')
-          .select('name, phone, crm_status, project_interested, budget_min, budget_max')
+          .select('name, phone, crm_status, project, property_type, budget_min, budget_max')
           .ilike('phone', '%$suffix%')
           .limit(1)
           .maybeSingle();
@@ -91,7 +91,7 @@ class TelephonyService {
         name = lead['name']?.toString() ?? name;
         phone = lead['phone']?.toString() ?? phone;
         status = lead['crm_status']?.toString() ?? status;
-        project = lead['project_interested']?.toString() ?? project;
+        project = lead['project']?.toString() ?? lead['property_type']?.toString() ?? project;
         final bMin = lead['budget_min'] != null ? double.tryParse(lead['budget_min'].toString()) : null;
         final bMax = lead['budget_max'] != null ? double.tryParse(lead['budget_max'].toString()) : null;
         budget = CurrencyFormatter.formatRange(bMin, bMax);

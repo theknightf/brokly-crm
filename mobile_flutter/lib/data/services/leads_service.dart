@@ -47,7 +47,7 @@ class LeadsService {
         query = query.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
       }
 
-      final response = await query.order('created_at', ascending: false).limit(200);
+      final response = await query.order('created_at', ascending: false).limit(1000);
       final List<dynamic> data = response as List<dynamic>;
       return data.map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
@@ -77,7 +77,7 @@ class LeadsService {
         fallbackQuery = fallbackQuery.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
       }
 
-      final data = await fallbackQuery.order('created_at', ascending: false).limit(200);
+      final data = await fallbackQuery.order('created_at', ascending: false).limit(1000);
       return (data as List<dynamic>).map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
     }
   }

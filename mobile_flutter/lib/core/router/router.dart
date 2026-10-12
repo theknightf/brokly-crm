@@ -7,8 +7,12 @@ import '../../features/leads/add_lead_screen.dart';
 import '../../features/leads/lead_detail_screen.dart';
 import '../../features/shell/main_shell.dart';
 
+/// Global root navigator key for deep linking from push/in-app notifications
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 GoRouter buildRouter({required Listenable refreshListenable}) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     refreshListenable: refreshListenable,
     initialLocation: '/home',
     redirect: (context, state) {

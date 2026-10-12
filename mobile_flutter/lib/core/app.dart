@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../features/notifications/notifications_sheet.dart';
 import '../state/auth_provider.dart';
 import '../state/attendance_provider.dart';
 import '../state/call_logs_provider.dart';
@@ -56,6 +57,11 @@ class _BroklyAppState extends State<BroklyApp> {
             darkTheme: AppTheme.darkTheme,
             themeMode: theme.themeMode,
             routerConfig: _router,
+            builder: (context, child) {
+              return RealTimeNotificationBannerHost(
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
           );
         },
       ),
