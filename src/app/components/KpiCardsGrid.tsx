@@ -6,6 +6,33 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface Card { stage: string; count: number; trend: string; trendValue: number }
 
+const kpiClientCache = new Map<string, { at: number; data: any; promise?: Promise<any> }>();
+
+export function fetchKpiCardsCached(teamId?: string, agentId?: string, force = false): Promise<any> {
+  const params = new URLSearchParams();
+  if (teamId) params.set('teamId', teamId);
+  if (agentId) params.set('agentId', agentId);
+  const key = params.toString();
+  const existing = kpiClientCache.get(key);
+  const now = Date.now();
+  if (!force && existing && existing.data && now - existing.at < 15_000) {
+    return Promise.resolve(existing.data);
+  }
+  if (existing?.promise) return existing.promise;
+  const p = fetch(`/api/dashboard/kpi-cards?${key}`, { cache: 'no-store', credentials: 'same-origin' })
+    .then((r) => r.json())
+    .then((j) => {
+      kpiClientCache.set(key, { at: Date.now(), data: j });
+      return j;
+    })
+    .finally(() => {
+      const cur = kpiClientCache.get(key);
+      if (cur) delete cur.promise;
+    });
+  kpiClientCache.set(key, { at: existing?.at || 0, data: existing?.data, promise: p });
+  return p;
+}
+
 /** Deep-link for a status card — All Leads opens unfiltered, every other
  * stage opens Leads Management with that exact status pre-applied. */
 function hrefForStage(stage: string): string {
@@ -20,28 +47,21 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
 
   useEffect(() => {
     if (authLoading || !user) return;
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (teamId) params.set('teamId', teamId);
-    if (agentId) params.set('agentId', agentId);
-    // Force revalidation with credentials and no-store; relies on patched fetch injecting x-sb-token when cookies blocked
-    fetch(`/api/dashboard/kpi-cards?${params}`, { cache: 'no-store', credentials: 'same-origin' })
-      .then(r => r.json())
-      .then(j => setCards(j.cards || []))
-      .catch(() => setCards([]))
+    if (cards.length === 0) setLoading(true);
+    fetchKpiCardsCached(teamId, agentId)
+      .then((j) => setCards(j?.cards || []))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [teamId, agentId, user?.id, authLoading]);
 
-  // Also revalidate on window focus/visibility for stale-while-revalidate
+  // Also revalidate silently on window focus/visibility for stale-while-revalidate
   useEffect(() => {
     if (authLoading || !user) return;
     const revalidate = () => {
-      const params = new URLSearchParams();
-      if (teamId) params.set('teamId', teamId);
-      if (agentId) params.set('agentId', agentId);
-      fetch(`/api/dashboard/kpi-cards?${params}`, { cache: 'no-store', credentials: 'same-origin' })
-        .then(r => r.json())
-        .then(j => setCards(j.cards || []))
+      fetchKpiCardsCached(teamId, agentId, true)
+        .then((j) => {
+          if (j?.cards) setCards(j.cards);
+        })
         .catch(() => {});
     };
     const onFocus = () => revalidate();
@@ -51,7 +71,7 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
     return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onVisible); };
   }, [teamId, agentId, user?.id, authLoading]);
 
-  if (loading) return (
+  if (loading && cards.length === 0) return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
       {Array.from({length: 14}).map((_,i)=>(
         <div key={i} className="bg-card border border-border rounded-2xl p-4 h-[92px] animate-pulse">

@@ -100,21 +100,65 @@ class LeadsService {
     }
   }
 
-  /// Create lead with duplicate phone/email detection
+  /// Create lead and automatically route duplicates to Duplicate Center without blocking
   Future<LeadModel> create(LeadModel lead) async {
     final currentUserId = _client.auth.currentUser?.id;
 
-    // Duplicate check
-    final normalizedPhone = lead.phone.replaceAll(RegExp(r'\D'), '');
-    if (normalizedPhone.length >= 8) {
-      final suffix = normalizedPhone.length >= 10 ? normalizedPhone.substring(normalizedPhone.length - 10) : normalizedPhone;
-      final dup = await _client.from('leads').select('id, name, phone').ilike('phone', '%$suffix%').limit(1).maybeSingle();
-      if (dup != null) {
-        throw Exception('Duplicate phone number already exists for lead: ${dup['name']}');
+    String? matchedDupId;
+    String? matchedDupName;
+    try {
+      final normalizedPhone = lead.phone.replaceAll(RegExp(r'\D'), '');
+      if (normalizedPhone.length >= 8) {
+        final suffix = normalizedPhone.length >= 10
+            ? normalizedPhone.substring(normalizedPhone.length - 10)
+            : normalizedPhone;
+        final dup = await _client
+            .from('leads')
+            .select('id, name, phone')
+            .ilike('phone', '%$suffix%')
+            .order('created_at', ascending: true)
+            .limit(1)
+            .maybeSingle();
+        if (dup != null) {
+          final dupDigits = (dup['phone']?.toString() ?? '').replaceAll(RegExp(r'\D'), '');
+          final dupTail = dupDigits.length >= 10 ? dupDigits.substring(dupDigits.length - 10) : dupDigits;
+          if (dupTail == suffix) {
+            matchedDupId = dup['id']?.toString();
+            matchedDupName = dup['name']?.toString();
+          }
+        }
+      }
+      final emailNorm = (lead.email ?? '').trim().toLowerCase();
+      if (matchedDupId == null && emailNorm.isNotEmpty && emailNorm.contains('@')) {
+        final dup = await _client
+            .from('leads')
+            .select('id, name, email')
+            .ilike('email', emailNorm)
+            .order('created_at', ascending: true)
+            .limit(1)
+            .maybeSingle();
+        if (dup != null) {
+          matchedDupId = dup['id']?.toString();
+          matchedDupName = dup['name']?.toString();
+        }
+      }
+    } catch (_) {}
+
+    final row = lead.toJson(currentUserId: currentUserId);
+    if (matchedDupId != null) {
+      row['crm_status'] = 'Duplicate Leads';
+      row['lead_status'] = 'Lost';
+      row['is_duplicate'] = true;
+      row['duplicate_of_lead_id'] = matchedDupId;
+      row['routed_to_duplicate_center_at'] = DateTime.now().toUtc().toIso8601String();
+      final existingNotes = (row['notes']?.toString() ?? '').trim();
+      final shortId = matchedDupId.length >= 8 ? matchedDupId.substring(0, 8) : matchedDupId;
+      final tag = '[Pending Review / Duplicate of #$shortId (${matchedDupName ?? 'Existing Lead'})]';
+      if (!existingNotes.contains('[Pending Review / Duplicate')) {
+        row['notes'] = existingNotes.isEmpty ? tag : '$existingNotes\n$tag';
       }
     }
 
-    final row = lead.toJson(currentUserId: currentUserId);
     final res = await _client.from('leads').insert(row).select().single();
     return LeadModel.fromJson(res);
   }

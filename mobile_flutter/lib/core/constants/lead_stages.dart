@@ -15,6 +15,7 @@ class LeadStages {
     'Pending Leads',
     'Following Up',
     'Meeting',
+    'Follow Up After Meeting',
     'Interested',
     'Reservation',
     'Done Deal',
@@ -34,7 +35,7 @@ class LeadStages {
     'Duplicate Leads',
   ];
 
-  /// Complete list of all 18 canonical statuses used across the web platform and backend
+  /// Complete list of all canonical statuses used across the web platform and backend
   static const List<String> allStatuses = [
     ...pipelineStages,
     ...outcomeStages,
@@ -70,6 +71,9 @@ class LeadStages {
       case 'following up':
       case 'follow-up':
         return 'Following Up';
+      case 'follow up after meeting':
+      case 'follow-up after meeting':
+        return 'Follow Up After Meeting';
       case 'meeting':
       case 'meeting scheduled':
       case 'site visit':
@@ -131,6 +135,8 @@ class LeadStages {
         return 'Active Follow-Up';
       case 'Meeting':
         return 'Meeting Scheduled';
+      case 'Follow Up After Meeting':
+        return 'Post-Meeting Follow-Up';
       case 'Interested':
         return 'Qualified • High Intent';
       case 'Reservation':
@@ -170,6 +176,8 @@ class LeadStages {
         return LucideIcons.refreshCw;
       case 'Meeting':
         return LucideIcons.calendarCheck;
+      case 'Follow Up After Meeting':
+        return LucideIcons.calendarClock;
       case 'Interested':
         return LucideIcons.star;
       case 'Reservation':

@@ -156,7 +156,7 @@ export async function GET(request: Request) {
   (expensesThisRes.data || []).forEach((e: any) => { byCategory[e.category] = (byCategory[e.category] || 0) + (Number(e.amount) || 0); });
   const categories = Object.entries(byCategory).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
 
-  const STATUSES_CANON = ['All Leads','Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number','No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'] as const;
+  const STATUSES_CANON = ['All Leads','Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Follow Up After Meeting','Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number','No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'] as const;
   const canonMap = new Map<string,string>(STATUSES_CANON.map(s=>[s.toLowerCase(), s]));
   const normalizeStatus = (raw: any): string => {
     const t = String(raw||'').trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');

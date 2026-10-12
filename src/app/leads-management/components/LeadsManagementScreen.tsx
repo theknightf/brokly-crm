@@ -309,7 +309,7 @@ export default function LeadsManagementScreen({
     setScheduleNotes('');
   }, [viewLead?.id]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(500);
+  const [pageSize, setPageSize] = useState(100);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [showFilters, setShowFilters] = useState(true);
   const [viewTab, setViewTab] = useState<'overview' | 'activity' | 'units' | 'comments'>('overview');
@@ -473,18 +473,96 @@ export default function LeadsManagementScreen({
     }
   };
 
-  // Debounced server-side fetch: pagination, filters, and sorting all happen in
-  // the database so we never download the full leads table to the browser.
+  const prevSearchRef = useRef(filters.search);
+
+  // Server-side fetch: pagination, filters, and sorting all happen in the DB.
+  // Only debounce text search input (150ms); stage/filter/page/sort changes fire in 0ms!
   useEffect(() => {
-    const timer = setTimeout(
-      () => {
-        fetchLeads();
-      },
-      firstLoadRef.current ? 0 : 250
-    );
+    const isSearchTyping = !firstLoadRef.current && prevSearchRef.current !== filters.search;
+    prevSearchRef.current = filters.search;
+
+    if (!isSearchTyping) {
+      fetchLeads();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchLeads();
+    }, 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, currentPage, pageSize, sortKey, sortDir]);
+
+  // Real-time two-way stage synchronization with Mobile App & other active sessions
+  useEffect(() => {
+    const supabase = createClient();
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('web-leads-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leads' },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const row = payload.new as Record<string, any>;
+            const rawStatus = String(row.crm_status || row.lead_status || '').trim();
+            const normalizedStatus: LeadStatus | '' =
+              rawStatus.toLowerCase() === 'follow up after meeting'
+                ? 'Follow Up After Meeting'
+                : rawStatus.toLowerCase() === 'no answer at all'
+                  ? 'No Answer At All'
+                  : (rawStatus as LeadStatus);
+
+            if (row.id) {
+              setLeads((prev) =>
+                prev.map((l) =>
+                  l.id === row.id
+                    ? {
+                        ...l,
+                        name: row.name ?? l.name,
+                        phone: row.phone ?? l.phone,
+                        email: row.email ?? l.email,
+                        status: normalizedStatus || l.status,
+                        notes: row.notes ?? l.notes,
+                        followUpDue: row.follow_up_due
+                          ? String(row.follow_up_due).slice(0, 10)
+                          : l.followUpDue,
+                      }
+                    : l
+                )
+              );
+              setViewLead((prev) =>
+                prev && prev.id === row.id
+                  ? {
+                      ...prev,
+                      name: row.name ?? prev.name,
+                      phone: row.phone ?? prev.phone,
+                      email: row.email ?? prev.email,
+                      status: normalizedStatus || prev.status,
+                      notes: row.notes ?? prev.notes,
+                      followUpDue: row.follow_up_due
+                        ? String(row.follow_up_due).slice(0, 10)
+                        : prev.followUpDue,
+                    }
+                  : prev
+              );
+            }
+          } else {
+            if (refreshTimer) clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(() => {
+              fetchLeads();
+            }, 300);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -520,11 +598,10 @@ export default function LeadsManagementScreen({
           ? { ...prev, status: newStatus, actionTakenToday: true, contactedToday: true }
           : prev
       );
+      toast.success(`Lead status updated to ${newStatus}`);
       await leadsService.updateStatus(id, newStatus);
-      // Unified fix: status "Following Up" must also guarantee a follow_ups row.
-      // If the lead has no due date, default to tomorrow (08/09/26 example) so the
-      // Follow-ups screen (which reads from follow_ups, not leads) is not empty.
-      const needsFollowUp = new Set(['Following Up', 'Pending Leads', 'Interested', 'Meeting', 'Reservation']).has(newStatus);
+      // Unified fix: status "Following Up" / "Follow Up After Meeting" must also guarantee a follow_ups row.
+      const needsFollowUp = new Set(['Following Up', 'Follow Up After Meeting', 'Pending Leads', 'Interested', 'Meeting', 'Reservation']).has(newStatus);
       if (needsFollowUp) {
         const src = prevLeads.find((x) => x.id === id) || prevView;
         if (!src?.followUpDue) {
@@ -561,7 +638,6 @@ export default function LeadsManagementScreen({
             .catch(() => {});
         }
       }
-      toast.success(`Lead status updated to ${newStatus}`);
     } catch (err: any) {
       setLeads((prev) =>
         prev.map((l) => {
@@ -607,7 +683,6 @@ export default function LeadsManagementScreen({
       }
     } catch {}
     const prev = viewLead;
-    setScheduleSaving(true);
     // Optimistic: reflect date immediately on card/list + drawer, and mark action taken
     setViewLead((v) =>
       v?.id === id ? { ...v, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : v
@@ -617,32 +692,32 @@ export default function LeadsManagementScreen({
         l.id === id ? { ...l, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : l
       )
     );
+    toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
+    setScheduleSaving(false);
     try {
-      // 1) Keep legacy lead column in sync and mark last_action_at / last_action_by
-      await leadsService.scheduleFollowUp(id, dueDate, user?.id).catch(() => {});
-      // 2) Canonical create: validates, upserts on lead_id, preserves time+notes,
-      //    and drives the dashboard widget + follow-up partition via emit.
-      await followUpsService.create(
-        {
-          title: `Follow up: ${viewLead.name || 'Lead'}`,
-          contactName: viewLead.name || 'Lead',
-          contactPhone: viewLead.phone || '',
-          contactEmail: viewLead.email || '',
-          type: 'Call',
-          status: 'Pending',
-          priority: 'Medium',
-          dueDate,
-          dueTime,
-          agent: viewLead.agent || '',
-          agentInitials: viewLead.agentInitials || '',
-          notes: notes || viewLead.notes || '',
-          propertyInterest: viewLead.propertyType || viewLead.project || '',
-          relationshipStatus: 'New',
-          leadId: id,
-        },
-        user?.id || ''
-      );
-      toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
+      await Promise.all([
+        leadsService.scheduleFollowUp(id, dueDate, user?.id).catch(() => {}),
+        followUpsService.create(
+          {
+            title: `Follow up: ${viewLead.name || 'Lead'}`,
+            contactName: viewLead.name || 'Lead',
+            contactPhone: viewLead.phone || '',
+            contactEmail: viewLead.email || '',
+            type: 'Call',
+            status: 'Pending',
+            priority: 'Medium',
+            dueDate,
+            dueTime,
+            agent: viewLead.agent || '',
+            agentInitials: viewLead.agentInitials || '',
+            notes: notes || viewLead.notes || '',
+            propertyInterest: viewLead.propertyType || viewLead.project || '',
+            relationshipStatus: 'New',
+            leadId: id,
+          },
+          user?.id || ''
+        ),
+      ]);
     } catch (err: any) {
       setViewLead(prev ?? null);
       setLeads((prevLeads) =>
@@ -653,8 +728,6 @@ export default function LeadsManagementScreen({
         )
       );
       toast.error(err?.message || 'Failed to schedule follow-up');
-    } finally {
-      setScheduleSaving(false);
     }
   };
 
@@ -884,59 +957,33 @@ export default function LeadsManagementScreen({
   };
 
   const handleAddLead = async (lead: Lead) => {
-    setDupChecking(true);
-    let existing = null;
-    try {
-      existing = await duplicateLeadsService.findByPhone(lead.phone || '');
-    } catch {
-      existing = null;
-    }
     setDupChecking(false);
-
-    // Strong duplicate detection: alert owner/admin and warn user before creating
-    if (existing) {
-      if (existing.id) {
-        // Automatically log attempt so owner and admin get notified who added it and who first owned it
-        duplicateLeadsService.logAttempt({
-          matchedLeadId: existing.id,
-          attemptedPhone: lead.phone || '',
-        }).catch(() => {});
-      }
-      setDupWarning({ existing, pendingLead: lead });
-      return;
-    }
+    setDupWarning(null);
     await createLead(lead);
   };
 
   const createLead = async (lead: Lead) => {
     try {
+      setAddModalOpen(false);
       const created = await leadsService.create(lead, user?.id || '');
       setLeads((prev) => [created as Lead, ...prev]);
       setTotal((t) => t + 1);
-      setAddModalOpen(false);
-      toast.success(`Lead "${lead.name}" added successfully`);
+      if ((created as any)?.isDuplicate || (created as any)?.routedToDuplicateCenter) {
+        toast.success(`Lead "${lead.name}" accepted and routed to Duplicate Center for review`);
+      } else {
+        toast.success(`Lead "${lead.name}" added successfully`);
+      }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to add lead');
     }
   };
 
-  /** "Create anyway" after a duplicate warning — records the attempt for admins. */
+  /** "Create anyway" fallback if dupWarning is ever triggered. */
   const createDuplicateAnyway = async () => {
     if (!dupWarning) return;
-    const { existing, pendingLead } = dupWarning;
+    const { pendingLead } = dupWarning;
     setDupWarning(null);
-    try {
-      await createLead(pendingLead);
-      if (existing?.id) {
-        await duplicateLeadsService.logAttempt({
-          matchedLeadId: existing.id,
-          attemptedLeadId: pendingLead.id,
-          attemptedPhone: pendingLead.phone || '',
-        });
-      }
-    } catch {
-      /* toast already shown by createLead */
-    }
+    await createLead(pendingLead);
   };
 
   const handleEditSave = async (updated: Lead) => {

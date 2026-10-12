@@ -10,6 +10,7 @@ export type LeadStatus =
   | 'Pending Leads'
   | 'Following Up'
   | 'Meeting'
+  | 'Follow Up After Meeting'
   | 'Cancellation'
   | 'Done Deal'
   | 'Not Interested'

@@ -34,7 +34,12 @@ export async function POST(request: Request) {
   // (legacy '__ROUND_ROBIN__' / 'round_robin' / '__UNASSIGNED__' still accepted)
   const rawAssignedTo: string = body.globalAssignedTo !== undefined ? String(body.globalAssignedTo) : '';
   const globalAssignedTo: string = rawAssignedTo === 'unassigned' ? '' : rawAssignedTo;
-  const duplicateAction: 'skip' | 'update' = body.duplicateAction === 'update' ? 'update' : 'skip';
+  const duplicateAction: 'route' | 'update' | 'skip' =
+    body.duplicateAction === 'update'
+      ? 'update'
+      : body.duplicateAction === 'skip_explicit'
+      ? 'skip'
+      : 'route';
   const sourceId: string | null = body.sourceId || null;
 
   // Validate global settings are provided (mandatory per spec Step 2)
@@ -85,22 +90,23 @@ export async function POST(request: Request) {
 
   // Pre-fetch existing phones for duplicate check (batch)
   const phonesToCheck = rows.map(r => normalizePhone(r.phone || '')).filter(Boolean);
-  const existingPhoneMap = new Map<string, { id: string; phone: string }>();
+  const existingPhoneMap = new Map<string, { id: string; phone: string; name?: string }>();
   const existingIdByPhone = new Map<string, string>();
   if (phonesToCheck.length) {
-    // chunk to avoid URL length limits
     for (let i = 0; i < phonesToCheck.length; i += 50) {
       const chunk = phonesToCheck.slice(i, i + 50);
       try {
-        const { data, error } = await supabase.from('leads').select('id, phone').or(chunk.map(p => `phone.ilike.%${p.slice(-10)}%`).join(','));
+        const { data, error } = await supabase
+          .from('leads')
+          .select('id, name, phone')
+          .or(chunk.map(p => `phone.ilike.%${p.slice(-10)}%`).join(','));
         if (!error && data) {
           for (const lead of data as any[]) {
             const norm = normalizePhone(lead.phone || '').slice(-10);
             if (norm) {
-              // find matching chunk phone that equals this
               for (const cp of chunk) {
                 if (cp.slice(-10) === norm) {
-                  existingPhoneMap.set(cp, { id: lead.id, phone: lead.phone });
+                  existingPhoneMap.set(cp, { id: lead.id, phone: lead.phone, name: lead.name });
                   existingIdByPhone.set(cp, lead.id);
                 }
               }
@@ -111,12 +117,23 @@ export async function POST(request: Request) {
     }
   }
 
+  // Pre-resolve single assignee name once if globalAssignedTo is a user id
+  let preResolvedAssigneeName = '';
+  if (!isRoundRobin && globalAssignedTo && globalAssignedTo !== '' && globalAssignedTo !== '__UNASSIGNED__') {
+    try {
+      const { data: prof } = await supabase.from('user_profiles').select('full_name').eq('id', globalAssignedTo).maybeSingle();
+      preResolvedAssigneeName = prof?.full_name || '';
+    } catch {}
+  }
+
   let imported = 0;
+  let routedDuplicates = 0;
   let skipped = 0;
   let updated = 0;
   let invalid = 0;
   const errors: string[] = [];
   const skippedDetails: string[] = [];
+  const seenBatchPhones = new Set<string>();
 
   // Process rows sequentially to handle per-row logic and round-robin index
   let rrIndex = 0;
@@ -128,9 +145,9 @@ export async function POST(request: Request) {
     const rowNum = row.rowNumber || idx + 2;
     const phoneRaw = String(row.phone || '').trim();
     const phoneNorm = normalizePhone(phoneRaw);
+    const phoneTail = phoneNorm.slice(-10);
     const name = String(row.name || '').trim();
 
-    // Validation: phone format and name exists
     if (!name || name.length < 2) {
       invalid += 1;
       skippedDetails.push(`Row ${rowNum}: missing or too short name`);
@@ -147,22 +164,20 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const isDuplicate = phoneNorm ? existingPhoneMap.has(phoneNorm) || existingIdByPhone.has(phoneNorm) : false;
+    const isExistingDup = phoneNorm ? existingPhoneMap.has(phoneNorm) || existingIdByPhone.has(phoneNorm) : false;
+    const isIntraBatchDup = phoneTail.length >= 8 && seenBatchPhones.has(phoneTail);
+    const isDuplicate = isExistingDup || isIntraBatchDup;
+    if (phoneTail.length >= 8) seenBatchPhones.add(phoneTail);
 
-    if (isDuplicate) {
-      if (duplicateAction === 'skip') {
-        skipped += 1;
-        skippedDetails.push(`Row ${rowNum}: duplicate phone ${phoneRaw} — skipped`);
-        continue;
-      } else {
-        // Update existing
-        const existingId = existingIdByPhone.get(phoneNorm) || existingPhoneMap.get(phoneNorm)?.id;
-        if (!existingId) {
-          skipped += 1;
-          skippedDetails.push(`Row ${rowNum}: duplicate phone ${phoneRaw} but no ID found — skipped`);
-          continue;
-        }
-        // Determine assignee for update: respect globalAssignedTo if set, otherwise keep existing
+    if (isDuplicate && duplicateAction === 'skip') {
+      skipped += 1;
+      skippedDetails.push(`Row ${rowNum}: duplicate phone ${phoneRaw} — skipped`);
+      continue;
+    }
+
+    if (isDuplicate && duplicateAction === 'update') {
+      const existingId = existingIdByPhone.get(phoneNorm) || existingPhoneMap.get(phoneNorm)?.id;
+      if (existingId) {
         let assignedTo: string | null = null;
         let agentName = '';
         if (isRoundRobin) {
@@ -172,11 +187,7 @@ export async function POST(request: Request) {
           agentName = rr.name;
         } else if (globalAssignedTo && globalAssignedTo !== '' && globalAssignedTo !== '__UNASSIGNED__') {
           assignedTo = globalAssignedTo;
-          // fetch name for agent
-          try {
-            const { data: prof } = await supabase.from('user_profiles').select('full_name').eq('id', assignedTo).maybeSingle();
-            agentName = prof?.full_name || '';
-          } catch {}
+          agentName = preResolvedAssigneeName;
         } else if (row.assignedTo) {
           assignedTo = row.assignedTo;
           agentName = row.assignedName || '';
@@ -189,7 +200,7 @@ export async function POST(request: Request) {
           source: resolvedSource,
           lead_source_id: resolvedSourceId,
           crm_status: globalStage,
-          lead_status: globalStage, // will be mapped on update handler as needed; keep simple
+          lead_status: globalStage,
           notes: row.notes || '',
           location: row.location || '',
           developer: row.developer || '',
@@ -212,7 +223,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Not duplicate — prepare insert
     let assignedTo: string | null = null;
     let agentName = '';
     let agentInitials = '';
@@ -224,21 +234,24 @@ export async function POST(request: Request) {
       agentInitials = agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase();
     } else if (globalAssignedTo && globalAssignedTo !== '' && globalAssignedTo !== '__UNASSIGNED__') {
       assignedTo = globalAssignedTo;
-      try {
-        const { data: prof } = await supabase.from('user_profiles').select('full_name').eq('id', assignedTo).maybeSingle();
-        agentName = prof?.full_name || row.assignedName || '';
-      } catch { agentName = row.assignedName || ''; }
+      agentName = preResolvedAssigneeName || row.assignedName || '';
       agentInitials = agentName ? agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase() : '';
     } else if (row.assignedTo) {
       assignedTo = row.assignedTo;
       agentName = row.assignedName || '';
       agentInitials = agentName ? agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase() : '';
     } else {
-      // Unassigned / Pool
       assignedTo = null;
       agentName = '';
       agentInitials = '';
     }
+
+    const existingInfo = existingPhoneMap.get(phoneNorm);
+    const existingId = existingIdByPhone.get(phoneNorm) || existingInfo?.id || null;
+    const rawNotes = String(row.notes || '').trim();
+    const dupTag = isDuplicate
+      ? `[Pending Review / Duplicate${existingId ? ` of #${existingId.slice(0, 8)} (${existingInfo?.name || 'Existing Lead'})` : ' in Import Batch'}]`
+      : '';
 
     const insertPayload: any = {
       name,
@@ -246,9 +259,14 @@ export async function POST(request: Request) {
       email: row.email || null,
       source: resolvedSource,
       lead_source_id: resolvedSourceId,
-      crm_status: globalStage,
-      lead_status: 'New',
-      notes: row.notes || '',
+      crm_status: isDuplicate ? 'Duplicate Leads' : globalStage,
+      lead_status: isDuplicate ? 'Lost' : 'New',
+      is_duplicate: isDuplicate,
+      duplicate_of_lead_id: existingId,
+      routed_to_duplicate_center_at: isDuplicate ? new Date().toISOString() : null,
+      notes: dupTag && !rawNotes.includes('[Pending Review / Duplicate')
+        ? `${rawNotes}\n${dupTag}`.trim()
+        : rawNotes,
       location: row.location || '',
       developer: row.developer || '',
       project: row.project || '',
@@ -261,7 +279,6 @@ export async function POST(request: Request) {
       assigned_to: assignedTo,
       created_by: user.id,
     };
-    // Handle date if provided
     if (row.date) {
       const iso = String(row.date);
       insertPayload.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0,10) : iso;
@@ -269,7 +286,6 @@ export async function POST(request: Request) {
     toInsert.push(insertPayload);
   }
 
-  // Perform updates for duplicateAction=update
   for (const upd of toUpdate) {
     try {
       const { error } = await supabase.from('leads').update(upd.payload).eq('id', upd.id);
@@ -285,37 +301,49 @@ export async function POST(request: Request) {
     }
   }
 
-  // Perform bulk insert for remaining
   if (toInsert.length > 0) {
-    // Chunk inserts to avoid payload limits (50 per chunk)
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const chunk = toInsert.slice(i, i + chunkSize);
-      const { error, data } = await supabase.from('leads').insert(chunk).select('id');
+      const { error, data } = await supabase.from('leads').insert(chunk).select('id, is_duplicate, crm_status');
       if (error) {
-        // Fallback to row-by-row to isolate bad rows
         for (const single of chunk) {
-          const { error: singleErr } = await supabase.from('leads').insert(single).select('id').single();
+          const { error: singleErr, data: singleData } = await supabase
+            .from('leads')
+            .insert(single)
+            .select('id, is_duplicate, crm_status')
+            .single();
           if (singleErr) {
             skipped += 1;
             errors.push(`Insert failed for ${single.phone}: ${singleErr.message}`);
           } else {
             imported += 1;
+            if (single.is_duplicate || singleData?.is_duplicate || singleData?.crm_status === 'Duplicate Leads') {
+              routedDuplicates += 1;
+            }
           }
         }
       } else {
         imported += chunk.length;
+        const rowsInserted = (data || []) as any[];
+        for (let k = 0; k < chunk.length; k++) {
+          const r = rowsInserted[k];
+          if (chunk[k].is_duplicate || r?.is_duplicate || r?.crm_status === 'Duplicate Leads') {
+            routedDuplicates += 1;
+          }
+        }
       }
     }
   }
 
   const totalProcessed = rows.length;
-  const summary = `Successfully imported ${imported} leads${updated>0 ? `, ${updated} updated` : ''}${skipped>0 ? `, ${skipped} duplicates skipped` : ''}${invalid>0 ? `, ${invalid} invalid` : ''}.`;
+  const summary = `Successfully imported ${imported} leads${routedDuplicates > 0 ? ` (${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} routed to Duplicate Center)` : ''}${updated > 0 ? `, ${updated} updated` : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}${invalid > 0 ? `, ${invalid} invalid` : ''}.`;
 
   return NextResponse.json({
     ok: true,
     summary,
     imported,
+    routedDuplicates,
     updated,
     skipped,
     invalid,

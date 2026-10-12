@@ -63,6 +63,58 @@ function invalidateCache(): void {
   crmCache.clear();
 }
 
+let actorScopeCache: {
+  expiresAt: number;
+  userId: string | null;
+  role: string | null;
+  memberIds: string[];
+} | null = null;
+
+async function getCachedActorScope(supabase: any) {
+  if (actorScopeCache && actorScopeCache.expiresAt > Date.now()) {
+    return actorScopeCache;
+  }
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? (await supabase.auth.getUser())?.data?.user ?? null;
+    if (!user) {
+      actorScopeCache = { expiresAt: Date.now() + 15_000, userId: null, role: null, memberIds: [] };
+      return actorScopeCache;
+    }
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    const role = profile?.role || null;
+    let memberIds = [user.id];
+    if (!isAdminRole(role) && (role === 'team_leader' || role === 'Team Lead' || role === 'manager')) {
+      const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
+      const teamIds = (teams || []).map((t: any) => t.id);
+      if (teamIds.length > 0) {
+        const { data: members } = await supabase
+          .from('team_memberships')
+          .select('user_id')
+          .in('team_id', teamIds);
+        if (members && members.length > 0) {
+          memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+        }
+      }
+    }
+    actorScopeCache = {
+      expiresAt: Date.now() + 60_000,
+      userId: user.id,
+      role,
+      memberIds,
+    };
+    return actorScopeCache;
+  } catch {
+    return { expiresAt: 0, userId: null, role: null, memberIds: [] };
+  }
+}
+
 /**
  * Server-side follow-up reconcile (primary sync path). Hits
  * POST /api/follow-ups/sync which runs service-role, so the reminder row is
@@ -248,33 +300,14 @@ export const leadsService = {
         .from('leads')
         .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
 
-      // Apply role-based query isolation for privacy
+      // Apply role-based query isolation for privacy (cached)
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle();
-          const role = profile?.role;
-          if (!isAdminRole(role)) {
-            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
-              // Team Leader: fetch members of teams led by this user
-              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
-              const teamIds = (teams || []).map((t: any) => t.id);
-              let memberIds = [user.id];
-              if (teamIds.length > 0) {
-                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
-                if (members && members.length > 0) {
-                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
-                }
-              }
-              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
-            } else {
-              // Regular Agent: only leads assigned to or created by current user
-              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
-            }
+        const scope = await getCachedActorScope(supabase);
+        if (scope.userId && !isAdminRole(scope.role)) {
+          if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
+            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
+          } else {
+            query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
           }
         }
       } catch {
@@ -352,27 +385,51 @@ export const leadsService = {
 
   async create(lead: any, userId: string) {
     const supabase = createClient();
-    // Global dedup pre-check (phone/email) — spec 2.C: provide clickable redirect link to existing lead
+    // Detect existing matching lead by phone or email without blocking ingestion.
+    // Duplicates are accepted, flagged as 'Duplicate Leads', linked to the original
+    // record, and routed directly to the Duplicate Center.
+    let matchedDup: { id: string; name: string } | null = null;
     try {
       const phoneNorm = String(lead.phone || '').replace(/\D/g, '');
       if (phoneNorm && phoneNorm.length >= 8) {
-        const { data: dup } = await supabase.from('leads').select('id, name, phone').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
-        if (dup && String(dup.phone||'').replace(/\D/g,'').slice(-10) === phoneNorm.slice(-10)) {
-          const err: any = new Error(`Duplicate phone — existing lead: ${dup.name} (${dup.id}). Open /leads/${dup.id}`);
-          err.code = '23505'; err.existingLeadId = dup.id; err.redirectLink = `/leads/${dup.id}`; err.apiLink = `/api/leads/${dup.id}/profile`;
-          throw err;
+        const { data: dup } = await supabase
+          .from('leads')
+          .select('id, name, phone')
+          .ilike('phone', `%${phoneNorm.slice(-10)}%`)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (dup && String(dup.phone || '').replace(/\D/g, '').slice(-10) === phoneNorm.slice(-10)) {
+          matchedDup = { id: dup.id, name: dup.name || 'Existing Lead' };
         }
       }
-      const emailNorm = String(lead.email||'').toLowerCase().trim();
-      if (emailNorm) {
-        const { data: dup } = await supabase.from('leads').select('id, name, email').ilike('email', emailNorm).limit(1).maybeSingle();
-        if (dup && String(dup.email||'').toLowerCase().trim()===emailNorm) {
-          const err: any = new Error(`Duplicate email — existing lead: ${dup.name} (${dup.id}). Open /leads/${dup.id}`);
-          err.code = '23505'; err.existingLeadId = dup.id; err.redirectLink = `/leads/${dup.id}`;
-          throw err;
+      const emailNorm = String(lead.email || '').toLowerCase().trim();
+      if (!matchedDup && emailNorm && emailNorm.includes('@')) {
+        const { data: dup } = await supabase
+          .from('leads')
+          .select('id, name, email')
+          .ilike('email', emailNorm)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (dup && String(dup.email || '').toLowerCase().trim() === emailNorm) {
+          matchedDup = { id: dup.id, name: dup.name || 'Existing Lead' };
         }
       }
-    } catch (e:any) { if (e?.code==='23505') throw e; }
+    } catch {
+      // non-fatal — DB trigger also checks and routes duplicates
+    }
+
+    if (matchedDup) {
+      lead.status = 'Duplicate Leads';
+      lead.isDuplicate = true;
+      lead.duplicateOfLeadId = matchedDup.id;
+      const tag = `[Pending Review / Duplicate of #${matchedDup.id.slice(0, 8)} (${matchedDup.name})]`;
+      if (!String(lead.notes || '').includes('[Pending Review / Duplicate')) {
+        lead.notes = `${lead.notes || ''}\n${tag}`.trim();
+      }
+    }
+
     // Auto-assignment when the admin rotation toggle is on.
     const rotation = await computeRotationAssignments([lead]);
     const rot = rotation.get(0);
@@ -382,41 +439,38 @@ export const leadsService = {
       lead.agent = rot.name;
       lead.agentInitials = agentInitials(rot.name);
     }
+
+    const rowPayload: any = leadToRow(lead, userId);
+    if (matchedDup) {
+      rowPayload.is_duplicate = true;
+      rowPayload.duplicate_of_lead_id = matchedDup.id;
+      rowPayload.routed_to_duplicate_center_at = new Date().toISOString();
+      rowPayload.crm_status = 'Duplicate Leads';
+      rowPayload.lead_status = 'Lost';
+    }
+
     const { data, error } = await supabase
       .from('leads')
-      .insert(leadToRow(lead, userId))
+      .insert(rowPayload)
       .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
       .single();
     if (error) {
-      // Handle race-condition unique violation with redirect link
-      if ((error as any).code === '23505') {
-        const phoneNorm = String(lead.phone||'').replace(/\D/g,'');
-        let dupId: string | null = null;
-        try {
-          if (phoneNorm) {
-            const { data: dup } = await supabase.from('leads').select('id').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
-            if (dup) dupId = dup.id;
-          }
-          if (!dupId && lead.email) {
-            const { data: dup } = await supabase.from('leads').select('id').ilike('email', String(lead.email).toLowerCase().trim()).limit(1).maybeSingle();
-            if (dup) dupId = dup.id;
-          }
-        } catch {}
-        (error as any).existingLeadId = dupId;
-        (error as any).redirectLink = dupId ? `/leads/${dupId}` : null;
-        (error as any).message = dupId ? `${error.message} — existing: /leads/${dupId}` : error.message;
-      }
       throw error;
     }
     invalidateCache();
-    // Notify an assignee when a lead is created already assigned to someone.
+    // Run side-effects in the background so UI responds immediately.
     if (data?.assigned_to) {
-      await pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
+      void pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
     }
-    await followUpsService.syncFromLead(data);
-    emitFollowUpsChanged();
+    void followUpsService.syncFromLead(data).then(() => emitFollowUpsChanged());
+
+    const mapped = rowToLead(data);
+    const isDupFinal = Boolean(data?.is_duplicate || matchedDup || data?.crm_status === 'Duplicate Leads');
     return {
-      ...rowToLead(data),
+      ...mapped,
+      isDuplicate: isDupFinal,
+      routedToDuplicateCenter: isDupFinal,
+      duplicateOfLeadId: data?.duplicate_of_lead_id || matchedDup?.id || null,
       referredToName: lead.referredToName || null,
       referredByName: lead.referredByName || null,
     };
@@ -432,18 +486,13 @@ export const leadsService = {
     if (!clean.length) return new Set<string>();
     const supabase = createClient();
     try {
-      const query: any = supabase
-        .from('leads')
-        .select('phone')
-        .or(clean.map((p) => `phone.ilike.%${p}%`).join(','));
-      // The `or` filter may exceed URL length for very large imports; chunk it.
       const found = new Set<string>();
       for (let i = 0; i < clean.length; i += 50) {
         const chunk = clean.slice(i, i + 50);
         const { data, error } = await supabase
           .from('leads')
           .select('phone')
-          .or(chunk.map((p) => `phone.ilike.%${p}%`).join(','));
+          .or(chunk.map((p) => `phone.ilike.%${p.slice(-10)}%`).join(','));
         if (error) continue;
         (data || []).forEach((r: any) => {
           if (r?.phone) found.add(String(r.phone).replace(/\D/g, ''));
@@ -457,9 +506,9 @@ export const leadsService = {
   },
 
   /**
-   * Inserts a batch of pre-validated leads (single round-trip). createdBy is
-   * the current user id so RLS ownership + the DB trigger work for imported
-   * rows. Returns the inserted leads and syncs any follow-up rows.
+   * Inserts a batch of pre-validated leads (single round-trip). Duplicate leads
+   * are accepted without blocking and automatically flagged & routed to the
+   * Duplicate Center by the database trigger and service layer.
    */
   async bulkInsert(rows: any[], userId: string) {
     if (!rows.length) return [];
@@ -482,46 +531,35 @@ export const leadsService = {
       .insert(finalRows.map((r) => leadToRow(r, userId)))
       .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
     if (error) {
-      if ((error as any).code === '23505') {
-        // Global dedup uniqueness violated — fetch one existing duplicate for redirect link
-        const phone = String(finalRows[0]?.phone || '').replace(/\D/g,'');
-        let dupId: string | null = null;
-        try {
-          if (phone) {
-            const { data: dup } = await supabase.from('leads').select('id').ilike('phone', `%${phone.slice(-10)}%`).limit(1).maybeSingle();
-            if (dup) dupId = (dup as any).id;
-          }
-        } catch {}
-        (error as any).existingLeadId = dupId;
-        (error as any).redirectLink = dupId ? `/leads/${dupId}` : null;
-        (error as any).message = dupId ? `${error.message} — existing lead: /leads/${dupId} (click to view)` : error.message;
-      }
       throw error;
     }
     invalidateCache();
-    // Notify assignees when imported leads were assigned to them (best-effort).
-    const assignees = new Map<string, string[]>();
-    (data || []).forEach((l: any) => {
-      if (l.assigned_to) {
-        assignees.set(l.assigned_to, [...(assignees.get(l.assigned_to) || []), l.id]);
-      }
-    });
-    for (const [to, ids] of assignees.entries()) {
-      await pushAssignmentNotifications(supabase, ids, to, 'Lead import');
-    }
-    await followUpsService.syncFromLead(data || []);
-    emitFollowUpsChanged();
+    // Notify assignees & sync follow-ups in the background so import finishes immediately.
+    void (async () => {
+      try {
+        const assignees = new Map<string, string[]>();
+        (data || []).forEach((l: any) => {
+          if (l.assigned_to) {
+            assignees.set(l.assigned_to, [...(assignees.get(l.assigned_to) || []), l.id]);
+          }
+        });
+        for (const [to, ids] of assignees.entries()) {
+          await pushAssignmentNotifications(supabase, ids, to, 'Lead import');
+        }
+        await followUpsService.syncFromLead(data || []);
+        emitFollowUpsChanged();
+      } catch {}
+    })();
     return (data || []).map(rowToLead);
   },
 
   async update(id: string, lead: any) {
     const supabase = createClient();
-    const { data: prev } = await supabase.from('leads').select('assigned_to').eq('id', id).single();
-    let actorId: string | null = null;
-    try {
-      const { data: au } = await supabase.auth.getUser();
-      actorId = au?.user?.id ?? null;
-    } catch {}
+    const [{ data: prev }, scope] = await Promise.all([
+      supabase.from('leads').select('assigned_to').eq('id', id).maybeSingle(),
+      getCachedActorScope(supabase),
+    ]);
+    const actorId = scope.userId;
     const payload: any = { ...leadToRow(lead), last_action_at: new Date().toISOString() };
     if (actorId) payload.last_action_by = actorId;
     const { data, error } = await supabase
@@ -532,28 +570,24 @@ export const leadsService = {
       .single();
     if (error) throw error;
     invalidateCache();
-    // Notify the new assignee when a lead is (re)assigned through the edit modal.
+    // Notify the new assignee when a lead is (re)assigned through the edit modal (non-blocking).
     const nextAssignee = data?.assigned_to || null;
     if (nextAssignee && nextAssignee !== (prev?.assigned_to || null)) {
-      await pushAssignmentNotifications(
+      void pushAssignmentNotifications(
         supabase,
         [id],
         nextAssignee,
         lead.assignedToName || lead.agent
       );
     }
-    await followUpsService.syncFromLead(data);
-    emitFollowUpsChanged();
+    void followUpsService.syncFromLead(data).then(() => emitFollowUpsChanged());
     return rowToLead(data);
   },
 
   async updateStatus(id: string, status: string) {
     const supabase = createClient();
-    let actorId: string | null = null;
-    try {
-      const { data: au } = await supabase.auth.getUser();
-      actorId = au?.user?.id ?? null;
-    } catch {}
+    const scope = await getCachedActorScope(supabase);
+    const actorId = scope.userId;
     const patch: any = {
       crm_status: status,
       lead_status: mapCrmStatusToLegacy(status),
@@ -567,10 +601,10 @@ export const leadsService = {
       );
     }
     invalidateCache();
-    await syncLeadFollowUpRow(id);
-    await followUpsService.syncFromLead(data);
-    // Follow-up dashboard: status changes may cancel/create reminders (terminal stages).
-    emitFollowUpsChanged();
+    void Promise.allSettled([
+      syncLeadFollowUpRow(id),
+      followUpsService.syncFromLead(data),
+    ]).then(() => emitFollowUpsChanged());
     return rowToLead(data);
   },
 
@@ -583,21 +617,18 @@ export const leadsService = {
   async scheduleFollowUp(id: string, dueDate: string, actorId?: string | null) {
     const supabase = createClient();
     if (!actorId) {
-      try {
-        const { data: au } = await supabase.auth.getUser();
-        actorId = au?.user?.id || null;
-      } catch {}
+      const scope = await getCachedActorScope(supabase);
+      actorId = scope.userId;
     }
     const patch: any = { follow_up_due: dueDate, last_action_at: new Date().toISOString() };
     if (actorId) patch.last_action_by = actorId;
     const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').single();
     if (error) throw error;
     invalidateCache();
-    // Server-side sync is the primary path (service-role, RLS-proof);
-    // client syncFromLead stays as offline fallback. Both are idempotent.
-    await syncLeadFollowUpRow(id);
-    await followUpsService.syncFromLead(data);
-    emitFollowUpsChanged();
+    void Promise.allSettled([
+      syncLeadFollowUpRow(id),
+      followUpsService.syncFromLead(data),
+    ]).then(() => emitFollowUpsChanged());
     return rowToLead(data);
   },
 
@@ -966,33 +997,14 @@ export const leadsService = {
           count: 'exact',
         });
 
-      // Role-based privacy isolation: only team leaders and admins can see other members' leads
+      // Role-based privacy isolation: only team leaders and admins can see other members' leads (cached)
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle();
-          const role = profile?.role;
-          if (!isAdminRole(role)) {
-            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
-              // Team Leader: fetch members of teams led by this user
-              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
-              const teamIds = (teams || []).map((t: any) => t.id);
-              let memberIds = [user.id];
-              if (teamIds.length > 0) {
-                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
-                if (members && members.length > 0) {
-                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
-                }
-              }
-              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
-            } else {
-              // Regular Agent: only leads assigned to or created by current user
-              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
-            }
+        const scope = await getCachedActorScope(supabase);
+        if (scope.userId && !isAdminRole(scope.role)) {
+          if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
+            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
+          } else {
+            query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
           }
         }
       } catch {
@@ -1051,26 +1063,14 @@ export const leadsService = {
       const to = from + pageSize - 1;
 
       // ── Action Taken filter (replaces Contacted) ──────────────────────────
-      // Reads leads.last_action_at directly — covers call, note, stage,
-      // follow-up (every key action bumps the timestamp + user). If the
-      // migration hasn't landed yet, falls back to the legacy
-      // call_logs+follow_ups created today set so the UI never breaks.
       const hasActionFilter = !!actionTaken || !!actionFrom || !!actionTo;
       let useFallbackContacted = false;
       if (hasActionFilter) {
         try {
-          // Date-range overrides the "today" shortcut when provided.
           if (actionFrom || actionTo) {
             if (actionFrom) query = query.gte('last_action_at', `${actionFrom}T00:00:00.000Z`);
             if (actionTo) query = query.lte('last_action_at', `${actionTo}T23:59:59.999Z`);
             if (actionTaken === 'no-action') {
-              // "No Action" in a range = outside the range OR never
-              // For now, treat as: last_action_at is null OR outside range
-              // Handled by client — we invert: fetch inside range then exclude?
-              // Simpler: if no-action + range, we need is null or not between
-              // Use two conditions: is null OR (lt from OR gt to) — PostgREST or
-              // not convenient, so we handle after fetch via in-memory filter?
-              // For v1, no-action with range = last_action_at is null
               query = query.is('last_action_at', null);
             }
           } else if (actionTaken === 'today') {
@@ -1082,19 +1082,13 @@ export const leadsService = {
           } else if (actionTaken === 'no-action') {
             const start = new Date();
             start.setHours(0, 0, 0, 0);
-            // untouched today = null OR before today 00:00
             query = query.or(`last_action_at.is.null,last_action_at.lt.${start.toISOString()}`);
           }
-          // Probe: if the column doesn't exist PostgREST returns 400/PGRST204
-          // and isSchemaError will be true for the follow-up query error, so we
-          // catch there and redo with fallback. No extra round-trip here.
         } catch {
           useFallbackContacted = true;
         }
       }
 
-      // Fallback set for badge when migration missing — still stamps
-      // contactedToday/actionTakenToday so the list never shows blank badges.
       let fallbackSet: Set<string> | null = null;
       if (useFallbackContacted) {
         try {
@@ -1141,7 +1135,6 @@ export const leadsService = {
           } else if (called === 'not-called') {
             if (calledSet.size) query = query.not('id', 'in', `(${[...calledSet].map((id) => `"${id}"`).join(',')})`);
           } else if (calledFrom || calledTo) {
-            // date range without explicit called value => show called in range
             if (!calledSet.size) return { data: [], total: 0, page, pageSize };
             query = query.in('id', [...calledSet]);
           }
@@ -1156,8 +1149,6 @@ export const leadsService = {
 
       if (error) {
         if (isSchemaError(error) && hasActionFilter && !useFallbackContacted) {
-          // Column last_action_at doesn't exist yet (migration not applied) —
-          // retry once with the legacy call_logs+follow_ups logic.
           try {
             const start = new Date();
             start.setHours(0, 0, 0, 0);
@@ -1186,9 +1177,6 @@ export const leadsService = {
             if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
               retryQuery = retryQuery.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
             }
-            if (action) {
-              // re-apply action filter (already computed as in: above, for brevity re-query without it if fallback path)
-            }
             if (actionTaken === 'today' || contacted === 'today') {
               if (!s.size) return { data: [], total: 0, page, pageSize };
               retryQuery = retryQuery.in('id', [...s]);
@@ -1210,46 +1198,18 @@ export const leadsService = {
             throw new Error(error.message || 'Failed to load leads');
           }
         }
-        // Schema errors throw with technical detail for the (un-migrated) case;
-        // every other failure (network, timeout, auth, integrity) must also
-        // propagate so the UI can show an actionable error state instead of a
-        // misleading empty table.
         throw new Error(error.message || 'Failed to load leads');
       }
-      // Stamp hasBeenCalled badge for current page (even when no called filter)
-      let pageCalledSet: Set<string> | null = calledSet;
-      if (!hasCalledFilter && (data || []).length) {
-        try {
-          const ids = (data || []).map((r: any) => r.id);
-          const chunks: string[][] = [];
-          for (let i = 0; i < ids.length; i += 100) {
-            chunks.push(ids.slice(i, i + 100));
-          }
-          const chunkResults = await Promise.all(
-            chunks.map((chunk) =>
-              supabase.from('call_logs').select('entity_id').in('entity_id', chunk).eq('entity_type', 'lead')
-            )
-          );
-          const found = new Set<string>();
-          chunkResults.forEach((res) => {
-            (res.data || []).forEach((r: any) => {
-              if (r.entity_id) found.add(r.entity_id);
-            });
-          });
-          pageCalledSet = found;
-        } catch {
-          pageCalledSet = new Set<string>();
-        }
-      }
+      // Derive hasBeenCalled without an extra blocking DB query when calledSet is not active
+      const pageCalledSet: Set<string> | null = calledSet;
       return {
         data: (data || []).map((row: any) => {
           const mapped = rowToLead(row);
-          // When falling back, override the derived badge with the join set
           if (fallbackSet) {
             const v = fallbackSet.has(row.id);
-            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : undefined };
+            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at) };
           }
-          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : undefined;
+          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at);
           return { ...mapped, hasBeenCalled };
         }),
         total: count ?? (data || []).length,
@@ -1257,9 +1217,6 @@ export const leadsService = {
         pageSize,
       };
     } catch (err: any) {
-      // Always rely on isSchemaError to decide a degraded path; for leads we
-      // want real errors surfaced, so re-throw unless it already describes a
-      // missing-schema situation that the older caller handles.
       if (isSchemaError(err)) throw err;
       throw err;
     }
@@ -1313,6 +1270,9 @@ function rowToLead(row: any) {
     agent: row.agent,
     agentInitials: row.agent_initials,
     status: row.crm_status || row.lead_status || 'Fresh Leads',
+    isDuplicate: Boolean(row.is_duplicate || row.crm_status === 'Duplicate Leads'),
+    duplicateOfLeadId: row.duplicate_of_lead_id || null,
+    routedToDuplicateCenterAt: row.routed_to_duplicate_center_at || null,
     assignedTo: row.assigned_to || null,
     assignedToName: row.assigned_to_profile?.full_name || null,
     referredTo: row.referred_to || null,
@@ -1448,10 +1408,8 @@ function leadToRow(lead: any, userId?: string) {
     reservation_date: lead.reservationDate || null,
     closing_date: lead.closingDate || null,
     final_price: lead.finalPrice ?? 0,
-    commission: lead.commission ?? 0,
+    commission: Number(lead.commission ?? 0),
   };
-  // If the caller supplies an explicit creation date (e.g. lead import), keep
-  // it; otherwise the DB default applies.
   if (lead.createdAt) {
     const iso = String(lead.createdAt);
     row.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
@@ -1460,12 +1418,6 @@ function leadToRow(lead: any, userId?: string) {
   return row;
 }
 
-/**
- * Turn raw Postgres/PostgREST errors into a clear, actionable message for the
- * lead stage/status flow. The DB triggers that write the activity log must
- * never be able to silently break a status change — if a write fails we tell
- * the user exactly why instead of a bare "Failed to update status".
- */
 function describeLeadWriteError(error: any, action: string): string {
   const msg = typeof error?.message === 'string' ? error.message : String(error || '');
   if (/permission denied|row-level security|violates row-level security/i.test(msg)) {
@@ -1489,6 +1441,7 @@ function mapCrmStatusToLegacy(crmStatus: string): string {
     'Cold Calls': 'Contacted',
     'Pending Leads': 'Contacted',
     'Following Up': 'Qualified',
+    'Follow Up After Meeting': 'Qualified',
     Meeting: 'Site Visit Scheduled',
     Interested: 'Qualified',
     'Not Interested': 'Lost',
