@@ -1328,6 +1328,14 @@ export default function LeadsManagementScreen({
             <Upload size={15} />
             <span className="hidden sm:inline">{t('leads.import')}</span>
           </button>
+          <a
+            href="/import-history"
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+            title="View Excel Import History & Download Uploaded Sheets"
+          >
+            <ClipboardList size={15} />
+            <span className="hidden sm:inline">Import History</span>
+          </a>
           {/* ── Prominent Add Lead CTA ── */}
           <div className="relative">
             {/* Animated glow ring */}

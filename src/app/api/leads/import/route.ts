@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import * as XLSX from 'xlsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +18,42 @@ function isValidEgyptian(phone: string): boolean {
   return /^1[0125]\d{8}$/.test(digits);
 }
 
+function sanitizeFileName(name: string): string {
+  const cleaned = String(name || 'leads_import.xlsx')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-\u0600-\u06FF ]/g, '_')
+    .replace(/\s+/g, '_');
+  return cleaned || 'leads_import.xlsx';
+}
+
+function buildXlsxBase64FromRows(rows: any[]): { base64: string; size: number } {
+  const sheetRows = rows.map((r, i) => ({
+    Row: r.rowNumber ?? i + 2,
+    Name: r.name || '',
+    Phone: r.phone || '',
+    Email: r.email || '',
+    Source: r.source || '',
+    Stage: r.status || r.stage || '',
+    Project: r.project || '',
+    Developer: r.developer || '',
+    Location: r.location || '',
+    Unit: r.unit || '',
+    BudgetMin: r.budgetMin ?? r.budget_min ?? '',
+    BudgetMax: r.budgetMax ?? r.budget_max ?? '',
+    Notes: r.notes || '',
+  }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(sheetRows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Imported Leads');
+  const buf: Buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  return { base64: buf.toString('base64'), size: buf.byteLength };
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json().catch(() => null);
@@ -27,28 +61,133 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'rows array required' }, { status: 400 });
   }
 
-  const rows: any[] = body.rows; // parsed rows from frontend
+  const rows: any[] = body.rows;
   const globalSource: string = String(body.globalSource || body.source || '').trim();
-  const globalStage: string = String(body.globalStage || body.stage || 'New Fresh').trim() || 'New Fresh';
-  // Assignee keywords: 'unassigned' = Pool, 'round-robin' = even split, else the user's unique id
-  // (legacy '__ROUND_ROBIN__' / 'round_robin' / '__UNASSIGNED__' still accepted)
-  const rawAssignedTo: string = body.globalAssignedTo !== undefined ? String(body.globalAssignedTo) : '';
+  const globalStage: string =
+    String(body.globalStage || body.stage || 'Fresh Leads').trim() || 'Fresh Leads';
+  const rawAssignedTo: string =
+    body.globalAssignedTo !== undefined ? String(body.globalAssignedTo) : '';
   const globalAssignedTo: string = rawAssignedTo === 'unassigned' ? '' : rawAssignedTo;
   const duplicateAction: 'route' | 'update' | 'skip' =
     body.duplicateAction === 'update'
       ? 'update'
       : body.duplicateAction === 'skip_explicit'
-      ? 'skip'
-      : 'route';
+        ? 'skip'
+        : 'route';
   const sourceId: string | null = body.sourceId || null;
 
-  // Validate global settings are provided (mandatory per spec Step 2)
+  const originalFileName: string =
+    String(body.fileName || body.originalFileName || '').trim() ||
+    `leads_import_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const mimeType: string =
+    String(body.mimeType || '').trim() ||
+    (originalFileName.toLowerCase().endsWith('.csv')
+      ? 'text/csv'
+      : originalFileName.toLowerCase().endsWith('.xls')
+        ? 'application/vnd.ms-excel'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
   if (!globalSource) {
-    return NextResponse.json({ error: 'Source selection is required for import batch' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Source selection is required for import batch' },
+      { status: 400 }
+    );
   }
   if (!globalStage) {
-    return NextResponse.json({ error: 'Stage selection is required for import batch' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Stage selection is required for import batch' },
+      { status: 400 }
+    );
   }
+
+  // Fetch uploader profile info
+  const { data: uploaderProfile } = await supabase
+    .from('user_profiles')
+    .select('id, full_name, email, role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const uploaderName =
+    uploaderProfile?.full_name ||
+    user.user_metadata?.full_name ||
+    uploaderProfile?.email ||
+    user.email ||
+    'User';
+  const uploaderRole = String(uploaderProfile?.role || 'admin');
+
+  // Prepare original file binary + storage upload
+  let fileBase64: string = typeof body.fileBase64 === 'string' ? body.fileBase64.trim() : '';
+  if (fileBase64.includes(',')) {
+    fileBase64 = fileBase64.split(',').pop() || '';
+  }
+  let fileSizeBytes = Number(body.fileSize || 0);
+
+  if (!fileBase64) {
+    try {
+      const generated = buildXlsxBase64FromRows(rows);
+      fileBase64 = generated.base64;
+      fileSizeBytes = generated.size;
+    } catch {
+      fileBase64 = '';
+    }
+  } else if (!fileSizeBytes && fileBase64) {
+    fileSizeBytes = Math.floor((fileBase64.length * 3) / 4);
+  }
+
+  const nowIso = new Date().toISOString();
+  const yyyyMm = nowIso.slice(0, 7);
+  const uniqueSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const storagePath =
+    typeof body.storagePath === 'string' && body.storagePath.trim()
+      ? body.storagePath.trim()
+      : `imports/${yyyyMm}/${uniqueSuffix}_${sanitizeFileName(originalFileName)}`;
+
+  if (fileBase64 && !body.storagePath) {
+    try {
+      const fileBuffer = Buffer.from(fileBase64, 'base64');
+      await supabase.storage.from('lead-imports').upload(storagePath, fileBuffer, {
+        contentType: mimeType,
+        upsert: false,
+      });
+    } catch {
+      // Fallback: file_base64 in import_logs guarantees download even if storage upload fails
+    }
+  }
+
+  const assignmentModeLabel =
+    globalAssignedTo === '__ROUND_ROBIN__' ||
+    globalAssignedTo === 'round_robin' ||
+    globalAssignedTo === 'round-robin'
+      ? 'Round Robin'
+      : !globalAssignedTo
+        ? 'Unassigned Pool'
+        : globalAssignedTo;
+
+  // Create initial "Processing" log row in public.import_logs
+  let importLogId: string | null = null;
+  try {
+    const { data: logRow } = await (supabase as any)
+      .from('import_logs')
+      .insert({
+        original_file_name: originalFileName,
+        file_size_bytes: fileSizeBytes,
+        mime_type: mimeType,
+        storage_bucket: 'lead-imports',
+        storage_path: storagePath,
+        file_base64: fileBase64 || null,
+        uploaded_by: user.id,
+        uploaded_by_name: uploaderName,
+        uploaded_by_role: uploaderRole,
+        status: 'Processing',
+        source_name: globalSource,
+        target_stage: globalStage,
+        assignment_mode: assignmentModeLabel,
+        total_rows: rows.length,
+      })
+      .select('id')
+      .single();
+    importLogId = logRow?.id || null;
+  } catch {}
 
   // Fetch assignable users if round-robin requested
   let roundRobinUsers: { id: string; name: string }[] = [];
@@ -58,29 +197,55 @@ export async function POST(request: Request) {
     globalAssignedTo === 'round-robin';
   if (isRoundRobin) {
     try {
-      const { data: users, error } = await supabase.from('user_profiles').select('id, full_name, role, is_active').eq('is_active', true).order('full_name');
+      const { data: users, error } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, role, is_active')
+        .eq('is_active', true)
+        .order('full_name');
       if (!error && users) {
         roundRobinUsers = users
           .filter((u: any) => !['owner', 'admin'].includes(u.role))
           .map((u: any) => ({ id: u.id, name: u.full_name || u.email }));
       }
       if (roundRobinUsers.length === 0) {
-        // fallback to all active
-        const { data: all } = await supabase.from('user_profiles').select('id, full_name').eq('is_active', true).limit(50);
+        const { data: all } = await supabase
+          .from('user_profiles')
+          .select('id, full_name')
+          .eq('is_active', true)
+          .limit(50);
         roundRobinUsers = (all || []).map((u: any) => ({ id: u.id, name: u.full_name }));
       }
     } catch {}
     if (roundRobinUsers.length === 0) {
-      return NextResponse.json({ error: 'No assignable users found for round-robin' }, { status: 400 });
+      if (importLogId) {
+        await (supabase as any)
+          .from('import_logs')
+          .update({
+            status: 'Failed',
+            error_count: rows.length,
+            summary: 'No assignable users found for round-robin',
+            error_details: [{ rowNumber: 0, reason: 'No assignable users found for round-robin', type: 'error' }],
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', importLogId);
+      }
+      return NextResponse.json(
+        { error: 'No assignable users found for round-robin' },
+        { status: 400 }
+      );
     }
   }
 
-  // Resolve source: verify it exists, otherwise keep as provided string
+  // Resolve source
   let resolvedSource = globalSource;
   let resolvedSourceId = sourceId;
   try {
     if (!resolvedSourceId) {
-      const { data: src } = await supabase.from('lead_sources').select('id, name').ilike('name', globalSource).maybeSingle();
+      const { data: src } = await supabase
+        .from('lead_sources')
+        .select('id, name')
+        .ilike('name', globalSource)
+        .maybeSingle();
       if (src) {
         resolvedSource = src.name;
         resolvedSourceId = src.id;
@@ -89,7 +254,7 @@ export async function POST(request: Request) {
   } catch {}
 
   // Pre-fetch existing phones for duplicate check (batch)
-  const phonesToCheck = rows.map(r => normalizePhone(r.phone || '')).filter(Boolean);
+  const phonesToCheck = rows.map((r) => normalizePhone(r.phone || '')).filter(Boolean);
   const existingPhoneMap = new Map<string, { id: string; phone: string; name?: string }>();
   const existingIdByPhone = new Map<string, string>();
   if (phonesToCheck.length) {
@@ -99,7 +264,7 @@ export async function POST(request: Request) {
         const { data, error } = await supabase
           .from('leads')
           .select('id, name, phone')
-          .or(chunk.map(p => `phone.ilike.%${p.slice(-10)}%`).join(','));
+          .or(chunk.map((p) => `phone.ilike.%${p.slice(-10)}%`).join(','));
         if (!error && data) {
           for (const lead of data as any[]) {
             const norm = normalizePhone(lead.phone || '').slice(-10);
@@ -119,9 +284,18 @@ export async function POST(request: Request) {
 
   // Pre-resolve single assignee name once if globalAssignedTo is a user id
   let preResolvedAssigneeName = '';
-  if (!isRoundRobin && globalAssignedTo && globalAssignedTo !== '' && globalAssignedTo !== '__UNASSIGNED__') {
+  if (
+    !isRoundRobin &&
+    globalAssignedTo &&
+    globalAssignedTo !== '' &&
+    globalAssignedTo !== '__UNASSIGNED__'
+  ) {
     try {
-      const { data: prof } = await supabase.from('user_profiles').select('full_name').eq('id', globalAssignedTo).maybeSingle();
+      const { data: prof } = await supabase
+        .from('user_profiles')
+        .select('full_name')
+        .eq('id', globalAssignedTo)
+        .maybeSingle();
       preResolvedAssigneeName = prof?.full_name || '';
     } catch {}
   }
@@ -133,12 +307,18 @@ export async function POST(request: Request) {
   let invalid = 0;
   const errors: string[] = [];
   const skippedDetails: string[] = [];
+  const structuredErrorDetails: {
+    rowNumber: number;
+    name?: string;
+    phone?: string;
+    type: 'invalid' | 'skipped' | 'duplicate_routed' | 'error';
+    reason: string;
+  }[] = [];
   const seenBatchPhones = new Set<string>();
 
-  // Process rows sequentially to handle per-row logic and round-robin index
   let rrIndex = 0;
   const toInsert: any[] = [];
-  const toUpdate: { id: string; payload: any; originalPhone: string }[] = [];
+  const toUpdate: { id: string; payload: any; originalPhone: string; rowNum: number; name: string }[] = [];
 
   for (let idx = 0; idx < rows.length; idx++) {
     const row = rows[idx];
@@ -146,37 +326,59 @@ export async function POST(request: Request) {
     const phoneRaw = String(row.phone || '').trim();
     const phoneNorm = normalizePhone(phoneRaw);
     const phoneTail = phoneNorm.slice(-10);
-    const name = String(row.name || '').trim();
+    const name = String(row.name || '').trim() || `Lead ${phoneRaw.slice(-4) || rowNum}`;
 
-    if (!name || name.length < 2) {
-      invalid += 1;
-      skippedDetails.push(`Row ${rowNum}: missing or too short name`);
-      continue;
-    }
     if (!phoneRaw || !phoneNorm) {
       invalid += 1;
-      skippedDetails.push(`Row ${rowNum}: missing phone`);
+      const msg = `Row ${rowNum}: missing phone number`;
+      skippedDetails.push(msg);
+      structuredErrorDetails.push({
+        rowNumber: rowNum,
+        name,
+        phone: phoneRaw,
+        type: 'invalid',
+        reason: 'Missing phone number',
+      });
       continue;
     }
-    if (!isValidEgyptian(phoneRaw)) {
+    if (!isValidEgyptian(phoneRaw) && phoneNorm.length < 7) {
       invalid += 1;
-      skippedDetails.push(`Row ${rowNum}: invalid Egyptian phone ${phoneRaw}`);
+      const msg = `Row ${rowNum}: invalid phone ${phoneRaw}`;
+      skippedDetails.push(msg);
+      structuredErrorDetails.push({
+        rowNumber: rowNum,
+        name,
+        phone: phoneRaw,
+        type: 'invalid',
+        reason: `Invalid phone number (${phoneRaw})`,
+      });
       continue;
     }
 
-    const isExistingDup = phoneNorm ? existingPhoneMap.has(phoneNorm) || existingIdByPhone.has(phoneNorm) : false;
+    const isExistingDup = phoneNorm
+      ? existingPhoneMap.has(phoneNorm) || existingIdByPhone.has(phoneNorm)
+      : false;
     const isIntraBatchDup = phoneTail.length >= 8 && seenBatchPhones.has(phoneTail);
     const isDuplicate = isExistingDup || isIntraBatchDup;
     if (phoneTail.length >= 8) seenBatchPhones.add(phoneTail);
 
     if (isDuplicate && duplicateAction === 'skip') {
       skipped += 1;
-      skippedDetails.push(`Row ${rowNum}: duplicate phone ${phoneRaw} — skipped`);
+      const msg = `Row ${rowNum}: duplicate phone ${phoneRaw} — skipped`;
+      skippedDetails.push(msg);
+      structuredErrorDetails.push({
+        rowNumber: rowNum,
+        name,
+        phone: phoneRaw,
+        type: 'skipped',
+        reason: 'Duplicate phone skipped',
+      });
       continue;
     }
 
     if (isDuplicate && duplicateAction === 'update') {
-      const existingId = existingIdByPhone.get(phoneNorm) || existingPhoneMap.get(phoneNorm)?.id;
+      const existingId =
+        existingIdByPhone.get(phoneNorm) || existingPhoneMap.get(phoneNorm)?.id;
       if (existingId) {
         let assignedTo: string | null = null;
         let agentName = '';
@@ -185,7 +387,11 @@ export async function POST(request: Request) {
           rrIndex++;
           assignedTo = rr.id;
           agentName = rr.name;
-        } else if (globalAssignedTo && globalAssignedTo !== '' && globalAssignedTo !== '__UNASSIGNED__') {
+        } else if (
+          globalAssignedTo &&
+          globalAssignedTo !== '' &&
+          globalAssignedTo !== '__UNASSIGNED__'
+        ) {
           assignedTo = globalAssignedTo;
           agentName = preResolvedAssigneeName;
         } else if (row.assignedTo) {
@@ -215,10 +421,15 @@ export async function POST(request: Request) {
           payload.assigned_to = assignedTo;
           if (agentName) {
             payload.agent = agentName;
-            payload.agent_initials = agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase();
+            payload.agent_initials = agentName
+              .split(' ')
+              .map((p: string) => p[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase();
           }
         }
-        toUpdate.push({ id: existingId, payload, originalPhone: phoneRaw });
+        toUpdate.push({ id: existingId, payload, originalPhone: phoneRaw, rowNum, name });
         continue;
       }
     }
@@ -231,19 +442,38 @@ export async function POST(request: Request) {
       rrIndex++;
       assignedTo = rr.id;
       agentName = rr.name;
-      agentInitials = agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase();
-    } else if (globalAssignedTo && globalAssignedTo !== '' && globalAssignedTo !== '__UNASSIGNED__') {
+      agentInitials = agentName
+        .split(' ')
+        .map((p: string) => p[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+    } else if (
+      globalAssignedTo &&
+      globalAssignedTo !== '' &&
+      globalAssignedTo !== '__UNASSIGNED__'
+    ) {
       assignedTo = globalAssignedTo;
       agentName = preResolvedAssigneeName || row.assignedName || '';
-      agentInitials = agentName ? agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase() : '';
+      agentInitials = agentName
+        ? agentName
+            .split(' ')
+            .map((p: string) => p[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase()
+        : '';
     } else if (row.assignedTo) {
       assignedTo = row.assignedTo;
       agentName = row.assignedName || '';
-      agentInitials = agentName ? agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase() : '';
-    } else {
-      assignedTo = null;
-      agentName = '';
-      agentInitials = '';
+      agentInitials = agentName
+        ? agentName
+            .split(' ')
+            .map((p: string) => p[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase()
+        : '';
     }
 
     const existingInfo = existingPhoneMap.get(phoneNorm);
@@ -252,6 +482,18 @@ export async function POST(request: Request) {
     const dupTag = isDuplicate
       ? `[Pending Review / Duplicate${existingId ? ` of #${existingId.slice(0, 8)} (${existingInfo?.name || 'Existing Lead'})` : ' in Import Batch'}]`
       : '';
+
+    if (isDuplicate) {
+      structuredErrorDetails.push({
+        rowNumber: rowNum,
+        name,
+        phone: phoneRaw,
+        type: 'duplicate_routed',
+        reason: existingId
+          ? `Matched existing lead #${existingId.slice(0, 8)} (${existingInfo?.name || 'Existing Lead'}) — routed to Duplicate Center`
+          : 'Duplicate phone within import batch — routed to Duplicate Center',
+      });
+    }
 
     const insertPayload: any = {
       name,
@@ -264,9 +506,10 @@ export async function POST(request: Request) {
       is_duplicate: isDuplicate,
       duplicate_of_lead_id: existingId,
       routed_to_duplicate_center_at: isDuplicate ? new Date().toISOString() : null,
-      notes: dupTag && !rawNotes.includes('[Pending Review / Duplicate')
-        ? `${rawNotes}\n${dupTag}`.trim()
-        : rawNotes,
+      notes:
+        dupTag && !rawNotes.includes('[Pending Review / Duplicate')
+          ? `${rawNotes}\n${dupTag}`.trim()
+          : rawNotes,
       location: row.location || '',
       developer: row.developer || '',
       project: row.project || '',
@@ -278,10 +521,11 @@ export async function POST(request: Request) {
       agent_initials: agentInitials,
       assigned_to: assignedTo,
       created_by: user.id,
+      _rowNum: rowNum,
     };
     if (row.date) {
       const iso = String(row.date);
-      insertPayload.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0,10) : iso;
+      insertPayload.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
     }
     toInsert.push(insertPayload);
   }
@@ -292,22 +536,42 @@ export async function POST(request: Request) {
       if (error) {
         skipped += 1;
         errors.push(`Update failed for ${upd.originalPhone}: ${error.message}`);
+        structuredErrorDetails.push({
+          rowNumber: upd.rowNum,
+          name: upd.name,
+          phone: upd.originalPhone,
+          type: 'error',
+          reason: `Update failed: ${error.message}`,
+        });
       } else {
         updated += 1;
       }
-    } catch (e:any) {
+    } catch (e: any) {
       skipped += 1;
       errors.push(`Update failed for ${upd.originalPhone}: ${e?.message || 'unknown'}`);
+      structuredErrorDetails.push({
+        rowNumber: upd.rowNum,
+        name: upd.name,
+        phone: upd.originalPhone,
+        type: 'error',
+        reason: `Update failed: ${e?.message || 'unknown'}`,
+      });
     }
   }
 
   if (toInsert.length > 0) {
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
-      const chunk = toInsert.slice(i, i + chunkSize);
-      const { error, data } = await supabase.from('leads').insert(chunk).select('id, is_duplicate, crm_status');
+      const rawChunk = toInsert.slice(i, i + chunkSize);
+      const chunk = rawChunk.map(({ _rowNum, ...dbRow }) => dbRow);
+      const { error, data } = await supabase
+        .from('leads')
+        .insert(chunk)
+        .select('id, is_duplicate, crm_status');
       if (error) {
-        for (const single of chunk) {
+        for (let k = 0; k < chunk.length; k++) {
+          const single = chunk[k];
+          const rowNum = rawChunk[k]._rowNum || 0;
           const { error: singleErr, data: singleData } = await supabase
             .from('leads')
             .insert(single)
@@ -316,9 +580,20 @@ export async function POST(request: Request) {
           if (singleErr) {
             skipped += 1;
             errors.push(`Insert failed for ${single.phone}: ${singleErr.message}`);
+            structuredErrorDetails.push({
+              rowNumber: rowNum,
+              name: single.name,
+              phone: single.phone,
+              type: 'error',
+              reason: `Insert failed: ${singleErr.message}`,
+            });
           } else {
             imported += 1;
-            if (single.is_duplicate || singleData?.is_duplicate || singleData?.crm_status === 'Duplicate Leads') {
+            if (
+              single.is_duplicate ||
+              singleData?.is_duplicate ||
+              singleData?.crm_status === 'Duplicate Leads'
+            ) {
               routedDuplicates += 1;
             }
           }
@@ -328,7 +603,11 @@ export async function POST(request: Request) {
         const rowsInserted = (data || []) as any[];
         for (let k = 0; k < chunk.length; k++) {
           const r = rowsInserted[k];
-          if (chunk[k].is_duplicate || r?.is_duplicate || r?.crm_status === 'Duplicate Leads') {
+          if (
+            chunk[k].is_duplicate ||
+            r?.is_duplicate ||
+            r?.crm_status === 'Duplicate Leads'
+          ) {
             routedDuplicates += 1;
           }
         }
@@ -337,18 +616,62 @@ export async function POST(request: Request) {
   }
 
   const totalProcessed = rows.length;
+  const totalFailedOrInvalid = invalid + errors.length;
+  const finalStatus: 'Completed' | 'Partially Imported' | 'Failed' =
+    imported + updated === 0
+      ? 'Failed'
+      : totalFailedOrInvalid > 0
+        ? 'Partially Imported'
+        : 'Completed';
+
   const summary = `Successfully imported ${imported} leads${routedDuplicates > 0 ? ` (${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} routed to Duplicate Center)` : ''}${updated > 0 ? `, ${updated} updated` : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}${invalid > 0 ? `, ${invalid} invalid` : ''}.`;
+
+  // Finalize import_logs record
+  if (importLogId) {
+    try {
+      await (supabase as any)
+        .from('import_logs')
+        .update({
+          status: finalStatus,
+          total_rows: totalProcessed,
+          imported_count: imported,
+          routed_duplicates_count: routedDuplicates,
+          updated_count: updated,
+          skipped_count: skipped,
+          error_count: totalFailedOrInvalid,
+          summary,
+          error_details: structuredErrorDetails.slice(0, 500),
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', importLogId);
+    } catch {}
+  }
+
+  // Also record in activity_log
+  try {
+    await supabase.from('activity_log').insert({
+      user_id: user.id,
+      action_type: 'Leads Imported',
+      entity_type: 'import_log',
+      entity_id: importLogId || originalFileName,
+      detail: `${originalFileName}: ${summary}`,
+    });
+  } catch {}
 
   return NextResponse.json({
     ok: true,
+    importLogId,
+    fileName: originalFileName,
+    status: finalStatus,
     summary,
     imported,
     routedDuplicates,
     updated,
     skipped,
     invalid,
+    errorCount: totalFailedOrInvalid,
     total: totalProcessed,
-    details: skippedDetails.slice(0, 20),
-    errors: errors.slice(0, 20),
+    details: skippedDetails.slice(0, 50),
+    errors: errors.slice(0, 50),
   });
 }
