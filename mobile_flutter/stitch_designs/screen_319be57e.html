@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+
+<html class="dark" dir="ltr" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Brokly CRM - Lead Profile &amp; 360° Activity Hub</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface": "#10131a",
+            "inverse-primary": "#446900",
+            "surface-container-highest": "#32353c",
+            "tertiary-container": "#f3c1ff",
+            "surface-bright": "#363940",
+            "background": "#10131a",
+            "on-secondary-fixed-variant": "#304f00",
+            "on-primary-fixed-variant": "#334f00",
+            "tertiary": "#fee7ff",
+            "surface-container-high": "#272a31",
+            "surface-variant": "#32353c",
+            "inverse-surface": "#e1e2eb",
+            "secondary-fixed": "#acf847",
+            "on-surface-variant": "#c2cab0",
+            "secondary": "#94de2d",
+            "surface-container": "#1d2026",
+            "on-primary": "#213600",
+            "outline": "#8c947c",
+            "error": "#ffb4ab",
+            "on-tertiary-fixed": "#2f093d",
+            "secondary-fixed-dim": "#91db2a",
+            "inverse-on-surface": "#2e3037",
+            "surface-container-low": "#191c22",
+            "tertiary-fixed": "#fad7ff",
+            "surface-dim": "#10131a",
+            "on-primary-container": "#416400",
+            "on-error": "#690005",
+            "primary-fixed": "#b2f746",
+            "on-tertiary": "#462153",
+            "primary-container": "#a3e635",
+            "on-tertiary-container": "#734b80",
+            "surface-container-lowest": "#0b0e14",
+            "tertiary-fixed-dim": "#e7b6f3",
+            "primary-fixed-dim": "#98da27",
+            "on-surface": "#e1e2eb",
+            "error-container": "#93000a",
+            "secondary-container": "#7ac100",
+            "primary": "#ccff80",
+            "on-tertiary-fixed-variant": "#5e376b",
+            "outline-variant": "#424936",
+            "on-primary-fixed": "#121f00",
+            "on-secondary-fixed": "#102000",
+            "on-secondary-container": "#2c4900",
+            "on-secondary": "#1f3700",
+            "surface-tint": "#98da27",
+            "on-error-container": "#ffdad6",
+            "on-background": "#e1e2eb"
+          },
+          "borderRadius": {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "gutter-mobile": "0.75rem",
+            "gutter": "1.5rem",
+            "space-xl": "2.5rem",
+            "space-md": "1rem",
+            "space-lg": "1.5rem",
+            "margin": "2rem",
+            "space-sm": "0.5rem",
+            "space-xs": "0.25rem",
+            "margin-mobile": "1rem"
+          },
+          "fontFamily": {
+            "label-lg": ["Plus Jakarta Sans"],
+            "display-hero": ["Libre Caslon Text"],
+            "headline-lg-mobile": ["Libre Caslon Text"],
+            "headline-md": ["Libre Caslon Text"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "display-hero-mobile": ["Libre Caslon Text"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Libre Caslon Text"],
+            "label-md": ["Plus Jakarta Sans"],
+            "mono": ["JetBrains Mono", "monospace"]
+          },
+          "fontSize": {
+            "label-lg": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "display-hero": ["3.5rem", { "lineHeight": "4rem", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+            "headline-lg-mobile": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "headline-md": ["1.5rem", { "lineHeight": "2rem", "fontWeight": "400" }],
+            "headline-sm": ["1.125rem", { "lineHeight": "1.5rem", "fontWeight": "600" }],
+            "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }],
+            "body-lg": ["1rem", { "lineHeight": "1.5rem", "fontWeight": "400" }],
+            "body-sm": ["0.75rem", { "lineHeight": "1rem", "fontWeight": "400" }],
+            "display-hero-mobile": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "headline-lg": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "label-md": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .material-symbols-outlined.fill {
+      font-variation-settings: 'FILL' 1;
+    }
+    /* Subtle neon scanline & ambient glow */
+    .neon-beacon-glow {
+      box-shadow: 0 0 16px -2px rgba(163, 230, 53, 0.28);
+    }
+    .neon-pill-glow {
+      box-shadow: 0 0 14px rgba(163, 230, 53, 0.35);
+    }
+    /* Hide scrollbar for tabs */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface antialiased min-h-screen pb-28 selection:bg-primary-container selection:text-surface-container-lowest">
+<!-- Top Bar / Navigation Context (Sub-page Header with Back action) -->
+<header class="sticky top-0 z-40 bg-surface-container-lowest/95 backdrop-blur-md px-margin-mobile py-space-sm border-b border-outline-variant flex items-center justify-between transition-colors">
+<div class="flex items-center gap-space-sm">
+<button aria-label="Go Back" class="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container-low text-on-surface hover:text-primary active:scale-95 transition-all duration-150 border border-outline-variant" type="button">
+<span class="material-symbols-outlined text-xl">arrow_back</span>
+</button>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-mono text-label-sm text-primary tracking-wider font-bold">#LEAD-98421</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant leading-none">ملف العميل • Lead Profile</p>
+</div>
+</div>
+<!-- Right Utility Cluster -->
+<div class="flex items-center gap-space-xs">
+<div class="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface-container border border-outline-variant mr-1">
+<img alt="Brokly Emblem" class="w-5 h-5 rounded-sm object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmffIeSvI1gCJ12RzYqwxmH0CGgu3SBqTEY_sR2BG7ejczfCkFVIfc7kMsQ8bVxHdwisn5HsgOZVU0KiboA3p0kkjZzftE965GcBd7JGBKt_dJRKCflo3S8YXCRSsuMfbpJ3aABk3mO43j932d-KtDAziyuMEiCc9qAQ6Kt77Je7k3Yug0LTlv2KqPjLHf9SSseD1PaXo-SFb8FRAvzh2tD74pTvKk8DxB-PRs4NYIWU30HORfyjXtGlt_Oi2WdvqVoSA"/>
+<span class="font-headline-sm text-label-md font-bold text-primary tracking-tight hidden xs:inline">Brokly</span>
+</div>
+<button aria-label="Share Lead" class="w-9 h-9 rounded-full flex items-center justify-center bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-primary active:scale-95 transition-all border border-outline-variant" type="button">
+<span class="material-symbols-outlined text-lg">share</span>
+</button>
+<button aria-label="More Options" class="w-9 h-9 rounded-full flex items-center justify-center bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant hover:text-primary active:scale-95 transition-all border border-outline-variant" type="button">
+<span class="material-symbols-outlined text-lg">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Main Content Container (Mobile strictly optimized, 12-col compatible) -->
+<main class="max-w-md mx-auto px-margin-mobile pt-space-md space-y-space-md">
+<!-- 1. Lead Identity & Executive Summary Card -->
+<section class="bg-surface-container-low border border-outline-variant rounded-DEFAULT p-space-md shadow-2xl relative overflow-hidden">
+<!-- Top Decorative Glow Trace -->
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/60 via-primary-container/20 to-transparent"></div>
+<!-- Identity Header -->
+<div class="flex items-start justify-between gap-space-sm mb-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="relative">
+<div class="w-14 h-14 rounded-full bg-surface-container-high border-2 border-primary flex items-center justify-center font-display-hero text-headline-md text-primary shadow-[0_0_12px_rgba(163,230,53,0.3)]">
+              MG
+            </div>
+<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary border-2 border-surface-container-lowest flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-surface-container-lowest"></span>
+</div>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h1 class="font-headline-sm text-body-lg font-bold text-on-surface tracking-tight">Mohamed Galal</h1>
+<span class="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/30 text-primary font-label-sm text-label-sm uppercase font-bold tracking-wider">VIP HNW</span>
+</div>
+<p class="font-body-md text-body-sm text-on-surface-variant" dir="rtl">محمد جلال عبد الحليم</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant/80 mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs text-primary">location_on</span> New Cairo, Egypt
+            </p>
+</div>
+</div>
+<!-- Tier Score Badge -->
+<div class="text-right">
+<span class="font-mono text-label-sm text-primary font-bold">94/100</span>
+<p class="font-label-sm text-[10px] text-on-surface-variant tracking-wider uppercase">Lead Score</p>
+</div>
+</div>
+<!-- Contact Ribbon & Direct CTA -->
+<div class="bg-surface-container-lowest/80 rounded-xl p-space-sm border border-outline-variant flex items-center justify-between gap-space-sm mb-space-md">
+<div class="flex items-center gap-2 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary border border-outline-variant">
+<span class="material-symbols-outlined text-base">call</span>
+</div>
+<div class="truncate">
+<p class="font-mono text-label-md text-on-surface tracking-wide truncate">+20 112 531 5790</p>
+<p class="font-label-sm text-[10px] text-on-surface-variant">Primary Mobile • Verified</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<!-- WhatsApp Action -->
+<a class="w-9 h-9 rounded-full bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] flex items-center justify-center active:scale-95 transition-all" href="https://wa.me/201125315790" rel="noopener" target="_blank" title="WhatsApp Chat">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">chat</span>
+</a>
+<!-- Direct Dial Action -->
+<a class="w-9 h-9 rounded-full bg-primary-container text-surface-container-lowest font-bold flex items-center justify-center neon-pill-glow hover:bg-secondary active:scale-95 transition-all" href="tel:+201125315790" title="Call Now">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">phone_in_talk</span>
+</a>
+</div>
+</div>
+<!-- Sales Stage Stepper Visualizer (مرحلة البيع) -->
+<div class="space-y-space-xs pt-1 border-t border-outline-variant">
+<div class="flex items-center justify-between text-label-sm">
+<span class="font-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-sm text-primary">timeline</span>
+<span>Sales Stage</span>
+<span class="text-on-surface-variant/60 font-body-sm">(مرحلة البيع)</span>
+</span>
+<span class="text-primary font-bold font-label-sm bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+            Meeting Scheduled (مقابلة محددة)
+          </span>
+</div>
+<!-- Progress Track -->
+<div class="grid grid-cols-5 gap-1.5 pt-2">
+<!-- Step 1: Fresh -->
+<div class="flex flex-col gap-1 items-center">
+<div class="h-1.5 w-full rounded-full bg-primary"></div>
+<span class="font-label-sm text-[9px] text-on-surface-variant">Fresh</span>
+</div>
+<!-- Step 2: Contacted -->
+<div class="flex flex-col gap-1 items-center">
+<div class="h-1.5 w-full rounded-full bg-primary"></div>
+<span class="font-label-sm text-[9px] text-on-surface-variant">Contacted</span>
+</div>
+<!-- Step 3: Meeting (Active) -->
+<div class="flex flex-col gap-1 items-center">
+<div class="h-1.5 w-full rounded-full bg-primary relative shadow-[0_0_8px_#a3e635]">
+<span class="absolute -top-1 right-1/2 translate-x-1/2 w-2 h-2 rounded-full bg-primary-container animate-ping"></span>
+</div>
+<span class="font-label-sm text-[9px] text-primary font-bold">Meeting</span>
+</div>
+<!-- Step 4: Negotiation -->
+<div class="flex flex-col gap-1 items-center">
+<div class="h-1.5 w-full rounded-full bg-surface-container-highest"></div>
+<span class="font-label-sm text-[9px] text-on-surface-variant/50">Negotiate</span>
+</div>
+<!-- Step 5: Won -->
+<div class="flex flex-col gap-1 items-center">
+<div class="h-1.5 w-full rounded-full bg-surface-container-highest"></div>
+<span class="font-label-sm text-[9px] text-on-surface-variant/50">Won</span>
+</div>
+</div>
+</div>
+<!-- Metadata Roster -->
+<div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-outline-variant text-[11px]">
+<div>
+<p class="font-label-sm text-[10px] text-on-surface-variant uppercase">Director</p>
+<p class="font-label-md text-on-surface font-semibold truncate">Faris Mansoor</p>
+</div>
+<div>
+<p class="font-label-sm text-[10px] text-on-surface-variant uppercase">Source</p>
+<p class="font-label-md text-on-surface font-semibold truncate">Meta VIP Ad</p>
+</div>
+<div>
+<p class="font-label-sm text-[10px] text-on-surface-variant uppercase">Added Date</p>
+<p class="font-label-md text-on-surface font-semibold truncate">14 Aug 2026</p>
+</div>
+</div>
+</section>
+<!-- 2. Quick Action Hub (4-Button Grid) -->
+<section>
+<div class="flex items-center justify-between mb-2">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Quick Dispatch Actions</h2>
+<span class="font-label-sm text-xs text-primary/80">إجراءات سريعة</span>
+</div>
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- Action 1: Log Outcome -->
+<button class="group p-space-sm bg-surface-container border border-outline-variant hover:border-primary/50 rounded-DEFAULT text-left transition-all duration-150 active:scale-95 flex items-start gap-space-sm" type="button">
+<div class="w-9 h-9 rounded-xl bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-lg">edit_note</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors">Log Call Outcome</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant truncate">سجل نتيجة الاتصال</p>
+</div>
+</button>
+<!-- Action 2: Schedule Follow-up -->
+<button class="group p-space-sm bg-surface-container border border-outline-variant hover:border-primary/50 rounded-DEFAULT text-left transition-all duration-150 active:scale-95 flex items-start gap-space-sm" type="button">
+<div class="w-9 h-9 rounded-xl bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-lg">event_available</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors">Schedule Follow-up</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant truncate">متابعة مجدولة</p>
+</div>
+</button>
+<!-- Action 3: WhatsApp Brochure -->
+<button class="group p-space-sm bg-surface-container border border-outline-variant hover:border-[#25D366]/50 rounded-DEFAULT text-left transition-all duration-150 active:scale-95 flex items-start gap-space-sm" type="button">
+<div class="w-9 h-9 rounded-xl bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-[#25D366] group-hover:bg-[#25D366] group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-lg">send</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-[#25D366] transition-colors">Send WA Brochure</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant truncate">كتالوج واتساب آلي</p>
+</div>
+</button>
+<!-- Action 4: Book Site Visit -->
+<button class="group p-space-sm bg-surface-container border border-outline-variant hover:border-primary/50 rounded-DEFAULT text-left transition-all duration-150 active:scale-95 flex items-start gap-space-sm" type="button">
+<div class="w-9 h-9 rounded-xl bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-lg">pin_drop</span>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors">Book Site Visit</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant truncate">حجز معاينة ميدانية</p>
+</div>
+</button>
+</div>
+</section>
+<!-- 3. Property Interest & Budget Matrix -->
+<section class="bg-surface-container-low border border-outline-variant rounded-DEFAULT p-space-md space-y-space-sm">
+<div class="flex items-center justify-between border-b border-outline-variant pb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">apartment</span>
+<h2 class="font-label-md text-label-md font-bold text-on-surface">Target Property &amp; Budget Matrix</h2>
+</div>
+<span class="font-body-sm text-xs text-on-surface-variant font-medium">الميزانية والوحدة</span>
+</div>
+<!-- Property Card Banner -->
+<div class="flex gap-3 bg-surface-container-lowest p-space-sm rounded-xl border border-outline-variant">
+<div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-surface-container-high border border-outline-variant relative">
+<img class="w-full h-full object-cover" data-alt="A modern architectural rendering of a luxury standalone villa with floor to ceiling glass windows, infinity pool, lush landscaped garden at dusk with dramatic exterior architectural lighting in a private gated community. Obsidian dark tone aesthetic with warm interior ambient lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxA-FeSETbAlXk8EgYOkMNJzhJsymFvVKo4ymA_PflCsFqWgtAH_fMRQ12gZl60OLfQiW6qiimx8gi5z4vyBE_VRRvIdo8VD8b1pvyezYThyl-iHkCi7jjMEua2DFKJS7ABPTsfnuvetZBrw2eoDE2GloXpJClE9ybOHECyUd3k1X41jYyc5Ui9MuQiNA3uwMp_zYypbs82G6EVnQP-bkW4erREYP44BBxpzxeO98hGVRSLbS1gYQxBA"/>
+<span class="absolute bottom-1 left-1 bg-surface-container-lowest/90 px-1 py-0.5 rounded text-[9px] font-mono font-bold text-primary">Palm Hills</span>
+</div>
+<div class="flex-1 min-w-0 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-[10px] text-primary uppercase font-bold tracking-wider">Prime Interest</span>
+<span class="px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant text-[10px] font-mono">Villa 3BR+M</span>
+</div>
+<h3 class="font-label-md text-body-md font-bold text-on-surface truncate mt-0.5">Palm Residence Luxury Villa</h3>
+<p class="font-body-sm text-[11px] text-on-surface-variant">Developer: Palm Hills Developments</p>
+</div>
+<div class="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+<span class="material-symbols-outlined text-xs text-primary">bathtub</span> 4 Bath
+            <span class="mx-1">•</span>
+<span class="material-symbols-outlined text-xs text-primary">square_foot</span> 385 m²
+          </div>
+</div>
+</div>
+<!-- Financial Matrix KPI Grid -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<!-- Target Budget (Libre Caslon Editorial Metric) -->
+<div class="bg-surface-container-lowest p-space-sm rounded-xl border border-outline-variant">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-[10px] uppercase tracking-wider">Target Budget</span>
+<span class="text-[10px] font-body-sm text-primary">الميزانية</span>
+</div>
+<p class="font-display-hero text-headline-sm text-primary font-bold mt-1">7.50M <span class="font-label-sm text-xs font-normal text-on-surface">EGP</span></p>
+<p class="font-mono text-label-sm text-[11px] text-on-surface-variant">≈ AED 910,000</p>
+</div>
+<!-- Payment Terms & Qualification -->
+<div class="bg-surface-container-lowest p-space-sm rounded-xl border border-outline-variant">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-[10px] uppercase tracking-wider">Payment Structure</span>
+<span class="text-[10px] font-body-sm">السداد</span>
+</div>
+<p class="font-label-md text-label-md text-on-surface font-bold mt-1">7 Yrs Installments</p>
+<div class="flex items-center gap-1 mt-1 text-[11px] text-primary">
+<span class="material-symbols-outlined text-xs">verified</span>
+<span class="font-label-sm text-[10px] font-bold">Pre-Approved Buyer</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. 360° Activity Timeline & Interaction Ledger (سجل النشاط والمكالمات) -->
+<section class="bg-surface-container-low border border-outline-variant rounded-DEFAULT p-space-md space-y-space-md">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-headline-sm text-body-lg font-bold text-on-surface flex items-center gap-1.5">
+<span>360° Activity Ledger</span>
+</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant">سجل التفاعلات والتواصل الشامل</p>
+</div>
+<button class="text-primary hover:text-secondary text-label-sm font-label-sm font-bold flex items-center gap-0.5" type="button">
+<span>Filter</span>
+<span class="material-symbols-outlined text-sm">filter_list</span>
+</button>
+</div>
+<!-- Segmented Interactive Filter Tabs -->
+<div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-label-sm">
+<button class="px-3 py-1.5 rounded-full bg-primary-container text-surface-container-lowest font-bold whitespace-nowrap active:scale-95 transition-all" type="button">
+          All Activity (18)
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface whitespace-nowrap active:scale-95 transition-all flex items-center gap-1" type="button">
+<span>Call Logs (3)</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+</button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface whitespace-nowrap active:scale-95 transition-all" type="button">
+          Notes (2)
+        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface whitespace-nowrap active:scale-95 transition-all" type="button">
+          Files &amp; KYC
+        </button>
+</div>
+<!-- Timeline Items -->
+<div class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-[2px] before:bg-outline-variant">
+<!-- Timeline 1: Outgoing Call with Audio Scrubber Preview -->
+<div class="relative group">
+<!-- Marker -->
+<div class="absolute -left-6 top-0 w-5 h-5 rounded-full bg-surface-container-lowest border-2 border-primary flex items-center justify-center text-primary shadow-[0_0_8px_#a3e635]">
+<span class="material-symbols-outlined text-xs">call_made</span>
+</div>
+<div class="bg-surface-container p-space-sm rounded-xl border border-outline-variant group-hover:border-primary/40 transition-colors">
+<div class="flex items-center justify-between text-label-sm">
+<span class="font-bold text-primary flex items-center gap-1">
+<span>Outgoing Dial</span>
+<span class="font-mono text-xs bg-primary/10 px-1.5 py-0.2 rounded text-primary">6m 42s</span>
+</span>
+<span class="font-mono text-[10px] text-on-surface-variant">Today • 11:20 AM</span>
+</div>
+<p class="font-body-md text-body-sm text-on-surface mt-1.5 leading-snug">
+              Client requested an on-ground site visit this Friday at 4:30 PM. He loved the 3BR layout and asked about early handover discounts.
+            </p>
+<!-- Embedded Mini Audio Scrubber Mockup -->
+<div class="mt-2.5 bg-surface-container-lowest p-2 rounded-lg border border-outline-variant flex items-center gap-2">
+<button aria-label="Play recording" class="w-7 h-7 rounded-full bg-primary text-surface-container-lowest flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform" type="button">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<div class="flex-1">
+<div class="flex items-center justify-between text-[10px] font-mono text-on-surface-variant mb-1">
+<span>REC_20260814_MG.wav</span>
+<span class="text-primary font-bold">02:14 / 06:42</span>
+</div>
+<!-- Simulated Waveform/Scrubber -->
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden flex items-center">
+<div class="bg-primary h-full w-2/5 rounded-full"></div>
+</div>
+</div>
+<button aria-label="Download call record" class="text-on-surface-variant hover:text-primary" type="button">
+<span class="material-symbols-outlined text-base">download</span>
+</button>
+</div>
+<!-- Agent metadata footnote -->
+<div class="mt-2 flex items-center gap-1.5 text-[10px] text-on-surface-variant">
+<span class="w-4 h-4 rounded-full bg-surface-container-high text-[9px] flex items-center justify-center font-bold text-primary">FM</span>
+<span>Logged by Faris Mansoor (Senior Director)</span>
+</div>
+</div>
+</div>
+<!-- Timeline 2: WhatsApp Automation Dispatched -->
+<div class="relative group">
+<!-- Marker -->
+<div class="absolute -left-6 top-0 w-5 h-5 rounded-full bg-surface-container-lowest border-2 border-[#25D366] flex items-center justify-center text-[#25D366]">
+<span class="material-symbols-outlined text-xs">chat</span>
+</div>
+<div class="bg-surface-container p-space-sm rounded-xl border border-outline-variant group-hover:border-[#25D366]/40 transition-colors">
+<div class="flex items-center justify-between text-label-sm">
+<span class="font-bold text-[#25D366] flex items-center gap-1">
+<span>WhatsApp Media Dispatched</span>
+</span>
+<span class="font-mono text-[10px] text-on-surface-variant">Today • 11:32 AM</span>
+</div>
+<p class="font-body-md text-body-sm text-on-surface mt-1 leading-snug">
+              Official Brochure &amp; Floorplan PDF dispatched via Brokly Bot with payment schedule breakdown.
+            </p>
+<div class="mt-2 flex items-center justify-between bg-surface-container-lowest p-2 rounded-lg border border-outline-variant">
+<div class="flex items-center gap-2 truncate">
+<span class="material-symbols-outlined text-error text-base">picture_as_pdf</span>
+<span class="font-mono text-label-sm text-on-surface truncate">Palm_Hills_VIP_Brochure_v4.pdf</span>
+</div>
+<span class="font-label-sm text-[10px] text-[#25D366] font-bold whitespace-nowrap flex items-center">
+<span class="material-symbols-outlined text-xs mr-0.5">done_all</span> Delivered
+              </span>
+</div>
+</div>
+</div>
+<!-- Timeline 3: Stage Progression Event -->
+<div class="relative group">
+<!-- Marker -->
+<div class="absolute -left-6 top-0 w-5 h-5 rounded-full bg-surface-container-lowest border-2 border-primary flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-xs">sync_alt</span>
+</div>
+<div class="bg-surface-container p-space-sm rounded-xl border border-outline-variant group-hover:border-primary/40 transition-colors">
+<div class="flex items-center justify-between text-label-sm">
+<span class="font-bold text-on-surface">Stage Status Advanced</span>
+<span class="font-mono text-[10px] text-on-surface-variant">Yesterday • 06:15 PM</span>
+</div>
+<p class="font-body-md text-body-sm text-on-surface-variant mt-1">
+              Moved from <span class="text-on-surface font-semibold">Fresh Lead</span> to <span class="text-primary font-semibold">Meeting Scheduled</span> after qualification call.
+            </p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- 5. Sticky Bottom Outreach & Execution Bar -->
+<footer class="fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest/95 backdrop-blur-xl border-t border-outline-variant px-margin-mobile py-space-sm shadow-[0_-8px_24px_rgba(0,0,0,0.8)]">
+<div class="max-w-md mx-auto flex items-center gap-space-sm">
+<!-- Direct Audio Call CTA (Secondary Kinetic) -->
+<a class="flex-1 h-12 rounded-full border border-outline-variant bg-surface-container-low hover:bg-surface-container-high text-on-surface font-label-md flex items-center justify-center gap-2 active:scale-95 transition-all" href="tel:+201125315790">
+<span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: 'FILL' 1;">phone</span>
+<div class="text-left leading-tight">
+<span class="block font-bold">Call Client</span>
+<span class="block text-[10px] text-on-surface-variant leading-none font-body-sm">اتصال هاتفي مباشر</span>
+</div>
+</a>
+<!-- Primary Kinetic Action: Update Stage & Schedule Callback -->
+<button class="flex-[1.4] h-12 rounded-full bg-primary-container text-surface-container-lowest font-label-md font-bold flex items-center justify-center gap-2 neon-pill-glow hover:bg-secondary active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-surface-container-lowest text-xl">event_upcoming</span>
+<div class="text-left leading-tight">
+<span class="block font-extrabold text-sm">Update &amp; Callback</span>
+<span class="block text-[10px] text-surface-container-lowest/80 leading-none">تحديث المرحلة وموعد</span>
+</div>
+</button>
+</div>
+</footer>
+</body></html>
