@@ -17,7 +17,10 @@ import {
   Calendar,
   FileText,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Mic,
+  MicOff,
+  Tag
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -26,6 +29,8 @@ export default function AssistantChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<any | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -37,6 +42,7 @@ export default function AssistantChatWidget() {
     setMessages,
     error,
     reload,
+    setInput,
   } = useChat({
     api: '/api/assistant',
     onError: (err) => {
@@ -44,6 +50,89 @@ export default function AssistantChatWidget() {
       toast.error('تعذر الرد من المساعد الذكي حالياً.');
     },
   });
+
+  // Clean up speech recognition on close or unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, []);
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
+      setIsListening(false);
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      toast.error('التعرف على الصوت غير مدعوم في هذا المتصفح.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.lang = 'ar-EG'; // Egyptian Arabic dialect
+      recognition.interimResults = true;
+      recognition.continuous = false;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast.info('تحدث الآن بالعامية المصرية...');
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript) {
+          if (typeof setInput === 'function') {
+            setInput(transcript);
+          } else {
+            handleInputChange({ target: { value: transcript } } as any);
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          toast.error('يرجى السماح بالوصول إلى الميكروفون لاستخدام الإملاء الصوتي.');
+        } else if (event.error !== 'no-speech') {
+          toast.error('تعذر التقاط الصوت، يرجى المحاولة ثانية.');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch (err: any) {
+      console.error('Failed to start speech recognition:', err);
+      setIsListening(false);
+      toast.error('تعذر تشغيل الميكروفون.');
+    }
+  };
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -307,11 +396,30 @@ export default function AssistantChatWidget() {
                   <AlertCircle size={16} />
                   <span>تأكيد الإجراء المطلوب</span>
                 </div>
-                <p className="text-foreground text-[11px] font-medium leading-relaxed">
+                <p className="text-foreground text-[11px] font-medium leading-relaxed whitespace-pre-line">
                   {pendingAction.message}
                 </p>
 
-                {pendingAction.text && (
+                {/* Structured details for compound update */}
+                {pendingAction.action === 'update_lead_stage_and_add_note' && (
+                  <div className="space-y-1.5 pt-0.5">
+                    {pendingAction.newStage && (
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        <span className="text-muted-foreground">المرحلة الجديدة:</span>
+                        <span className="px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">
+                          {pendingAction.newStage}
+                        </span>
+                      </div>
+                    )}
+                    {pendingAction.noteText && (
+                      <div className="p-2 rounded bg-card border border-border text-[11px] font-mono text-muted-foreground text-right">
+                        "{pendingAction.noteText}"
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {pendingAction.text && pendingAction.action !== 'update_lead_stage_and_add_note' && (
                   <div className="p-2 rounded bg-card border border-border text-[11px] font-mono text-muted-foreground">
                     "{pendingAction.text}"
                   </div>
@@ -354,16 +462,29 @@ export default function AssistantChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Message Input Box */}
+          {/* Message Input Box with Free Voice-to-Text Button */}
           <form
             onSubmit={handleSubmit}
             className="p-3 border-t border-border bg-card/80 backdrop-blur-sm flex items-center gap-2"
           >
+            <button
+              type="button"
+              onClick={toggleVoiceInput}
+              disabled={isLoading}
+              title={isListening ? 'إيقاف الاستماع' : 'إملاء صوتي بالعامية المصرية'}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+                isListening
+                  ? 'bg-red-500 text-white animate-pulse shadow-md ring-2 ring-red-400'
+                  : 'bg-muted/80 text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95'
+              }`}
+            >
+              {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+            </button>
             <input
               type="text"
               value={input}
               onChange={handleInputChange}
-              placeholder="اكتب سؤالك أو طلبك هنا..."
+              placeholder={isListening ? 'جاري الاستماع... تحدث بالعامية المصرية' : 'اكتب سؤالك أو طلبك هنا...'}
               disabled={isLoading}
               dir="auto"
               className="flex-1 py-2 px-3 bg-muted/60 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-all"
@@ -371,7 +492,7 @@ export default function AssistantChatWidget() {
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="p-2 rounded-xl bg-primary text-black hover:brightness-110 active:scale-95 disabled:opacity-40 transition-all"
+              className="p-2 rounded-xl bg-primary text-black hover:brightness-110 active:scale-95 disabled:opacity-40 transition-all shrink-0"
             >
               <Send size={15} />
             </button>

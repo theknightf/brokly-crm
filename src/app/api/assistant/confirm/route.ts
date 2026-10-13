@@ -22,6 +22,12 @@ const confirmSchema = z.discriminatedUnion('action', [
     leadId: z.string().uuid(),
     newStatus: z.enum(ALL_REAL_STATUSES as [string, ...string[]]),
   }),
+  z.object({
+    action: z.literal('update_lead_stage_and_add_note'),
+    leadId: z.string().uuid(),
+    newStage: z.enum(ALL_REAL_STATUSES as [string, ...string[]]).optional(),
+    noteText: z.string().min(1).max(2000).optional(),
+  }),
 ]);
 
 /**
@@ -161,6 +167,69 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         message: `تم تحديث مرحلة العميل "${targetLead.name}" إلى "${payload.newStatus}"`,
+      });
+    }
+
+    if (payload.action === 'update_lead_stage_and_add_note') {
+      const summaryParts: string[] = [];
+
+      // 1. Stage update if newStage is provided
+      if (payload.newStage) {
+        const { error: stageErr } = await supabase
+          .from('leads')
+          .update({
+            crm_status: payload.newStage,
+            last_action_at: new Date().toISOString(),
+            last_action_by: user.id,
+          })
+          .eq('id', payload.leadId);
+
+        if (stageErr) throw new Error(stageErr.message);
+
+        await supabase.from('activity_log').insert({
+          user_id: user.id,
+          action_type: 'Lead Status Updated',
+          entity_type: 'lead',
+          entity_id: payload.leadId,
+          detail: `Status changed to ${payload.newStage} via AI Assistant`,
+        });
+
+        summaryParts.push(`تحديث المرحلة إلى "${payload.newStage}"`);
+      }
+
+      // 2. Insert note if noteText is provided
+      if (payload.noteText) {
+        const { error: noteErr } = await supabase.from('lead_comments').insert({
+          lead_id: payload.leadId,
+          user_id: user.id,
+          body: payload.noteText,
+        });
+
+        if (noteErr) throw new Error(noteErr.message);
+
+        await supabase.from('activity_log').insert({
+          user_id: user.id,
+          action_type: 'Comment Added',
+          entity_type: 'lead',
+          entity_id: payload.leadId,
+          detail: payload.noteText.slice(0, 80),
+        });
+
+        summaryParts.push('إضافة الملاحظة');
+      }
+
+      // Audit in assistant_logs
+      await supabase.from('assistant_logs').insert({
+        user_id: user.id,
+        tool_name: 'update_lead_stage_and_add_note',
+        tool_args: { leadId: payload.leadId, newStage: payload.newStage, noteText: payload.noteText },
+        status: 'confirmed',
+        result_summary: `Updated ${summaryParts.join(' و ')} for lead ${targetLead.name}`,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `تم ${summaryParts.join(' و ')} بنجاح للعميل "${targetLead.name}"`,
       });
     }
 

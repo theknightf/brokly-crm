@@ -1535,7 +1535,7 @@ export default function LeadsManagementScreen({
               <p className="text-xs opacity-80">{loadError}</p>
             </div>
           </div>
-          <button onClick={fetchLeads} className="btn-secondary shrink-0">
+          <button onClick={() => fetchLeads()} className="btn-secondary shrink-0">
             <RefreshCw size={14} />
             Retry
           </button>

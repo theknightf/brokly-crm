@@ -58,3 +58,123 @@ export function extractKeywords(prompt: string): string[] {
 
   return keywords.length > 0 ? keywords : words;
 }
+
+/**
+ * Generates forgiving search terms for a given query:
+ * handles 'ال' prefix, Alef variations, Taa Marbuta/Haa, and common typos.
+ */
+export function getArabicSearchVariants(query: string): string[] {
+  const raw = query.trim();
+  if (!raw) return [];
+
+  const norm = normalizeArabic(raw);
+  const variants = new Set<string>();
+
+  if (raw.length >= 2) variants.add(raw);
+  if (norm.length >= 2) variants.add(norm);
+
+  // If raw has 'ال', add variant without it; if not, add variant with 'ال'
+  if (raw.startsWith('ال') && raw.length > 3) {
+    variants.add(raw.slice(2));
+  } else if (!raw.startsWith('ال') && raw.length >= 2) {
+    variants.add(`ال${raw}`);
+  }
+
+  if (norm.length >= 2) {
+    variants.add(`ال${norm}`);
+    if (norm.startsWith('ال') && norm.length > 3) {
+      variants.add(norm.slice(2));
+    }
+  }
+
+  // Taa Marbuta vs Haa variations
+  if (raw.endsWith('ة')) variants.add(raw.slice(0, -1) + 'ه');
+  if (raw.endsWith('ه')) variants.add(raw.slice(0, -1) + 'ة');
+
+  return Array.from(variants).filter((v) => v.length >= 2);
+}
+
+/**
+ * Maps Arabic and English conversational stage mentions to canonical CRM statuses
+ */
+export function mapArabicToStage(input: string): string | undefined {
+  if (!input) return undefined;
+  const trimmed = input.trim();
+
+  const STAGE_MAP: Record<string, string> = {
+    'مهتم': 'Interested',
+    'مهتمة': 'Interested',
+    'مهتمين': 'Interested',
+    'انترستد': 'Interested',
+    'interested': 'Interested',
+    'متابعه': 'Following Up',
+    'متابعة': 'Following Up',
+    'فولو اب': 'Following Up',
+    'following up': 'Following Up',
+    'فولو': 'Following Up',
+    'اجتماع': 'Meeting',
+    'ميتنج': 'Meeting',
+    'مقابله': 'Meeting',
+    'مقابلة': 'Meeting',
+    'meeting': 'Meeting',
+    'متابعه بعد الاجتماع': 'Follow Up After Meeting',
+    'متابعة بعد الاجتماع': 'Follow Up After Meeting',
+    'حجز': 'Reservation',
+    'ريزرفيشن': 'Reservation',
+    'reservation': 'Reservation',
+    'ديل': 'Done Deal',
+    'تم البيع': 'Done Deal',
+    'بيع': 'Done Deal',
+    'done deal': 'Done Deal',
+    'won': 'Done Deal',
+    'غير مهتم': 'Not Interested',
+    'مش مهتم': 'Not Interested',
+    'not interested': 'Not Interested',
+    'لم يرد': 'No Answer',
+    'ماردش': 'No Answer',
+    'ما بيردش': 'No Answer',
+    'ما ردش': 'No Answer',
+    'no answer': 'No Answer',
+    'ما بيردش خالص': 'No Answer At All',
+    'لا يرد نهائيا': 'No Answer At All',
+    'no answer at all': 'No Answer At All',
+    'رقم خاطئ': 'Wrong Number',
+    'رقم غلط': 'Wrong Number',
+    'wrong number': 'Wrong Number',
+    'مغلق': 'Closed Number',
+    'غير متاح': 'Closed Number',
+    'closed number': 'Closed Number',
+    'ميزانيه منخفضه': 'Low Budget',
+    'ميزانية منخفضة': 'Low Budget',
+    'low budget': 'Low Budget',
+    'الغاء': 'Cancellation',
+    'إلغاء': 'Cancellation',
+    'كنسل': 'Cancellation',
+    'cancellation': 'Cancellation',
+    'مؤجل': 'Pending Leads',
+    'بيندينج': 'Pending Leads',
+    'pending': 'Pending Leads',
+    'بارد': 'Cold Calls',
+    'كولد': 'Cold Calls',
+    'cold': 'Cold Calls',
+    'جديد': 'Fresh Leads',
+    'فريش': 'Fresh Leads',
+    'fresh': 'Fresh Leads',
+    'تاجيل اجتماع': 'Reschedule Meeting',
+    'تأجيل الاجتماع': 'Reschedule Meeting',
+    'reschedule meeting': 'Reschedule Meeting',
+  };
+
+  const norm = normalizeArabic(trimmed).toLowerCase();
+  if (STAGE_MAP[norm]) return STAGE_MAP[norm];
+  if (STAGE_MAP[trimmed.toLowerCase()]) return STAGE_MAP[trimmed.toLowerCase()];
+
+  for (const [key, stage] of Object.entries(STAGE_MAP)) {
+    if (norm.includes(key) || key.includes(norm)) {
+      return stage;
+    }
+  }
+
+  return undefined;
+}
+

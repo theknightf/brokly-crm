@@ -1,6 +1,11 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { normalizeArabic, extractKeywords } from './arabicNormalizer';
+import {
+  normalizeArabic,
+  extractKeywords,
+  getArabicSearchVariants,
+  mapArabicToStage,
+} from './arabicNormalizer';
 import { ALL_REAL_STATUSES } from '@/app/leads-management/components/leadStages';
 
 /**
@@ -24,7 +29,125 @@ export function createAssistantTools(supabase: any, userId: string) {
   };
 
   return {
-    // ─── 1. SEARCH LEADS AND NOTES ─────────────────────────────
+    // ─── 1. SMART ARABIC NOTES & LEAD SEARCH ───────────────────
+    searchLeadsByNoteOrKeyword: tool({
+      description:
+        'Searches leads (name, phone, area, project) and notes/comments using keywords or Arabic normalized text. Always call this when an agent asks about a client or property requirement (e.g. "في عميل عاوز يشتري في النرجس").',
+      parameters: z.object({
+        keyword: z.string().describe('The keyword, location, compound, or client requirement to search for (e.g. "النرجس", "العبور", "شقة", "أحمد")'),
+        limit: z.number().int().min(1).max(10).optional().default(5).describe('Max results to return (max 10)'),
+      }),
+      execute: async ({ keyword, limit = 5 }) => {
+        const raw = keyword.trim();
+        const extracted = extractKeywords(raw);
+        const variants = getArabicSearchVariants(raw);
+        const searchTerms = Array.from(new Set([...extracted, ...variants, raw])).filter((t) => t.length >= 2);
+
+        // 1. Search leads table
+        let leadsQuery = supabase
+          .from('leads')
+          .select('id, name, phone, crm_status, location, project, notes, created_at, agent')
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        const orClauses = searchTerms
+          .slice(0, 4)
+          .flatMap((t) => [
+            `name.ilike.%${t}%`,
+            `notes.ilike.%${t}%`,
+            `location.ilike.%${t}%`,
+            `project.ilike.%${t}%`,
+            `phone.ilike.%${t}%`,
+          ])
+          .join(',');
+
+        if (orClauses) {
+          leadsQuery = leadsQuery.or(orClauses);
+        }
+
+        const { data: leads, error: leadsError } = await leadsQuery;
+
+        // 2. Search comments table for matching notes
+        let commentsQuery = supabase
+          .from('lead_comments')
+          .select('id, lead_id, body, created_at, user_profiles(full_name), leads(id, name, phone, crm_status, location, project)')
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        const commentClauses = searchTerms
+          .slice(0, 4)
+          .map((t) => `body.ilike.%${t}%`)
+          .join(',');
+
+        if (commentClauses) {
+          commentsQuery = commentsQuery.or(commentClauses);
+        }
+
+        const { data: comments } = await commentsQuery;
+
+        const results: any[] = [];
+        const seenLeadIds = new Set<string>();
+
+        // Process leads matches
+        for (const l of leads || []) {
+          seenLeadIds.add(l.id);
+          results.push({
+            leadId: l.id,
+            id: l.id,
+            name: l.name,
+            phone: l.phone,
+            stage: l.crm_status,
+            status: l.crm_status,
+            project: l.project || l.location || '',
+            matchingNote: l.notes || '',
+            matchingSnippet: l.notes ? l.notes.slice(0, 160) : null,
+            noteDate: l.created_at ? l.created_at.slice(0, 10) : null,
+            authorAgent: l.agent || 'Agent',
+            openUrl: `/leads-management?leadId=${l.id}`,
+            whatsappUrl: l.phone ? `https://wa.me/${l.phone.replace(/\D/g, '')}` : null,
+          });
+        }
+
+        // Process comments matches
+        for (const c of comments || []) {
+          if (!c.leads) continue;
+          if (!seenLeadIds.has(c.lead_id)) {
+            seenLeadIds.add(c.lead_id);
+            results.push({
+              leadId: c.leads.id,
+              id: c.leads.id,
+              name: c.leads.name,
+              phone: c.leads.phone,
+              stage: c.leads.crm_status,
+              status: c.leads.crm_status,
+              project: c.leads.project || c.leads.location || '',
+              matchingNote: c.body || '',
+              matchingSnippet: c.body ? c.body.slice(0, 160) : null,
+              noteDate: c.created_at ? c.created_at.slice(0, 10) : null,
+              authorAgent: c.user_profiles?.full_name || 'Agent',
+              openUrl: `/leads-management?leadId=${c.leads.id}`,
+              whatsappUrl: c.leads.phone ? `https://wa.me/${c.leads.phone.replace(/\D/g, '')}` : null,
+            });
+          }
+        }
+
+        const finalResults = results.slice(0, limit);
+        await logToolCall(
+          'searchLeadsByNoteOrKeyword',
+          { keyword, limit },
+          leadsError ? 'error' : 'executed',
+          `Found ${finalResults.length} leads matching "${keyword}"`
+        );
+
+        return {
+          keyword,
+          matchCount: finalResults.length,
+          leads: finalResults,
+        };
+      },
+    }),
+
+    // ─── 1B. SEARCH LEADS AND NOTES (COMPATIBILITY ALIAS) ─────
     search_leads_and_notes: tool({
       description:
         'Searches leads (name, phone, area, project) and notes/comments using keywords or Arabic normalized text. Always call this when an agent asks about a client or property requirement.',
@@ -243,7 +366,153 @@ export function createAssistantTools(supabase: any, userId: string) {
       },
     }),
 
-    // ─── 4. ADD NOTE (WRITE - REQUIRES CONFIRMATION) ───────────
+    // ─── 4. SMART STAGE UPDATE AND NOTE ADDITION (COMPOUND ACTION) ─────
+    updateLeadStageAndAddNote: tool({
+      description:
+        'Resolves a lead (by explicit leadId, leadName, or useLastCalledLead: true for the most recently called contact from call logs), updates their stage, and/or adds a note. Requires user confirmation before execution.',
+      parameters: z.object({
+        leadId: z.string().optional().describe('UUID of the lead if known'),
+        leadName: z.string().optional().describe('Name or partial name of the lead (e.g. "أحمد محمد")'),
+        useLastCalledLead: z
+          .boolean()
+          .optional()
+          .describe('Set to true if agent says "آخر عميل كلمته" or refers to the most recent call'),
+        newStage: z
+          .string()
+          .optional()
+          .describe('New stage or status for the lead (e.g. "Interested", "مهتم", "Following Up")'),
+        noteText: z.string().optional().describe('Note or requirement text to add to the lead (e.g. "عاوز يشتري في العبور")'),
+      }),
+      execute: async ({ leadId, leadName, useLastCalledLead, newStage, noteText }) => {
+        let resolvedLead: any = null;
+        let resolutionNote = '';
+
+        // 1. Resolve via explicit leadId
+        if (leadId) {
+          const { data } = await supabase
+            .from('leads')
+            .select('id, name, phone, crm_status, location, project')
+            .eq('id', leadId)
+            .maybeSingle();
+          if (data) {
+            resolvedLead = data;
+            resolutionNote = 'بمعرف العميل (ID)';
+          }
+        }
+
+        // 2. Resolve via last called lead
+        if (!resolvedLead && useLastCalledLead) {
+          const { data: lastCall } = await supabase
+            .from('call_logs')
+            .select('entity_id, lead_id, contact_name, contact_phone, created_at, outcome')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const targetId = lastCall?.entity_id || lastCall?.lead_id;
+          if (targetId) {
+            const { data: leadFromCall } = await supabase
+              .from('leads')
+              .select('id, name, phone, crm_status, location, project')
+              .eq('id', targetId)
+              .maybeSingle();
+            if (leadFromCall) {
+              resolvedLead = leadFromCall;
+              resolutionNote = 'آخر عميل تم الاتصال به في سجل المكالمات';
+            }
+          }
+
+          if (!resolvedLead && lastCall) {
+            resolvedLead = {
+              id: targetId || '',
+              name: lastCall.contact_name || 'آخر عميل',
+              phone: lastCall.contact_phone || '',
+              crm_status: 'Fresh Leads',
+            };
+            resolutionNote = 'آخر مكالمة مسجلة';
+          }
+        }
+
+        // 3. Resolve via leadName
+        if (!resolvedLead && leadName) {
+          const trimmed = leadName.trim();
+          const { data: directMatches } = await supabase
+            .from('leads')
+            .select('id, name, phone, crm_status, location, project')
+            .ilike('name', `%${trimmed}%`)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (directMatches && directMatches.length > 0) {
+            resolvedLead = directMatches[0];
+            resolutionNote = `مطابقة الاسم "${trimmed}"`;
+          } else {
+            const keywords = extractKeywords(trimmed);
+            if (keywords.length > 0) {
+              const { data: fuzzyMatches } = await supabase
+                .from('leads')
+                .select('id, name, phone, crm_status, location, project')
+                .ilike('name', `%${keywords[0]}%`)
+                .order('created_at', { ascending: false })
+                .limit(1);
+              if (fuzzyMatches && fuzzyMatches.length > 0) {
+                resolvedLead = fuzzyMatches[0];
+                resolutionNote = `مطابقة تقريبية "${keywords[0]}"`;
+              }
+            }
+          }
+        }
+
+        if (!resolvedLead || !resolvedLead.id) {
+          return {
+            error:
+              'لم يتم العثور على العميل المطلوب. يرجى ذكر اسم العميل بدقة أو التأكد من وجود سجل مكالمات.',
+            confirmationRequired: false,
+          };
+        }
+
+        // Map stage to canonical CRM stage
+        const canonicalStage = newStage ? mapArabicToStage(newStage) || newStage : undefined;
+
+        const messageLines: string[] = [
+          `هل تود تأكيد تحديث بيانات العميل ${resolvedLead.name}${resolvedLead.phone ? ` (${resolvedLead.phone})` : ''}؟`,
+        ];
+        if (canonicalStage) {
+          messageLines.push(`• تغيير المرحلة: من "${resolvedLead.crm_status || 'Fresh Leads'}" إلى "${canonicalStage}"`);
+        }
+        if (noteText) {
+          messageLines.push(`• إضافة ملاحظة: "${noteText.trim()}"`);
+        }
+        if (resolutionNote) {
+          messageLines.push(`• طريقة التحديد: ${resolutionNote}`);
+        }
+
+        const pendingAction = {
+          type: 'pending_action',
+          action: 'update_lead_stage_and_add_note',
+          leadId: resolvedLead.id,
+          leadName: resolvedLead.name || 'عميل',
+          leadPhone: resolvedLead.phone || '',
+          currentStage: resolvedLead.crm_status || 'Fresh Leads',
+          newStage: canonicalStage,
+          noteText: noteText?.trim() || undefined,
+          message: messageLines.join('\n'),
+          confirmationRequired: true,
+        };
+
+        await logToolCall(
+          'updateLeadStageAndAddNote',
+          { leadId: resolvedLead.id, newStage: canonicalStage, noteText },
+          'pending_confirmation',
+          `Pending update for ${resolvedLead.name} (${canonicalStage || 'note only'})`
+        );
+
+        return pendingAction;
+      },
+    }),
+
+    // ─── 5. ADD NOTE (WRITE - REQUIRES CONFIRMATION) ───────────
     add_note: tool({
       description: 'Prepares adding a new note or comment to a lead. REQUIRES user confirmation before executing.',
       parameters: z.object({
