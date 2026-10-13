@@ -47,7 +47,10 @@ export default function AssistantChatWidget() {
     api: '/api/assistant',
     onError: (err) => {
       console.error('AI Assistant Error:', err);
-      toast.error('تعذر الرد من المساعد الذكي حالياً.');
+      toast.error('تعذر الرد من المساعد الذكي حالياً.', {
+        duration: 3000,
+        id: 'assistant-error-toast',
+      });
     },
   });
 
@@ -225,10 +228,15 @@ export default function AssistantChatWidget() {
       {/* Slide-over Chat Panel */}
       {isOpen && (
         <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-card border-l border-border shadow-2xl flex flex-col transition-all duration-300 animate-in slide-in-from-right">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+          {/* Header with Safe Area Inset for Mobile Status Bar */}
+          <div
+            className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40 shrink-0 pt-[max(env(safe-area-inset-top),1.5rem)] sm:pt-3"
+            style={{
+              paddingTop: 'max(env(safe-area-inset-top, 0px) + 0.75rem, 1.5rem)',
+            }}
+          >
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">
                 <Sparkles size={16} />
               </div>
               <div>
@@ -239,7 +247,7 @@ export default function AssistantChatWidget() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={clearChat}
                 className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -465,7 +473,10 @@ export default function AssistantChatWidget() {
           {/* Message Input Box with Free Voice-to-Text Button */}
           <form
             onSubmit={handleSubmit}
-            className="p-3 border-t border-border bg-card/80 backdrop-blur-sm flex items-center gap-2"
+            className="p-3 border-t border-border bg-card/80 backdrop-blur-sm flex items-center gap-2 pb-[max(env(safe-area-inset-bottom),0.75rem)]"
+            style={{
+              paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 0.5rem, 0.75rem)',
+            }}
           >
             <button
               type="button"

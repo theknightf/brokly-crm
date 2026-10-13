@@ -78,7 +78,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <LanguageProvider>
             <ThemeProvider>
               {children}
-              <Toaster position="bottom-right" richColors closeButton />
+              <Toaster
+                position="top-center"
+                richColors
+                closeButton
+                toastOptions={{
+                  duration: 3000,
+                  className: 'text-xs',
+                }}
+              />
             </ThemeProvider>
           </LanguageProvider>
         </AuthProvider>

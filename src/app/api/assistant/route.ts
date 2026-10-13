@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText } from 'ai';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/assistant/rateLimiter';
@@ -57,11 +57,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!apiKey) {
+  // Accept GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+
+  if (!apiKey || apiKey === 'your-gemini-api-key-here' || apiKey.trim() === '') {
+    console.error('Gemini API Error: No valid API key configured. Checked GEMINI_API_KEY and GOOGLE_GENERATIVE_AI_API_KEY.');
     return new Response(
       JSON.stringify({
-        error: 'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GOOGLE_GENERATIVE_AI_API_KEY.',
+        error: 'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GEMINI_API_KEY أو GOOGLE_GENERATIVE_AI_API_KEY في ملف البيئة.',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
@@ -78,24 +83,59 @@ export async function POST(request: Request) {
   // Send only the last 10 messages to the model to minimize token consumption and data leakage
   const recentMessages = body.messages.slice(-10);
 
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  // Supported Active Free Tier Models:
+  // Note: Older models like gemini-2.0-flash / gemini-2.5-flash / gemini-pro have been retired by Google.
+  // gemini-flash-lite-latest, gemini-3.5-flash-lite, and gemini-flash-latest are active and fast.
+  let modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+  if (
+    ['gemini-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-2.0-flash', 'gemini-2.5-flash'].includes(
+      modelName
+    )
+  ) {
+    console.warn(`Deprecated or retired Gemini model "${modelName}" detected. Falling back to "gemini-flash-lite-latest".`);
+    modelName = 'gemini-flash-lite-latest';
+  }
+
+  const googleProvider = createGoogleGenerativeAI({
+    apiKey,
+  });
+
   const tools = createAssistantTools(supabase, user.id);
 
   try {
     const result = streamText({
-      model: google(modelName) as any,
+      model: googleProvider(modelName) as any,
       system: SYSTEM_PROMPT,
       messages: recentMessages,
       tools,
       maxSteps: 5,
+      onError({ error }) {
+        console.error('Gemini streamText stream error details:', {
+          model: modelName,
+          errorName: (error as any)?.name,
+          errorMessage: (error as any)?.message,
+          status: (error as any)?.status,
+          statusCode: (error as any)?.statusCode,
+          cause: (error as any)?.cause,
+          stack: (error as any)?.stack,
+        });
+      },
     });
 
     return result.toDataStreamResponse();
   } catch (error: any) {
-    console.error('Assistant error:', error);
+    console.error('Gemini API Invocation Error:', {
+      model: modelName,
+      name: error?.name,
+      message: error?.message,
+      status: error?.status || error?.statusCode,
+      cause: error?.cause,
+      stack: error?.stack,
+    });
     return new Response(
       JSON.stringify({
         error: 'حدث خطأ مؤقت في التواصل مع المساعد الذكي. برجاء إعادة المحاولة.',
+        details: error?.message || 'Unknown error',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
