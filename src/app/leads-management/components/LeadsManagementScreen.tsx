@@ -260,21 +260,45 @@ export default function LeadsManagementScreen({
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    status: initialStatus || '',
-    source: '',
-    agent: '',
-    project: '',
-    propertyType: '',
-    action: '',
-    contacted: '',
-    actionTaken: '',
-    actionFrom: '',
-    actionTo: '',
-    called: '',
-    calledFrom: '',
-    calledTo: '',
+  const [filters, setFilters] = useState<FilterState>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const urlCalled = (p.get('called') || '') as FilterState['called'];
+      const urlAction = (p.get('actionTaken') || '') as FilterState['actionTaken'];
+      const urlStatus = resolveStatusParam(p.get('stage')) || resolveStatusParam(p.get('status')) || initialStatus || '';
+      return {
+        search: p.get('search') || '',
+        status: urlStatus,
+        source: (p.get('source') as LeadSource) || '',
+        agent: p.get('agent') || '',
+        project: p.get('project') || '',
+        propertyType: (p.get('propertyType') as PropertyType) || '',
+        action: (p.get('action') as LeadAction) || '',
+        contacted: '',
+        actionTaken: urlAction,
+        actionFrom: p.get('actionFrom') || '',
+        actionTo: p.get('actionTo') || '',
+        called: urlCalled,
+        calledFrom: p.get('calledFrom') || '',
+        calledTo: p.get('calledTo') || '',
+      };
+    }
+    return {
+      search: '',
+      status: initialStatus || '',
+      source: '',
+      agent: '',
+      project: '',
+      propertyType: '',
+      action: '',
+      contacted: '',
+      actionTaken: '',
+      actionFrom: '',
+      actionTo: '',
+      called: '',
+      calledFrom: '',
+      calledTo: '',
+    };
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -380,6 +404,37 @@ export default function LeadsManagementScreen({
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
 
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+  const pageSizeRef = useRef(pageSize);
+  pageSizeRef.current = pageSize;
+  const sortKeyRef = useRef(sortKey);
+  sortKeyRef.current = sortKey;
+  const sortDirRef = useRef(sortDir);
+  sortDirRef.current = sortDir;
+
+  // Keep URL search params in sync with active filters so opening a lead,
+  // logging a call, drawer closes, or router navigation never wipes active filters
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (filters.called) url.searchParams.set('called', filters.called);
+    else url.searchParams.delete('called');
+
+    if (filters.actionTaken) url.searchParams.set('actionTaken', filters.actionTaken);
+    else url.searchParams.delete('actionTaken');
+
+    if (filters.status) url.searchParams.set('status', filters.status);
+    else url.searchParams.delete('status');
+
+    if (filters.search) url.searchParams.set('search', filters.search);
+    else url.searchParams.delete('search');
+
+    window.history.replaceState({}, '', url.toString());
+  }, [filters]);
+
   // Deep-link intake via useSearchParams (dashboard cards, follow-ups, topbar):
   // /leads-management?lead=<id> · ?new=1 · ?search= · ?status=<exact|alias> ·
   // ?stage=fresh|cold|pending|deal. Applied on mount AND on in-place query
@@ -396,23 +451,33 @@ export default function LeadsManagementScreen({
     const leadId = params.get('lead');
     const openNew = params.get('new') === '1';
     const searchParam = params.get('search');
-    if (searchParam) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('search');
-      window.history.replaceState({}, '', url.toString());
-      setFilters((f) => ({ ...f, search: searchParam }));
-    }
-    // Exact statuses (?status=Fresh%20Leads) + short aliases (?status=no_answer)
-    // + dashboard stage keys (?stage=fresh). Stage wins when both are present.
+    const calledParam = params.get('called') as FilterState['called'];
+    const actionTakenParam = params.get('actionTaken') as FilterState['actionTaken'];
+
     const resolved = resolveStatusParam(params.get('stage')) || resolveStatusParam(params.get('status'));
-    if (resolved) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('status');
-      url.searchParams.delete('stage');
-      window.history.replaceState({}, '', url.toString());
-      setFilters((f) => ({ ...f, status: resolved }));
-      setCurrentPage(1);
-    }
+
+    setFilters((prev) => {
+      const updated = { ...prev };
+      let changed = false;
+      if (searchParam && searchParam !== prev.search) {
+        updated.search = searchParam;
+        changed = true;
+      }
+      if (resolved && resolved !== prev.status) {
+        updated.status = resolved;
+        changed = true;
+      }
+      if (calledParam && calledParam !== prev.called) {
+        updated.called = calledParam;
+        changed = true;
+      }
+      if (actionTakenParam && actionTakenParam !== prev.actionTaken) {
+        updated.actionTaken = actionTakenParam;
+        changed = true;
+      }
+      return changed ? updated : prev;
+    });
+
     if (openNew) {
       const url = new URL(window.location.href);
       url.searchParams.delete('new');
@@ -420,9 +485,6 @@ export default function LeadsManagementScreen({
       setAddModalOpen(true);
     }
     if (!leadId) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete('lead');
-    window.history.replaceState({}, '', url.toString());
     leadsService
       .getById(leadId)
       .then((lead) => {
@@ -431,29 +493,30 @@ export default function LeadsManagementScreen({
       .catch(() => {});
   }, [qpLead, qpNew, qpSearch, qpStatus, qpStage]);
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async (overrideFilters?: FilterState) => {
+    const activeFilters = overrideFilters || filtersRef.current;
     const requestId = ++fetchRef.current;
     if (firstLoadRef.current) setLoading(true);
     try {
       const res = await leadsService.getPage({
-        page: currentPage,
-        pageSize,
-        search: filters.search,
-        status: filters.status || undefined,
-        source: filters.source || undefined,
-        agent: filters.agent || undefined,
-        project: filters.project || undefined,
-        propertyType: filters.propertyType || undefined,
-        action: filters.action || undefined,
-        contacted: filters.contacted || undefined,
-        actionTaken: filters.actionTaken || undefined,
-        actionFrom: filters.actionFrom || undefined,
-        actionTo: filters.actionTo || undefined,
-        called: filters.called || undefined,
-        calledFrom: filters.calledFrom || undefined,
-        calledTo: filters.calledTo || undefined,
-        sortKey,
-        sortDir,
+        page: currentPageRef.current,
+        pageSize: pageSizeRef.current,
+        search: activeFilters.search,
+        status: activeFilters.status || undefined,
+        source: activeFilters.source || undefined,
+        agent: activeFilters.agent || undefined,
+        project: activeFilters.project || undefined,
+        propertyType: activeFilters.propertyType || undefined,
+        action: activeFilters.action || undefined,
+        contacted: activeFilters.contacted || undefined,
+        actionTaken: activeFilters.actionTaken || undefined,
+        actionFrom: activeFilters.actionFrom || undefined,
+        actionTo: activeFilters.actionTo || undefined,
+        called: activeFilters.called || undefined,
+        calledFrom: activeFilters.calledFrom || undefined,
+        calledTo: activeFilters.calledTo || undefined,
+        sortKey: sortKeyRef.current,
+        sortDir: sortDirRef.current,
         // Exclude leads that were optimistically removed after call logging
         recentlyCalledIds: Array.from(recentlyCalledRef.current),
       });
@@ -471,7 +534,7 @@ export default function LeadsManagementScreen({
         firstLoadRef.current = false;
       }
     }
-  };
+  }, []);
 
   const prevSearchRef = useRef(filters.search);
 
@@ -491,7 +554,7 @@ export default function LeadsManagementScreen({
     }, 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, currentPage, pageSize, sortKey, sortDir]);
+  }, [filters, currentPage, pageSize, sortKey, sortDir, fetchLeads]);
 
   // Real-time two-way stage synchronization with Mobile App & other active sessions
   useEffect(() => {
@@ -805,35 +868,52 @@ export default function LeadsManagementScreen({
   const handleCallLogged = useCallback((loggedLead: Lead, outcome: string) => {
     const leadId = loggedLead.id;
 
-    // 1. Optimistic local removal: instantly drop from list/board
+    // 1. Optimistic local update/removal:
+    // When filtering by 'not-called', the lead has now been called, so remove it from the list.
+    // When not filtering by 'not-called', update the lead in-place with called status so it doesn't vanish unnecessarily.
+    const isFilteredNotCalled = filtersRef.current.called === 'not-called';
+
     setLeads((prev) => {
-      if (!prev.find((l) => l.id === leadId)) return prev; // already gone
-      return prev.filter((l) => l.id !== leadId);
+      if (isFilteredNotCalled) {
+        return prev.filter((l) => l.id !== leadId);
+      }
+      return prev.map((l) =>
+        l.id === leadId
+          ? {
+              ...l,
+              hasBeenCalled: true,
+              lastCallOutcome: outcome,
+              lastCallAt: new Date().toISOString(),
+              actionTakenToday: true,
+            }
+          : l
+      );
     });
 
-    // 2. Decrement total so pagination stays accurate
-    setTotal((t) => Math.max(0, t - 1));
+    if (isFilteredNotCalled) {
+      setTotal((t) => Math.max(0, t - 1));
+    }
 
-    // 3. Remove from selected set (if somehow selected)
+    // 2. Remove from selected set (if selected)
     setSelectedIds((prev) => {
+      if (!prev.has(leadId)) return prev;
       const n = new Set(prev);
       n.delete(leadId);
       return n;
     });
 
-    // 4. Close the lead preview if this lead was open
-    if (viewLead?.id === leadId) setViewLead(null);
+    // 3. Close the lead preview drawer if this lead was open
+    setViewLead((curr) => (curr?.id === leadId ? null : curr));
 
-    // 5. Track ID so the next fetchLeads() can exclude it from the server result
-    //    (the API already handles last_call_at / action='called_today' natively)
-    recentlyCalledRef.current.add(leadId);
-    // Auto-clear after 5 minutes so re-fetching naturally re-includes it
-    setTimeout(() => recentlyCalledRef.current.delete(leadId), 5 * 60 * 1000);
+    // 4. Track ID so server query excludes it when filtering not-called
+    if (isFilteredNotCalled) {
+      recentlyCalledRef.current.add(leadId);
+      setTimeout(() => recentlyCalledRef.current.delete(leadId), 5 * 60 * 1000);
+    }
 
-    // 6. Trigger a silent background refresh so the next page/fetch reflects
-    //    the server-side state. Do NOT block the UI.
+    // 5. Trigger a silent background refresh with active filters preserved
     void fetchLeads();
-  }, [viewLead?.id]);
+  }, [fetchLeads]);
 
   // Post-Call Outcome: triggered by Call button — shows modal immediately + dials tel:
   const handlePostCallTrigger = useCallback((lead: Lead) => {
