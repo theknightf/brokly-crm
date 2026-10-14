@@ -817,16 +817,25 @@ export const leadsService = {
     } catch {
       // fall through to client aggregation
     }
-    // Fallback: client-side aggregation over the status columns.
+    // Fallback: client-side aggregation over the status columns with range pagination.
     return cachedRead('statusCounts', async () => {
       try {
-        const { data, error } = await supabase.from('leads').select('crm_status, lead_status');
-        if (error) return {};
+        const CHUNK = 1000;
+        let page = 0;
         const counts: Record<string, number> = {};
-        (data || []).forEach((row: any) => {
-          const s = row.crm_status || row.lead_status || 'Fresh Leads';
-          counts[s] = (counts[s] || 0) + 1;
-        });
+        while (true) {
+          const { data, error } = await supabase
+            .from('leads')
+            .select('crm_status, lead_status')
+            .range(page * CHUNK, (page + 1) * CHUNK - 1);
+          if (error || !data || data.length === 0) break;
+          data.forEach((row: any) => {
+            const s = row.crm_status || row.lead_status || 'Fresh Leads';
+            counts[s] = (counts[s] || 0) + 1;
+          });
+          if (data.length < CHUNK) break;
+          page++;
+        }
         return counts;
       } catch {
         return {};

@@ -69,6 +69,24 @@ export async function GET(request: Request) {
   const period = rangeParam === 'month' ? thisMonth : { from: weekAgo, to: today };
   const totalDays = Math.round((new Date(period.to).getTime() - new Date(period.from).getTime()) / 86400000) + 1;
 
+  const fetchAllLeads = async (): Promise<{ data: any[]; error: any }> => {
+    const CHUNK = 1000;
+    let allRows: any[] = [];
+    let page = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('crm_status, lead_status, assigned_to, source, total_price, final_price, budget_min, budget_max, created_at, updated_at')
+        .range(page * CHUNK, (page + 1) * CHUNK - 1);
+      if (error) return { data: allRows, error };
+      if (!data || data.length === 0) break;
+      allRows.push(...data);
+      if (data.length < CHUNK) break;
+      page++;
+    }
+    return { data: allRows, error: null };
+  };
+
   const [profilesRes, todayRes, periodRes, monthRes, expensesThisRes, expensesPrevRes, activityRes, leadsRes, callsRes, evalsRes, deductionsRes, notificationsRes] = await Promise.all([
     supabase.from('user_profiles').select('id, full_name, email, role, is_active, team_id').order('full_name'),
     supabase.from('attendance').select('user_id, check_in_time, check_out_time').eq('attendance_date', today),
@@ -77,7 +95,7 @@ export async function GET(request: Request) {
     supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', thisMonth.from).lte('expense_date', thisMonth.to),
     supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', prevMonth.from).lte('expense_date', prevMonth.to),
     supabase.from('activity_log').select('user_id, action_type, detail, created_at').order('created_at', { ascending: false }).limit(80),
-    supabase.from('leads').select('crm_status, lead_status, assigned_to, source, total_price, final_price, budget_min, budget_max, created_at, updated_at'),
+    fetchAllLeads(),
     supabase.from('call_logs').select('user_id, outcome, is_valid, created_at, duration_seconds').gte('created_at', `${period.from}T00:00:00`).lte('created_at', `${period.to}T23:59:59.999`),
     supabase.from('evaluations').select('employee_id, dress_code_rating, date').gte('date', period.from).lte('date', period.to),
     supabase.from('payroll_deductions').select('id, user_id, reason, amount, month_year, is_applied, source_ref, created_at').order('created_at', { ascending: false }).limit(50),

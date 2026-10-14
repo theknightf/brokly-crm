@@ -258,8 +258,23 @@ export default function LeadsManagementScreen({
   const { t } = useLanguage();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadStatusCounts = useCallback(async () => {
+    try {
+      const counts = await leadsService.getStatusCounts();
+      if (counts && Object.keys(counts).length > 0) {
+        setStatusCounts(counts);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    loadStatusCounts();
+  }, [loadStatusCounts]);
+
   const [filters, setFilters] = useState<FilterState>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
@@ -524,6 +539,7 @@ export default function LeadsManagementScreen({
       setLeads((res.data || []) as Lead[]);
       setTotal(res.total);
       setLoadError(null);
+      loadStatusCounts();
     } catch (err: any) {
       if (requestId !== fetchRef.current) return;
       setLoadError(err?.message || 'Failed to load leads');
@@ -663,6 +679,7 @@ export default function LeadsManagementScreen({
       );
       toast.success(`Lead status updated to ${newStatus}`);
       await leadsService.updateStatus(id, newStatus);
+      loadStatusCounts();
       // Unified fix: status "Following Up" / "Follow Up After Meeting" must also guarantee a follow_ups row.
       const needsFollowUp = new Set(['Following Up', 'Follow Up After Meeting', 'Pending Leads', 'Interested', 'Meeting', 'Reservation']).has(newStatus);
       if (needsFollowUp) {
@@ -1481,7 +1498,13 @@ export default function LeadsManagementScreen({
               <span className="hidden md:inline">{t('leads.list')}</span>
             </button>
             <button
-              onClick={() => setViewMode('board')}
+              onClick={() => {
+                setViewMode('board');
+                if (pageSize < 500) {
+                  setPageSize(500);
+                  setCurrentPage(1);
+                }
+              }}
               className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
                 viewMode === 'board'
                   ? 'bg-card text-primary shadow-sm'
@@ -1546,6 +1569,7 @@ export default function LeadsManagementScreen({
         {viewMode === 'board' ? (
           <LeadBoard
             leads={leads}
+            statusCounts={statusCounts}
             onView={(lead) => {
               setViewLead(lead);
               setViewTab('overview');

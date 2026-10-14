@@ -317,14 +317,17 @@ function MobileLeadCardInner({
           </ViewportPopover>
         )}
 
-        {/* Status badge — darker green pill with lightning */}
-        <span
-          className="inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-xs font-bold text-white dark:text-white"
-          style={{ backgroundColor: '#2f855a' }}
-        >
-          <Zap size={13} className="fill-white" />
-          <span className="truncate max-w-[110px]">{lead.status || 'Pending Leads'}</span>
-        </span>
+        {lead.source && (
+          <span className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+            <span className="truncate max-w-[110px]">{lead.source}</span>
+          </span>
+        )}
+        {lead.priority && lead.priority !== 'Normal' && (
+          <span className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <Zap size={12} className="fill-current" />
+            <span className="truncate max-w-[110px]">{lead.priority}</span>
+          </span>
+        )}
       </div>
 
       {/* 3. Primary Communication Actions — Call dials directly */}

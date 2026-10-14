@@ -87,23 +87,35 @@ export async function GET(request: Request) {
     return q;
   };
 
-  const leadsQuery = buildLeadsQuery(true);
-  const [settingsRes, leadsResRaw, teamsRes] = await Promise.all([
+  const fetchAllLeadRows = async (withTeamCol: boolean): Promise<any[]> => {
+    const CHUNK = 1000;
+    let allRows: any[] = [];
+    let page = 0;
+    while (true) {
+      const q = buildLeadsQuery(withTeamCol);
+      if (!q) break;
+      const { data, error } = await q.range(page * CHUNK, (page + 1) * CHUNK - 1);
+      if (error) {
+        if (withTeamCol && /team/i.test(error.message || '')) {
+          return fetchAllLeadRows(false);
+        }
+        break;
+      }
+      if (!data || data.length === 0) break;
+      allRows.push(...data);
+      if (data.length < CHUNK) break;
+      page++;
+    }
+    return allRows;
+  };
+
+  const [settingsRes, leadRows, teamsRes] = await Promise.all([
     db.from('admin_settings').select('name, sort_order').eq('category', 'pipelineStages').eq('is_active', true).order('sort_order', { ascending: true }),
-    leadsQuery ? leadsQuery : Promise.resolve({ data: [], error: null }),
+    fetchAllLeadRows(true),
     (isAdminRole(actor.role) || actor.role === 'team_leader')
       ? db.from('teams').select('id, name').limit(50)
       : Promise.resolve({ data: [] }),
   ]);
-
-  let leadRows: any[] = leadsResRaw?.data || [];
-  if (leadsResRaw?.error && /team/i.test(leadsResRaw.error.message || '')) {
-    const retryQ = buildLeadsQuery(false);
-    if (retryQ) {
-      const r2 = await retryQ;
-      leadRows = r2?.data || [];
-    }
-  }
 
   // Merge canonical statuses with custom admin_settings pipelineStages + distinct DB statuses
   const pipelineNames: string[] = !settingsRes.error && settingsRes.data?.length

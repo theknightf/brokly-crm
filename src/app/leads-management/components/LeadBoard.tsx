@@ -17,6 +17,7 @@ interface LeadBoardProps {
   onDelete: (id: string) => void;
   isAdmin?: boolean;
   onPostCall?: (lead: Lead) => void;
+  statusCounts?: Record<string, number>;
 }
 
 const formatBudget = (min?: number, max?: number) => {
@@ -174,13 +175,31 @@ const BoardCard = React.memo(function BoardCard({
   );
 }, (prev, next) => prev.lead === next.lead && prev.canDelete === next.canDelete);
 
-export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDelete, isAdmin = false, onPostCall }: LeadBoardProps) {
+export default function LeadBoard({
+  leads,
+  onView,
+  onEdit,
+  onStatusChange,
+  onDelete,
+  isAdmin = false,
+  onPostCall,
+  statusCounts,
+}: LeadBoardProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const deletingLead = leads.find((l) => l.id === deletingId) || null;
   const columns: { key: string; label: string; stage?: LeadStatus }[] = [
     ...PIPELINE_STAGES.map((s) => ({ key: s, label: s, stage: s })),
     { key: '__other__', label: 'Outcomes' },
   ];
+
+  const outcomesCount = React.useMemo(() => {
+    if (!statusCounts) return null;
+    const pipelineSet = new Set(PIPELINE_STAGES as string[]);
+    return Object.entries(statusCounts)
+      .filter(([k]) => !pipelineSet.has(k) && k !== 'All Leads')
+      .reduce((s, [, v]) => s + Number(v || 0), 0);
+  }, [statusCounts]);
+
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-4 -mx-1 px-1">
@@ -188,23 +207,24 @@ export default function LeadBoard({ leads, onView, onEdit, onStatusChange, onDel
           const colLeads = col.stage
             ? leads.filter((l) => (l.status || 'Fresh Leads') === col.stage)
             : leads.filter((l) => !PIPELINE_STAGES.includes(l.status || 'Fresh Leads'));
+          const colCount = col.stage
+            ? (statusCounts?.[col.stage] ?? colLeads.length)
+            : (outcomesCount ?? colLeads.length);
           return (
             <div key={col.key} className="w-[272px] flex-shrink-0 flex flex-col max-h-[calc(100vh-260px)]">
-              {!isAdmin && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border mb-2 sticky top-0 z-10">
-                  {col.stage ? (
-                    <StatusBadge status={col.stage} showDot />
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                      <span className="w-2.5 h-2.5 rounded-full bg-clay-soft" />
-                      {col.label}
-                    </span>
-                  )}
-                  <span className="ml-auto text-xs font-bold text-muted-foreground bg-muted rounded-full px-2 py-0.5 tabular-nums">
-                    {colLeads.length}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border mb-2 sticky top-0 z-10">
+                {col.stage ? (
+                  <StatusBadge status={col.stage} showDot />
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-clay-soft" />
+                    {col.label}
                   </span>
-                </div>
-              )}
+                )}
+                <span className="ml-auto text-xs font-bold text-muted-foreground bg-muted rounded-full px-2 py-0.5 tabular-nums">
+                  {colCount}
+                </span>
+              </div>
               <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
                 {colLeads.length === 0 ? (
                   <div className="border border-dashed border-border rounded-2xl py-10 text-center text-xs text-muted-foreground">
