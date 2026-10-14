@@ -1,11 +1,9 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { streamText } from 'ai';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/assistant/rateLimiter';
 import { createAssistantTools } from '@/lib/assistant/tools';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 45;
+export const maxDuration = 30;
 
 const SYSTEM_PROMPT = `أنت المساعد الذكي لمسؤولي المبيعات العقارية في Brokly CRM بمصر.
 كن عملياً وسريعاً ومختصراً. دائماً اعتمد على الأدوات والبيانات الحقيقية ولا تخمّن بيانات العملاء نهائياً.
@@ -29,6 +27,108 @@ const SYSTEM_PROMPT = `أنت المساعد الذكي لمسؤولي المب�
    - يمكنك صياغة رسائل واتساب ودية ومناسبة للعملاء بالعامية المصرية عند طلب ذلك.
    - تحدث بنفس لغة المستخدم (العامية المصرية أو الإنجليزية).`;
 
+const GROQ_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'searchLeadsByNoteOrKeyword',
+      description:
+        'البحث الذكي في العملاء والملاحظات باستخدام الكلمات المفتاحية أو المناطق أو المشاريع العقارية.',
+      parameters: {
+        type: 'object',
+        properties: {
+          keyword: {
+            type: 'string',
+            description: 'الكلمة المفتاحية أو المنطقة أو متطلب العميل المراد البحث عنه (مثل النرجس، العبور، شقة)',
+          },
+          limit: {
+            type: 'integer',
+            description: 'الحد الأقصى لعدد النتائج (افتراضياً 5)',
+          },
+        },
+        required: ['keyword'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'updateLeadStageAndAddNote',
+      description:
+        'تحديث مرحلة عميل بالاسم أو آخر عميل تم الاتصال به وإضافة ملاحظة أو رغبة الشراء له.',
+      parameters: {
+        type: 'object',
+        properties: {
+          leadName: {
+            type: 'string',
+            description: 'اسم العميل إذا تم ذكره صراحة',
+          },
+          useLastCalledLead: {
+            type: 'boolean',
+            description: 'ضع true إذا قال مسؤول المبيعات آخر عميل كلمته أو آخر مكالمة',
+          },
+          newStage: {
+            type: 'string',
+            description: 'المرحلة الجديدة للعميل (مثل مهتم، Interested، Following Up)',
+          },
+          noteText: {
+            type: 'string',
+            description: 'نص الملاحظة أو متطلب الشراء المراد حفظه',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_my_summary',
+      description: 'عرض ملخص متابعات اليوم والمتابعات المتأخرة وإجمالي العملاء لمسؤول المبيعات الحالي.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+];
+
+async function callGroqWithTimeout(
+  apiKey: string,
+  model: string,
+  messages: any[],
+  tools?: any[]
+): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        ...(tools && tools.length ? { tools, tool_choice: 'auto' } : {}),
+        temperature: 0.3,
+        max_tokens: 1024,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const data = await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, data };
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err?.name === 'AbortError') {
+      return { ok: false, status: 504, error: 'TIMEOUT' };
+    }
+    return { ok: false, status: 500, error: err?.message || 'Network error' };
+  }
+}
+
 export async function POST(request: Request) {
   // 1. Auth check - strictly use logged-in user's session client (respecting RLS)
   const supabase = await createClient();
@@ -48,7 +148,8 @@ export async function POST(request: Request) {
   if (!rateLimit.allowed) {
     return new Response(
       JSON.stringify({
-        error: 'لقد تجاوزت الحد المسموح من الرسائل (20 رسالة في الدقيقة). برجاء الانتظار دقيقة والمحاولة مرة أخرى.',
+        error:
+          'لقد تجاوزت الحد المسموح من الرسائل (20 رسالة في الدقيقة). برجاء الانتظار دقيقة والمحاولة مرة أخرى.',
       }),
       {
         status: 429,
@@ -57,21 +158,20 @@ export async function POST(request: Request) {
     );
   }
 
-  // Accept GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY
-  const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-
-  if (!apiKey || apiKey === 'your-gemini-api-key-here' || apiKey.trim() === '') {
-    console.error('Gemini API Error: No valid API key configured. Checked GEMINI_API_KEY and GOOGLE_GENERATIVE_AI_API_KEY.');
+  // 3. API Key check
+  const apiKey = (process.env.GROQ_API_KEY || '').trim();
+  if (!apiKey || apiKey === 'your-groq-api-key-here') {
+    console.error('Groq API Error: No valid GROQ_API_KEY configured in environment.');
     return new Response(
       JSON.stringify({
-        error: 'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GEMINI_API_KEY أو GOOGLE_GENERATIVE_AI_API_KEY في ملف البيئة.',
+        error:
+          'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GROQ_API_KEY في ملف البيئة.',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
+  // 4. Validate input
   const body = await request.json().catch(() => null);
   if (!body || !Array.isArray(body.messages)) {
     return new Response(JSON.stringify({ error: 'Invalid messages array' }), {
@@ -80,64 +180,159 @@ export async function POST(request: Request) {
     });
   }
 
-  // Send only the last 10 messages to the model to minimize token consumption and data leakage
-  const recentMessages = body.messages.slice(-10);
+  // Limit conversation history to the last 10 messages to control token limits
+  const recentMessages = body.messages.slice(-10).map((m: any) => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: String(m.content || ''),
+  }));
 
-  // Supported Active Free Tier Models:
-  // Note: Older models like gemini-2.0-flash / gemini-2.5-flash / gemini-pro have been retired by Google.
-  // gemini-flash-lite-latest, gemini-3.5-flash-lite, and gemini-flash-latest are active and fast.
-  let modelName = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
-  if (
-    ['gemini-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-2.0-flash', 'gemini-2.5-flash'].includes(
-      modelName
-    )
-  ) {
-    console.warn(`Deprecated or retired Gemini model "${modelName}" detected. Falling back to "gemini-flash-lite-latest".`);
-    modelName = 'gemini-flash-lite-latest';
+  const messagesToSend = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    ...recentMessages,
+  ];
+
+  // 5. Groq Model Cascade:
+  // Primary: llama-3.3-70b-versatile
+  // Fallback 1: llama-3.1-8b-instant (on 429 rate limit or 503 or 404)
+  // Fallback 2: openai/gpt-oss-120b (active key fallback)
+  const models = [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'openai/gpt-oss-120b',
+  ];
+
+  let groqRes: { ok: boolean; status: number; data?: any; error?: string } | null = null;
+  let activeModel = models[0];
+
+  for (let i = 0; i < models.length; i++) {
+    activeModel = models[i];
+    groqRes = await callGroqWithTimeout(apiKey, activeModel, messagesToSend, GROQ_TOOLS);
+
+    if (groqRes.ok && groqRes.data?.choices?.[0]?.message) {
+      break;
+    }
+
+    const isRetryable =
+      groqRes.status === 429 ||
+      groqRes.status === 503 ||
+      groqRes.status === 404 ||
+      groqRes.data?.error?.code === 'model_not_found';
+
+    if (!isRetryable && groqRes.status !== 504) {
+      break;
+    }
+    console.warn(`Groq model ${activeModel} failed with status ${groqRes.status}. Trying next fallback...`);
   }
 
-  const googleProvider = createGoogleGenerativeAI({
-    apiKey,
-  });
-
-  const tools = createAssistantTools(supabase, user.id);
-
-  try {
-    const result = streamText({
-      model: googleProvider(modelName) as any,
-      system: SYSTEM_PROMPT,
-      messages: recentMessages,
-      tools,
-      maxSteps: 5,
-      onError({ error }) {
-        console.error('Gemini streamText stream error details:', {
-          model: modelName,
-          errorName: (error as any)?.name,
-          errorMessage: (error as any)?.message,
-          status: (error as any)?.status,
-          statusCode: (error as any)?.statusCode,
-          cause: (error as any)?.cause,
-          stack: (error as any)?.stack,
-        });
-      },
-    });
-
-    return result.toDataStreamResponse();
-  } catch (error: any) {
-    console.error('Gemini API Invocation Error:', {
-      model: modelName,
-      name: error?.name,
-      message: error?.message,
-      status: error?.status || error?.statusCode,
-      cause: error?.cause,
-      stack: error?.stack,
-    });
+  if (!groqRes || !groqRes.ok || !groqRes.data?.choices?.[0]?.message) {
+    if (groqRes?.status === 504) {
+      return new Response(
+        JSON.stringify({
+          error: 'استغرقت الاستجابة وقتاً أطول من المتوقع (مهلة 15 ثانية). برجاء إعادة المحاولة.',
+        }),
+        { status: 504, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (groqRes?.status === 429) {
+      return new Response(
+        JSON.stringify({
+          error: 'تم الوصول إلى الحد الأقصى لمعدل الطلبات في خدمة الذكاء الاصطناعي. برجاء الانتظار ثوانٍ والمحاولة مرة أخرى.',
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    console.error('Groq API Error:', groqRes?.data?.error || groqRes?.error);
     return new Response(
       JSON.stringify({
-        error: 'حدث خطأ مؤقت في التواصل مع المساعد الذكي. برجاء إعادة المحاولة.',
-        details: error?.message || 'Unknown error',
+        error: 'تعذر الرد من المساعد الذكي حالياً. برجاء المحاولة مجدداً.',
+        details: groqRes?.data?.error?.message || groqRes?.error || 'Unknown error',
       }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: groqRes?.status || 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
+
+  const choice = groqRes.data.choices[0];
+  const assistantMsg = choice.message;
+  const toolCalls = assistantMsg.tool_calls || [];
+
+  const assistantTools = createAssistantTools(supabase, user.id);
+  const toolInvocations: any[] = [];
+  let pendingAction: any = null;
+
+  // 6. Handle tool invocations if generated
+  if (toolCalls.length > 0) {
+    const toolMessages: any[] = [...messagesToSend, assistantMsg];
+
+    for (const toolCall of toolCalls) {
+      const fnName = toolCall.function?.name;
+      let args: any = {};
+      try {
+        args = JSON.parse(toolCall.function?.arguments || '{}');
+      } catch {
+        args = {};
+      }
+
+      let toolResult: any = null;
+      try {
+        if (fnName === 'searchLeadsByNoteOrKeyword' || fnName === 'search_leads_and_notes') {
+          toolResult = await (assistantTools.searchLeadsByNoteOrKeyword as any).execute(args);
+        } else if (fnName === 'updateLeadStageAndAddNote') {
+          toolResult = await (assistantTools.updateLeadStageAndAddNote as any).execute(args);
+          if (toolResult?.confirmationRequired) {
+            pendingAction = toolResult;
+          }
+        } else if (fnName === 'get_my_summary') {
+          toolResult = await (assistantTools.get_my_summary as any).execute(args);
+        } else if (fnName === 'get_lead_details') {
+          toolResult = await (assistantTools.get_lead_details as any).execute(args);
+        }
+      } catch (err: any) {
+        toolResult = { error: err?.message || 'Tool execution failed' };
+      }
+
+      toolInvocations.push({
+        toolCallId: toolCall.id,
+        toolName: fnName,
+        args,
+        state: 'result',
+        result: toolResult,
+      });
+
+      toolMessages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(toolResult),
+      });
+    }
+
+    // Call Groq once more with tool results to generate natural conversational summary
+    // If pendingAction was generated for manual confirmation, assistant summary can simply describe it
+    const secondTurnRes = await callGroqWithTimeout(apiKey, activeModel, toolMessages);
+    let finalContent = assistantMsg.content || '';
+
+    if (secondTurnRes.ok && secondTurnRes.data?.choices?.[0]?.message?.content) {
+      finalContent = secondTurnRes.data.choices[0].message.content;
+    }
+
+    return new Response(
+      JSON.stringify({
+        role: 'assistant',
+        content: finalContent,
+        toolInvocations,
+        pendingAction,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // 7. Standard text response
+  return new Response(
+    JSON.stringify({
+      role: 'assistant',
+      content: assistantMsg.content || '',
+      toolInvocations: [],
+      pendingAction: null,
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
 }

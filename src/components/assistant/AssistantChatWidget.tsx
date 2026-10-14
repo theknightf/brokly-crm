@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useChat } from 'ai/react';
 import {
   Sparkles,
   X,
@@ -30,29 +29,96 @@ export default function AssistantChatWidget() {
   const [pendingAction, setPendingAction] = useState<any | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    setMessages,
-    error,
-    reload,
-    setInput,
-  } = useChat({
-    api: '/api/assistant',
-    onError: (err) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
+
+  const sendMessage = async (textToSend: string) => {
+    const trimmed = textToSend.trim();
+    if (!trimmed || isLoading) return;
+
+    const userMsg = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: trimmed,
+    };
+
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setInput('');
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: updatedMessages.slice(-10).map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data) {
+        const errorMsg = data?.error || 'تعذر الرد من المساعد الذكي حالياً.';
+        throw new Error(errorMsg);
+      }
+
+      const botMsg = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: data.content || '',
+        toolInvocations: data.toolInvocations || [],
+      };
+
+      setMessages((prev) => [...prev, botMsg]);
+
+      if (data.pendingAction) {
+        setPendingAction(data.pendingAction);
+      }
+    } catch (err: any) {
       console.error('AI Assistant Error:', err);
-      toast.error('تعذر الرد من المساعد الذكي حالياً.', {
+      const displayMsg = err?.message || 'حدث خطأ في استلام الرد. برجاء المحاولة مجدداً.';
+      setError(displayMsg);
+      toast.error(displayMsg, {
         duration: 3000,
         id: 'assistant-error-toast',
       });
-    },
-  });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          role: 'assistant',
+          content: `⚠️ ${displayMsg}`,
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    sendMessage(input);
+  };
+
+  const reload = () => {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg) {
+      sendMessage(lastUserMsg.content);
+    }
+  };
 
   // Clean up speech recognition on close or unmount
   useEffect(() => {
@@ -247,7 +313,7 @@ export default function AssistantChatWidget() {
               <div>
                 <h3 className="text-xs font-bold text-foreground">مساعد بروكلي العقاري</h3>
                 <span className="text-[10px] text-muted-foreground block font-mono">
-                  Gemini Free Tier • Brokly AI
+                  Groq AI • Brokly AI
                 </span>
               </div>
             </div>
@@ -343,7 +409,7 @@ export default function AssistantChatWidget() {
                       </div>
 
                       {/* Tool Output Details & Action Buttons (Lead Card / WhatsApp) */}
-                      {m.toolInvocations?.map((inv) => {
+                      {m.toolInvocations?.map((inv: any) => {
                         if (inv.state !== 'result' || !inv.result) return null;
                         const res = inv.result;
 
