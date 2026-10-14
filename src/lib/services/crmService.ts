@@ -1363,13 +1363,15 @@ export const leadSourcesService = {
 };
 
 function leadToRow(lead: any, userId?: string) {
+  const cleanPhone = String(lead.phone || '').trim();
+  const cleanName = String(lead.name || '').trim() || (cleanPhone ? `Lead (${cleanPhone.slice(-4)})` : 'New Lead');
   const row: any = {
-    name: lead.name,
-    phone: lead.phone,
-    email: lead.email,
-    property_type: lead.propertyType,
-    budget_min: lead.budgetMin,
-    budget_max: lead.budgetMax,
+    name: cleanName,
+    phone: cleanPhone,
+    email: lead.email ? String(lead.email).trim() : '',
+    property_type: lead.propertyType || '',
+    budget_min: lead.budgetMin ?? 0,
+    budget_max: lead.budgetMax ?? 0,
     source: lead.source,
     lead_source_id: lead.leadSourceId || lead.lead_source_id || null,
     agent: lead.agent,

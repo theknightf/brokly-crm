@@ -211,8 +211,13 @@ export default function AssistantChatWidget() {
 
   return (
     <>
-      {/* Floating Launcher Button */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center">
+      {/* Floating Launcher Button — positioned higher to clear mobile nav & action bars */}
+      <div
+        className="fixed bottom-20 sm:bottom-24 right-5 sm:right-6 z-50 flex items-center"
+        style={{
+          marginBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+      >
         {!isOpen && (
           <button
             onClick={() => setIsOpen(true)}

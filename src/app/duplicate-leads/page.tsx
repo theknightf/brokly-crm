@@ -120,6 +120,7 @@ export default function DuplicateCenterPage() {
   const [filterType, setFilterType] = useState<'all' | 'conflict' | 'clean'>('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set());
 
   const fetchDuplicates = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -161,6 +162,83 @@ export default function DuplicateCenterPage() {
     }
   }, [activeCase?.id, agents.length]);
 
+  const toggleSelectCase = (caseId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedCaseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(caseId)) {
+        next.delete(caseId);
+      } else {
+        next.add(caseId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCaseIds.size === filteredCases.length && filteredCases.length > 0) {
+      setSelectedCaseIds(new Set());
+    } else {
+      setSelectedCaseIds(new Set(filteredCases.map((c) => c.id)));
+    }
+  };
+
+  const handleBulkAction = async (bulkAction: 'bulk_discard' | 'bulk_review' | 'bulk_merge') => {
+    if (selectedCaseIds.size === 0) return;
+    const selectedList = cases.filter((c) => selectedCaseIds.has(c.id));
+    if (selectedList.length === 0) return;
+
+    const actionLabels: Record<string, string> = {
+      bulk_discard: `Discard ${selectedList.length} duplicate leads?`,
+      bulk_review: `Keep ${selectedList.length} duplicate leads as reviewed separate records?`,
+      bulk_merge: `Merge ${selectedList.length} duplicate leads into their original master records?`,
+    };
+
+    if (!window.confirm(actionLabels[bulkAction])) return;
+
+    setIsProcessing(true);
+    const prevCases = cases;
+    const selectedIdsArray = Array.from(selectedCaseIds);
+
+    // Optimistically remove from list
+    setCases((prev) => prev.filter((c) => !selectedCaseIds.has(c.id)));
+    setSelectedCaseIds(new Set());
+    setSelectedCaseIndex(0);
+
+    const items = selectedList.map((c) => ({
+      masterLeadId: c.lead1.id,
+      duplicateLeadId: c.lead2.id,
+    }));
+
+    try {
+      const res = await fetch('/api/duplicate-leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: bulkAction,
+          items,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setCases(prevCases);
+        setSelectedCaseIds(new Set(selectedIdsArray));
+        setActionNotice(data?.error || 'Bulk action failed. Please try again.');
+      } else {
+        setActionNotice(data?.message || `Successfully processed ${items.length} duplicate cases.`);
+        void fetchDuplicates(true);
+      }
+    } catch {
+      setCases(prevCases);
+      setSelectedCaseIds(new Set(selectedIdsArray));
+      setActionNotice('Bulk action failed. Please check network connection.');
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => setActionNotice(null), 5000);
+    }
+  };
+
   const handleAction = async (action: 'merge' | 'discard' | 'reassign' | 'review') => {
     if (!activeCase) return;
     if (action === 'reassign' && !reassignAgentId) {
@@ -175,6 +253,11 @@ export default function DuplicateCenterPage() {
     // Optimistic UI update: remove resolved case immediately (0ms perceived latency)
     const prevCases = cases;
     setCases((prev) => prev.filter((c) => c.id !== removedCaseId));
+    setSelectedCaseIds((prev) => {
+      const next = new Set(prev);
+      next.delete(removedCaseId);
+      return next;
+    });
     setSelectedCaseIndex((idx) => Math.max(0, idx - 1));
 
     const targetAgentName = agents.find((a) => a.id === reassignAgentId)?.name || 'selected agent';
@@ -822,57 +905,125 @@ export default function DuplicateCenterPage() {
           <div className="lg:col-span-4 space-y-4">
             <div className="p-4 rounded-xl bg-card border border-border">
               <div className="flex items-center justify-between pb-3 border-b border-border">
-                <span className="text-sm font-bold text-foreground">Duplicate Center Queue</span>
-                <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                  {filteredCases.length} Cases
-                </span>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredCases.length > 0 &&
+                        selectedCaseIds.size === filteredCases.length
+                      }
+                      onChange={toggleSelectAll}
+                      className="rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                    />
+                    <span>Select All</span>
+                  </label>
+                  <span className="text-xs font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    {filteredCases.length} Cases
+                  </span>
+                </div>
+
+                {selectedCaseIds.size > 0 && (
+                  <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                    {selectedCaseIds.size} Selected
+                  </span>
+                )}
               </div>
 
+              {/* Quick Bulk Action Buttons in Queue Header if items selected */}
+              {selectedCaseIds.size > 0 && (
+                <div className="p-2.5 my-2.5 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-primary">
+                    Bulk ({selectedCaseIds.size}):
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => handleBulkAction('bulk_merge')}
+                      disabled={isProcessing}
+                      className="px-2 py-1 rounded bg-primary text-black font-extrabold text-[11px] hover:brightness-110 active:scale-95 disabled:opacity-50"
+                      title="Merge selected duplicates into master records"
+                    >
+                      Merge All
+                    </button>
+                    <button
+                      onClick={() => handleBulkAction('bulk_review')}
+                      disabled={isProcessing}
+                      className="px-2 py-1 rounded bg-card border border-border text-foreground font-semibold text-[11px] hover:border-primary/40 disabled:opacity-50"
+                      title="Mark selected as reviewed (keep both)"
+                    >
+                      Keep Both
+                    </button>
+                    <button
+                      onClick={() => handleBulkAction('bulk_discard')}
+                      disabled={isProcessing}
+                      className="px-2 py-1 rounded bg-red-500/10 border border-red-500/30 text-red-400 font-semibold text-[11px] hover:bg-red-500/20 disabled:opacity-50"
+                      title="Discard selected duplicates"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-3 space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
-                {filteredCases.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    onClick={() => setSelectedCaseIndex(idx)}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                      selectedCaseIndex === idx
-                        ? 'bg-primary/5 border-primary shadow-sm'
-                        : 'bg-muted/20 border-border hover:border-muted-foreground/30'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              item.severity === 'conflict' ? 'bg-red-500' : 'bg-emerald-500'
-                            }`}
-                          ></span>
-                          <h4 className="text-xs font-bold text-foreground">{item.name}</h4>
+                {filteredCases.map((item, idx) => {
+                  const isChecked = selectedCaseIds.has(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedCaseIndex(idx)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer relative ${
+                        isChecked
+                          ? 'border-primary bg-primary/10 shadow-sm'
+                          : selectedCaseIndex === idx
+                          ? 'bg-primary/5 border-primary shadow-sm'
+                          : 'bg-muted/20 border-border hover:border-muted-foreground/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => toggleSelectCase(item.id, e as any)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-0.5 rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                          />
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  item.severity === 'conflict' ? 'bg-red-500' : 'bg-emerald-500'
+                                }`}
+                              ></span>
+                              <h4 className="text-xs font-bold text-foreground">{item.name}</h4>
+                            </div>
+                            <span className="text-[11px] font-mono text-primary mt-0.5 block">
+                              {item.phone}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-[11px] font-mono text-primary mt-0.5 block">
-                          {item.phone}
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 ${
+                            item.severity === 'conflict'
+                              ? 'bg-red-500/10 text-red-400'
+                              : 'bg-emerald-500/10 text-emerald-400'
+                          }`}
+                        >
+                          {item.severity}
                         </span>
                       </div>
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                          item.severity === 'conflict'
-                            ? 'bg-red-500/10 text-red-400'
-                            : 'bg-emerald-500/10 text-emerald-400'
-                        }`}
-                      >
-                        {item.severity}
-                      </span>
+                      <div className="mt-1.5 text-[10px] text-muted-foreground flex items-center justify-between pl-6">
+                        <span>By: {item.submittedBy || item.lead2.repName}</span>
+                        <span>{item.routedAt}</span>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground pl-6">
+                        <span>{item.disputeAgents}</span>
+                        <span className="text-primary font-bold">Review ➔</span>
+                      </div>
                     </div>
-                    <div className="mt-1.5 text-[10px] text-muted-foreground flex items-center justify-between">
-                      <span>By: {item.submittedBy || item.lead2.repName}</span>
-                      <span>{item.routedAt}</span>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>{item.disputeAgents}</span>
-                      <span className="text-primary font-bold">Review ➔</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -903,6 +1054,59 @@ export default function DuplicateCenterPage() {
                 </li>
               </ul>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bulk Action Bar (bottom-docked with animation) */}
+      {selectedCaseIds.size > 0 && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-950/95 dark:bg-card/95 backdrop-blur-md border border-primary/40 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 text-xs animate-in slide-in-from-bottom duration-200"
+          style={{
+            marginBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
+          }}
+        >
+          <div className="flex items-center gap-2 pr-3 border-r border-border/80">
+            <span className="w-6 h-6 rounded-full bg-primary text-black font-extrabold flex items-center justify-center text-xs">
+              {selectedCaseIds.size}
+            </span>
+            <span className="font-semibold text-foreground whitespace-nowrap">
+              Selected
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => handleBulkAction('bulk_merge')}
+              disabled={isProcessing}
+              className="px-3.5 py-1.5 rounded-xl bg-primary text-black font-extrabold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50"
+            >
+              <GitMerge size={14} />
+              <span>Bulk Merge</span>
+            </button>
+            <button
+              onClick={() => handleBulkAction('bulk_review')}
+              disabled={isProcessing}
+              className="px-3.5 py-1.5 rounded-xl bg-card border border-border text-foreground font-semibold hover:border-primary/40 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Eye size={14} className="text-emerald-400" />
+              <span>Bulk Keep Both</span>
+            </button>
+            <button
+              onClick={() => handleBulkAction('bulk_discard')}
+              disabled={isProcessing}
+              className="px-3.5 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-semibold hover:bg-red-500/20 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+              <span>Bulk Discard</span>
+            </button>
+            <button
+              onClick={() => setSelectedCaseIds(new Set())}
+              disabled={isProcessing}
+              className="px-2.5 py-1.5 rounded-xl text-muted-foreground hover:text-foreground text-[11px] font-medium"
+            >
+              Deselect
+            </button>
           </div>
         </div>
       )}

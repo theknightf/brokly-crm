@@ -354,12 +354,144 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
 
-  const { action, masterLeadId, duplicateLeadId, soleAssigneeId } = body;
-  if (!action || !masterLeadId) {
-    return NextResponse.json({ error: 'action and masterLeadId required' }, { status: 400 });
+  const { action, masterLeadId, duplicateLeadId, soleAssigneeId, items } = body;
+  if (!action) {
+    return NextResponse.json({ error: 'action required' }, { status: 400 });
   }
 
   const actorName = (profile as any)?.full_name || user.email || 'Admin';
+
+  // ─── BULK ACTIONS HANDLER ──────────────────────────────────────────────
+  if (action === 'bulk_discard' && Array.isArray(items) && items.length > 0) {
+    const dupIds = items.map((i: any) => i.duplicateLeadId || i.dupId).filter(Boolean);
+    const masterIds = items.map((i: any) => i.masterLeadId || i.masterId).filter(Boolean);
+
+    await Promise.allSettled([
+      supabase
+        .from('duplicate_lead_attempts')
+        .update({ status: 'discarded', note: `Bulk discarded by ${actorName}` })
+        .in('attempted_lead_id', dupIds),
+      supabase
+        .from('leads')
+        .delete()
+        .in('id', dupIds),
+    ]);
+
+    await supabase.from('activity_log').insert({
+      user_id: user.id,
+      action_type: 'Duplicate Discarded',
+      entity_type: 'lead',
+      entity_id: masterIds[0] || user.id,
+      detail: `Bulk discarded ${dupIds.length} duplicate leads by ${actorName}.`,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully discarded ${dupIds.length} duplicate leads`,
+      count: dupIds.length,
+    });
+  }
+
+  if (action === 'bulk_review' && Array.isArray(items) && items.length > 0) {
+    const dupIds = items.map((i: any) => i.duplicateLeadId || i.dupId).filter(Boolean);
+
+    await Promise.allSettled([
+      supabase
+        .from('leads')
+        .update({
+          is_duplicate: false,
+          duplicate_of_lead_id: null,
+          crm_status: 'Fresh Leads',
+          notes: `[ARCHIVED DUPLICATE] Reviewed and kept as separate lead by ${actorName}`,
+        })
+        .in('id', dupIds),
+      supabase
+        .from('duplicate_lead_attempts')
+        .update({ status: 'reviewed', note: `Bulk approved/kept by ${actorName}` })
+        .in('attempted_lead_id', dupIds),
+      supabase.from('activity_log').insert({
+        user_id: user.id,
+        action_type: 'Duplicate Reviewed',
+        entity_type: 'lead',
+        entity_id: dupIds[0] || user.id,
+        detail: `Bulk reviewed and kept ${dupIds.length} duplicate leads by ${actorName}.`,
+      }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully marked ${dupIds.length} leads as reviewed`,
+      count: dupIds.length,
+    });
+  }
+
+  if (action === 'bulk_merge' && Array.isArray(items) && items.length > 0) {
+    let mergedCount = 0;
+    for (const item of items) {
+      const mId = item.masterLeadId || item.masterId;
+      const dId = item.duplicateLeadId || item.dupId;
+      if (!mId || !dId || mId === dId) continue;
+
+      const [{ data: dupLead }, { data: masterLead }] = await Promise.all([
+        supabase.from('leads').select('notes, name, phone').eq('id', dId).maybeSingle(),
+        supabase.from('leads').select('notes, name, phone').eq('id', mId).maybeSingle(),
+      ]);
+
+      if (dupLead && dupLead.notes) {
+        const cleanDupNotes = String(dupLead.notes)
+          .replace(/\[Pending Review \/ Duplicate[^\]]*\]/g, '')
+          .trim();
+        const mergedNotes = cleanDupNotes
+          ? `${masterLead?.notes || ''}\n[Merged from Duplicate #${String(dId).slice(0, 8)} by ${actorName}]: ${cleanDupNotes}`.trim()
+          : masterLead?.notes || '';
+        await supabase
+          .from('leads')
+          .update({ notes: mergedNotes, last_action_at: new Date().toISOString(), last_action_by: user.id })
+          .eq('id', mId);
+      }
+
+      await Promise.allSettled([
+        supabase.from('call_logs').update({ entity_id: mId }).eq('entity_type', 'lead').eq('entity_id', dId),
+        supabase.from('follow_ups').update({ lead_id: mId }).eq('lead_id', dId),
+        supabase
+          .from('duplicate_lead_attempts')
+          .update({ status: 'merged', note: `Bulk merged into #${mId} by ${actorName}` })
+          .or(`attempted_lead_id.eq.${dId},matched_lead_id.eq.${dId}`),
+      ]);
+
+      const { error: delErr } = await supabase.from('leads').delete().eq('id', dId);
+      if (delErr) {
+        await supabase
+          .from('leads')
+          .update({
+            crm_status: 'Duplicate Leads',
+            is_duplicate: false,
+            notes: `[ARCHIVED DUPLICATE] Merged into master lead #${mId} by ${actorName}`,
+          })
+          .eq('id', dId);
+      }
+      mergedCount++;
+    }
+
+    await supabase.from('activity_log').insert({
+      user_id: user.id,
+      action_type: 'Duplicate Merged',
+      entity_type: 'lead',
+      entity_id: user.id,
+      detail: `Bulk merged ${mergedCount} duplicate leads by ${actorName}.`,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully merged ${mergedCount} duplicate leads into master records`,
+      count: mergedCount,
+    });
+  }
+
+  // ─── SINGLE ACTION HANDLER ─────────────────────────────────────────────
+  if (!masterLeadId) {
+    return NextResponse.json({ error: 'masterLeadId required for single actions' }, { status: 400 });
+  }
 
   if (action === 'merge' && duplicateLeadId) {
     const [{ data: dupLead }, { data: masterLead }] = await Promise.all([

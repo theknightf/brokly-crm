@@ -1048,6 +1048,7 @@ export default function LeadsManagementScreen({
       const created = await leadsService.create(lead, user?.id || '');
       setLeads((prev) => [created as Lead, ...prev]);
       setTotal((t) => t + 1);
+      void fetchLeads();
       if ((created as any)?.isDuplicate || (created as any)?.routedToDuplicateCenter) {
         toast.success(`Lead "${lead.name}" accepted and routed to Duplicate Center for review`);
       } else {
