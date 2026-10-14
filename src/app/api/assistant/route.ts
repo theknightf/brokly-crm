@@ -165,7 +165,7 @@ export async function POST(request: Request) {
     return new Response(
       JSON.stringify({
         error:
-          'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GROQ_API_KEY في ملف البيئة.',
+          'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GROQ_API_KEY في ملف البيئة أو في إعدادات الاستضافة (Vercel).',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
@@ -192,13 +192,13 @@ export async function POST(request: Request) {
   ];
 
   // 5. Groq Model Cascade:
-  // Primary: llama-3.3-70b-versatile
-  // Fallback 1: llama-3.1-8b-instant (on 429 rate limit or 503 or 404)
-  // Fallback 2: openai/gpt-oss-120b (active key fallback)
+  // Starts with models confirmed active and high performance on this key
   const models = [
+    'openai/gpt-oss-120b',
     'llama-3.3-70b-versatile',
     'llama-3.1-8b-instant',
-    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.8-27b',
   ];
 
   let groqRes: { ok: boolean; status: number; data?: any; error?: string } | null = null;
@@ -225,6 +225,14 @@ export async function POST(request: Request) {
   }
 
   if (!groqRes || !groqRes.ok || !groqRes.data?.choices?.[0]?.message) {
+    if (groqRes?.status === 401) {
+      return new Response(
+        JSON.stringify({
+          error: 'مفتاح Groq API غير صالح أو منتهي الصلاحية. برجاء تحديث المفتاح في الإعدادات.',
+        }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
     if (groqRes?.status === 504) {
       return new Response(
         JSON.stringify({
