@@ -471,8 +471,8 @@ class AssistantService {
         query = query.or(terms.map((t) => 'name.ilike.%$t%').join(','));
       }
       final matches = await query.order('created_at', ascending: false).limit(1);
-      if (matches != null && (matches as List).isNotEmpty) {
-        resolvedLead = matches.first as Map<String, dynamic>;
+      if (matches.isNotEmpty) {
+        resolvedLead = matches.first;
         resolutionNote = 'بالبحث عن الاسم "$leadName"';
       }
     }
