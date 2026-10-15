@@ -61,7 +61,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           DART_DEFINES=""
           if [ -n "$SUPABASE_URL" ]; then
@@ -69,9 +68,6 @@ jobs:
           fi
           if [ -n "$SUPABASE_ANON_KEY" ]; then
             DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
-          fi
-          if [ -n "$GROQ_API_KEY" ]; then
-            DART_DEFINES="$DART_DEFINES --dart-define=GROQ_API_KEY=$GROQ_API_KEY"
           fi
           flutter build apk --release $DART_DEFINES
 

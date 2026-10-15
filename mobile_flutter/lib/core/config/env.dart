@@ -17,10 +17,4 @@ class Env {
   static const double defaultOfficeLat = 30.0444;
   static const double defaultOfficeLng = 31.2357;
   static const double defaultOfficeRadiusM = 800.0;
-
-  /// Groq API Key for AI Assistant (Groq OpenAI-compatible endpoint)
-  static const String groqApiKey = String.fromEnvironment(
-    'GROQ_API_KEY',
-    defaultValue: '',
-  );
 }

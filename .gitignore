@@ -56,3 +56,7 @@ key.properties
 **/key.properties
 *.jks
 *.keystore
+
+# Supabase temp & local archives
+supabase/.temp/
+*.zip

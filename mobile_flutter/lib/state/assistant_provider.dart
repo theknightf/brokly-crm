@@ -35,11 +35,31 @@ class AssistantProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _service.sendChat(messages: _messages);
+      final res = await _service.sendChat(question: trimmed);
 
       final content = res['content'] as String? ?? '';
-      final toolInvocations = res['toolInvocations'] as List<dynamic>?;
-      final action = res['pendingAction'] as AssistantPendingAction?;
+      final leadsList = res['leads'] as List<AssistantLeadMatch>?;
+
+      final toolInvocations = (leadsList != null && leadsList.isNotEmpty)
+          ? [
+              {
+                'state': 'result',
+                'result': {
+                  'leads': leadsList
+                      .map((l) => {
+                            'leadId': l.leadId,
+                            'name': l.name,
+                            'phone': l.phone,
+                            'status': l.status,
+                            'project': l.project,
+                            'matchingSnippet': l.matchingSnippet,
+                            'whatsappUrl': l.whatsappUrl,
+                          })
+                      .toList(),
+                },
+              }
+            ]
+          : null;
 
       final botMsg = AssistantMessage(
         id: 'bot_${DateTime.now().millisecondsSinceEpoch}',
@@ -50,9 +70,6 @@ class AssistantProvider extends ChangeNotifier {
       );
 
       _messages.add(botMsg);
-      if (action != null) {
-        _pendingAction = action;
-      }
     } catch (e) {
       final errorMsg = _parseErrorMessage(e);
       _error = errorMsg;

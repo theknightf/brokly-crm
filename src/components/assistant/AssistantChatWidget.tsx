@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
 
 export default function AssistantChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -58,40 +59,48 @@ export default function AssistantChatWidget() {
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: updatedMessages.slice(-10).map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
+      const supabase = createClient();
+      const { data, error: fnError } = await supabase.functions.invoke('ask-brokly', {
+        body: { question: trimmed },
       });
 
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data) {
-        const errorMsg = data?.error || 'تعذر الرد من المساعد الذكي حالياً.';
+      if (fnError || !data) {
+        let errorMsg = 'تعذر الرد من المساعد الذكي حالياً.';
+        if (fnError) {
+          try {
+            const errContext = (fnError as any).context;
+            const parsed = typeof errContext?.json === 'function' ? await errContext.json() : null;
+            if (process.env.NODE_ENV === 'development') {
+              errorMsg = parsed?.error || fnError.message || errorMsg;
+            }
+          } catch {
+            if (process.env.NODE_ENV === 'development') {
+              errorMsg = fnError.message || errorMsg;
+            }
+          }
+        }
         throw new Error(errorMsg);
       }
 
       const botMsg = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: data.content || '',
-        toolInvocations: data.toolInvocations || [],
+        content: data.answer || '',
+        toolInvocations: data.leads && data.leads.length > 0 ? [{
+          state: 'result',
+          toolCallId: `call-${Date.now()}`,
+          result: { leads: data.leads }
+        }] : [],
         timestamp: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, botMsg]);
-
-      if (data.pendingAction) {
-        setPendingAction(data.pendingAction);
-      }
     } catch (err: any) {
       console.error('AI Assistant Error:', err);
-      const displayMsg = err?.message || 'حدث خطأ في استلام الرد. برجاء المحاولة مجدداً.';
+      const isDev = process.env.NODE_ENV === 'development';
+      const displayMsg = isDev
+        ? (err?.message || 'حدث خطأ في استلام الرد. برجاء المحاولة مجدداً.')
+        : 'حدث خطأ في استلام الرد. برجاء المحاولة مجدداً.';
       setError(displayMsg);
       toast.error(displayMsg, {
         duration: 3000,
