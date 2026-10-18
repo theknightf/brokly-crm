@@ -149,6 +149,15 @@ Deno.serve(async (req) => {
     }
 
     // 5. Query relevant CRM data scoped to authenticated user & question (Limit ~10 rows)
+    const { data: userProfile } = await supabase
+      .from("user_profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const role = (userProfile?.role || "sales").toLowerCase().trim();
+    const isAdmin = ["admin", "owner", "super_admin", "director", "manager"].includes(role);
+
     const keywords = extractSearchKeywords(question);
     const contextItems: string[] = [];
 
@@ -158,6 +167,11 @@ Deno.serve(async (req) => {
       .select("id, name, phone, crm_status, location, project, notes, created_at, agent")
       .order("created_at", { ascending: false })
       .limit(10);
+
+    // Non-admin agents only see leads assigned to them
+    if (!isAdmin) {
+      leadsQuery = leadsQuery.eq("assigned_to", user.id);
+    }
 
     if (keywords.length > 0) {
       const orClauses = keywords.slice(0, 4);
@@ -190,12 +204,18 @@ Deno.serve(async (req) => {
         .map((k) => `body.ilike.%${k}%`)
         .join(",");
 
-      const { data: comments } = await supabase
+      let commentsQuery = supabase
         .from("lead_comments")
-        .select("id, body, created_at, leads(id, name, phone, crm_status, project, location)")
+        .select("id, body, created_at, leads!inner(id, name, phone, crm_status, project, location, assigned_to)")
         .or(commentClauses)
         .order("created_at", { ascending: false })
         .limit(10);
+
+      if (!isAdmin) {
+        commentsQuery = commentsQuery.eq("leads.assigned_to", user.id);
+      }
+
+      const { data: comments } = await commentsQuery;
 
       if (comments && comments.length > 0) {
         contextItems.push("\n=== أحدث الملاحظات والتعليقات المطابقة ===");

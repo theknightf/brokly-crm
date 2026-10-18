@@ -307,7 +307,7 @@ export const leadsService = {
           if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
             query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
           } else {
-            query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
+            query = query.eq('assigned_to', scope.userId);
           }
         }
       } catch {
@@ -800,13 +800,14 @@ export const leadsService = {
     invalidateCache();
   },
 
-  async getStatusCounts() {
+  async getStatusCounts(assignedTo?: string) {
     const supabase = createClient();
     // Prefer the server-side aggregate (single rowset, no full-table transfer).
     // Any failure (including a missing RPC on a DB that's behind on migrations)
     // must degrade to the client-side fallback — never throw.
     try {
-      const { data, error } = await supabase.rpc('get_lead_status_counts');
+      const rpcParams = assignedTo ? { p_assigned_to: assignedTo } : {};
+      const { data, error } = await supabase.rpc('get_lead_status_counts', rpcParams);
       if (!error && Array.isArray(data)) {
         const counts: Record<string, number> = {};
         (data as { status: string; count: number }[]).forEach((r) => {
@@ -817,17 +818,21 @@ export const leadsService = {
     } catch {
       // fall through to client aggregation
     }
-    // Fallback: client-side aggregation over the status columns with range pagination.
-    return cachedRead('statusCounts', async () => {
+    // Fallback: client-side aggregation over active_leads / leads with range pagination.
+    const cacheKey = assignedTo ? `statusCounts:${assignedTo}` : 'statusCounts:all';
+    return cachedRead(cacheKey, async () => {
       try {
         const CHUNK = 1000;
         let page = 0;
         const counts: Record<string, number> = {};
         while (true) {
-          const { data, error } = await supabase
-            .from('leads')
-            .select('crm_status, lead_status')
-            .range(page * CHUNK, (page + 1) * CHUNK - 1);
+          let q = supabase
+            .from('active_leads')
+            .select('crm_status, lead_status');
+          if (assignedTo) {
+            q = q.eq('assigned_to', assignedTo);
+          }
+          const { data, error } = await q.range(page * CHUNK, (page + 1) * CHUNK - 1);
           if (error || !data || data.length === 0) break;
           data.forEach((row: any) => {
             const s = row.crm_status || row.lead_status || 'Fresh Leads';
@@ -1013,7 +1018,7 @@ export const leadsService = {
           if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
             query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
           } else {
-            query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
+            query = query.eq('assigned_to', scope.userId);
           }
         }
       } catch {

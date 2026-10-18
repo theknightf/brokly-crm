@@ -87,7 +87,7 @@ export default function KPIBentoGrid() {
 
   useEffect(() => {
     leadsService
-      .getStatusCounts()
+      .getStatusCounts(isOwnerOrAdmin ? undefined : user?.id)
       .then((data: any) => {
         const c = data || {};
         const t = Object.values(c).reduce((sum: number, v: any) => sum + Number(v), 0);
@@ -99,7 +99,7 @@ export default function KPIBentoGrid() {
         setTotal(0);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.id, isOwnerOrAdmin]);
 
   useEffect(() => {
     if (!storageKey) {

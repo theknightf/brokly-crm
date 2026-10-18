@@ -327,12 +327,43 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
-        );
+        final errText = e.toString().replaceAll('Exception: ', '').trim();
+        if (errText.contains('مسجل بالفعل') || errText.contains('مكرر')) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF1E222B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'تنبيه تكرار العميل',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: Text(
+                errText,
+                style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 14, height: 1.5),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('حسناً', style: TextStyle(color: Color(0xFFCCFF80), fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errText),
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+          );
+        }
       }
     }
   }

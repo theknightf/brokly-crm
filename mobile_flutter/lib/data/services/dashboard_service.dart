@@ -307,6 +307,8 @@ class DashboardService {
             final res = await _client
                 .from('leads')
                 .select('id, assigned_to, created_by, last_action_by, crm_status')
+                .isFilter('merged_into', null)
+                .eq('is_duplicate', false)
                 .gte('created_at', monthStartIso);
             allMonthLeads = res as List<dynamic>;
           } catch (_) {}

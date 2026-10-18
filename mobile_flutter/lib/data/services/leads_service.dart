@@ -23,13 +23,16 @@ class LeadsService {
         '*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)',
       );
 
+      // Exclude soft-deleted/merged duplicates
+      query = query.isFilter('merged_into', null).eq('is_duplicate', false);
+
       // Role scoping
       if (authIds != null) {
         if (assignedToFilter != null && assignedToFilter.isNotEmpty) {
           query = query.eq('assigned_to', assignedToFilter);
         } else if (authIds.length == 1) {
           final uid = authIds.first;
-          query = query.or('assigned_to.eq.$uid,created_by.eq.$uid');
+          query = query.eq('assigned_to', uid);
         } else {
           final idsStr = authIds.join(',');
           query = query.or('assigned_to.in.($idsStr),created_by.in.($idsStr)');
@@ -47,19 +50,22 @@ class LeadsService {
         query = query.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
       }
 
-      final response = await query.order('created_at', ascending: false).limit(1000);
+      final response = await query.order('created_at', ascending: false).limit(10000);
       final List<dynamic> data = response as List<dynamic>;
       return data.map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
       // Fallback without foreign key join if schema relationship differs
       var fallbackQuery = _client.from('leads').select('*');
 
+      // Exclude soft-deleted/merged duplicates
+      fallbackQuery = fallbackQuery.isFilter('merged_into', null).eq('is_duplicate', false);
+
       if (authIds != null) {
         if (assignedToFilter != null && assignedToFilter.isNotEmpty) {
           fallbackQuery = fallbackQuery.eq('assigned_to', assignedToFilter);
         } else if (authIds.length == 1) {
           final uid = authIds.first;
-          fallbackQuery = fallbackQuery.or('assigned_to.eq.$uid,created_by.eq.$uid');
+          fallbackQuery = fallbackQuery.eq('assigned_to', uid);
         } else {
           final idsStr = authIds.join(',');
           fallbackQuery = fallbackQuery.or('assigned_to.in.($idsStr),created_by.in.($idsStr)');
@@ -77,7 +83,7 @@ class LeadsService {
         fallbackQuery = fallbackQuery.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
       }
 
-      final data = await fallbackQuery.order('created_at', ascending: false).limit(1000);
+      final data = await fallbackQuery.order('created_at', ascending: false).limit(10000);
       return (data as List<dynamic>).map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
     }
   }
@@ -144,23 +150,21 @@ class LeadsService {
       }
     } catch (_) {}
 
-    final row = lead.toJson(currentUserId: currentUserId);
     if (matchedDupId != null) {
-      row['crm_status'] = 'Duplicate Leads';
-      row['lead_status'] = 'Lost';
-      row['is_duplicate'] = true;
-      row['duplicate_of_lead_id'] = matchedDupId;
-      row['routed_to_duplicate_center_at'] = DateTime.now().toUtc().toIso8601String();
-      final existingNotes = (row['notes']?.toString() ?? '').trim();
-      final shortId = matchedDupId.length >= 8 ? matchedDupId.substring(0, 8) : matchedDupId;
-      final tag = '[Pending Review / Duplicate of #$shortId (${matchedDupName ?? 'Existing Lead'})]';
-      if (!existingNotes.contains('[Pending Review / Duplicate')) {
-        row['notes'] = existingNotes.isEmpty ? tag : '$existingNotes\n$tag';
-      }
+      final nameStr = matchedDupName != null && matchedDupName.isNotEmpty ? '"$matchedDupName"' : 'عميل آخر';
+      throw Exception('رقم الهاتف مسجل بالفعل لـ $nameStr. لا يمكن إضافة عميل مكرر.');
     }
 
-    final res = await _client.from('leads').insert(row).select().single();
-    return LeadModel.fromJson(res);
+    final row = lead.toJson(currentUserId: currentUserId);
+    try {
+      final res = await _client.from('leads').insert(row).select().single();
+      return LeadModel.fromJson(res);
+    } on PostgrestException catch (e) {
+      if (e.code == '23505' || e.message.contains('idx_leads_phone_normalized_unique_active') || e.message.contains('phone_normalized')) {
+        throw Exception('رقم الهاتف مسجل بالفعل في النظام. لا يمكن تكرار نفس الرقم.');
+      }
+      rethrow;
+    }
   }
 
   /// Update lead
