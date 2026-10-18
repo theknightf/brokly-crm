@@ -217,6 +217,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
   }
 
   Future<void> _submit({bool launchWhatsAppAfter = false}) async {
+    if (_isSubmitting) return;
     // Validate ONLY Phone Number & Lead Source
     final rawPhone = _phoneController.text.trim();
     final cleanDigits = rawPhone.replaceAll(RegExp(r'\D'), '');
