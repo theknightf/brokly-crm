@@ -49,6 +49,9 @@ function dressScore(avg: number | null) {
   return avg == null ? 0 : Math.round((avg / 5) * 100);
 }
 
+// In-memory server cache for unified master dashboard (10s TTL)
+const masterServerCache = new Map<string, { expiresAt: number; payload: any }>();
+
 // GET /api/dashboard/unified-master?range=week|month
 // Identical for Admin and Owner - single unified executive view per spec
 export async function GET(request: Request) {
@@ -58,9 +61,15 @@ export async function GET(request: Request) {
   const { data: actor } = await supabase.from('user_profiles').select('id, role, is_active').eq('id', user.id).maybeSingle();
   if (!actor || actor.is_active === false || !isAdminRole(actor.role)) return NextResponse.json({ error: 'Forbidden: Admin/Owner only' }, { status: 403 });
 
-  const office = await loadOfficeHours(supabase as any);
   const url = new URL(request.url);
   const rangeParam = url.searchParams.get('range') || 'week';
+  const cacheKey = `${actor.id}:${rangeParam}:${actor.role}`;
+  const cached = masterServerCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(cached.payload);
+  }
+
+  const office = await loadOfficeHours(supabase as any);
   const today = localDay(0);
   const weekAgo = localDay(-6);
   const now = new Date();
@@ -240,7 +249,7 @@ export async function GET(request: Request) {
     recent: recentDeductions.slice(0,5),
   };
 
-  return NextResponse.json({
+  const payload = {
     generated_at: new Date().toISOString(),
     range: rangeParam,
     period,
@@ -273,5 +282,15 @@ export async function GET(request: Request) {
       canRotateLeads: true,
       canApproveFlaggedCalls: true,
     },
-  });
+  };
+
+  if (masterServerCache.size > 100) {
+    const nowMs = Date.now();
+    for (const [k, v] of masterServerCache.entries()) {
+      if (v.expiresAt <= nowMs) masterServerCache.delete(k);
+    }
+  }
+  masterServerCache.set(cacheKey, { expiresAt: Date.now() + 10_000, payload });
+
+  return NextResponse.json(payload);
 }
