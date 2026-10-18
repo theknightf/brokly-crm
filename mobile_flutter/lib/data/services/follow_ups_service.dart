@@ -59,7 +59,7 @@ class FollowUpsService {
         }
       }
 
-      final res = await query.order('due_date', ascending: true).limit(500);
+      final res = await query.order('due_date', ascending: true);
       final list = res as List<dynamic>;
       final followUps = list.map((e) => FollowUpModel.fromJson(e as Map<String, dynamic>)).toList();
 
@@ -75,7 +75,7 @@ class FollowUpsService {
             leadsQuery = leadsQuery.or('assigned_to.in.($idsStr),created_by.in.($idsStr)');
           }
         }
-        final leadsRes = await leadsQuery.limit(200);
+        final leadsRes = await leadsQuery;
         for (final l in leadsRes as List<dynamic>) {
           final leadId = l['id']?.toString();
           final due = l['follow_up_due']?.toString();
