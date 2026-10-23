@@ -70,7 +70,7 @@ export function createAssistantTools(supabase: any, userId: string) {
         // 2. Search comments table for matching notes
         let commentsQuery = supabase
           .from('lead_comments')
-          .select('id, lead_id, body, created_at, user_profiles(full_name), leads(id, name, phone, crm_status, location, project)')
+          .select('id, lead_id, body, created_at, author:user_profiles!lead_comments_user_id_fkey(full_name), leads(id, name, phone, crm_status, location, project)')
           .order('created_at', { ascending: false })
           .limit(limit);
 
@@ -124,7 +124,7 @@ export function createAssistantTools(supabase: any, userId: string) {
               matchingNote: c.body || '',
               matchingSnippet: c.body ? c.body.slice(0, 160) : null,
               noteDate: c.created_at ? c.created_at.slice(0, 10) : null,
-              authorAgent: c.user_profiles?.full_name || 'Agent',
+              authorAgent: c.author?.full_name || 'Agent',
               openUrl: `/leads-management?leadId=${c.leads.id}`,
               whatsappUrl: c.leads.phone ? `https://wa.me/${c.leads.phone.replace(/\D/g, '')}` : null,
             });
@@ -184,7 +184,7 @@ export function createAssistantTools(supabase: any, userId: string) {
         // Also search comments table for matching notes
         let commentsQuery = supabase
           .from('lead_comments')
-          .select('id, lead_id, body, created_at, user_profiles(full_name), leads(id, name, phone, crm_status)')
+          .select('id, lead_id, body, created_at, author:user_profiles!lead_comments_user_id_fkey(full_name), leads(id, name, phone, crm_status)')
           .order('created_at', { ascending: false })
           .limit(limit);
 
@@ -227,7 +227,7 @@ export function createAssistantTools(supabase: any, userId: string) {
               project: '',
               matchingSnippet: c.body ? c.body.slice(0, 150) : null,
               noteDate: c.created_at ? c.created_at.slice(0, 10) : null,
-              authorAgent: c.user_profiles?.full_name || 'Agent',
+              authorAgent: c.author?.full_name || 'Agent',
               openUrl: `/leads-management?leadId=${c.leads.id}`,
               whatsappUrl: c.leads.phone ? `https://wa.me/${c.leads.phone.replace(/\D/g, '')}` : null,
             });
@@ -272,7 +272,7 @@ export function createAssistantTools(supabase: any, userId: string) {
         // Fetch last 5 comments/notes
         const { data: comments } = await supabase
           .from('lead_comments')
-          .select('id, body, created_at, user_profiles(full_name)')
+          .select('id, body, created_at, author:user_profiles!lead_comments_user_id_fkey(full_name)')
           .eq('lead_id', leadId)
           .order('created_at', { ascending: false })
           .limit(5);
@@ -298,7 +298,7 @@ export function createAssistantTools(supabase: any, userId: string) {
           notes: lead.notes,
           recentNotes: (comments || []).map((c: any) => ({
             text: c.body,
-            author: c.user_profiles?.full_name || 'Agent',
+            author: c.author?.full_name || 'Agent',
             date: c.created_at ? c.created_at.slice(0, 10) : '',
           })),
           nextFollowUp: followUps?.[0]

@@ -1997,7 +1997,7 @@ export const teamsService = {
           id,
           user_id,
           is_leader,
-          user_profiles(id, full_name, email, role)
+          user:user_profiles!team_memberships_user_id_fkey(id, full_name, email, role)
         `
         )
         .eq('team_id', teamId)
@@ -2009,9 +2009,9 @@ export const teamsService = {
       return (data || []).map((row: any) => ({
         id: row.id,
         userId: row.user_id,
-        userName: row.user_profiles?.full_name || '',
-        userEmail: row.user_profiles?.email || '',
-        userRole: row.user_profiles?.role || 'agent',
+        userName: row.user?.full_name || '',
+        userEmail: row.user?.email || '',
+        userRole: row.user?.role || 'agent',
         isLeader: row.is_leader || false,
       }));
     } catch (err: any) {
@@ -2189,7 +2189,7 @@ export const teamsService = {
         const teamIds = leadership.map((l: any) => l.team_id);
         const { data: members, error: memErr } = await supabase
           .from('team_memberships')
-          .select('user_id, user_profiles(id, full_name, email, role, is_active)')
+          .select('user_id, user:user_profiles!team_memberships_user_id_fkey(id, full_name, email, role, is_active)')
           .in('team_id', teamIds);
         if (memErr) {
           if (isSchemaError(memErr)) throw memErr;
@@ -2199,7 +2199,7 @@ export const teamsService = {
         const seen = new Set<string>();
         const result: { id: string; name: string; role: string }[] = [];
         for (const row of members || []) {
-          const up = (row as any).user_profiles;
+          const up = (row as any).user;
           if (!up || up.is_active === false || seen.has(up.id)) continue;
           seen.add(up.id);
           result.push({
@@ -3315,7 +3315,7 @@ export const leadCommentsService = {
           body,
           created_at,
           user_id,
-          user_profiles(id, full_name, email)
+          author:user_profiles!lead_comments_user_id_fkey(id, full_name, email)
         `
         )
         .eq('lead_id', leadId)
@@ -3328,7 +3328,7 @@ export const leadCommentsService = {
         id: row.id,
         body: row.body,
         userId: row.user_id,
-        authorName: row.user_profiles?.full_name || row.user_profiles?.email || 'Unknown',
+        authorName: row.author?.full_name || row.author?.email || 'Unknown',
         createdAt: row.created_at,
       }));
     } catch (err: any) {
@@ -3348,7 +3348,7 @@ export const leadCommentsService = {
         body,
         created_at,
         user_id,
-        user_profiles(id, full_name, email)
+        author:user_profiles!lead_comments_user_id_fkey(id, full_name, email)
       `
       )
       .single();
@@ -3369,7 +3369,7 @@ export const leadCommentsService = {
       body: data.body,
       userId: data.user_id,
       authorName:
-        (data as any).user_profiles?.full_name || (data as any).user_profiles?.email || 'Unknown',
+        (data as any).author?.full_name || (data as any).author?.email || 'Unknown',
       createdAt: data.created_at,
     };
   },
