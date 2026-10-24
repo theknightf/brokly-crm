@@ -10,6 +10,7 @@ import {
   X,
   AlertTriangle,
   ExternalLink,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -130,7 +131,7 @@ function useKeyboardInset(): number {
   return inset;
 }
 
-/** Small chevron used on every select, anchored to the inline-end edge. */
+/** Small chevron used on select elements, anchored to the inline-end edge. */
 function SelectChevron() {
   return (
     <ChevronDown
@@ -140,76 +141,22 @@ function SelectChevron() {
   );
 }
 
-function AccordionSection({
-  num,
-  title,
-  open,
-  onToggle,
-  children,
-  id,
-}: {
-  num: number;
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-  id: string;
-}) {
-  return (
-    <div className="border border-border rounded-xl overflow-hidden bg-card">
-      <button
-        type="button"
-        id={id}
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={`${id}-panel`}
-        className="btn-press w-full flex items-center gap-3 px-4 py-3 min-h-[44px] text-left hover:bg-muted/40 transition-colors active:scale-[0.99]"
-      >
-        <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-          {num}
-        </span>
-        <span className="text-sm font-semibold text-foreground flex-1">{title}</span>
-        <ChevronDown
-          size={16}
-          className={`text-muted-foreground transition-transform duration-300 ${
-            open ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
-      <div
-        id={`${id}-panel`}
-        role="region"
-        aria-labelledby={id}
-        className={`grid transition-all duration-300 ease-out ${
-          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-      >
-        <div className="overflow-hidden">
-          <div className="px-4 pb-4 pt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLeadFormProps) {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
-  const canEditProtectedFields = isAdminRole(profile?.role);
+  const isPrivileged = isAdminRole(profile?.role) || profile?.role === 'manager';
   const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
   const [agentList, setAgentList] = useState<string[]>([]);
   const [userList, setUserList] = useState<{ id: string; name: string }[]>([]);
   const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
   const [newSourceName, setNewSourceName] = useState('');
   const [creatingSource, setCreatingSource] = useState(false);
+  const [showAddSourceInput, setShowAddSourceInput] = useState(false);
   const [developers, setDevelopers] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string; status: string }[]
   >([]);
   const [showDetails, setShowDetails] = useState(false);
-  const [openSection, setOpenSection] = useState<'contact' | 'dev' | 'prop' | 'pipe' | null>(null);
   const [referralEnabled, setReferralEnabled] = useState(Boolean(initialData?.referredTo));
   const [dupState, setDupState] = useState<{ checking: boolean; existing: DuplicateMatch | null }>({
     checking: false,
@@ -270,6 +217,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
 
   const budgetMin = watch('budgetMin');
   const assignedTo = watch('assignedTo');
+  const watchedSource = watch('source');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(() => {
     if (initialData?.assignedToIds && initialData.assignedToIds.length > 0) {
       return initialData.assignedToIds.slice(0, 2);
@@ -277,9 +225,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     return initialData?.assignedTo ? [initialData.assignedTo] : [];
   });
 
-  // Autofocus the first field once the sheet has settled. On touch devices the
-  // keyboard opens — the layout below is built so the sticky submit row is
-  // lifted above it (see useKeyboardInset) and never covered.
+  // Autofocus the Phone field immediately on mount
   useEffect(() => {
     const timer = window.setTimeout(() => {
       phoneRef.current?.focus({ preventScroll: true });
@@ -330,7 +276,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     });
   }, []);
 
-  // Default the assignee to the current agent (unless the caller preset one).
+  // Default the assignee to the current user (unless caller preset one)
   useEffect(() => {
     if (autoAssignDoneRef.current) return;
     if (!userList.length || !currentUserId) return;
@@ -347,8 +293,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     if (!initialData?.agent && agentList.includes(me.name)) setValue('agent', me.name);
   }, [userList, agentList, currentUserId, initialData, setValue]);
 
-  // If the stored source list does not contain the remembered/default source,
-  // fall back to the closest available one so the select is never out of sync.
+  // Sync default/remembered source
   useEffect(() => {
     if (!sourceList.length) return;
     const current = getValues('source');
@@ -385,7 +330,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     setValue('project', '');
   };
 
-  /** Inline duplicate check — never blocks saving, it only warns. */
+  /** Inline duplicate check — never blocks saving, warns agent */
   const checkDuplicate = async (value: string) => {
     const digits = phoneDigits(value);
     if (digits.length < 8) {
@@ -398,8 +343,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     try {
       const found = await duplicateLeadsService.findByPhone(key);
       if (seq !== dupSeqRef.current) return;
-      // The lookup matches on a LIKE pattern, so confirm the numbers are
-      // actually the same before warning the agent.
       if (!found || phoneCanonicalKey(found.phone || '') !== key) {
         setDupState({ checking: false, existing: null });
         return;
@@ -413,7 +356,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   const handlePhoneChange = (raw: string, caret: number) => {
     const digitsBefore = phoneDigits(raw.slice(0, caret)).length;
     const next = formatEgyptianPhone(raw);
-    // A stale warning must not linger once the number changes.
     if (dupState.existing) setDupState({ checking: false, existing: null });
     return { value: next, caret: caretAfterDigits(next, digitsBefore) };
   };
@@ -430,10 +372,10 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       sourceList.find((s) => s.name === data.source) ||
       (ALL_SOURCES.includes(data.source as any) ? ({ id: '', name: data.source } as any) : null);
     const leadSourceId = matchedSource?.id || null;
-    // Store the canonical national form ("01012345678") so the existing
-    // duplicate lookups keep matching on contiguous digits.
     const cleanPhone = phoneToStore(data.phone);
-    const cleanName = (data.name || '').trim() || `Lead (${cleanPhone.slice(-4) || 'New'})`;
+    // Name is optional — falls back to phone number as requested
+    const fallbackName = cleanPhone || 'New Lead';
+    const cleanName = (data.name || '').trim() || fallbackName;
 
     const newLead: Lead & { leadSourceId?: string | null } = {
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
@@ -476,17 +418,13 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     };
 
     const result = await onSubmit(newLead, { keepOpen: mode === 'another' });
-    // `false` means the save failed — keep what the agent typed.
     if (result === false) return;
 
-    // Remember for the rest of the session.
     lastUsedSource = data.source || '';
     lastUsedStatus = data.status || '';
 
     if (mode !== 'another') return;
 
-    // "Save & add another": clear everything except the source/stage and the
-    // assignee, then get ready for the next number.
     reset({
       name: '',
       phone: '',
@@ -509,7 +447,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     setReferralEnabled(false);
     setSelectedDeveloperId('');
     setShowDetails(false);
-    setOpenSection(null);
     setDupState({ checking: false, existing: null });
     dupSeqRef.current += 1;
 
@@ -519,7 +456,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     }, 60);
   };
 
-  /** Enter anywhere (except a textarea) submits the form. */
+  /** Enter anywhere (except a textarea) submits the form */
   const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     if (e.key !== 'Enter') return;
     const target = e.target as HTMLElement;
@@ -528,9 +465,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     submitModeRef.current = 'single';
     void handleSubmit(onFormSubmit)();
   };
-
-  const selectClass = (hasError: boolean) =>
-    `input-base appearance-none pe-8 min-h-[44px] ${hasError ? 'border-red-400' : ''}`;
 
   const createNewSource = async () => {
     const name = newSourceName.trim();
@@ -543,8 +477,9 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           a.name.localeCompare(b.name)
         )
       );
-      setValue('source', created.name);
+      setValue('source', created.name as LeadSource, { shouldValidate: true, shouldDirty: true });
       setNewSourceName('');
+      setShowAddSourceInput(false);
       toast.success(t('leadForm.sourceAdded', { name: created.name }));
     } catch (e: any) {
       toast.error(e?.message || t('leadForm.sourceFailed'));
@@ -553,26 +488,34 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     }
   };
 
+  // Build the list of source options (from database or canonical list)
+  const sourcesToDisplay = sourceList.length > 0
+    ? sourceList
+    : ALL_SOURCES.map((s) => ({ id: s, name: s }));
+
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} onKeyDown={handleFormKeyDown} noValidate>
-      <div className="px-4 sm:px-6 py-5 space-y-4 pop-in">
-        {/* ── Step 1: the three things you always need ─────────────────── */}
+    <form
+      onSubmit={handleSubmit(onFormSubmit)}
+      onKeyDown={handleFormKeyDown}
+      noValidate
+      className="w-full max-w-md mx-auto flex flex-col justify-between min-h-full"
+    >
+      <div className="px-4 sm:px-6 py-4 space-y-4">
+        {/* ── 1. Phone (Required, autofocus, type="tel", inputMode="numeric") ── */}
         <div>
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <label
               htmlFor="add-phone"
-              className="text-sm font-semibold text-foreground flex items-center gap-1.5"
+              className="text-xs font-semibold text-foreground flex items-center gap-1"
             >
-              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-                1
-              </span>
-              {t('leadForm.phone')}
-              <span className="text-xs font-normal text-red-500 ms-0.5">*</span>
+              <span>{t('leadForm.phone')}</span>
+              <span className="text-red-500">*</span>
             </label>
             <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5 tracking-wide">
               {t('leadForm.required')}
             </span>
           </div>
+
           <Controller
             name="phone"
             control={control}
@@ -585,7 +528,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 <input
                   id="add-phone"
                   type="tel"
-                  inputMode="tel"
+                  inputMode="numeric"
                   autoComplete="tel"
                   dir="ltr"
                   placeholder="010 1234 5678"
@@ -595,14 +538,13 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     const caret = el.selectionStart ?? el.value.length;
                     const next = handlePhoneChange(el.value, caret);
                     field.onChange(next.value);
-                    // Keep the cursor where the agent left it.
                     window.requestAnimationFrame(() => {
                       const node = phoneRef.current;
                       if (!node) return;
                       try {
                         node.setSelectionRange(next.caret, next.caret);
                       } catch {
-                        /* selection not supported — ignore */
+                        /* ignore */
                       }
                     });
                   }}
@@ -622,12 +564,14 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                         ? 'add-phone-duplicate'
                         : undefined
                   }
-                  className={`input-base text-base h-12 scroll-mb-28 ${
-                    fieldState.error ? 'border-red-400' : 'border-primary/30 focus:border-primary'
+                  className={`input-base text-base font-mono-data h-12 min-h-[44px] ${
+                    fieldState.error
+                      ? 'border-red-400 focus:border-red-500 ring-1 ring-red-400/20'
+                      : 'border-border/80 focus:border-primary'
                   }`}
                 />
                 {fieldState.error && (
-                  <p id="add-phone-error" className="mt-1 text-xs text-red-500">
+                  <p id="add-phone-error" className="mt-1 text-xs text-red-500 font-medium">
                     {fieldState.error.message}
                   </p>
                 )}
@@ -635,17 +579,18 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             )}
           />
 
+          {/* Inline duplicate warning */}
           {dupState.existing ? (
             <div
               id="add-phone-duplicate"
               role="status"
               className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3"
             >
-              <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
                 <AlertTriangle size={13} className="flex-shrink-0" />
                 {t('leadForm.duplicateTitle')}
               </p>
-              <p className="text-xs text-amber-700 mt-1">
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
                 {t('leadForm.duplicateBody', {
                   name: dupState.existing.name,
                   status: dupState.existing.status,
@@ -670,140 +615,244 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           )}
         </div>
 
-        {/* Name */}
+        {/* ── 2. Name (Optional) ── */}
         <div>
-          <label htmlFor="add-name" className="label-base">
-            {t('leadForm.name')}{' '}
-            <span className="text-muted-foreground font-normal text-xs">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <label htmlFor="add-name" className="text-xs font-semibold text-foreground">
+              {t('leadForm.name')}
+            </label>
+            <span className="text-[10px] font-normal text-muted-foreground">
               {t('leadForm.optional')}
             </span>
-          </label>
+          </div>
           <input
             id="add-name"
             type="text"
             autoComplete="name"
-            className={`input-base min-h-[44px] scroll-mb-28 ${
-              errors.name ? 'border-red-400' : ''
-            }`}
+            className="input-base text-sm h-11 min-h-[44px] border-border/80"
             placeholder="Ahmed Hassan"
-            aria-invalid={errors.name ? true : undefined}
-            aria-describedby={errors.name ? 'add-name-error' : undefined}
             {...register('name')}
           />
-          {errors.name && (
-            <p id="add-name-error" className="mt-1 text-xs text-red-500">
-              {errors.name.message}
-            </p>
-          )}
         </div>
 
-        {/* Source + status */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="add-source" className="label-base">
-              {t('leadForm.source')} <span className="text-xs font-normal text-red-500">*</span>
+        {/* ── 3. Source (Selectable chips instead of dropdown, single select) ── */}
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+              <span>{t('leadForm.source')}</span>
+              <span className="text-red-500">*</span>
             </label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-              <div className="relative flex-1 min-w-0">
-                <select
-                  id="add-source"
-                  autoComplete="off"
-                  className={selectClass(!!errors.source)}
-                  aria-invalid={errors.source ? true : undefined}
-                  aria-describedby={errors.source ? 'add-source-error' : undefined}
-                  {...register('source', { required: t('leadForm.sourceRequired') })}
-                >
-                  {sourceList.length
-                    ? sourceList.map((s) => (
-                        <option key={`quick-source-${s.id}`} value={s.name}>
-                          {s.name}
-                        </option>
-                      ))
-                    : ALL_SOURCES.map((s) => (
-                        <option key={`quick-source-${s}`} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                </select>
-                <SelectChevron />
-              </div>
-              <div className="flex gap-1 sm:w-auto">
-                <input
-                  value={newSourceName}
-                  onChange={(e) => setNewSourceName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'Enter') return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void createNewSource();
-                  }}
-                  placeholder={t('leadForm.newSource')}
-                  aria-label={t('leadForm.newSource')}
-                  autoComplete="off"
-                  className="input-base h-11 text-xs flex-1 sm:w-28 sm:flex-none"
-                />
-                <button
-                  type="button"
-                  disabled={creatingSource || !newSourceName.trim()}
-                  onClick={() => void createNewSource()}
-                  aria-label={t('leadForm.addSource')}
-                  className="h-11 min-w-[44px] px-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1"
-                >
-                  <Plus size={12} />
-                  {creatingSource ? '…' : t('leadForm.addSource')}
-                </button>
-              </div>
-            </div>
-            {errors.source && (
-              <p id="add-source-error" className="mt-1 text-xs text-red-500">
-                {errors.source.message}
-              </p>
+            {!showAddSourceInput && (
+              <button
+                type="button"
+                onClick={() => setShowAddSourceInput(true)}
+                className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-0.5"
+              >
+                <Plus size={11} />
+                <span>{t('leadForm.newSource')}</span>
+              </button>
             )}
           </div>
 
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="radiogroup"
+            aria-label={t('leadForm.source')}
+          >
+            {sourcesToDisplay.map((s) => {
+              const isSelected = watchedSource === s.name;
+              return (
+                <button
+                  key={`chip-source-${s.id || s.name}`}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() =>
+                    setValue('source', s.name as LeadSource, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
+                  className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 select-none ${
+                    isSelected
+                      ? 'bg-primary text-primary-foreground font-semibold shadow-sm ring-2 ring-primary/30'
+                      : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60'
+                  }`}
+                >
+                  {isSelected && <Check size={12} className="stroke-[2.5]" />}
+                  <span>{s.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Optional inline input for new custom source */}
+          {showAddSourceInput && (
+            <div className="flex items-center gap-1.5 mt-2 animate-rise-in">
+              <input
+                value={newSourceName}
+                onChange={(e) => setNewSourceName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  void createNewSource();
+                }}
+                placeholder={t('leadForm.newSource')}
+                className="input-base h-10 min-h-[44px] text-xs flex-1"
+                autoFocus
+              />
+              <button
+                type="button"
+                disabled={creatingSource || !newSourceName.trim()}
+                onClick={() => void createNewSource()}
+                className="min-h-[44px] px-3.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
+              >
+                {creatingSource ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                <span>{t('leadForm.addSource')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddSourceInput(false);
+                  setNewSourceName('');
+                }}
+                className="min-h-[44px] px-2.5 rounded-xl text-muted-foreground hover:bg-muted"
+                aria-label={t('leadForm.cancel')}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {errors.source && (
+            <p className="mt-1 text-xs text-red-500 font-medium">{errors.source.message}</p>
+          )}
+        </div>
+
+        {/* ── 4. Assign To (Visible ONLY for admin/manager, otherwise hidden) ── */}
+        {isPrivileged && (
           <div>
-            <label htmlFor="add-status" className="label-base">
-              {t('leadForm.status')}
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label htmlFor="add-assignee" className="text-xs font-semibold text-foreground">
+                {t('leadForm.assignTo')}
+              </label>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                {t('leadForm.assignCount', { n: selectedUserIds.length })}
+              </span>
+            </div>
+
+            {/* Selected assignees badge list */}
+            {selectedUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedUserIds.map((id) => {
+                  const u = userList.find((user) => user.id === id);
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                    >
+                      <UserCheck size={12} className="text-emerald-500" />
+                      <span>{u?.name || 'Agent'}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleUser(id)}
+                        className="hover:text-red-500 ms-0.5 text-muted-foreground p-0.5 rounded"
+                        aria-label={t('leadForm.removeAgent', { name: u?.name || 'agent' })}
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Agent Select Dropdown */}
             <div className="relative">
               <select
-                id="add-status"
-                autoComplete="off"
-                className={selectClass(!!errors.status)}
-                aria-invalid={errors.status ? true : undefined}
-                {...register('status')}
+                id="add-assignee"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) toggleUser(e.target.value);
+                }}
+                className="input-base appearance-none pe-8 min-h-[44px] text-xs"
               >
-                {ALL_STATUSES.map((s) => (
-                  <option key={`add-status-${s}`} value={s}>
-                    {s}
-                  </option>
-                ))}
+                <option value="">
+                  {selectedUserIds.length >= 2
+                    ? 'Max 2 agents chosen'
+                    : t('leadForm.selectAgent')}
+                </option>
+                {userList.map((u) => {
+                  const isSelected = selectedUserIds.includes(u.id);
+                  return (
+                    <option key={`assign-opt-${u.id}`} value={u.id} disabled={isSelected}>
+                      {isSelected ? `✓ ${u.name}` : u.name}
+                    </option>
+                  );
+                })}
               </select>
               <SelectChevron />
             </div>
-            {errors.status && <p className="mt-1 text-xs text-red-500">{errors.status.message}</p>}
           </div>
-        </div>
+        )}
 
-        {/* ── Everything else ──────────────────────────────────────────── */}
+        {/* ── Toggle "More Details" (Collapsed by default) ── */}
+        <button
+          type="button"
+          onClick={() => setShowDetails((prev) => !prev)}
+          aria-expanded={showDetails}
+          aria-controls="add-more-details-panel"
+          className="w-full flex items-center justify-between px-3.5 py-2.5 min-h-[44px] rounded-xl border border-border/70 bg-muted/30 hover:bg-muted/60 text-xs font-semibold text-foreground transition-colors active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-2">
+            <SlidersHorizontal size={14} className="text-primary" />
+            <span>{showDetails ? t('leadForm.hideDetails') : `+ ${t('leadForm.moreDetails')}`}</span>
+          </span>
+          <ChevronDown
+            size={15}
+            className={`text-muted-foreground transition-transform duration-200 ${
+              showDetails ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+
+        {/* ── Collapsed Content: All other fields (budget, area, property type, notes, etc.) ── */}
         <div
+          id="add-more-details-panel"
           className={`grid transition-all duration-300 ease-out ${
-            showDetails ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+            showDetails ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
           }`}
         >
           <div className="overflow-hidden">
-            <div className="space-y-4 pt-1">
-              <AccordionSection
-                num={2}
-                id="add-section-contact"
-                title={t('leadForm.contactDetails')}
-                open={openSection === 'contact'}
-                onToggle={() => setOpenSection(openSection === 'contact' ? null : 'contact')}
-              >
+            <div className="space-y-3.5 pt-2 pb-1 border-t border-border/50">
+              {/* Status / Stage */}
+              <div>
+                <label htmlFor="add-status" className="text-xs font-semibold text-foreground block mb-1">
+                  {t('leadForm.status')}
+                </label>
+                <div className="relative">
+                  <select
+                    id="add-status"
+                    autoComplete="off"
+                    className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                    {...register('status')}
+                  >
+                    {ALL_STATUSES.map((s) => (
+                      <option key={`add-status-${s}`} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectChevron />
+                </div>
+              </div>
+
+              {/* Email & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="add-email" className="label-base">
+                  <label htmlFor="add-email" className="text-xs font-semibold text-foreground block mb-1">
                     {t('leadForm.email')}{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
+                    <span className="text-muted-foreground font-normal text-[10px]">
                       {t('leadForm.optional')}
                     </span>
                   </label>
@@ -812,24 +861,21 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     type="email"
                     inputMode="email"
                     autoComplete="email"
-                    className={`input-base min-h-[44px] ${errors.email ? 'border-red-400' : ''}`}
+                    className={`input-base min-h-[44px] text-xs ${errors.email ? 'border-red-400' : ''}`}
                     placeholder="ahmed@email.com"
-                    aria-invalid={errors.email ? true : undefined}
-                    aria-describedby={errors.email ? 'add-email-error' : undefined}
                     {...register('email', {
                       pattern: { value: /^\S+@\S+\.\S+$/, message: t('leadForm.emailInvalid') },
                     })}
                   />
                   {errors.email && (
-                    <p id="add-email-error" className="mt-1 text-xs text-red-500">
-                      {errors.email.message}
-                    </p>
+                    <p className="mt-1 text-xs text-red-500 font-medium">{errors.email.message}</p>
                   )}
                 </div>
+
                 <div>
-                  <label htmlFor="add-location" className="label-base">
+                  <label htmlFor="add-location" className="text-xs font-semibold text-foreground block mb-1">
                     {t('leadForm.location')}{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
+                    <span className="text-muted-foreground font-normal text-[10px]">
                       {t('leadForm.optional')}
                     </span>
                   </label>
@@ -837,28 +883,19 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     id="add-location"
                     type="text"
                     autoComplete="address-level2"
-                    className={`input-base min-h-[44px] ${errors.location ? 'border-red-400' : ''}`}
-                    placeholder="Cairo"
-                    aria-invalid={errors.location ? true : undefined}
+                    className="input-base min-h-[44px] text-xs"
+                    placeholder="Cairo / New Cairo"
                     {...register('location')}
                   />
-                  {errors.location && (
-                    <p className="mt-1 text-xs text-red-500">{errors.location.message}</p>
-                  )}
                 </div>
-              </AccordionSection>
+              </div>
 
-              <AccordionSection
-                num={3}
-                id="add-section-dev"
-                title={t('leadForm.developerProject')}
-                open={openSection === 'dev'}
-                onToggle={() => setOpenSection(openSection === 'dev' ? null : 'dev')}
-              >
+              {/* Developer & Project */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="add-developer" className="label-base">
+                  <label htmlFor="add-developer" className="text-xs font-semibold text-foreground block mb-1">
                     {t('leadForm.developer')}{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
+                    <span className="text-muted-foreground font-normal text-[10px]">
                       {t('leadForm.optional')}
                     </span>
                   </label>
@@ -866,7 +903,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     <select
                       id="add-developer"
                       autoComplete="off"
-                      className="input-base appearance-none pe-8 min-h-[44px]"
+                      className="input-base appearance-none pe-8 min-h-[44px] text-xs"
                       value={selectedDeveloperId}
                       onChange={(e) => handleDeveloperChange(e.target.value)}
                     >
@@ -880,10 +917,11 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     <SelectChevron />
                   </div>
                 </div>
+
                 <div>
-                  <label htmlFor="add-project" className="label-base">
+                  <label htmlFor="add-project" className="text-xs font-semibold text-foreground block mb-1">
                     {t('leadForm.project')}{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
+                    <span className="text-muted-foreground font-normal text-[10px]">
                       {t('leadForm.optional')}
                     </span>
                   </label>
@@ -891,7 +929,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     <select
                       id="add-project"
                       autoComplete="off"
-                      className={`input-base appearance-none pe-8 min-h-[44px] ${
+                      className={`input-base appearance-none pe-8 min-h-[44px] text-xs ${
                         !selectedDeveloperId ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                       disabled={!selectedDeveloperId}
@@ -913,48 +951,39 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     <SelectChevron />
                   </div>
                 </div>
-              </AccordionSection>
+              </div>
 
-              <AccordionSection
-                num={4}
-                id="add-section-prop"
-                title={t('leadForm.propertyReq')}
-                open={openSection === 'prop'}
-                onToggle={() => setOpenSection(openSection === 'prop' ? null : 'prop')}
-              >
-                <div>
-                  <label htmlFor="add-proptype" className="label-base">
-                    {t('leadForm.propertyType')}{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
-                      {t('leadForm.optional')}
-                    </span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="add-proptype"
-                      autoComplete="off"
-                      className={selectClass(!!errors.propertyType)}
-                      {...register('propertyType')}
-                    >
-                      {ALL_PROPERTY_TYPES.map((p) => (
-                        <option key={`add-prop-${p}`} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                    <SelectChevron />
-                  </div>
-                  {errors.propertyType && (
-                    <p className="mt-1 text-xs text-red-500">{errors.propertyType.message}</p>
-                  )}
+              {/* Property Type */}
+              <div>
+                <label htmlFor="add-proptype" className="text-xs font-semibold text-foreground block mb-1">
+                  {t('leadForm.propertyType')}{' '}
+                  <span className="text-muted-foreground font-normal text-[10px]">
+                    {t('leadForm.optional')}
+                  </span>
+                </label>
+                <div className="relative">
+                  <select
+                    id="add-proptype"
+                    autoComplete="off"
+                    className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                    {...register('propertyType')}
+                  >
+                    {ALL_PROPERTY_TYPES.map((p) => (
+                      <option key={`add-prop-${p}`} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectChevron />
                 </div>
+              </div>
+
+              {/* Budget Range (Min / Max) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="add-budgetmin" className="label-base">
+                  <label htmlFor="add-budgetmin" className="text-xs font-semibold text-foreground block mb-1">
                     {t('leadForm.budgetMin')}{' '}
-                    <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
-                      {t('leadForm.optional')}
-                    </span>
+                    <span className="text-muted-foreground font-normal">(ج.م)</span>
                   </label>
                   <input
                     id="add-budgetmin"
@@ -962,27 +991,24 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     inputMode="numeric"
                     min={1}
                     dir="ltr"
-                    className={`input-base font-mono-data min-h-[44px] ${
+                    className={`input-base font-mono-data min-h-[44px] text-xs ${
                       errors.budgetMin ? 'border-red-400' : ''
                     }`}
                     placeholder="500000"
-                    aria-invalid={errors.budgetMin ? true : undefined}
                     {...register('budgetMin', {
                       min: { value: 1, message: t('leadForm.budgetMinInvalid') },
                       valueAsNumber: true,
                     })}
                   />
                   {errors.budgetMin && (
-                    <p className="mt-1 text-xs text-red-500">{errors.budgetMin.message}</p>
+                    <p className="mt-1 text-xs text-red-500 font-medium">{errors.budgetMin.message}</p>
                   )}
                 </div>
+
                 <div>
-                  <label htmlFor="add-budgetmax" className="label-base">
+                  <label htmlFor="add-budgetmax" className="text-xs font-semibold text-foreground block mb-1">
                     {t('leadForm.budgetMax')}{' '}
-                    <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
-                      {t('leadForm.optional')}
-                    </span>
+                    <span className="text-muted-foreground font-normal">(ج.م)</span>
                   </label>
                   <input
                     id="add-budgetmax"
@@ -990,11 +1016,10 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     inputMode="numeric"
                     min={1}
                     dir="ltr"
-                    className={`input-base font-mono-data min-h-[44px] ${
+                    className={`input-base font-mono-data min-h-[44px] text-xs ${
                       errors.budgetMax ? 'border-red-400' : ''
                     }`}
                     placeholder="800000"
-                    aria-invalid={errors.budgetMax ? true : undefined}
                     {...register('budgetMax', {
                       min: { value: 1, message: t('leadForm.budgetMinInvalid') },
                       valueAsNumber: true,
@@ -1006,269 +1031,144 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     })}
                   />
                   {errors.budgetMax && (
-                    <p className="mt-1 text-xs text-red-500">{errors.budgetMax.message}</p>
+                    <p className="mt-1 text-xs text-red-500 font-medium">{errors.budgetMax.message}</p>
                   )}
                 </div>
-              </AccordionSection>
+              </div>
 
-              <AccordionSection
-                num={5}
-                id="add-section-pipe"
-                title={t('leadForm.pipeline')}
-                open={openSection === 'pipe'}
-                onToggle={() => setOpenSection(openSection === 'pipe' ? null : 'pipe')}
-              >
-                <div>
-                  <label htmlFor="add-agent" className="label-base">
-                    {t('leadForm.agent')}{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
-                      {t('leadForm.optional')}
-                    </span>
-                  </label>
-                  <div className="relative">
+              {/* Referral Assignment */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={referralEnabled}
+                    onChange={(e) => {
+                      setReferralEnabled(e.target.checked);
+                      if (!e.target.checked) setValue('referralTo', '');
+                    }}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span className="text-xs font-semibold text-foreground">
+                    {t('leadForm.referral')}
+                  </span>
+                </label>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t('leadForm.referralHint')}</p>
+                {referralEnabled && (
+                  <div className="relative mt-2.5 animate-rise-in">
                     <select
-                      id="add-agent"
+                      id="add-referral-to"
+                      disabled={!referralEnabled}
                       autoComplete="off"
-                      className={selectClass(!!errors.agent)}
-                      {...register('agent')}
+                      className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                      {...register('referralTo', {
+                        required: referralEnabled ? t('leadForm.referralRequired') : false,
+                      })}
                     >
-                      <option value="">{t('leadForm.selectAgent')}</option>
-                      {agentList.map((a) => (
-                        <option key={`add-agent-${a}`} value={a}>
-                          {a}
-                        </option>
-                      ))}
+                      <option value="">{t('leadForm.selectSecond')}</option>
+                      {userList
+                        .filter((u) => u.id !== assignedTo)
+                        .map((u) => (
+                          <option key={`add-referral-${u.id}`} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
                     </select>
                     <SelectChevron />
-                  </div>
-                  {errors.agent && (
-                    <p className="mt-1 text-xs text-red-500">{errors.agent.message}</p>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <label className="label-base !mb-0">
-                      {t('leadForm.assignTo')}{' '}
-                      <span className="text-muted-foreground font-normal text-xs">
-                        {t('leadForm.assignCoHint')}
-                      </span>
-                    </label>
-                    <span className="text-xs text-muted-foreground font-medium">
-                      {t('leadForm.assignCount', { n: selectedUserIds.length })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-1.5">
-                    {t('leadForm.assignScope')}
-                  </p>
-
-                  {selectedUserIds.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {selectedUserIds.map((id) => {
-                        const u = userList.find((user) => user.id === id);
-                        return (
-                          <span
-                            key={id}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
-                          >
-                            <UserCheck size={12} className="text-emerald-500" />
-                            {u?.name || 'Agent'}
-                            <button
-                              type="button"
-                              onClick={() => toggleUser(id)}
-                              className="hover:text-red-500 ms-0.5 text-muted-foreground"
-                              aria-label={t('leadForm.removeAgent', { name: u?.name || 'agent' })}
-                            >
-                              <X size={12} />
-                            </button>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div className="max-h-36 overflow-y-auto border border-input rounded-xl p-1.5 space-y-1 bg-background">
-                    {userList.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-2 text-center">
-                        {t('leadForm.noAgents')}
-                      </p>
-                    ) : (
-                      userList.map((u) => {
-                        const isSelected = selectedUserIds.includes(u.id);
-                        const isDisabled = !isSelected && selectedUserIds.length >= 2;
-                        return (
-                          <button
-                            type="button"
-                            key={`add-user-${u.id}`}
-                            disabled={isDisabled}
-                            onClick={() => toggleUser(u.id)}
-                            aria-pressed={isSelected}
-                            className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs transition-colors text-left min-h-[44px] ${
-                              isSelected
-                                ? 'bg-primary/15 text-primary font-semibold'
-                                : isDisabled
-                                  ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                                  : 'hover:bg-muted text-foreground'
-                            }`}
-                          >
-                            <span className="truncate">{u.name}</span>
-                            {isSelected && (
-                              <Check size={13} className="text-primary flex-shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })
+                    {errors.referralTo && (
+                      <p className="mt-1 text-xs text-red-500 font-medium">{errors.referralTo.message}</p>
                     )}
                   </div>
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={referralEnabled}
-                      onChange={(e) => {
-                        setReferralEnabled(e.target.checked);
-                        if (!e.target.checked) setValue('referralTo', '');
-                      }}
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <span className="text-sm font-semibold text-foreground">
-                      {t('leadForm.referral')}
-                    </span>
-                  </label>
-                  <p className="mt-1 text-xs text-muted-foreground">{t('leadForm.referralHint')}</p>
-                  {referralEnabled && (
-                    <div className="relative mt-3 animate-rise-in">
-                      <select
-                        id="add-referral-to"
-                        disabled={!referralEnabled}
-                        autoComplete="off"
-                        className="input-base appearance-none pe-8 min-h-[44px]"
-                        aria-invalid={errors.referralTo ? true : undefined}
-                        {...register('referralTo', {
-                          required: referralEnabled ? t('leadForm.referralRequired') : false,
-                        })}
-                      >
-                        <option value="">{t('leadForm.selectSecond')}</option>
-                        {userList
-                          .filter((u) => u.id !== assignedTo)
-                          .map((u) => (
-                            <option key={`add-referral-${u.id}`} value={u.id}>
-                              {u.name}
-                            </option>
-                          ))}
-                      </select>
-                      <SelectChevron />
-                      {errors.referralTo && (
-                        <p className="mt-1 text-xs text-red-500">{errors.referralTo.message}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="add-followup" className="label-base">
-                    {t('leadForm.followUp')}{' '}
-                    <span className="text-muted-foreground font-normal text-xs">
-                      {t('leadForm.optional')}
-                    </span>
-                  </label>
-                  <input
-                    id="add-followup"
-                    type="date"
-                    className={`input-base min-h-[44px] ${
-                      errors.followUpDue ? 'border-red-400' : ''
-                    }`}
-                    aria-invalid={errors.followUpDue ? true : undefined}
-                    {...register('followUpDue')}
-                  />
-                  {errors.followUpDue && (
-                    <p className="mt-1 text-xs text-red-500">{errors.followUpDue.message}</p>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="add-notes" className="label-base">
-                    {t('leadForm.notes')}
-                  </label>
-                  <textarea
-                    id="add-notes"
-                    rows={3}
-                    className="input-base resize-none"
-                    placeholder="e.g. Interested in Palm Hills New Cairo, wants 3BR unit, flexible on payment plan"
-                    {...register('notes')}
-                  />
-                </div>
-              </AccordionSection>
+                )}
+              </div>
+
+              {/* First Follow-Up Date */}
+              <div>
+                <label htmlFor="add-followup" className="text-xs font-semibold text-foreground block mb-1">
+                  {t('leadForm.followUp')}{' '}
+                  <span className="text-muted-foreground font-normal text-[10px]">
+                    {t('leadForm.optional')}
+                  </span>
+                </label>
+                <input
+                  id="add-followup"
+                  type="date"
+                  className="input-base min-h-[44px] text-xs"
+                  {...register('followUpDue')}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label htmlFor="add-notes" className="text-xs font-semibold text-foreground block mb-1">
+                  {t('leadForm.notes')}
+                </label>
+                <textarea
+                  id="add-notes"
+                  rows={2}
+                  className="input-base resize-none text-xs"
+                  placeholder="e.g. Interested in Palm Hills New Cairo, 3BR unit"
+                  {...register('notes')}
+                />
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Toggle */}
-        <button
-          type="button"
-          onClick={() => {
-            const next = !showDetails;
-            setShowDetails(next);
-            if (next) setOpenSection('contact');
-          }}
-          aria-expanded={showDetails}
-          aria-controls="add-more-details"
-          className="btn-press inline-flex items-center justify-center gap-1.5 text-sm font-medium text-primary hover:underline active:scale-[0.97] transition-transform bg-primary/8 px-3 py-2 min-h-[44px] rounded-lg"
-        >
-          <ChevronDown
-            size={15}
-            className={`transition-transform duration-300 ${showDetails ? 'rotate-180' : ''}`}
-          />
-          {showDetails ? t('leadForm.hideDetails') : `+ ${t('leadForm.moreDetails')}`}
-        </button>
       </div>
 
-      {/* ── Sticky action row ─────────────────────────────────────────── */}
+      {/* ── Sticky Bottom Actions ── */}
       <div
-        className="sticky bottom-0 z-10 bg-card border-t border-border px-4 sm:px-6 pt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-b-2xl"
+        className="sticky bottom-0 z-10 bg-card/95 backdrop-blur-md border-t border-border px-4 sm:px-6 py-3 flex items-center justify-between gap-2"
         style={{
           bottom: keyboardInset > 0 ? `${keyboardInset}px` : undefined,
-          paddingBottom: keyboardInset > 0 ? '12px' : 'max(16px, env(safe-area-inset-bottom))',
+          paddingBottom: keyboardInset > 0 ? '12px' : 'max(14px, env(safe-area-inset-bottom))',
         }}
       >
-        <div className="flex items-center gap-2 w-full sm:w-auto sm:order-1">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="btn-secondary btn-press flex-1 sm:flex-none min-h-[44px] px-3 sm:px-4"
-          >
-            {t('leadForm.cancel')}
-          </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-secondary min-h-[44px] px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0"
+        >
+          {t('leadForm.cancel')}
+        </button>
+
+        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
           <button
             type="submit"
             onClick={() => {
               submitModeRef.current = 'another';
             }}
             disabled={isSubmitting}
-            className="btn-secondary btn-press flex-1 sm:flex-none min-h-[44px] px-3 text-xs sm:text-sm inline-flex items-center justify-center gap-1.5"
+            className="btn-secondary min-h-[44px] px-3 py-2 text-xs sm:text-sm font-medium rounded-xl inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
           >
-            {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            {t('leadForm.saveAnother')}
+            {isSubmitting && submitModeRef.current === 'another' ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Plus size={13} />
+            )}
+            <span className="truncate">{t('leadForm.saveAnother')}</span>
+          </button>
+
+          <button
+            type="submit"
+            onClick={() => {
+              submitModeRef.current = 'single';
+            }}
+            disabled={isSubmitting}
+            className="btn-press min-h-[44px] px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs sm:text-sm shadow-md hover:brightness-105 active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+          >
+            {isSubmitting && submitModeRef.current === 'single' ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>{t('leadForm.adding')}</span>
+              </>
+            ) : (
+              <>
+                <Check size={14} strokeWidth={2.5} />
+                <span>{t('leadForm.addLead')}</span>
+              </>
+            )}
           </button>
         </div>
-        <button
-          type="submit"
-          onClick={() => {
-            submitModeRef.current = 'single';
-          }}
-          disabled={isSubmitting}
-          className="relative btn-press flex items-center gap-2 w-full sm:w-auto sm:order-2 justify-center min-h-[44px] px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-[0_6px_20px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_10px_28px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 size={15} className="animate-spin" />
-              <span>{t('leadForm.adding')}</span>
-            </>
-          ) : (
-            <>
-              <Plus size={15} strokeWidth={2.5} />
-              <span>{t('leadForm.addLead')}</span>
-            </>
-          )}
-        </button>
       </div>
     </form>
   );

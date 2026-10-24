@@ -1677,8 +1677,8 @@ export default function LeadsManagementScreen({
         onClose={() => setAddModalOpen(false)}
         title="Add lead"
         subtitle="Enter a phone number — everything else is optional"
-        size="xl"
-        mobileFullScreen
+        size="md"
+        mobileFullScreen={false}
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
       </Modal>
