@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, ChevronDown, Plus } from 'lucide-react';
+import { Loader2, ChevronDown, Plus, UserCheck, Check, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import {
@@ -186,6 +186,26 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
 
   const budgetMin = watch('budgetMin');
   const assignedTo = watch('assignedTo');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(() => {
+    if (initialData?.assignedToIds && initialData.assignedToIds.length > 0) {
+      return initialData.assignedToIds.slice(0, 2);
+    }
+    return initialData?.assignedTo ? [initialData.assignedTo] : [];
+  });
+
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      if (prev.includes(userId)) {
+        const next = prev.filter((id) => id !== userId);
+        setValue('assignedTo', next[0] || '');
+        return next;
+      }
+      if (prev.length >= 2) return prev;
+      const next = [...prev, userId];
+      setValue('assignedTo', next[0] || '');
+      return next;
+    });
+  };
 
   const filteredProjects = selectedDeveloperId
     ? projects.filter((p) => p.developerId === selectedDeveloperId && p.status === 'Active')
@@ -200,7 +220,11 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
 
   const onFormSubmit = async (data: AddLeadFormData) => {
     const today = new Date().toISOString().split('T')[0];
-    const assignedUser = userList.find((u) => u.id === data.assignedTo);
+    const primaryId = selectedUserIds[0] || data.assignedTo || '';
+    const assignedNames = selectedUserIds
+      .map((id) => userList.find((u) => u.id === id)?.name)
+      .filter(Boolean) as string[];
+    const primaryAgentName = assignedNames[0] || data.agent || '';
     const matchedSource = sourceList.find(s=> s.name === data.source) || (ALL_SOURCES.includes(data.source as any) ? { id: '', name: data.source } as any : null);
     const leadSourceId = matchedSource?.id || null;
     const cleanPhone = (data.phone || '').trim();
@@ -217,16 +241,22 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       budgetMax: data.budgetMax ? Number(data.budgetMax) : undefined,
       source: data.source || initialData?.source || 'Facebook Ads',
       leadSourceId,
-      agent: data.agent,
-      agentInitials: data.agent
-        ? data.agent
+      agent: primaryAgentName || data.agent,
+      agentInitials: (primaryAgentName || data.agent)
+        ? (primaryAgentName || data.agent)
             .split(' ')
             .map((p) => p[0])
             .join('')
         : '',
       status: data.status,
-      assignedTo: data.assignedTo || undefined,
-      assignedToName: assignedUser?.name,
+      assignedTo: primaryId || undefined,
+      assignedToName: assignedNames.length > 0 ? assignedNames.join(' & ') : undefined,
+      assignedToIds: selectedUserIds,
+      assignedToNames: assignedNames,
+      assignees: selectedUserIds.map((id) => ({
+        userId: id,
+        userName: userList.find((u) => u.id === id)?.name || null,
+      })),
       referredTo: data.referralTo || null,
       referredBy: data.referralTo ? profile?.id || null : null,
       referredToName: userList.find((u) => u.id === data.referralTo)?.name || null,
@@ -590,31 +620,71 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     <p className="mt-1 text-xs text-red-500">{errors.agent.message}</p>
                   )}
                 </div>
-                <div>
-                  <label htmlFor="add-assignedto" className="label-base">
-                    Assign to user{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-1">
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="label-base !mb-0">
+                      Assign to users <span className="text-muted-foreground font-normal text-xs">(max 2 for co-assignment)</span>
+                    </label>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {selectedUserIds.length}/2 chosen
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1.5">
                     Admin: any user · Team leader: own team only
                   </p>
-                  <div className="relative">
-                    <select
-                      id="add-assignedto"
-                      className="input-base appearance-none pr-8"
-                      {...register('assignedTo')}
-                    >
-                      <option value="">— Unassigned —</option>
-                      {userList.map((u) => (
-                        <option key={`add-user-${u.id}`} value={u.id}>
-                          {u.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
+
+                  {selectedUserIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {selectedUserIds.map((id) => {
+                        const u = userList.find((user) => user.id === id);
+                        return (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                          >
+                            <UserCheck size={12} className="text-emerald-500" />
+                            {u?.name || 'Agent'}
+                            <button
+                              type="button"
+                              onClick={() => toggleUser(id)}
+                              className="hover:text-red-500 ml-0.5 text-muted-foreground"
+                              aria-label={`Remove ${u?.name || 'agent'}`}
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="max-h-36 overflow-y-auto border border-input rounded-xl p-1.5 space-y-1 bg-background">
+                    {userList.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-2 text-center">No agents found</p>
+                    ) : (
+                      userList.map((u) => {
+                        const isSelected = selectedUserIds.includes(u.id);
+                        const isDisabled = !isSelected && selectedUserIds.length >= 2;
+                        return (
+                          <button
+                            type="button"
+                            key={`add-user-${u.id}`}
+                            disabled={isDisabled}
+                            onClick={() => toggleUser(u.id)}
+                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
+                              isSelected
+                                ? 'bg-primary/15 text-primary font-semibold'
+                                : isDisabled
+                                ? 'opacity-40 cursor-not-allowed text-muted-foreground'
+                                : 'hover:bg-muted text-foreground'
+                            }`}
+                          >
+                            <span className="truncate">{u.name}</span>
+                            {isSelected && <Check size={13} className="text-primary flex-shrink-0" />}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
                 <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-3">

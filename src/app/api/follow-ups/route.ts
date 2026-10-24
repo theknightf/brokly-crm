@@ -86,11 +86,17 @@ export async function GET() {
           }
         } catch {}
 
-        // Fetch leads assigned to or created by any team member
-        const { data: teamLeads } = await db.from('leads').select('id').or(
-          `assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`
-        );
-        const leadIds = (teamLeads || []).map((l: any) => l.id);
+        // Fetch leads assigned to (including co-assignees) or created by any team member
+        const [{ data: teamLeads }, { data: coAssignedRows }] = await Promise.all([
+          db.from('leads').select('id').or(
+            `assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`
+          ),
+          db.from('lead_assignees').select('lead_id').in('user_id', memberIds),
+        ]);
+        const leadIds = Array.from(new Set([
+          ...(teamLeads || []).map((l: any) => l.id),
+          ...(coAssignedRows || []).map((l: any) => l.lead_id),
+        ]));
 
         if (leadIds.length > 0) {
           query = query.or(`created_by.in.(${memberIds.join(',')}),lead_id.in.(${leadIds.join(',')})`);
@@ -98,11 +104,17 @@ export async function GET() {
           query = query.in('created_by', memberIds);
         }
       } else {
-        // Regular Agent: only follow-ups created by user or linked to leads assigned to / created by user
-        const { data: userLeads } = await db.from('leads').select('id').or(
-          `assigned_to.eq.${user.id},created_by.eq.${user.id}`
-        );
-        const leadIds = (userLeads || []).map((l: any) => l.id);
+        // Regular Agent: only follow-ups created by user or linked to leads assigned to (including co-assignees) / created by user
+        const [{ data: userLeads }, { data: coAssignedRows }] = await Promise.all([
+          db.from('leads').select('id').or(
+            `assigned_to.eq.${user.id},created_by.eq.${user.id}`
+          ),
+          db.from('lead_assignees').select('lead_id').eq('user_id', user.id),
+        ]);
+        const leadIds = Array.from(new Set([
+          ...(userLeads || []).map((l: any) => l.id),
+          ...(coAssignedRows || []).map((l: any) => l.lead_id),
+        ]));
 
         if (leadIds.length > 0) {
           query = query.or(`created_by.eq.${user.id},lead_id.in.(${leadIds.join(',')})`);

@@ -283,19 +283,24 @@ const LeadTableRow = React.memo(function LeadTableRow({
         </div>
       </td>
       <td className="table-td">
-        {lead.assignedToName || lead.adminName ? (
+        {(lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName || lead.adminName ? (
           <div className="flex flex-col gap-0.5">
-            {lead.assignedToName && (
-              <div className="flex items-center gap-1.5">
+            {((lead.assignedToNames && lead.assignedToNames.length > 0)
+              ? lead.assignedToNames
+              : lead.assignedToName
+              ? lead.assignedToName.split(' & ')
+              : []
+            ).map((name, idx) => (
+              <div key={idx} className="flex items-center gap-1.5" title={name}>
                 <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
-                <span className="text-xs text-foreground truncate max-w-[100px]">
-                  {lead.assignedToName}
+                <span className="text-xs text-foreground truncate max-w-[120px]">
+                  {name}
                 </span>
               </div>
-            )}
+            ))}
             {lead.adminName && (
-              <span className="text-xs text-muted-foreground truncate max-w-[100px]">
-                {lead.assignedToName ? 'admin: ' : ''}
+              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                {(lead.assignedToNames?.length || lead.assignedToName) ? 'admin: ' : ''}
                 {lead.adminName}
               </span>
             )}

@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 
   // Fetch leads with all filter-relevant columns + profiles/teams for team derivation
   const [leadsRes, profilesRes, teamsRes, membershipsRes, callsRes, activityRes] = await Promise.all([
-    supabase.from('leads').select('id, crm_status, lead_status, source, project, team, created_at, assigned_to, created_by'),
+    supabase.from('leads').select('id, crm_status, lead_status, source, project, team, created_at, assigned_to, created_by, lead_assignees(user_id)'),
     supabase.from('user_profiles').select('id, full_name, email, team_id'),
     supabase.from('teams').select('id, name, leader_id'),
     supabase.from('team_memberships').select('team_id, user_id, is_leader'),
@@ -81,23 +81,27 @@ export async function GET(request: Request) {
     return p?.team_id || null;
   };
 
+  const leadAssigneeIds = (l: any) => [
+    l.assigned_to,
+    ...(l.lead_assignees || []).map((la: any) => la.user_id),
+  ].filter(Boolean);
+
   // Agent filter
   if (agentParam) {
-    leads = leads.filter((l: any) => l.assigned_to === agentParam || l.created_by === agentParam);
+    leads = leads.filter((l: any) => leadAssigneeIds(l).includes(agentParam) || l.created_by === agentParam);
   }
 
   // Team filter
   if (teamParam) {
     leads = leads.filter((l: any) => {
-      const tid = teamIdForUser(l.assigned_to);
-      return tid === teamParam;
+      const aids = leadAssigneeIds(l);
+      return aids.some((aid: string) => teamIdForUser(aid) === teamParam);
     });
   }
 
   // Team Leader filter: show only leads assigned to members of the leader's team
   if (teamLeaderParam) {
     const leaderTeams = teams.filter((t: any) => t.leader_id === teamLeaderParam).map((t: any) => t.id);
-    // Also include memberships where is_leader true
     const leaderMembershipTeams = memberships
       .filter((m: any) => m.user_id === teamLeaderParam && m.is_leader)
       .map((m: any) => m.team_id);
@@ -108,11 +112,10 @@ export async function GET(request: Request) {
       const memberIds = new Set(
         memberships.filter((m: any) => allLeaderTeamIds.includes(m.team_id)).map((m: any) => m.user_id)
       );
-      // Also include users whose profile team_id is in leader teams
       profiles.forEach((p: any) => {
         if (allLeaderTeamIds.includes(p.team_id)) memberIds.add(p.id);
       });
-      leads = leads.filter((l: any) => memberIds.has(l.assigned_to) || memberIds.has(l.created_by));
+      leads = leads.filter((l: any) => leadAssigneeIds(l).some((aid: string) => memberIds.has(aid)) || memberIds.has(l.created_by));
     }
   }
 
@@ -137,8 +140,12 @@ export async function GET(request: Request) {
   // ── Scope calls & actions to the same agents that own the filtered leads ──
   const visibleAgentIds = new Set<string>();
   for (const l of stageFilteredLeads) {
-    if (l.assigned_to) visibleAgentIds.add(String(l.assigned_to));
-    else if (l.created_by) visibleAgentIds.add(String(l.created_by));
+    const aids = leadAssigneeIds(l);
+    if (aids.length > 0) {
+      aids.forEach((aid: string) => visibleAgentIds.add(String(aid)));
+    } else if (l.created_by) {
+      visibleAgentIds.add(String(l.created_by));
+    }
   }
   if (agentParam) visibleAgentIds.add(agentParam);
 

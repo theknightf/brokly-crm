@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Building2, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Building2, Trash2, UserCheck } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
@@ -118,6 +118,16 @@ const BoardCard = React.memo(function BoardCard({
           </span>
         )}
       </div>
+      {((lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName) && (
+        <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground truncate">
+          <UserCheck size={11} className="text-emerald-500 flex-shrink-0" />
+          <span className="truncate">
+            {lead.assignedToNames && lead.assignedToNames.length > 0
+              ? lead.assignedToNames.join(' & ')
+              : lead.assignedToName}
+          </span>
+        </div>
+      )}
 
       {lead.phone && (
         <div className="mt-2 flex items-center gap-1.5">

@@ -1,6 +1,7 @@
 'use client';
 import React, { useRef, useState } from 'react';
 import {
+  UserCheck,
   Pencil,
   Trash2,
   PhoneCall,
@@ -317,6 +318,16 @@ function MobileLeadCardInner({
           </ViewportPopover>
         )}
 
+        {((lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName) && (
+          <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+            <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
+            <span className="truncate max-w-[140px]">
+              {lead.assignedToNames && lead.assignedToNames.length > 0
+                ? lead.assignedToNames.join(' & ')
+                : lead.assignedToName}
+            </span>
+          </span>
+        )}
         {lead.source && (
           <span className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-xs font-medium bg-muted text-muted-foreground">
             <span className="truncate max-w-[110px]">{lead.source}</span>
