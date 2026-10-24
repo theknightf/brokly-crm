@@ -174,11 +174,11 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
       </div>
 
       {/* Source */}
-      <div className="relative">
+      <div className="relative w-full sm:w-auto">
         <select
           value={filters.source}
           onChange={(e) => update('source', e.target.value as LeadSource | '')}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[130px]"
+          className="input-base h-9 text-sm appearance-none pr-8 min-w-[130px] w-full sm:w-auto"
         >
           <option value="">All Sources</option>
           {sourceOptions.map((s) => (
@@ -198,11 +198,11 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
       </div>
 
       {/* Agent */}
-      <div className="relative">
+      <div className="relative w-full sm:w-auto">
         <select
           value={filters.agent}
           onChange={(e) => update('agent', e.target.value)}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[140px]"
+          className="input-base h-9 text-sm appearance-none pr-8 min-w-[140px] w-full sm:w-auto"
         >
           <option value="">All Agents</option>
           {agentOptions.map((a) => (
@@ -218,11 +218,11 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
       </div>
 
       {/* Project */}
-      <div className="relative">
+      <div className="relative w-full sm:w-auto">
         <select
           value={filters.project}
           onChange={(e) => update('project', e.target.value)}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[150px]"
+          className="input-base h-9 text-sm appearance-none pr-8 min-w-[150px] w-full sm:w-auto"
         >
           <option value="">All Projects</option>
           {projectOptions.map((p) => (
@@ -238,11 +238,11 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
       </div>
 
       {/* Property type */}
-      <div className="relative">
+      <div className="relative w-full sm:w-auto">
         <select
           value={filters.propertyType}
           onChange={(e) => update('propertyType', e.target.value as PropertyType | '')}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[150px]"
+          className="input-base h-9 text-sm appearance-none pr-8 min-w-[150px] w-full sm:w-auto"
         >
           <option value="">All Property Types</option>
           {ALL_PROPERTY_TYPES.map((p) => (

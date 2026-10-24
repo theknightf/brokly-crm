@@ -1081,15 +1081,17 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleAddLead = async (lead: Lead) => {
+  const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     setDupChecking(false);
     setDupWarning(null);
-    await createLead(lead);
+    return createLead(lead, options);
   };
 
-  const createLead = async (lead: Lead) => {
+  const createLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     try {
-      setAddModalOpen(false);
+      // "Save & add another" keeps the modal open so the agent can type the
+      // next number straight away.
+      if (!options?.keepOpen) setAddModalOpen(false);
       const created = await leadsService.create(lead, user?.id || '');
       setLeads((prev) => [created as Lead, ...prev]);
       setTotal((t) => t + 1);
@@ -1099,8 +1101,10 @@ export default function LeadsManagementScreen({
       } else {
         toast.success(`Lead "${lead.name}" added successfully`);
       }
+      return true;
     } catch (err: any) {
       toast.error(err?.message || 'Failed to add lead');
+      return false;
     }
   };
 
@@ -1499,7 +1503,10 @@ export default function LeadsManagementScreen({
       </div>
 
       {/* Sticky toolbar */}
-      <div className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-rise-in" style={{ animationDelay: '140ms' }}>
+      <div
+        className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2.5 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm transition-all flex flex-col sm:flex-row gap-2 animate-rise-in"
+        style={{ animationDelay: '140ms' }}
+      >
         <div className="relative flex-1">
           <Search
             size={16}
@@ -1567,7 +1574,7 @@ export default function LeadsManagementScreen({
 
       {/* Filters */}
       {showFilters && (
-        <div className="card-base !p-4 animate-in fade-in slide-in-from-top-2">
+        <div className="card-base !p-4 mt-2 animate-in fade-in slide-in-from-top-2 relative z-10 shadow-sm">
           <div className="flex items-center gap-2 mb-0.5">
             <SlidersHorizontal size={14} className="text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">Filters</span>
@@ -1671,6 +1678,7 @@ export default function LeadsManagementScreen({
         title="Add lead"
         subtitle="Enter a phone number — everything else is optional"
         size="xl"
+        mobileFullScreen
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
       </Modal>
