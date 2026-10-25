@@ -39,19 +39,19 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     {'code': '+974', 'label': '🇶🇦 +974'},
   ];
 
-  // REQUIRED: Lead Source (Default to Meta Ads / Facebook Ads, validated on submit)
-  String? _selectedSource = 'Meta Ads';
+  // REQUIRED: Lead Source (Default to Facebook, validated on submit)
+  String? _selectedSource = 'Facebook';
   List<String> _sources = [
-    'Meta Ads',
-    'Google Ads',
-    'TikTok',
-    'Referral',
-    'Cold Dial',
-    'Walk-in',
-    'Facebook Ads',
+    'Facebook',
     'Instagram',
+    'TikTok',
     'WhatsApp',
     'Website',
+    'Referral',
+    'Sales Referral',
+    'Walk-in',
+    'Cold Dial',
+    'Other',
   ];
   bool _isAddingSource = false;
 
@@ -139,7 +139,14 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
       }
       if (liveSources.isNotEmpty && mounted) {
         setState(() {
-          _sources = {..._sources, ...liveSources}.toList();
+          _sources = {...liveSources, ..._sources}.toList();
+          if (_selectedSource != null && !_sources.contains(_selectedSource)) {
+            final match = _sources.firstWhere(
+              (s) => s.toLowerCase() == _selectedSource!.toLowerCase(),
+              orElse: () => _sources.first,
+            );
+            _selectedSource = match;
+          }
         });
       }
     } catch (_) {}

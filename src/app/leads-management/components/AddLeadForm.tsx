@@ -153,7 +153,24 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           name: u.name,
         }))
       );
-      setSourceList((sources as any[]).map((s:any)=> ({ id: s.id, name: s.name })));
+      const loadedSources = (sources as any[]).map((s: any) => ({ id: s.id, name: s.name }));
+      setSourceList(loadedSources);
+      const currentSource = watch('source');
+      if (!currentSource || currentSource === 'Facebook Ads') {
+        const defaultSource =
+          loadedSources.find((s) => s.name === 'Facebook' || s.name === 'Facebook Ads') ||
+          loadedSources[0];
+        if (defaultSource) {
+          setValue('source', defaultSource.name, { shouldValidate: true });
+        }
+      } else {
+        const match = loadedSources.find(
+          (s) => s.name.toLowerCase() === currentSource.toLowerCase()
+        );
+        if (match && match.name !== currentSource) {
+          setValue('source', match.name, { shouldValidate: true });
+        }
+      }
     });
   }, []);
 
@@ -166,7 +183,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   } = useForm<AddLeadFormData>({
     defaultValues: {
       status: (initialData?.status as LeadStatus) || 'Fresh Leads',
-      source: (initialData?.source as LeadSource) || 'Facebook Ads',
+      source: (initialData?.source as LeadSource) || 'Facebook',
       agent: initialData?.agent || '',
       assignedTo: initialData?.assignedTo || '',
       referralTo: initialData?.referredTo || '',
@@ -201,8 +218,13 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   const onFormSubmit = async (data: AddLeadFormData) => {
     const today = new Date().toISOString().split('T')[0];
     const assignedUser = userList.find((u) => u.id === data.assignedTo);
-    const matchedSource = sourceList.find(s=> s.name === data.source) || (ALL_SOURCES.includes(data.source as any) ? { id: '', name: data.source } as any : null);
+    const chosenSource = data.source || watch('source') || initialData?.source || (sourceList[0]?.name ?? 'Facebook');
+    const matchedSource =
+      sourceList.find((s) => s.name === chosenSource) ||
+      sourceList.find((s) => s.name.toLowerCase() === chosenSource?.toLowerCase()) ||
+      (ALL_SOURCES.includes(chosenSource as any) ? ({ id: '', name: chosenSource } as any) : null);
     const leadSourceId = matchedSource?.id || null;
+    const finalSource = matchedSource?.name || chosenSource;
     const newLead: Lead & { leadSourceId?: string | null } = {
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
       name: data.name,
@@ -212,7 +234,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       propertyType: data.propertyType,
       budgetMin: data.budgetMin ? Number(data.budgetMin) : undefined,
       budgetMax: data.budgetMax ? Number(data.budgetMax) : undefined,
-      source: data.source || initialData?.source || 'Facebook Ads',
+      source: finalSource,
       leadSourceId,
       agent: data.agent,
       agentInitials: data.agent
@@ -289,6 +311,10 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                   id="add-source"
                   className={selectClass(!!errors.source)}
                   {...register('source', { required: 'Lead source is required' })}
+                  value={watch('source') || ''}
+                  onChange={(e) => {
+                    setValue('source', e.target.value as any, { shouldValidate: true, shouldDirty: true });
+                  }}
                 >
                   {sourceList.length ? sourceList.map((s) => (
                     <option key={`quick-source-${s.id}`} value={s.name}>{s.name}</option>

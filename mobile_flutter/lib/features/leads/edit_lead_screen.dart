@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/lead_model.dart';
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/leads_service.dart';
+import '../../data/services/supabase_service.dart';
 import '../../data/services/users_service.dart';
+import '../../state/auth_provider.dart';
 
 class EditLeadScreen extends StatefulWidget {
   final LeadModel lead;
@@ -36,14 +39,16 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
   bool _isSubmitting = false;
   List<UserProfileModel> _assignableUsers = [];
 
-  final List<String> _sources = [
-    'Referral',
-    'Walk-in',
-    'Facebook Ads',
-    'Cold Call',
+  List<String> _sources = [
+    'Facebook',
     'Instagram',
+    'TikTok',
     'WhatsApp',
     'Website',
+    'Referral',
+    'Sales Referral',
+    'Walk-in',
+    'Cold Dial',
     'Other',
   ];
 
@@ -78,14 +83,40 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
     _priority = l.priority;
     _assignedToId = l.assignedTo;
 
-    _loadAssignableUsers();
+    _loadInitialData();
   }
 
-  Future<void> _loadAssignableUsers() async {
-    final users = await UsersService().getAssignableUsers();
-    if (mounted) {
-      setState(() => _assignableUsers = users);
-    }
+  Future<void> _loadInitialData() async {
+    try {
+      final users = await UsersService().getAssignableUsers();
+      if (mounted) setState(() => _assignableUsers = users);
+    } catch (_) {}
+
+    try {
+      final client = SupabaseService().client;
+      final srcRes = await client
+          .from('lead_sources')
+          .select('name')
+          .eq('is_active', true)
+          .order('name', ascending: true);
+      final liveSources = <String>[];
+      for (final raw in (srcRes as List<dynamic>)) {
+        final name = (raw as Map<String, dynamic>)['name']?.toString().trim() ?? '';
+        if (name.isNotEmpty) liveSources.add(name);
+      }
+      if (liveSources.isNotEmpty && mounted) {
+        setState(() {
+          _sources = {...liveSources, ..._sources}.toList();
+          if (_source != null && !_sources.contains(_source)) {
+            final match = _sources.firstWhere(
+              (s) => s.toLowerCase() == _source!.toLowerCase(),
+              orElse: () => _source!,
+            );
+            _source = match;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -106,6 +137,9 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
     if (_isSubmitting) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
+    final profile = context.read<AuthProvider>().profile;
+    final canEditSource = profile?.isAdmin == true || profile?.isTeamLeader == true;
+
     setState(() => _isSubmitting = true);
 
     final updates = {
@@ -119,11 +153,13 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
       'property_type': _propertyType,
       'budget_min': double.tryParse(_budgetMinController.text.trim()),
       'budget_max': double.tryParse(_budgetMaxController.text.trim()),
-      'source': _source,
       'priority': _priority,
       'assigned_to': _assignedToId,
       'notes': _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
     };
+    if (canEditSource) {
+      updates['source'] = _source;
+    }
 
     try {
       await LeadsService().update(widget.lead.id, updates);
@@ -232,14 +268,33 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: _sources.contains(_source) ? _source : null,
-                decoration: const InputDecoration(
-                  labelText: 'Source',
-                  prefixIcon: Icon(LucideIcons.compass, size: 18),
-                ),
-                items: _sources.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                onChanged: (v) => setState(() => _source = v),
+              Builder(
+                builder: (context) {
+                  final profile = context.watch<AuthProvider>().profile;
+                  final canEditSource = profile?.isAdmin == true || profile?.isTeamLeader == true;
+                  if (!canEditSource) {
+                    return InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Source (Read-only)',
+                        prefixIcon: Icon(LucideIcons.compass, size: 18),
+                        enabled: false,
+                      ),
+                      child: Text(
+                        _source?.isNotEmpty == true ? _source! : '—',
+                        style: TextStyle(color: Theme.of(context).disabledColor),
+                      ),
+                    );
+                  }
+                  return DropdownButtonFormField<String>(
+                    initialValue: _sources.contains(_source) ? _source : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Source',
+                      prefixIcon: Icon(LucideIcons.compass, size: 18),
+                    ),
+                    items: _sources.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) => setState(() => _source = v),
+                  );
+                },
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(

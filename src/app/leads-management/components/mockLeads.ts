@@ -25,16 +25,23 @@ export type LeadStatus =
   | 'Reservation';
 
 export type LeadSource =
-  | 'MagicBricks'
-  | 'Referral'
-  | '99acres'
-  | 'Walk-in'
+  | 'Facebook'
   | 'Facebook Ads'
-  | 'Cold Call'
   | 'Instagram'
+  | 'TikTok'
   | 'WhatsApp'
   | 'Website'
-  | 'Other';
+  | 'Referral'
+  | 'Sales Referral'
+  | 'Walk-in'
+  | 'Cold Dial'
+  | 'Cold Call'
+  | 'Property Portal'
+  | 'Word of Mouth'
+  | 'MagicBricks'
+  | '99acres'
+  | 'Other'
+  | (string & {});
 
 export type PropertyType =
   | '1BHK Apartment'
@@ -133,15 +140,17 @@ export interface Lead {
 export const mockLeads: Lead[] = [];
 
 export const ALL_SOURCES: LeadSource[] = [
-  'MagicBricks',
-  'Referral',
-  '99acres',
-  'Walk-in',
-  'Facebook Ads',
-  'Cold Call',
+  'Facebook',
   'Instagram',
+  'TikTok',
   'WhatsApp',
   'Website',
+  'Referral',
+  'Sales Referral',
+  'Walk-in',
+  'Cold Dial',
+  'Property Portal',
+  'Word of Mouth',
   'Other',
 ];
 

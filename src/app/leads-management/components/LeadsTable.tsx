@@ -164,14 +164,6 @@ function StageSelector({
 
 const StatusDropdown = StageSelector;
 
-const formatBudget = (min?: number, max?: number) => {
-  if (min == null && max == null) return '—';
-  const parts: string[] = [];
-  if (min != null) parts.push(min.toLocaleString());
-  if (max != null) parts.push(max.toLocaleString());
-  return `${parts.join('–')} ج.م`;
-};
-
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '—';
   const [y, m, d] = dateStr.split('-');
@@ -258,14 +250,6 @@ const LeadTableRow = React.memo(function LeadTableRow({
             <span className="truncate max-w-[150px]">{lead.email || '—'}</span>
           </div>
         </div>
-      </td>
-      <td className="table-td">
-        <span className="text-sm text-foreground">{lead.propertyType || '—'}</span>
-      </td>
-      <td className="table-td">
-        <span className="font-mono-data text-sm text-foreground tabular-nums">
-          {formatBudget(lead.budgetMin, lead.budgetMax)}
-        </span>
       </td>
       <td className="table-td">
         <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
@@ -549,7 +533,7 @@ export default function LeadsTable({
 
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full min-w-[1300px] table-mobile">
+        <table className="w-full min-w-[1050px] table-mobile">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
               <th className="table-th w-10">
@@ -564,8 +548,6 @@ export default function LeadsTable({
               {sortableCol('Lead Name', 'name')}
               <th className="table-th">Lead ID</th>
               <th className="table-th">Contact</th>
-              <th className="table-th">Property Type</th>
-              {sortableCol('Budget', 'budgetMin')}
               {sortableCol('Source', 'source')}
               {sortableCol('Agent', 'agent')}
               <th className="table-th">Assigned To</th>
@@ -577,7 +559,7 @@ export default function LeadsTable({
           <tbody className="divide-y divide-border">
             {leads.length === 0 ? (
               <tr>
-                <td colSpan={12}>
+                <td colSpan={10}>
                   <EmptyState
                     icon={<Users size={24} className="text-muted-foreground" />}
                     title="No leads found"
@@ -602,7 +584,7 @@ export default function LeadsTable({
             )}
             {visibleLeads.length < leads.length && (
               <tr>
-                <td colSpan={12} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
+                <td colSpan={10} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
                   <div className="inline-flex items-center gap-3">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />

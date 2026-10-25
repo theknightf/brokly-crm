@@ -1,7 +1,9 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Building2, RefreshCw, ChevronDown } from 'lucide-react';
+import { Loader2, Building2, RefreshCw, ChevronDown, Plus } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 import {
   Lead,
   LeadStatus,
@@ -11,7 +13,7 @@ import {
   ALL_SOURCES,
   ALL_PROPERTY_TYPES,
 } from './mockLeads';
-import { projectsService, teamsService, teamService } from '@/lib/services/crmService';
+import { projectsService, teamsService, teamService, leadSourcesService } from '@/lib/services/crmService';
 import { unitsService } from '@/lib/services/crmService';
 
 interface EditLeadFormData {
@@ -84,6 +86,14 @@ const parseBudgetRange = (value: string) => {
 };
 
 export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormProps) {
+  const { profile } = useAuth();
+  const canEditSource =
+    isAdminRole(profile?.role) ||
+    profile?.role === 'manager' ||
+    profile?.role === 'branch_manager' ||
+    profile?.role === 'team_leader' ||
+    profile?.role === 'Team Lead';
+
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string | null; developerName: string }[]
   >([]);
@@ -91,6 +101,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   const [agents, setAgents] = useState<string[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+  const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
+  const [newSourceName, setNewSourceName] = useState('');
+  const [creatingSource, setCreatingSource] = useState(false);
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -115,7 +128,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       location: lead.location || '',
       propertyType: (lead.propertyType as PropertyType) || '2BHK Apartment',
       budgetRange: budgetRangeValue(lead.budgetMin, lead.budgetMax),
-      source: (lead.source as LeadSource) || 'Facebook Ads',
+      source: (lead.source as LeadSource) || 'Facebook',
       agent: lead.agent || '',
       assignedTo: lead.assignedTo || '',
       status: (lead.status as LeadStatus) || 'Fresh Leads',
@@ -149,7 +162,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       teamService.getAll().catch(() => []),
       teamsService.getAssignableUsers().catch(() => []),
       teamsService.getAll().catch(() => []),
-    ]).then(([projectData, teamData, assignableUsers, teamsData]) => {
+      leadSourcesService.getActive().catch(() => []),
+    ]).then(([projectData, teamData, assignableUsers, teamsData, sources]) => {
       setProjects(
         (projectData as any[]).map((p) => ({
           id: p.id,
@@ -164,8 +178,18 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       setAgents(combined);
       setUsers((assignableUsers as any[]).map((u) => ({ id: u.id, name: u.name })));
       setTeams((teamsData as any[]).map((t) => ({ id: t.id, name: t.name })));
+      const activeSources = (sources as any[]).map((s: any) => ({ id: s.id, name: s.name }));
+      setSourceList(activeSources);
+      if (lead.source) {
+        const match = activeSources.find(
+          (s) => s.name.toLowerCase() === lead.source?.toLowerCase()
+        );
+        if (match && match.name !== lead.source) {
+          setValue('source', match.name);
+        }
+      }
     });
-  }, []);
+  }, [lead.source, setValue]);
 
   const totalPrice = watch('totalPrice');
   const downPayment = watch('downPayment');
@@ -233,7 +257,17 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
     const unit = projectUnits.find((u) => u.id === data.unitId);
     const assignedUser = users.find((u) => u.id === data.assignedTo);
     const { budgetMin, budgetMax } = parseBudgetRange(data.budgetRange);
-    const updated: Lead = {
+    const chosenSource = canEditSource
+      ? (data.source || watch('source') || lead.source || (sourceList[0]?.name ?? 'Facebook'))
+      : lead.source;
+    const matchedSource =
+      sourceList.find((s) => s.name === chosenSource) ||
+      sourceList.find((s) => s.name.toLowerCase() === chosenSource?.toLowerCase()) ||
+      (ALL_SOURCES.includes(chosenSource as any) ? ({ id: '', name: chosenSource } as any) : null);
+    const leadSourceId = matchedSource?.id || (lead as any).leadSourceId || null;
+    const finalSource = matchedSource?.name || chosenSource;
+
+    const updated: Lead & { leadSourceId?: string | null } = {
       ...lead,
       name: data.name,
       phone: data.phone,
@@ -242,7 +276,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       propertyType: data.propertyType,
       budgetMin,
       budgetMax,
-      source: data.source,
+      source: finalSource,
+      leadSourceId,
       agent: data.agent,
       agentInitials: data.agent
         ? data.agent
@@ -402,13 +437,75 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
             </div>
             <div>
               <label className="label-base">Source</label>
-              <select className={selectClass} {...register('source')}>
-                {ALL_SOURCES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              {canEditSource ? (
+                <div className="relative flex gap-2">
+                  <div className="relative flex-1">
+                    <select
+                      className={selectClass}
+                      {...register('source')}
+                      value={watch('source') || lead.source || ''}
+                      onChange={(e) => setValue('source', e.target.value as any, { shouldDirty: true })}
+                    >
+                      {lead.source && !sourceList.some((s) => s.name.toLowerCase() === lead.source?.toLowerCase()) && (
+                        <option value={lead.source}>{lead.source}</option>
+                      )}
+                      {sourceList.length ? (
+                        sourceList.map((s) => (
+                          <option key={`edit-source-${s.id}`} value={s.name}>
+                            {s.name}
+                          </option>
+                        ))
+                      ) : (
+                        ALL_SOURCES.map((s) => (
+                          <option key={`edit-source-${s}`} value={s}>
+                            {s}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
+                  <div className="flex gap-1">
+                    <input
+                      value={newSourceName}
+                      onChange={(e) => setNewSourceName(e.target.value)}
+                      placeholder="New source"
+                      className="input-base h-9 text-xs w-28"
+                    />
+                    <button
+                      type="button"
+                      disabled={creatingSource || !newSourceName.trim()}
+                      onClick={async () => {
+                        if (!newSourceName.trim()) return;
+                        setCreatingSource(true);
+                        try {
+                          const created = await leadSourcesService.create(newSourceName.trim());
+                          setSourceList((prev) =>
+                            [...prev, { id: created.id, name: created.name }].sort((a, b) =>
+                              a.name.localeCompare(b.name)
+                            )
+                          );
+                          setValue('source', created.name, { shouldDirty: true });
+                          setNewSourceName('');
+                        } catch (e: any) {
+                          alert(e.message);
+                        } finally {
+                          setCreatingSource(false);
+                        }
+                      }}
+                      className="h-9 px-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      {creatingSource ? '…' : '+'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="input-base bg-muted/40 cursor-not-allowed opacity-80 flex items-center justify-between">
+                  <span className="text-foreground text-sm font-medium">{lead.source || '—'}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Read-only</span>
+                </div>
+              )}
             </div>
             <div>
               <label className="label-base">Priority</label>

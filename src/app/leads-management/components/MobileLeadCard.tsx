@@ -40,14 +40,6 @@ interface MobileLeadCardProps {
   onPostCall?: (lead: Lead) => void;
 }
 
-function formatEgyBudget(min?: number, max?: number) {
-  if (min == null && max == null) return '—';
-  const parts: string[] = [];
-  if (min != null) parts.push(min.toLocaleString('en-EG'));
-  if (max != null) parts.push(max.toLocaleString('en-EG'));
-  return `${parts.join('–')} ج.م`;
-}
-
 function formatFollowUpShort(d?: string | null) {
   if (!d) return '—';
   const dt = new Date(d);
@@ -106,7 +98,6 @@ function MobileLeadCardInner({
   const stageAnchorRef = useRef<HTMLButtonElement>(null);
   const initials = getInitials(lead.name || '', lead.id?.toString().slice(0, 2));
   const overdue = isOverdue(lead.followUpDue);
-  const budgetText = formatEgyBudget(lead.budgetMin, lead.budgetMax);
 
   // quick note
   const [noteOpen, setNoteOpen] = useState(false);
@@ -240,9 +231,6 @@ function MobileLeadCardInner({
               </button>
             )}
           </div>
-          <p className="text-sm font-bold text-foreground tabular-nums" dir="ltr">
-            {budgetText}
-          </p>
         </div>
       </div>
 
