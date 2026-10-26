@@ -63,7 +63,7 @@
     "@tanstack/react-virtual": "^3.14.13",
     "@types/papaparse": "^5.5.2",
     "ai": "^4.1.54",
-    "lucide-react": "^1.7.0",
+    "lucide-react": "1.28.0",
     "next": "15.5.18",
     "nodemailer": "^9.0.5",
     "papaparse": "^5.5.4",
