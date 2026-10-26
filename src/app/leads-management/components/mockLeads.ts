@@ -66,6 +66,12 @@ export const LEAD_ACTIONS: LeadAction[] = [
   'Call Logged',
 ];
 
+export interface LeadAssignee {
+  userId: string;
+  userName?: string | null;
+  assignedAt?: string | null;
+}
+
 export interface Lead {
   id: string;
   name?: string;
@@ -80,6 +86,9 @@ export interface Lead {
   status?: LeadStatus;
   assignedTo?: string;
   assignedToName?: string;
+  assignees?: LeadAssignee[];
+  assignedToIds?: string[];
+  assignedToNames?: string[];
   referredTo?: string | null;
   referredToName?: string | null;
   referredBy?: string | null;

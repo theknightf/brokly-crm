@@ -804,12 +804,39 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleBulkAssignMany = async (users: { id: string; name: string }[]) => {
+  const handleBulkAssignMany = async (
+    users: { id: string; name: string }[],
+    mode: 'co_assign' | 'round_robin' = 'co_assign'
+  ) => {
     const ids = Array.from(selectedIds);
     if (!ids.length || !users.length) return;
     try {
-      // Single RPC call: deterministic round-robin, fully atomic on the server.
-      // If any lead can't be reassigned the whole batch rolls back.
+      if (mode === 'co_assign' || users.length <= 2) {
+        const userIds = users.slice(0, 2).map((u) => u.id);
+        const userNames = users.slice(0, 2).map((u) => u.name);
+        await leadsService.bulkAssignUsers(ids, userIds, userNames);
+        setLeads((prev) =>
+          prev.map((l) => {
+            if (!selectedIds.has(l.id)) return l;
+            return {
+              ...l,
+              agent: userNames[0] || l.agent,
+              agentInitials: (userNames[0] || l.agent || '')
+                .split(' ')
+                .map((p) => p[0])
+                .join(''),
+              assignedTo: userIds[0] || undefined,
+              assignedToName: userNames.join(' & '),
+              assignedToIds: userIds,
+              assignedToNames: userNames,
+              assignees: userIds.map((id, i) => ({ userId: id, userName: userNames[i] })),
+            };
+          })
+        );
+        toast.success(`Assigned ${ids.length} leads to ${userNames.join(' & ')}`);
+        setSelectedIds(new Set());
+        return;
+      }
       const result = await leadsService.bulkAssignRoundRobin(ids, users);
       const done: { id: string; userId: string; name: string }[] = (result || []).map((r) => ({
         id: r.lead_id,
@@ -829,6 +856,9 @@ export default function LeadsManagementScreen({
               .join(''),
             assignedTo: a.userId,
             assignedToName: a.name,
+            assignedToIds: [a.userId],
+            assignedToNames: [a.name],
+            assignees: [{ userId: a.userId, userName: a.name }],
           };
         })
       );
@@ -841,8 +871,6 @@ export default function LeadsManagementScreen({
       );
       setSelectedIds(new Set());
     } catch (err: any) {
-      // The RPC is atomic — nothing was persisted, so there is nothing to
-      // un-assign. State already reflects the failure (toast only).
       toast.error(err?.message || 'Assignment failed — no leads were changed');
     }
   };
@@ -883,7 +911,7 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleAddLead = async (lead: Lead) => {
+  const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     setDupChecking(true);
     let existing = null;
     try {
@@ -903,20 +931,29 @@ export default function LeadsManagementScreen({
         }).catch(() => {});
       }
       setDupWarning({ existing, pendingLead: lead });
-      return;
+      return false;
     }
-    await createLead(lead);
+    return createLead(lead, options);
   };
 
-  const createLead = async (lead: Lead) => {
+  const createLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     try {
+      // "Save & add another" keeps the modal open so the agent can type the
+      // next number straight away.
+      if (!options?.keepOpen) setAddModalOpen(false);
       const created = await leadsService.create(lead, user?.id || '');
       setLeads((prev) => [created as Lead, ...prev]);
       setTotal((t) => t + 1);
-      setAddModalOpen(false);
-      toast.success(`Lead "${lead.name}" added successfully`);
+      void fetchLeads();
+      if ((created as any)?.isDuplicate || (created as any)?.routedToDuplicateCenter) {
+        toast.success(`Lead "${lead.name}" accepted and routed to Duplicate Center for review`);
+      } else {
+        toast.success(`Lead "${lead.name}" added successfully`);
+      }
+      return true;
     } catch (err: any) {
       toast.error(err?.message || 'Failed to add lead');
+      return false;
     }
   };
 
@@ -942,19 +979,37 @@ export default function LeadsManagementScreen({
   const handleEditSave = async (updated: Lead) => {
     try {
       const original = editLead;
+      const isAssigneesChanged =
+        JSON.stringify(original?.assignedToIds || (original?.assignedTo ? [original.assignedTo] : [])) !==
+        JSON.stringify(updated.assignedToIds || (updated.assignedTo ? [updated.assignedTo] : []));
       const assignmentOnly =
         original &&
-        original.assignedTo !== updated.assignedTo &&
+        isAssigneesChanged &&
         Object.keys(updated).every((key) => {
-          if (key === 'assignedTo' || key === 'assignedToName') return true;
+          if (
+            key === 'assignedTo' ||
+            key === 'assignedToName' ||
+            key === 'assignedToIds' ||
+            key === 'assignedToNames' ||
+            key === 'assignees' ||
+            key === 'agent' ||
+            key === 'agentInitials'
+          )
+            return true;
           return (updated as any)[key] === (original as any)[key];
         });
       const saved = assignmentOnly
-        ? await leadsService.assignLead(updated.id, updated.assignedTo || null).then((row: any) => ({
-            ...updated,
-            assignedTo: row.assigned_to,
-            assignedToName: row.assigned_to ? updated.assignedToName : null,
-          }))
+        ? await leadsService
+            .assignLead(
+              updated.id,
+              updated.assignedToIds || updated.assignedTo || null,
+              updated.assignedToNames
+            )
+            .then((row: any) => ({
+              ...updated,
+              assignedTo: row.assigned_to,
+              assignedToName: updated.assignedToName || (row.assigned_to ? updated.assignedToName : null),
+            }))
         : await leadsService.update(updated.id, updated);
       setLeads((prev) => prev.map((l) => (l.id === updated.id ? (saved as Lead) : l)));
       setViewLead((current) => (current?.id === updated.id ? (saved as Lead) : current));
@@ -1300,7 +1355,10 @@ export default function LeadsManagementScreen({
       </div>
 
       {/* Sticky toolbar */}
-      <div className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-rise-in" style={{ animationDelay: '140ms' }}>
+      <div
+        className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2.5 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm transition-all flex flex-col sm:flex-row gap-2 animate-rise-in"
+        style={{ animationDelay: '140ms' }}
+      >
         <div className="relative flex-1">
           <Search
             size={16}
@@ -1362,7 +1420,7 @@ export default function LeadsManagementScreen({
 
       {/* Filters */}
       {showFilters && (
-        <div className="card-base !p-4 animate-in fade-in slide-in-from-top-2">
+        <div className="card-base !p-4 mt-2 animate-in fade-in slide-in-from-top-2 relative z-10 shadow-sm">
           <div className="flex items-center gap-2 mb-0.5">
             <SlidersHorizontal size={14} className="text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">Filters</span>
@@ -1464,7 +1522,8 @@ export default function LeadsManagementScreen({
         onClose={() => setAddModalOpen(false)}
         title="Add lead"
         subtitle="Enter a phone number — everything else is optional"
-        size="xl"
+        size="md"
+        mobileFullScreen={false}
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
       </Modal>
@@ -1739,7 +1798,7 @@ export default function LeadsManagementScreen({
                   { label: 'Property', value: viewLead.propertyType || '—' },
                   { label: 'Budget', value: formatDisplayBudget(viewLead) },
                   { label: 'Agent', value: viewLead.agent || 'Unassigned' },
-                  { label: 'Assigned To', value: viewLead.assignedToName || 'Unassigned' },
+                  { label: 'Assigned To', value: (viewLead.assignedToNames && viewLead.assignedToNames.length > 0) ? viewLead.assignedToNames.join(' & ') : (viewLead.assignedToName || 'Unassigned') },
                   ...(viewLead.referredTo
                     ? [{ label: 'Referred To', value: viewLead.referredToName || 'Second user' }]
                     : []),

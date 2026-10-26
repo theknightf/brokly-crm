@@ -35,6 +35,17 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
+
+    const userIds = [...new Set((data || []).map((r: any) => r.user_id).filter(Boolean))];
+    let names: Record<string, string> = {};
+    if (userIds.length) {
+      const { data: profiles } = await supabase
+        .from('user_profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      names = Object.fromEntries((profiles || []).map((p: any) => [p.id, p.full_name || '']));
+    }
+
     return NextResponse.json({
       events: (data || []).map((row: any) => ({
         id: row.id,
@@ -42,6 +53,8 @@ export async function GET(request: Request) {
         detail: row.detail,
         meta: row.meta,
         createdAt: row.created_at,
+        userId: row.user_id,
+        userName: names[row.user_id] || row.meta?.user_name || null,
       })),
     });
   } catch (err: any) {

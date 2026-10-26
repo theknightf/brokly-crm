@@ -10,6 +10,12 @@ interface ModalProps {
   subtitle?: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  /**
+   * Opt-in: on small screens render the panel as a full-screen sheet instead of
+   * the default 85dvh bottom sheet. Off by default — every existing modal keeps
+   * its current layout.
+   */
+  mobileFullScreen?: boolean;
 }
 
 const sizeClasses = {
@@ -26,8 +32,15 @@ export default function Modal({
   subtitle,
   children,
   size = 'md',
+  mobileFullScreen = false,
 }: ModalProps) {
   const [mounted, setMounted] = useState(false);
+
+  // On small screens the panel is a bottom sheet; `mobileFullScreen` promotes it
+  // to a full-screen sheet. Both fall back to a centred dialog from `sm` up.
+  const panelClasses = mobileFullScreen
+    ? 'rounded-none h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[85vh]'
+    : 'rounded-t-3xl max-h-[85dvh] sm:max-h-[85vh]';
 
   useEffect(() => {
     setMounted(true);
@@ -75,8 +88,8 @@ export default function Modal({
         aria-hidden
       />
       <div
-        className={`relative z-[101] w-full ${sizeClasses[size]} bg-card sm:rounded-2xl rounded-t-3xl shadow-modal flex flex-col overflow-hidden slide-up-enter max-h-[85dvh] sm:max-h-[85vh]`}
-        style={{ maxHeight: 'min(85vh, 85dvh)' }}
+        className={`relative z-[101] w-full ${sizeClasses[size]} bg-card sm:rounded-2xl ${panelClasses} shadow-modal flex flex-col overflow-hidden slide-up-enter`}
+        style={mobileFullScreen ? undefined : { maxHeight: 'min(85vh, 85dvh)' }}
       >
         {/* Header — fixed, never scrolls */}
         <div className="flex items-start justify-between p-5 sm:p-6 border-b border-border flex-shrink-0 bg-card">

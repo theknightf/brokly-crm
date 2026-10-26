@@ -95,11 +95,7 @@ export async function GET(request: Request) {
         .in('id', allMemberIds.length ? allMemberIds : ['00000000-0000-0000-0000-000000000000']),
       supabase
         .from('leads')
-        .select('id, name, assigned_to, created_by, lead_status, crm_status, budget_max, project')
-        .in(
-          'assigned_to',
-          allMemberIds.length ? allMemberIds : ['00000000-0000-0000-0000-000000000000']
-        ),
+        .select('id, name, assigned_to, created_by, lead_status, crm_status, budget_max, project, created_at, lead_assignees(user_id)'),
       supabase
         .from('call_logs')
         .select('user_id, channel, duration_seconds, outcome, created_at')
@@ -134,8 +130,12 @@ export async function GET(request: Request) {
     const ratings = ratingsRes.data || [];
 
     const profileById = new Map(profiles.map((p: any) => [p.id, p]));
+    const leadAssignees = (l: any) => [
+      l.assigned_to,
+      ...(l.lead_assignees || []).map((la: any) => la.user_id),
+    ].filter(Boolean);
     const leadByMember = (memberId: string) =>
-      leads.filter((l: any) => l.assigned_to === memberId || l.created_by === memberId);
+      leads.filter((l: any) => leadAssignees(l).includes(memberId) || l.created_by === memberId);
     const callsByMember = (memberId: string) => calls.filter((c: any) => c.user_id === memberId);
     const expensesByMember = (memberId: string) =>
       expenses.filter((e: any) => e.created_by === memberId);

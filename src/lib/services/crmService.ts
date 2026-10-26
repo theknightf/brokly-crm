@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 import { isAdminRole } from '@/lib/roles';
-import { LEADS_LIST_SELECT } from '@/lib/supabase/leadsSelect';
+import { LEADS_ASSIGNMENT_SELECT, LEADS_LIST_SELECT } from '@/lib/supabase/leadsSelect';
 import { logPostgrestError, toPostgrestError } from '@/lib/supabase/postgrestError';
 
 export function getLocalTodayDateString(): string {
@@ -63,6 +63,58 @@ function cachedRead<T>(key: string, factory: () => Promise<T>): Promise<T> {
 
 function invalidateCache(): void {
   crmCache.clear();
+}
+
+let actorScopeCache: {
+  expiresAt: number;
+  userId: string | null;
+  role: string | null;
+  memberIds: string[];
+} | null = null;
+
+async function getCachedActorScope(supabase: any) {
+  if (actorScopeCache && actorScopeCache.expiresAt > Date.now()) {
+    return actorScopeCache;
+  }
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? (await supabase.auth.getUser())?.data?.user ?? null;
+    if (!user) {
+      actorScopeCache = { expiresAt: Date.now() + 15_000, userId: null, role: null, memberIds: [] };
+      return actorScopeCache;
+    }
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    const role = profile?.role || null;
+    let memberIds = [user.id];
+    if (!isAdminRole(role) && (role === 'team_leader' || role === 'Team Lead' || role === 'manager')) {
+      const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
+      const teamIds = (teams || []).map((t: any) => t.id);
+      if (teamIds.length > 0) {
+        const { data: members } = await supabase
+          .from('team_memberships')
+          .select('user_id')
+          .in('team_id', teamIds);
+        if (members && members.length > 0) {
+          memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+        }
+      }
+    }
+    actorScopeCache = {
+      expiresAt: Date.now() + 60_000,
+      userId: user.id,
+      role,
+      memberIds,
+    };
+    return actorScopeCache;
+  } catch {
+    return { expiresAt: 0, userId: null, role: null, memberIds: [] };
+  }
 }
 
 /**
@@ -201,41 +253,50 @@ async function computeRotationAssignments(
 async function pushAssignmentNotifications(
   supabase: any,
   ids: string[],
-  assignedTo: string | null,
+  assignedTo: string | string[] | null,
   assigneeName?: string
 ) {
   if (!assignedTo || !ids.length) return;
+  const targetUserIds = (Array.isArray(assignedTo) ? assignedTo : [assignedTo]).filter(Boolean);
+  if (!targetUserIds.length) return;
   try {
     const { data: leads } = await supabase.from('leads').select('id, name').in('id', ids);
     if (!leads?.length) return;
-    const rows = leads.map((l: any) => ({
-      user_id: assignedTo,
-      action_type: 'Lead Assigned',
-      entity_type: 'lead',
-      entity_id: l.id,
-      detail: l.name || 'A lead',
-      meta: assigneeName ? JSON.stringify({ by: assigneeName }) : '',
-    }));
-    await supabase.from('activity_log').insert(rows);
-    // Also fire a real phone push to the assignee (best-effort).
-    try {
-      await fetch(`/api/push/send?target=${encodeURIComponent(assignedTo)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: assigneeName
-            ? `${assigneeName} assigned a lead to you`
-            : 'New lead assigned to you',
-          body:
-            ids.length > 1
-              ? `${ids.length} leads assigned to you`
-              : leads[0]?.name || 'A lead was assigned to you',
-          url: '/',
-          tag: 'brokly-assignment',
-        }),
+    const rows: any[] = [];
+    for (const uid of targetUserIds) {
+      leads.forEach((l: any) => {
+        rows.push({
+          user_id: uid,
+          action_type: 'Lead Assigned',
+          entity_type: 'lead',
+          entity_id: l.id,
+          detail: l.name || 'A lead',
+          meta: assigneeName ? JSON.stringify({ by: assigneeName }) : '',
+        });
       });
-    } catch {
-      // ignore — push is best-effort
+    }
+    await supabase.from('activity_log').insert(rows);
+    // Also fire a real phone push to each assignee (best-effort).
+    for (const uid of targetUserIds) {
+      try {
+        await fetch(`/api/push/send?target=${encodeURIComponent(uid)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: assigneeName
+              ? `${assigneeName} assigned a lead to you`
+              : 'New lead assigned to you',
+            body:
+              ids.length > 1
+                ? `${ids.length} leads assigned to you`
+                : leads[0]?.name || 'A lead was assigned to you',
+            url: '/',
+            tag: 'brokly-assignment',
+          }),
+        });
+      } catch {
+        // ignore — push is best-effort
+      }
     }
   } catch {
     // ignore — notifications are best-effort
@@ -252,30 +313,24 @@ export const leadsService = {
 
       // Apply role-based query isolation for privacy
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle();
-          const role = profile?.role;
-          if (!isAdminRole(role)) {
-            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
-              // Team Leader: fetch members of teams led by this user
-              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
-              const teamIds = (teams || []).map((t: any) => t.id);
-              let memberIds = [user.id];
-              if (teamIds.length > 0) {
-                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
-                if (members && members.length > 0) {
-                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
-                }
+        const scope = await getCachedActorScope(supabase);
+        if (scope.userId && !isAdminRole(scope.role)) {
+          if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
+            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
+          } else {
+            try {
+              const { data: laRows } = await supabase
+                .from('lead_assignees')
+                .select('lead_id')
+                .eq('user_id', scope.userId);
+              const assignedLeadIds = (laRows || []).map((r: any) => r.lead_id);
+              if (assignedLeadIds.length > 0) {
+                query = query.or(`assigned_to.eq.${scope.userId},id.in.(${assignedLeadIds.join(',')})`);
+              } else {
+                query = query.eq('assigned_to', scope.userId);
               }
-              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
-            } else {
-              // Regular Agent: only leads assigned to or created by current user
-              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+            } catch {
+              query = query.eq('assigned_to', scope.userId);
             }
           }
         }
@@ -413,9 +468,12 @@ export const leadsService = {
       throw error;
     }
     invalidateCache();
-    // Notify an assignee when a lead is created already assigned to someone.
-    if (data?.assigned_to) {
-      await pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
+    // Run side-effects in the background so UI responds immediately.
+    const assigneeIds = Array.isArray(lead.assignedToIds) && lead.assignedToIds.length > 0
+      ? lead.assignedToIds
+      : (data?.assigned_to ? [data.assigned_to] : []);
+    if (assigneeIds.length > 0) {
+      void leadsService.setAssignees(data.id, assigneeIds, lead.agent ? [lead.agent] : undefined);
     }
     await followUpsService.syncFromLead(data);
     emitFollowUpsChanged();
@@ -536,15 +594,19 @@ export const leadsService = {
       .single();
     if (error) throw error;
     invalidateCache();
-    // Notify the new assignee when a lead is (re)assigned through the edit modal.
-    const nextAssignee = data?.assigned_to || null;
-    if (nextAssignee && nextAssignee !== (prev?.assigned_to || null)) {
-      await pushAssignmentNotifications(
-        supabase,
-        [id],
-        nextAssignee,
-        lead.assignedToName || lead.agent
-      );
+    // Notify the new assignee when a lead is (re)assigned through the edit modal (non-blocking).
+    if (Array.isArray(lead.assignedToIds)) {
+      await leadsService.setAssignees(id, lead.assignedToIds, lead.assignedToNames || (lead.agent ? [lead.agent] : undefined));
+    } else {
+      const nextAssignee = data?.assigned_to || null;
+      if (nextAssignee && nextAssignee !== (prev?.assigned_to || null)) {
+        void pushAssignmentNotifications(
+          supabase,
+          [id],
+          nextAssignee,
+          lead.assignedToName || lead.agent
+        );
+      }
     }
     await followUpsService.syncFromLead(data);
     emitFollowUpsChanged();
@@ -605,21 +667,45 @@ export const leadsService = {
     return rowToLead(data);
   },
 
-  async assignLead(id: string, assignedTo: string | null) {
+  async setAssignees(id: string, userIds: string[], assigneeNames?: string[]) {
     const supabase = createClient();
-    let actorId: string | null = null;
+    const cleanUserIds = Array.from(new Set(userIds.filter(Boolean))).slice(0, 2);
     try {
-      const { data: au } = await supabase.auth.getUser();
-      actorId = au?.user?.id ?? null;
-    } catch {}
-    const patch: any = { assigned_to: assignedTo, last_action_at: new Date().toISOString() };
-    if (actorId) patch.last_action_by = actorId;
-    const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('id, assigned_to, agent, agent_initials, crm_status, lead_status').single();
-    if (error) throw error;
-    if (assignedTo) {
-      await pushAssignmentNotifications(supabase, [id], assignedTo);
+      const { error } = await supabase.rpc('set_lead_assignees', {
+        p_lead_id: id,
+        p_user_ids: cleanUserIds,
+      });
+      if (error) {
+        // Fallback to direct table operations if RPC missing
+        await supabase.from('lead_assignees').delete().eq('lead_id', id);
+        if (cleanUserIds.length > 0) {
+          const rows = cleanUserIds.map((uid) => ({ lead_id: id, user_id: uid }));
+          await supabase.from('lead_assignees').insert(rows);
+          await supabase.from('leads').update({ assigned_to: cleanUserIds[0] }).eq('id', id);
+        } else {
+          await supabase.from('leads').update({ assigned_to: null }).eq('id', id);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    if (cleanUserIds.length > 0) {
+      await pushAssignmentNotifications(supabase, [id], cleanUserIds, assigneeNames?.join(' & '));
     }
     invalidateCache();
+  },
+
+  async assignLead(id: string, assignedTo: string | string[] | null, assigneeNames?: string[]) {
+    const targetUserIds = Array.isArray(assignedTo)
+      ? assignedTo
+      : (assignedTo ? [assignedTo] : []);
+    await this.setAssignees(id, targetUserIds, assigneeNames);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('leads')
+      .select(LEADS_ASSIGNMENT_SELECT)
+      .eq('id', id)
+      .single();
     return data;
   },
 
@@ -697,27 +783,28 @@ export const leadsService = {
     invalidateCache();
   },
 
-  async bulkAssignUsers(ids: string[], assignedTo: string | null, assigneeName?: string) {
+  async bulkAssignUsers(ids: string[], userIds: string | string[] | null, assigneeNames?: string | string[]) {
     const supabase = createClient();
-    let actorId: string | null = null;
+    const targetUserIds = (Array.isArray(userIds) ? userIds : (userIds ? [userIds] : [])).slice(0, 2);
     try {
-      const { data: au } = await supabase.auth.getUser();
-      actorId = au?.user?.id ?? null;
-    } catch {}
-    const payload: any = { assigned_to: assignedTo, last_action_at: new Date().toISOString() };
-    if (actorId) payload.last_action_by = actorId;
-    if (assigneeName) {
-      payload.agent = assigneeName;
-      payload.agent_initials = assigneeName
-        .split(' ')
-        .map((p: string) => p[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
+      const { error } = await supabase.rpc('bulk_set_lead_assignees', {
+        p_lead_ids: ids,
+        p_user_ids: targetUserIds,
+      });
+      if (error) {
+        for (const id of ids) {
+          await this.setAssignees(id, targetUserIds);
+        }
+      }
+    } catch {
+      for (const id of ids) {
+        await this.setAssignees(id, targetUserIds);
+      }
     }
-    const { error } = await supabase.from('leads').update(payload).in('id', ids);
-    if (error) throw error;
-    await pushAssignmentNotifications(supabase, ids, assignedTo, assigneeName);
+    const namesStr = Array.isArray(assigneeNames) ? assigneeNames.join(' & ') : assigneeNames;
+    if (targetUserIds.length > 0) {
+      await pushAssignmentNotifications(supabase, ids, targetUserIds, namesStr);
+    }
     const { data: synced } = await supabase.from('leads').select('*').in('id', ids);
     await followUpsService.syncFromLead(synced || []);
     invalidateCache();
@@ -972,30 +1059,24 @@ export const leadsService = {
 
       // Role-based privacy isolation: only team leaders and admins can see other members' leads
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', user.id)
-            .maybeSingle();
-          const role = profile?.role;
-          if (!isAdminRole(role)) {
-            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
-              // Team Leader: fetch members of teams led by this user
-              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
-              const teamIds = (teams || []).map((t: any) => t.id);
-              let memberIds = [user.id];
-              if (teamIds.length > 0) {
-                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
-                if (members && members.length > 0) {
-                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
-                }
+        const scope = await getCachedActorScope(supabase);
+        if (scope.userId && !isAdminRole(scope.role)) {
+          if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
+            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
+          } else {
+            try {
+              const { data: laRows } = await supabase
+                .from('lead_assignees')
+                .select('lead_id')
+                .eq('user_id', scope.userId);
+              const assignedLeadIds = (laRows || []).map((r: any) => r.lead_id);
+              if (assignedLeadIds.length > 0) {
+                query = query.or(`assigned_to.eq.${scope.userId},id.in.(${assignedLeadIds.join(',')})`);
+              } else {
+                query = query.eq('assigned_to', scope.userId);
               }
-              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
-            } else {
-              // Regular Agent: only leads assigned to or created by current user
-              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+            } catch {
+              query = query.eq('assigned_to', scope.userId);
             }
           }
         }
@@ -1041,7 +1122,31 @@ export const leadsService = {
       }
       if (status) query = query.eq('crm_status', status);
       if (source) query = query.eq('source', source);
-      if (agent) query = query.eq('agent', agent);
+      if (agent) {
+        try {
+          const { data: matchedUsers } = await supabase
+            .from('user_profiles')
+            .select('id')
+            .ilike('full_name', `%${agent}%`);
+          const userIds = (matchedUsers || []).map((u: any) => u.id);
+          if (userIds.length > 0) {
+            const { data: laRows } = await supabase
+              .from('lead_assignees')
+              .select('lead_id')
+              .in('user_id', userIds);
+            const extraIds = (laRows || []).map((r: any) => r.lead_id);
+            if (extraIds.length > 0) {
+              query = query.or(`agent.ilike.%${agent}%,id.in.(${extraIds.join(',')})`);
+            } else {
+              query = query.or(`agent.ilike.%${agent}%,assigned_to.in.(${userIds.join(',')})`);
+            }
+          } else {
+            query = query.ilike('agent', `%${agent}%`);
+          }
+        } catch {
+          query = query.ilike('agent', `%${agent}%`);
+        }
+      }
       if (project) query = query.eq('project', project);
       if (propertyType) query = query.eq('property_type', propertyType);
       // Exclude leads the agent just called so the queue updates instantly.
@@ -1342,8 +1447,34 @@ function rowToLead(row: any) {
     agent: row.agent,
     agentInitials: row.agent_initials,
     status: row.crm_status || row.lead_status || 'Fresh Leads',
-    assignedTo: row.assigned_to || null,
-    assignedToName: row.assigned_to_profile?.full_name || null,
+    isDuplicate: Boolean(row.is_duplicate || row.crm_status === 'Duplicate Leads'),
+    duplicateOfLeadId: row.duplicate_of_lead_id || null,
+    routedToDuplicateCenterAt: row.routed_to_duplicate_center_at || null,
+    ...(() => {
+      const rawAssignees: any[] = Array.isArray(row.lead_assignees) ? row.lead_assignees : [];
+      const assignees = rawAssignees.map((la: any) => ({
+        userId: la.user_id,
+        userName: la.user_profiles?.full_name || la.user_profile?.full_name || null,
+        assignedAt: la.assigned_at || null,
+      }));
+      if (assignees.length === 0 && row.assigned_to) {
+        assignees.push({
+          userId: row.assigned_to,
+          userName: row.assigned_to_profile?.full_name || null,
+          assignedAt: null,
+        });
+      }
+      const assignedToIds = assignees.map((a: any) => a.userId).filter(Boolean);
+      const assignedToNames = assignees.map((a: any) => a.userName).filter(Boolean) as string[];
+      const assignedToName = assignedToNames.length > 0 ? assignedToNames.join(' & ') : (row.assigned_to_profile?.full_name || null);
+      return {
+        assignedTo: assignedToIds[0] || row.assigned_to || null,
+        assignedToName,
+        assignees,
+        assignedToIds,
+        assignedToNames,
+      };
+    })(),
     referredTo: row.referred_to || null,
     referredToName: row.referred_to_profile?.full_name || null,
     referredBy: row.referred_by || null,
