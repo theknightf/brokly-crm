@@ -48,12 +48,10 @@ export type CallOutcome =
   | 'Interested'
   | 'Site Visit'
   | 'Meeting'
-  | 'Follow Up After Meeting'
   | 'Won Deal'
   | 'Not Interested'
   | 'Call back later'
   | 'No Answer'
-  | 'No Answer At All'
   | 'Wrong Number'
   | 'Busy'
   | 'Other'
@@ -84,11 +82,6 @@ const OUTCOMES: { value: CallOutcome; icon: React.ReactNode; cls: string }[] = [
     cls: 'border-violet-200 bg-violet-50 text-violet-700',
   },
   {
-    value: 'Follow Up After Meeting',
-    icon: <CalendarClock size={14} />,
-    cls: 'border-indigo-200 bg-indigo-50 text-indigo-700',
-  },
-  {
     value: 'Won Deal',
     icon: <Trophy size={14} />,
     cls: 'border-yellow-200 bg-yellow-50 text-yellow-700',
@@ -107,11 +100,6 @@ const OUTCOMES: { value: CallOutcome; icon: React.ReactNode; cls: string }[] = [
     value: 'No Answer',
     icon: <UserX size={14} />,
     cls: 'border-muted bg-muted/50 text-muted-foreground',
-  },
-  {
-    value: 'No Answer At All',
-    icon: <UserX size={14} />,
-    cls: 'border-amber-200 bg-amber-50 text-amber-800',
   },
   {
     value: 'Wrong Number',
@@ -136,12 +124,9 @@ const CALLBACK_DAYS = [1, 2, 3, 5, 7, 14, 30];
 const OUTCOME_TO_STATUS: Partial<Record<CallOutcome, string>> = {
   Interested: 'Interested',
   'Site Visit': 'Meeting',
-  Meeting: 'Meeting',
-  'Follow Up After Meeting': 'Follow Up After Meeting',
   'Won Deal': 'Done Deal',
   'Not Interested': 'Not Interested',
   'No Answer': 'No Answer',
-  'No Answer At All': 'No Answer At All',
   'Wrong Number': 'Wrong Number',
   'Customer Replied': 'Following Up',
 };
@@ -303,170 +288,195 @@ export function CallOutcomeSheet({
   const save = async () => {
     if (!outcome || saving) return;
     setSaving(true);
-    const durationSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
-    const estimatedDurationSeconds = initiatedAt
-      ? Math.max(0, Math.round((Date.now() - initiatedAt) / 1000))
-      : durationSeconds;
-    const clientRef =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    try {
+      const durationSeconds = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+      // Real-world estimate from the dialer tap to now (via visibilitychange).
+      const estimatedDurationSeconds = initiatedAt
+        ? Math.max(0, Math.round((Date.now() - initiatedAt) / 1000))
+        : durationSeconds;
+      const clientRef =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-    // 0ms Optimistic UI: close sheet and notify user immediately
-    toast.success(`Logged: ${outcome}`);
-    onClose();
+      const res = await fetch('/api/call-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entity_type: item.entityType || 'lead',
+          entity_id: item.id,
+          contact_name: item.contactName,
+          contact_phone: item.contactPhone || '',
+          channel,
+          direction,
+          outcome,
+          notes: note.trim() || '',
+          duration_seconds: durationSeconds,
+          estimated_duration_seconds: estimatedDurationSeconds,
+          client_ref: clientRef,
+        }),
+      });
 
-    void (async () => {
-      try {
-        const res = await fetch('/api/call-log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            entity_type: item.entityType || 'lead',
-            entity_id: item.id,
-            contact_name: item.contactName,
-            contact_phone: item.contactPhone || '',
-            channel,
-            direction,
-            outcome,
-            notes: note.trim() || '',
-            duration_seconds: durationSeconds,
-            estimated_duration_seconds: estimatedDurationSeconds,
-            client_ref: clientRef,
-          }),
-        });
+      // The activity-log backend may not be provisioned yet (call_logs table
+      // missing). That must never block the outcome flow — the lead status
+      // change below still applies. Other errors (auth, etc.) are real.
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        if (res.status !== 503) throw new Error(body.error || 'Failed to save call log');
+      }
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          if (res.status !== 503) throw new Error(body.error || 'Failed to save call log');
-        }
-
-        if (item.entityType === 'lead' || !item.entityType) {
-          const nextStatus = OUTCOME_TO_STATUS[outcome];
-          if (nextStatus) {
-            try {
-              await leadsService.updateStatus(item.id, nextStatus);
-            } catch {
-              // ignore
-            }
+      // Reflect the call outcome on the lead's pipeline stage (client-side,
+      // so "change status after a call" always works — even offline-ish).
+      if (item.entityType === 'lead' || !item.entityType) {
+        const nextStatus = OUTCOME_TO_STATUS[outcome];
+        if (nextStatus) {
+          try {
+            await leadsService.updateStatus(item.id, nextStatus);
+          } catch {
+            // ignore — the follow-up lifecycle below is what really matters
           }
         }
+      }
 
-        const scheduleFollowUp = async (newDate: string, label: string) => {
-          if (item.rescheduleId) {
-            try {
-              await followUpsService.update(item.rescheduleId, {
-                dueDate: newDate,
+      const scheduleFollowUp = async (newDate: string, label: string) => {
+        if (item.rescheduleId) {
+          try {
+            await followUpsService.update(item.rescheduleId, {
+              dueDate: newDate,
+              status: 'Pending',
+              notes: `${note.trim() ? note.trim() + ' — ' : ''}${label} after ${callbackDays} day(s)`,
+            });
+            toast.success(`Follow-up rescheduled to ${newDate}`);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Call logged, but reschedule failed');
+          }
+        } else if (item.entityType === 'lead' || !item.entityType) {
+          // No scheduled follow-up yet — create one for this lead so the
+          // callback appears on the Follow-ups page on the chosen date.
+          try {
+            const supabase = createClient();
+            const {
+              data: { user: currentUser },
+            } = await supabase.auth.getUser();
+            const created = await followUpsService.create(
+              {
+                title: `Follow up: ${item.contactName}`,
+                contactName: item.contactName,
+                contactPhone: item.contactPhone || '',
+                contactType: 'Lead',
+                type: 'Call',
                 status: 'Pending',
-                notes: `${note.trim() ? note.trim() + ' — ' : ''}${label} after ${callbackDays} day(s)`,
-              });
-            } catch {}
-          } else if (item.entityType === 'lead' || !item.entityType) {
-            try {
-              const supabase = createClient();
-              const {
-                data: { user: currentUser },
-              } = await supabase.auth.getUser();
-              const created = await followUpsService.create(
-                {
-                  title: `Follow up: ${item.contactName}`,
-                  contactName: item.contactName,
-                  contactPhone: item.contactPhone || '',
-                  contactType: 'Lead',
-                  type: 'Call',
-                  status: 'Pending',
-                  priority: 'Medium',
-                  dueDate: newDate,
-                  dueTime: '09:00',
-                  agent: '',
-                  agentInitials: '',
-                  notes:
-                    (note.trim() ? note.trim() + ' — ' : '') +
-                    `${label} after ${callbackDays} day(s)`,
-                  propertyInterest: '',
-                  relationshipStatus: 'New',
-                },
-                currentUser?.id || ''
-              );
-              if (created?.id) {
-                await supabase
-                  .from('follow_ups')
-                  .update({ lead_id: item.id })
-                  .eq('id', created.id);
-              }
-            } catch {}
+                priority: 'Medium',
+                dueDate: newDate,
+                dueTime: '09:00',
+                agent: '',
+                agentInitials: '',
+                notes:
+                  (note.trim() ? note.trim() + ' — ' : '') +
+                  `${label} after ${callbackDays} day(s)`,
+                propertyInterest: '',
+                relationshipStatus: 'New',
+              },
+              currentUser?.id || ''
+            );
+            // Link the fresh follow-up back to the lead so the DB trigger and
+            // future edits stay consistent.
+            if (created?.id) {
+              await supabase
+                .from('follow_ups')
+                .update({ lead_id: item.id })
+                .eq('id', created.id)
+                .then(({ error }) => {
+                  if (error) throw error;
+                });
+            }
+            toast.success(`Follow-up scheduled for ${newDate}`);
+          } catch {
+            toast.success('Call logged');
           }
-        };
+        }
+      };
 
-        const scheduleMeeting = async () => {
-          const targetDate = meetingDate || futureDate(0);
-          const locationNote = `Meeting at ${meetingLocation}${
-            item.projectName ? ` — ${item.projectName}` : ''
-          }`;
-          if (item.entityType === 'lead' || !item.entityType) {
-            try {
-              const supabase = createClient();
-              const {
-                data: { user: currentUser },
-              } = await supabase.auth.getUser();
-              const created = await followUpsService.create(
-                {
-                  title: `Meeting: ${item.contactName}`,
-                  contactName: item.contactName,
-                  contactPhone: item.contactPhone || '',
-                  contactType: 'Lead',
-                  type: 'Meeting',
-                  status: 'Pending',
-                  priority: 'High',
-                  dueDate: targetDate,
-                  dueTime: meetingTime || '12:00',
-                  agent: '',
-                  agentInitials: '',
-                  notes: [locationNote, meetingNotes.trim(), note.trim()]
-                    .filter(Boolean)
-                    .join(' — '),
-                  propertyInterest: '',
-                  relationshipStatus: 'New',
-                },
-                currentUser?.id || ''
-              );
-              if (created?.id) {
-                await supabase
-                  .from('follow_ups')
-                  .update({ lead_id: item.id })
-                  .eq('id', created.id);
-              }
-            } catch {}
-          } else if (item.rescheduleId) {
-            try {
-              await followUpsService.update(item.rescheduleId, {
-                dueDate: targetDate,
-                dueTime: meetingTime,
+      const scheduleMeeting = async () => {
+        const targetDate = meetingDate || futureDate(0);
+        const locationNote = `Meeting at ${meetingLocation}${
+          item.projectName ? ` — ${item.projectName}` : ''
+        }`;
+        if (item.entityType === 'lead' || !item.entityType) {
+          try {
+            const supabase = createClient();
+            const {
+              data: { user: currentUser },
+            } = await supabase.auth.getUser();
+            const created = await followUpsService.create(
+              {
+                title: `Meeting: ${item.contactName}`,
+                contactName: item.contactName,
+                contactPhone: item.contactPhone || '',
+                contactType: 'Lead',
                 type: 'Meeting',
                 status: 'Pending',
-                notes: [locationNote, meetingNotes.trim(), note.trim()].filter(Boolean).join(' — '),
-              });
-            } catch {}
+                priority: 'High',
+                dueDate: targetDate,
+                dueTime: meetingTime || '12:00',
+                agent: '',
+                agentInitials: '',
+                notes: [locationNote, meetingNotes.trim(), note.trim()]
+                  .filter(Boolean)
+                  .join(' — '),
+                propertyInterest: '',
+                relationshipStatus: 'New',
+              },
+              currentUser?.id || ''
+            );
+            if (created?.id) {
+              await supabase
+                .from('follow_ups')
+                .update({ lead_id: item.id })
+                .eq('id', created.id)
+                .then(({ error }) => {
+                  if (error) throw error;
+                });
+            }
+            toast.success(`Meeting scheduled for ${targetDate} at ${meetingTime}`);
+          } catch {
+            toast.success('Call logged');
           }
-        };
-
-        if (outcome === 'Call back later' || outcome === 'Follow Up After Meeting') {
-          await scheduleFollowUp(futureDate(callbackDays), outcome);
+        } else if (item.rescheduleId) {
+          try {
+            await followUpsService.update(item.rescheduleId, {
+              dueDate: targetDate,
+              dueTime: meetingTime,
+              type: 'Meeting',
+              status: 'Pending',
+              notes: [locationNote, meetingNotes.trim(), note.trim()].filter(Boolean).join(' — '),
+            });
+            toast.success(`Meeting scheduled for ${targetDate} at ${meetingTime}`);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Call logged, but scheduling failed');
+          }
         }
+      };
 
-        if (outcome === 'WhatsApp Follow-up') {
-          await scheduleFollowUp(futureDate(callbackDays), 'WhatsApp follow-up');
-        }
-
-        if (outcome === 'Site Visit' || outcome === 'Meeting') {
-          await scheduleMeeting();
-        }
-
-        if (onSaved) await onSaved(item);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Could not save call log');
+      if (outcome === 'Call back later') {
+        scheduleFollowUp(futureDate(callbackDays), 'Call back');
       }
-    })();
+
+      if (outcome === 'WhatsApp Follow-up') {
+        scheduleFollowUp(futureDate(callbackDays), 'WhatsApp follow-up');
+      }
+
+      if (outcome === 'Site Visit' || outcome === 'Meeting') {
+        await scheduleMeeting();
+      }
+
+      toast.success('Call logged');
+      if (onSaved) await onSaved(item);
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save call log');
+      setSaving(false);
+    }
   };
 
   return createPortal(

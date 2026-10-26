@@ -7,6 +7,7 @@ import { isAdminRole } from '@/lib/roles';
 
 const DashboardHeader = dynamic(() => import('./components/DashboardHeader'));
 const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
+const DashboardKpis = dynamic(() => import('./components/DashboardKpis'));
 const MyTargetsTasks = dynamic(() => import('./components/MyTargetsTasks'));
 const DashboardCharts = dynamic(() => import('./components/DashboardCharts'));
 const SalesFollowUpsWidget = dynamic(() => import('./components/SalesFollowUpsWidget'));
@@ -71,6 +72,9 @@ export default function DashboardPage() {
           <SalesFollowUpsWidget />
         </div>
         <div className="order-3">
+          <DashboardKpis />
+        </div>
+        <div className="order-4">
           <MyTargetsTasks />
         </div>
         <div className="order-5">

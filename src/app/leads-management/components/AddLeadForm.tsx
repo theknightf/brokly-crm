@@ -35,7 +35,7 @@ interface AddLeadFormData {
 }
 
 interface AddLeadFormProps {
-  onSubmit: (lead: Lead) => void | Promise<void>;
+  onSubmit: (lead: Lead) => void;
   onCancel: () => void;
   initialData?: Partial<Lead>;
 }
@@ -203,15 +203,12 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     const assignedUser = userList.find((u) => u.id === data.assignedTo);
     const matchedSource = sourceList.find(s=> s.name === data.source) || (ALL_SOURCES.includes(data.source as any) ? { id: '', name: data.source } as any : null);
     const leadSourceId = matchedSource?.id || null;
-    const cleanPhone = (data.phone || '').trim();
-    const cleanName = (data.name || '').trim() || `Lead (${cleanPhone.slice(-4) || 'New'})`;
-
     const newLead: Lead & { leadSourceId?: string | null } = {
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
-      name: cleanName,
-      phone: cleanPhone,
-      email: (data.email || '').trim(),
-      location: data.location || '',
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      location: data.location,
       propertyType: data.propertyType,
       budgetMin: data.budgetMin ? Number(data.budgetMin) : undefined,
       budgetMax: data.budgetMax ? Number(data.budgetMax) : undefined,
@@ -238,7 +235,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       developer: data.developer || undefined,
       project: data.project || undefined,
     };
-    await onSubmit(newLead);
+    onSubmit(newLead);
   };
 
   const selectClass = (hasError: boolean) =>

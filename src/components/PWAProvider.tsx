@@ -19,32 +19,9 @@ export function PWAProvider() {
       (navigator as { standalone?: boolean }).standalone === true;
     setStandalone(isStandalone);
 
-    // Register service worker & force immediate update check so mobile PWAs never run stale bundles
+    // Register service worker
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-      });
-      navigator.serviceWorker
-        .register('/sw.js', { updateViaCache: 'none' })
-        .then((reg) => {
-          reg.update().catch(() => {});
-          if (reg.waiting) {
-            reg.waiting.postMessage('SKIP_WAITING');
-          }
-          reg.addEventListener('updatefound', () => {
-            const nw = reg.installing;
-            if (!nw) return;
-            nw.addEventListener('statechange', () => {
-              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                nw.postMessage('SKIP_WAITING');
-              }
-            });
-          });
-        })
-        .catch(() => {});
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
 
     // Hook the Android/Chromium install prompt

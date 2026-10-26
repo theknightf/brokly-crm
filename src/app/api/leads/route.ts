@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
+import { LEADS_LIST_SELECT } from '@/lib/supabase/leadsSelect';
+import { describePostgrestError, logPostgrestError } from '@/lib/supabase/postgrestError';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/leads — create lead and automatically detect & route duplicates
- * to the Duplicate Center without blocking ingestion.
+ * POST /api/leads — create lead with global deduplication (phone & email)
+ * Spec 2.C: Automatic validation on phone/email before insertion,
+ * prevent duplicates globally and provide clickable redirect link to existing lead.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -24,43 +27,40 @@ export async function POST(request: Request) {
 
   const db: any = supabase as any;
 
-  // --- Detect existing matching lead by normalized phone or email ---
-  let existingMatch: { id: string; name: string; phone?: string; email?: string } | null = null;
+  // --- Pre-check dedup via normalized lookup (best-effort fast path) ---
   try {
     const phoneNorm = phone.replace(/\D/g, '');
     if (phoneNorm && phoneNorm.length >= 8) {
-      const { data: existing } = await db
-        .from('leads')
-        .select('id, name, phone, email, crm_status')
-        .ilike('phone', `%${phoneNorm.slice(-10)}%`)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      const { data: existing } = await db.from('leads').select('id, name, phone, email, crm_status').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
+      // Verify exact normalized match
       if (existing && String(existing.phone || '').replace(/\D/g, '').slice(-10) === phoneNorm.slice(-10)) {
-        existingMatch = existing;
+        return NextResponse.json({
+          error: 'Duplicate lead: phone already exists',
+          duplicate: true,
+          existingLeadId: existing.id,
+          existingLeadName: existing.name,
+          redirectLink: `/api/leads/${existing.id}/profile`,
+          profileLink: `/leads-management?leadId=${existing.id}`,
+        }, { status: 409 });
       }
     }
-    if (!existingMatch && email && email.includes('@')) {
+    if (email) {
       const emailNorm = email.toLowerCase().trim();
-      const { data: existing } = await db
-        .from('leads')
-        .select('id, name, phone, email')
-        .ilike('email', emailNorm)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      const { data: existing } = await db.from('leads').select('id, name, phone, email').ilike('email', emailNorm).limit(1).maybeSingle();
       if (existing && String(existing.email || '').toLowerCase().trim() === emailNorm) {
-        existingMatch = existing;
+        return NextResponse.json({
+          error: 'Duplicate lead: email already exists',
+          duplicate: true,
+          existingLeadId: existing.id,
+          existingLeadName: existing.name,
+          redirectLink: `/api/leads/${existing.id}/profile`,
+          profileLink: `/leads-management?leadId=${existing.id}`,
+        }, { status: 409 });
       }
     }
   } catch {}
 
-  const requestedStatus = body.stage || body.status || body.crm_status || 'Fresh Leads';
-  const rawNotes = String(body.notes || '').trim();
-  const duplicateNoteTag = existingMatch
-    ? `[Pending Review / Duplicate of #${String(existingMatch.id).slice(0, 8)} (${existingMatch.name || 'Existing Lead'})]`
-    : '';
-
+  // --- Insert with DB uniqueness fallback (handles race) ---
   const row: any = {
     name,
     phone,
@@ -71,14 +71,9 @@ export async function POST(request: Request) {
     source: body.source || '',
     agent: body.agent || '',
     agent_initials: body.agentInitials || body.agent_initials || '',
-    crm_status: existingMatch ? 'Duplicate Leads' : requestedStatus,
-    lead_status: existingMatch ? 'Lost' : (body.lead_status || 'New'),
-    is_duplicate: Boolean(existingMatch),
-    duplicate_of_lead_id: existingMatch?.id || null,
-    routed_to_duplicate_center_at: existingMatch ? new Date().toISOString() : null,
-    notes: duplicateNoteTag && !rawNotes.includes('[Pending Review / Duplicate')
-      ? `${rawNotes}\n${duplicateNoteTag}`.trim()
-      : rawNotes,
+    crm_status: body.stage || body.status || body.crm_status || 'Fresh Leads',
+    lead_status: body.lead_status || 'New',
+    notes: body.notes || '',
     location: body.location || '',
     developer: body.developer || '',
     project: body.project || '',
@@ -88,25 +83,35 @@ export async function POST(request: Request) {
 
   const { data, error } = await db.from('leads').insert(row).select().single();
   if (error) {
+    const msg = String(error.message || '').toLowerCase();
+    const isDup = error.code === '23505' || msg.includes('duplicate') || msg.includes('unique') || msg.includes('idx_leads_phone') || msg.includes('idx_leads_email');
+    if (isDup) {
+      // Fetch existing for redirect link
+      let existing: any = null;
+      try {
+        const phoneNorm = phone.replace(/\D/g, '');
+        if (phoneNorm) {
+          const { data: byPhone } = await db.from('leads').select('id, name').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
+          if (byPhone) existing = byPhone;
+        }
+        if (!existing && email) {
+          const { data: byEmail } = await db.from('leads').select('id, name').ilike('email', email.toLowerCase().trim()).limit(1).maybeSingle();
+          if (byEmail) existing = byEmail;
+        }
+      } catch {}
+      return NextResponse.json({
+        error: 'Duplicate lead detected (global uniqueness)',
+        duplicate: true,
+        existingLeadId: existing?.id || null,
+        redirectLink: existing ? `/api/leads/${existing.id}/profile` : null,
+        profileLink: existing ? `/leads-management?leadId=${existing.id}` : null,
+        detail: error.message,
+      }, { status: 409 });
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const isDuplicate = Boolean(existingMatch || data?.is_duplicate || data?.crm_status === 'Duplicate Leads');
-  const matchedId = existingMatch?.id || data?.duplicate_of_lead_id || null;
-
-  return NextResponse.json({
-    lead: data,
-    duplicate: isDuplicate,
-    routedToDuplicateCenter: isDuplicate,
-    existingLeadId: matchedId,
-    existingLeadName: existingMatch?.name || null,
-    duplicateCenterLink: '/duplicate-leads',
-    redirectLink: matchedId ? `/api/leads/${matchedId}/profile` : null,
-    profileLink: matchedId ? `/leads-management?leadId=${matchedId}` : null,
-    message: isDuplicate
-      ? 'Duplicate lead ingested and routed to Duplicate Center for review'
-      : 'Lead created',
-  }, { status: 201 });
+  return NextResponse.json({ lead: data, message: 'Lead created' }, { status: 201 });
 }
 
 // GET /api/leads — paginated list (supports drill-down filtering)
@@ -122,7 +127,7 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get('page') || 1));
   const pageSize = Math.min(100, Math.max(5, Number(url.searchParams.get('pageSize') || 25)));
 
-  let query: any = supabase.from('leads').select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)', { count: 'exact' });
+  let query: any = supabase.from('leads').select(LEADS_LIST_SELECT, { count: 'exact' });
 
   // Privacy isolation: only team leaders and admins can see other members' leads
   try {
@@ -160,7 +165,13 @@ export async function GET(request: Request) {
 
   const from = (page - 1) * pageSize;
   const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, from + pageSize - 1);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    logPostgrestError('GET /api/leads', error, { search, stage, assignedTo, page, pageSize, select: LEADS_LIST_SELECT });
+    return NextResponse.json(
+      { error: describePostgrestError(error, 'Failed to load leads') },
+      { status: 400 }
+    );
+  }
   return NextResponse.json({ leads: data || [], total: count ?? (data || []).length, page, pageSize });
 }
 

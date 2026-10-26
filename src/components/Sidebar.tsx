@@ -24,9 +24,7 @@ import {
   KeyRound,
   Handshake,
   Phone,
-  CopyCheck,
   CalendarCheck2,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -170,18 +168,6 @@ const navGroups: NavGroup[] = [
         labelKey: 'common.expenses',
         icon: <Receipt size={18} />,
         href: '/expenses',
-      },
-      {
-        id: 'nav-duplicate-leads',
-        labelKey: 'common.duplicateLeads',
-        icon: <CopyCheck size={18} />,
-        href: '/duplicate-leads',
-      },
-      {
-        id: 'nav-import-history',
-        labelKey: 'common.importHistory',
-        icon: <FileSpreadsheet size={18} />,
-        href: '/import-history',
       },
       {
         id: 'nav-admin',
@@ -389,8 +375,7 @@ function SidebarContent({
             ...group,
             items: group.items.filter(
               (item) =>
-                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses' && item.id !== 'nav-duplicate-leads')) &&
-                (isAdminOrOwner || canWatchTeams || item.id !== 'nav-import-history') &&
+                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses')) &&
                 (canWatchTeams || item.id !== 'nav-teams')
             ),
           }))

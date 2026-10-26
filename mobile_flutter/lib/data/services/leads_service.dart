@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/lead_model.dart';
+import 'leads_select.dart';
 import 'supabase_service.dart';
 import 'users_service.dart';
 
@@ -19,12 +20,7 @@ class LeadsService {
     }
 
     try {
-      var query = _client.from('leads').select(
-        '*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)',
-      );
-
-      // Exclude soft-deleted/merged duplicates
-      query = query.isFilter('merged_into', null).eq('is_duplicate', false);
+      var query = _client.from('leads').select(LeadsSelect.list);
 
       // Role scoping
       if (authIds != null) {
@@ -32,7 +28,7 @@ class LeadsService {
           query = query.eq('assigned_to', assignedToFilter);
         } else if (authIds.length == 1) {
           final uid = authIds.first;
-          query = query.eq('assigned_to', uid);
+          query = query.or('assigned_to.eq.$uid,created_by.eq.$uid');
         } else {
           final idsStr = authIds.join(',');
           query = query.or('assigned_to.in.($idsStr),created_by.in.($idsStr)');
@@ -50,22 +46,19 @@ class LeadsService {
         query = query.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
       }
 
-      final response = await query.order('created_at', ascending: false).limit(10000);
+      final response = await query.order('created_at', ascending: false).limit(1000);
       final List<dynamic> data = response as List<dynamic>;
       return data.map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
       // Fallback without foreign key join if schema relationship differs
       var fallbackQuery = _client.from('leads').select('*');
 
-      // Exclude soft-deleted/merged duplicates
-      fallbackQuery = fallbackQuery.isFilter('merged_into', null).eq('is_duplicate', false);
-
       if (authIds != null) {
         if (assignedToFilter != null && assignedToFilter.isNotEmpty) {
           fallbackQuery = fallbackQuery.eq('assigned_to', assignedToFilter);
         } else if (authIds.length == 1) {
           final uid = authIds.first;
-          fallbackQuery = fallbackQuery.eq('assigned_to', uid);
+          fallbackQuery = fallbackQuery.or('assigned_to.eq.$uid,created_by.eq.$uid');
         } else {
           final idsStr = authIds.join(',');
           fallbackQuery = fallbackQuery.or('assigned_to.in.($idsStr),created_by.in.($idsStr)');
@@ -83,7 +76,7 @@ class LeadsService {
         fallbackQuery = fallbackQuery.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
       }
 
-      final data = await fallbackQuery.order('created_at', ascending: false).limit(10000);
+      final data = await fallbackQuery.order('created_at', ascending: false).limit(1000);
       return (data as List<dynamic>).map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
     }
   }
@@ -93,7 +86,7 @@ class LeadsService {
     try {
       final res = await _client
           .from('leads')
-          .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
+          .select(LeadsSelect.detail)
           .eq('id', id)
           .maybeSingle();
 
@@ -106,65 +99,23 @@ class LeadsService {
     }
   }
 
-  /// Create lead and automatically route duplicates to Duplicate Center without blocking
+  /// Create lead with duplicate phone/email detection
   Future<LeadModel> create(LeadModel lead) async {
     final currentUserId = _client.auth.currentUser?.id;
 
-    String? matchedDupId;
-    String? matchedDupName;
-    try {
-      final normalizedPhone = lead.phone.replaceAll(RegExp(r'\D'), '');
-      if (normalizedPhone.length >= 8) {
-        final suffix = normalizedPhone.length >= 10
-            ? normalizedPhone.substring(normalizedPhone.length - 10)
-            : normalizedPhone;
-        final dup = await _client
-            .from('leads')
-            .select('id, name, phone')
-            .ilike('phone', '%$suffix%')
-            .order('created_at', ascending: true)
-            .limit(1)
-            .maybeSingle();
-        if (dup != null) {
-          final dupDigits = (dup['phone']?.toString() ?? '').replaceAll(RegExp(r'\D'), '');
-          final dupTail = dupDigits.length >= 10 ? dupDigits.substring(dupDigits.length - 10) : dupDigits;
-          if (dupTail == suffix) {
-            matchedDupId = dup['id']?.toString();
-            matchedDupName = dup['name']?.toString();
-          }
-        }
+    // Duplicate check
+    final normalizedPhone = lead.phone.replaceAll(RegExp(r'\D'), '');
+    if (normalizedPhone.length >= 8) {
+      final suffix = normalizedPhone.length >= 10 ? normalizedPhone.substring(normalizedPhone.length - 10) : normalizedPhone;
+      final dup = await _client.from('leads').select('id, name, phone').ilike('phone', '%$suffix%').limit(1).maybeSingle();
+      if (dup != null) {
+        throw Exception('Duplicate phone number already exists for lead: ${dup['name']}');
       }
-      final emailNorm = (lead.email ?? '').trim().toLowerCase();
-      if (matchedDupId == null && emailNorm.isNotEmpty && emailNorm.contains('@')) {
-        final dup = await _client
-            .from('leads')
-            .select('id, name, email')
-            .ilike('email', emailNorm)
-            .order('created_at', ascending: true)
-            .limit(1)
-            .maybeSingle();
-        if (dup != null) {
-          matchedDupId = dup['id']?.toString();
-          matchedDupName = dup['name']?.toString();
-        }
-      }
-    } catch (_) {}
-
-    if (matchedDupId != null) {
-      final nameStr = matchedDupName != null && matchedDupName.isNotEmpty ? '"$matchedDupName"' : 'عميل آخر';
-      throw Exception('رقم الهاتف مسجل بالفعل لـ $nameStr. لا يمكن إضافة عميل مكرر.');
     }
 
     final row = lead.toJson(currentUserId: currentUserId);
-    try {
-      final res = await _client.from('leads').insert(row).select().single();
-      return LeadModel.fromJson(res);
-    } on PostgrestException catch (e) {
-      if (e.code == '23505' || e.message.contains('idx_leads_phone_normalized_unique_active') || e.message.contains('phone_normalized')) {
-        throw Exception('رقم الهاتف مسجل بالفعل في النظام. لا يمكن تكرار نفس الرقم.');
-      }
-      rethrow;
-    }
+    final res = await _client.from('leads').insert(row).select().single();
+    return LeadModel.fromJson(res);
   }
 
   /// Update lead

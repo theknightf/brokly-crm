@@ -12,7 +12,6 @@ class StatusChangeSheet extends StatelessWidget {
     'Pending Leads',
     'Following Up',
     'Meeting',
-    'Follow Up After Meeting',
     'Interested',
     'Reservation',
     'Done Deal',

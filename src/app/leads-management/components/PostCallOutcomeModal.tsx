@@ -6,18 +6,7 @@ import { toast } from 'sonner';
 import { leadsService, followUpsService } from '@/lib/services/crmService';
 import type { Lead } from './mockLeads';
 
-export type PostCallOutcome =
-  | 'Answered'
-  | 'No Answer'
-  | 'No Answer At All'
-  | 'Interested'
-  | 'Not Interested'
-  | 'Follow-up'
-  | 'Meeting'
-  | 'Follow Up After Meeting'
-  | 'Schedule Meeting'
-  | 'Wrong Phone'
-  | 'Closed Number';
+export type PostCallOutcome = 'Answered' | 'No Answer' | 'Interested' | 'Not Interested' | 'Follow-up' | 'Schedule Meeting' | 'Wrong Phone' | 'Closed Number';
 
 interface PostCallOutcomeModalProps {
   lead: Lead | null;
@@ -44,14 +33,6 @@ const OUTCOMES: { value: PostCallOutcome; labelEn: string; labelAr: string; icon
     activeCls: 'bg-zinc-800 text-white border-zinc-800 shadow-md',
   },
   {
-    value: 'No Answer At All',
-    labelEn: 'No Answer At All',
-    labelAr: 'لا يرد نهائياً',
-    icon: <PhoneOff size={15} />,
-    cls: 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100',
-    activeCls: 'bg-amber-700 text-white border-amber-700 shadow-md',
-  },
-  {
     value: 'Interested',
     labelEn: 'Interested',
     labelAr: 'مهتم',
@@ -76,20 +57,12 @@ const OUTCOMES: { value: PostCallOutcome; labelEn: string; labelAr: string; icon
     activeCls: 'bg-amber-500 text-white border-amber-500 shadow-md',
   },
   {
-    value: 'Meeting',
-    labelEn: 'Meeting',
-    labelAr: 'اجتماع / تحديد موعد',
+    value: 'Schedule Meeting',
+    labelEn: 'Schedule Meeting',
+    labelAr: 'تحديد موعد',
     icon: <CalendarCheck size={15} />,
     cls: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100',
     activeCls: 'bg-violet-600 text-white border-violet-600 shadow-md',
-  },
-  {
-    value: 'Follow Up After Meeting',
-    labelEn: 'Follow Up After Meeting',
-    labelAr: 'متابعة بعد الاجتماع',
-    icon: <CalendarClock size={15} />,
-    cls: 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
-    activeCls: 'bg-indigo-600 text-white border-indigo-600 shadow-md',
   },
   {
     value: 'Wrong Phone',
@@ -112,12 +85,9 @@ const OUTCOMES: { value: PostCallOutcome; labelEn: string; labelAr: string; icon
 const OUTCOME_TO_STATUS: Record<PostCallOutcome, string> = {
   'Answered': 'Following Up',
   'No Answer': 'No Answer',
-  'No Answer At All': 'No Answer At All',
   'Interested': 'Interested',
   'Not Interested': 'Not Interested',
   'Follow-up': 'Following Up',
-  'Meeting': 'Meeting',
-  'Follow Up After Meeting': 'Follow Up After Meeting',
   'Schedule Meeting': 'Meeting',
   'Wrong Phone': 'Wrong Number',
   'Closed Number': 'Closed Number',
@@ -213,13 +183,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
   // Follow-up / Meeting / No Answer all need a next-action date. For No Answer
   // this is the retry reminder: the date lands in Follow-ups & Workspace so
   // the agent is reminded to call back.
-  const needsSchedule =
-    outcome === 'Follow-up' ||
-    outcome === 'Schedule Meeting' ||
-    outcome === 'Meeting' ||
-    outcome === 'Follow Up After Meeting' ||
-    outcome === 'No Answer' ||
-    outcome === 'No Answer At All';
+  const needsSchedule = outcome === 'Follow-up' || outcome === 'Schedule Meeting' || outcome === 'No Answer';
 
   const retryPresets: { label: string; days: number; time: string }[] = [
     { label: 'Tomorrow 10:00', days: 1, time: '10:00' },

@@ -1,6 +1,5 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { fetchKpiCardsCached } from './KpiCardsGrid';
 
 interface Team { id: string; name: string }
 interface Agent { id: string; full_name: string }
@@ -12,13 +11,19 @@ export default function DashboardTeamFilter({ onChange }: { onChange: (teamId:st
   const [agentId, setAgentId] = useState('');
 
   useEffect(() => {
-    fetchKpiCardsCached(teamId || undefined)
-      .then((j) => {
-        if (!teamId && j?.teams) setTeams(j.teams);
-        setAgents(j?.agents || []);
-      })
-      .catch(() => {});
-    if (teamId) setAgentId('');
+    fetch('/api/dashboard/kpi-cards', { cache: 'no-store' }).then(r=>r.json()).then(j=>{
+      setTeams(j.teams||[]);
+      setAgents(j.agents||[]);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!teamId) {
+      fetch('/api/dashboard/kpi-cards').then(r=>r.json()).then(j=> setAgents(j.agents||[]));
+      return;
+    }
+    fetch(`/api/dashboard/kpi-cards?teamId=${teamId}`).then(r=>r.json()).then(j=> setAgents(j.agents||[]));
+    setAgentId('');
   }, [teamId]);
 
   useEffect(()=>{ onChange(teamId||null, agentId||null); }, [teamId, agentId]);

@@ -103,11 +103,11 @@ CREATE POLICY notif_write ON public.notifications FOR ALL USING (is_admin_or_own
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.notifications TO authenticated;
 
 -- 6. Lead stage hardening: ensure crm_status has known values (no enum lock to allow Admin settings sync, but add check via allowed list soft)
--- Add dedup support: normalized phone/email generated columns + non-unique lookup indexes (duplicates are routed to Duplicate Center)
+-- Add dedup support: normalized phone/email generated columns + unique partial indexes for global dedup
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS phone_normalized TEXT GENERATED ALWAYS AS (regexp_replace(COALESCE(phone,''), '\D', '', 'g')) STORED;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS email_normalized TEXT GENERATED ALWAYS AS (lower(trim(COALESCE(email,'')))) STORED;
-CREATE INDEX IF NOT EXISTS idx_leads_phone_normalized_lookup ON public.leads(phone_normalized);
-CREATE INDEX IF NOT EXISTS idx_leads_email_normalized_lookup ON public.leads(email_normalized);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_phone_normalized_unique ON public.leads(phone_normalized) WHERE phone_normalized <> '' AND char_length(phone_normalized) >= 8;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_email_normalized_unique ON public.leads(email_normalized) WHERE email_normalized <> '';
 
 -- 7. Trigger: auto-create FollowUpTask on call outcome FOLLOW_UP
 CREATE OR REPLACE FUNCTION public.auto_create_followup_task()

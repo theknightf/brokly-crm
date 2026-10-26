@@ -7,7 +7,6 @@ import Topbar from './Topbar';
 import MobileBottomNav from './MobileBottomNav';
 import QuickActions from './QuickActions';
 import DeductionAlertProvider from './DeductionAlertProvider';
-import AssistantChatWidget from './assistant/AssistantChatWidget';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface AppLayoutProps {
@@ -82,8 +81,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <QuickActions />
       {/* Instant deduction dispatcher (spec 4.B) */}
       <DeductionAlertProvider />
-      {/* AI Assistant for sales agents */}
-      <AssistantChatWidget />
     </div>
   );
 }

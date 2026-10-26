@@ -3,7 +3,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../state/auth_provider.dart';
-import '../assistant/assistant_chat_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final int selectedIndex;
@@ -174,76 +173,6 @@ class AppDrawer extends StatelessWidget {
 
                   // ── MANAGEMENT SECTION ────────────────────────────────
                   _buildSectionHeader('MANAGEMENT', isDark),
-
-                  // Brokly AI Copilot (Obsidian / Neon-Lime luxury card)
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF142407), Color(0xFF0F141D)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.neonLime.withAlpha(120), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.neonLime.withAlpha(50),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: ListTile(
-                      dense: true,
-                      leading: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: AppColors.neonLime,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Icon(LucideIcons.sparkles, size: 16, color: Color(0xFF142407)),
-                        ),
-                      ),
-                      title: const Text(
-                        'Brokly AI Copilot',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'مساعد المبيعات الذكي (Groq)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.neonLime,
-                        ),
-                      ),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.neonLime.withAlpha(30),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'AI',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.neonLime,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        AssistantChatScreen.showAsModal(context);
-                      },
-                    ),
-                  ),
 
                   // Unit Calculator (active neon-green highlight capsule)
                   Container(

@@ -45,8 +45,6 @@
     "mobile",
     "mobile/**",
     "mobile_flutter",
-    "mobile_flutter/**",
-    "supabase/functions",
-    "supabase/functions/**"
+    "mobile_flutter/**"
   ]
 }

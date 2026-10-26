@@ -25,8 +25,6 @@ export const dictionaries: Dict = {
   'common.reservations': { en: 'Reservations', ar: 'الحجوزات' },
   'common.deals': { en: 'Deals', ar: 'الصفقات' },
   'common.callLogs': { en: 'Call Logs', ar: 'سجل المكالمات' },
-  'common.duplicateLeads': { en: 'Duplicate Center', ar: 'مركز معالجة التكرار' },
-  'common.importHistory': { en: 'Import History', ar: 'سجل ملفات الاستيراد' },
   'common.calendar': { en: 'Calendar', ar: 'التقويم' },
   'common.myLocation': { en: 'My Location', ar: 'موقعي' },
   'common.newLead': { en: 'Add new lead', ar: 'ضيف عميل جديد' },

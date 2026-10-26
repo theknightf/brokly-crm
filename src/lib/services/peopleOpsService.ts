@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { computePayrollEntry, round2, type PayrollRules } from '@/lib/payrollMath';
+import { LEADS_OWNERS_SELECT, LEADS_PEOPLE_OPS_SELECT } from '@/lib/supabase/leadsSelect';
 export { computePayrollEntry, round2 };
 export type { PayrollRules };
 
@@ -783,7 +784,7 @@ export const duplicateLeadsService = {
     try {
       const { data, error } = await supabase
         .from('leads')
-        .select('id, name, phone, created_by, created_at, created_by_profile:user_profiles!leads_created_by_fkey(full_name), lead_status, assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)')
+        .select(LEADS_PEOPLE_OPS_SELECT)
         .ilike('phone', `%${clean}`)
         .order('created_at', { ascending: true })
         .limit(3);
@@ -830,7 +831,7 @@ export const duplicateLeadsService = {
       try {
         const { data: origLead } = await supabase
           .from('leads')
-          .select('name, created_by, assigned_to, created_by_profile:user_profiles!leads_created_by_fkey(full_name), assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)')
+          .select(LEADS_OWNERS_SELECT)
           .eq('id', input.matchedLeadId)
           .maybeSingle();
         if (origLead) {

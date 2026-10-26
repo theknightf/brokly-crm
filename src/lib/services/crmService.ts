@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/client';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 import { isAdminRole } from '@/lib/roles';
+import { LEADS_LIST_SELECT } from '@/lib/supabase/leadsSelect';
+import { logPostgrestError, toPostgrestError } from '@/lib/supabase/postgrestError';
 
 export function getLocalTodayDateString(): string {
   const d = new Date();
@@ -61,58 +63,6 @@ function cachedRead<T>(key: string, factory: () => Promise<T>): Promise<T> {
 
 function invalidateCache(): void {
   crmCache.clear();
-}
-
-let actorScopeCache: {
-  expiresAt: number;
-  userId: string | null;
-  role: string | null;
-  memberIds: string[];
-} | null = null;
-
-async function getCachedActorScope(supabase: any) {
-  if (actorScopeCache && actorScopeCache.expiresAt > Date.now()) {
-    return actorScopeCache;
-  }
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user ?? (await supabase.auth.getUser())?.data?.user ?? null;
-    if (!user) {
-      actorScopeCache = { expiresAt: Date.now() + 15_000, userId: null, role: null, memberIds: [] };
-      return actorScopeCache;
-    }
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle();
-    const role = profile?.role || null;
-    let memberIds = [user.id];
-    if (!isAdminRole(role) && (role === 'team_leader' || role === 'Team Lead' || role === 'manager')) {
-      const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
-      const teamIds = (teams || []).map((t: any) => t.id);
-      if (teamIds.length > 0) {
-        const { data: members } = await supabase
-          .from('team_memberships')
-          .select('user_id')
-          .in('team_id', teamIds);
-        if (members && members.length > 0) {
-          memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
-        }
-      }
-    }
-    actorScopeCache = {
-      expiresAt: Date.now() + 60_000,
-      userId: user.id,
-      role,
-      memberIds,
-    };
-    return actorScopeCache;
-  } catch {
-    return { expiresAt: 0, userId: null, role: null, memberIds: [] };
-  }
 }
 
 /**
@@ -298,16 +248,35 @@ export const leadsService = {
     try {
       let query = supabase
         .from('leads')
-        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
+        .select(LEADS_LIST_SELECT);
 
-      // Apply role-based query isolation for privacy (cached)
+      // Apply role-based query isolation for privacy
       try {
-        const scope = await getCachedActorScope(supabase);
-        if (scope.userId && !isAdminRole(scope.role)) {
-          if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
-            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
-          } else {
-            query = query.eq('assigned_to', scope.userId);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          const role = profile?.role;
+          if (!isAdminRole(role)) {
+            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
+              // Team Leader: fetch members of teams led by this user
+              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
+              const teamIds = (teams || []).map((t: any) => t.id);
+              let memberIds = [user.id];
+              if (teamIds.length > 0) {
+                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
+                if (members && members.length > 0) {
+                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+                }
+              }
+              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
+            } else {
+              // Regular Agent: only leads assigned to or created by current user
+              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+            }
           }
         }
       } catch {
@@ -316,7 +285,8 @@ export const leadsService = {
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) {
-        if (isSchemaError(error)) throw error;
+        logPostgrestError('leadsService.getAll', error, { select: LEADS_LIST_SELECT });
+        if (isSchemaError(error)) throw toPostgrestError(error, 'Failed to load leads');
         return [];
       }
       return (data || []).map(rowToLead);
@@ -332,11 +302,12 @@ export const leadsService = {
     try {
       const { data, error } = await supabase
         .from('leads')
-        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
+        .select(LEADS_LIST_SELECT)
         .eq('id', id)
         .single();
       if (error) {
-        if (isSchemaError(error)) throw error;
+        logPostgrestError('leadsService.getById', error, { select: LEADS_LIST_SELECT, leadId: id });
+        if (isSchemaError(error)) throw toPostgrestError(error, 'Failed to load lead');
         return null;
       }
       const lead = rowToLead(data);
@@ -385,51 +356,27 @@ export const leadsService = {
 
   async create(lead: any, userId: string) {
     const supabase = createClient();
-    // Detect existing matching lead by phone or email without blocking ingestion.
-    // Duplicates are accepted, flagged as 'Duplicate Leads', linked to the original
-    // record, and routed directly to the Duplicate Center.
-    let matchedDup: { id: string; name: string } | null = null;
+    // Global dedup pre-check (phone/email) — spec 2.C: provide clickable redirect link to existing lead
     try {
       const phoneNorm = String(lead.phone || '').replace(/\D/g, '');
       if (phoneNorm && phoneNorm.length >= 8) {
-        const { data: dup } = await supabase
-          .from('leads')
-          .select('id, name, phone')
-          .ilike('phone', `%${phoneNorm.slice(-10)}%`)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (dup && String(dup.phone || '').replace(/\D/g, '').slice(-10) === phoneNorm.slice(-10)) {
-          matchedDup = { id: dup.id, name: dup.name || 'Existing Lead' };
+        const { data: dup } = await supabase.from('leads').select('id, name, phone').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
+        if (dup && String(dup.phone||'').replace(/\D/g,'').slice(-10) === phoneNorm.slice(-10)) {
+          const err: any = new Error(`Duplicate phone — existing lead: ${dup.name} (${dup.id}). Open /leads/${dup.id}`);
+          err.code = '23505'; err.existingLeadId = dup.id; err.redirectLink = `/leads/${dup.id}`; err.apiLink = `/api/leads/${dup.id}/profile`;
+          throw err;
         }
       }
-      const emailNorm = String(lead.email || '').toLowerCase().trim();
-      if (!matchedDup && emailNorm && emailNorm.includes('@')) {
-        const { data: dup } = await supabase
-          .from('leads')
-          .select('id, name, email')
-          .ilike('email', emailNorm)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (dup && String(dup.email || '').toLowerCase().trim() === emailNorm) {
-          matchedDup = { id: dup.id, name: dup.name || 'Existing Lead' };
+      const emailNorm = String(lead.email||'').toLowerCase().trim();
+      if (emailNorm) {
+        const { data: dup } = await supabase.from('leads').select('id, name, email').ilike('email', emailNorm).limit(1).maybeSingle();
+        if (dup && String(dup.email||'').toLowerCase().trim()===emailNorm) {
+          const err: any = new Error(`Duplicate email — existing lead: ${dup.name} (${dup.id}). Open /leads/${dup.id}`);
+          err.code = '23505'; err.existingLeadId = dup.id; err.redirectLink = `/leads/${dup.id}`;
+          throw err;
         }
       }
-    } catch {
-      // non-fatal — DB trigger also checks and routes duplicates
-    }
-
-    if (matchedDup) {
-      lead.status = 'Duplicate Leads';
-      lead.isDuplicate = true;
-      lead.duplicateOfLeadId = matchedDup.id;
-      const tag = `[Pending Review / Duplicate of #${matchedDup.id.slice(0, 8)} (${matchedDup.name})]`;
-      if (!String(lead.notes || '').includes('[Pending Review / Duplicate')) {
-        lead.notes = `${lead.notes || ''}\n${tag}`.trim();
-      }
-    }
-
+    } catch (e:any) { if (e?.code==='23505') throw e; }
     // Auto-assignment when the admin rotation toggle is on.
     const rotation = await computeRotationAssignments([lead]);
     const rot = rotation.get(0);
@@ -439,38 +386,41 @@ export const leadsService = {
       lead.agent = rot.name;
       lead.agentInitials = agentInitials(rot.name);
     }
-
-    const rowPayload: any = leadToRow(lead, userId);
-    if (matchedDup) {
-      rowPayload.is_duplicate = true;
-      rowPayload.duplicate_of_lead_id = matchedDup.id;
-      rowPayload.routed_to_duplicate_center_at = new Date().toISOString();
-      rowPayload.crm_status = 'Duplicate Leads';
-      rowPayload.lead_status = 'Lost';
-    }
-
     const { data, error } = await supabase
       .from('leads')
-      .insert(rowPayload)
-      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
+      .insert(leadToRow(lead, userId))
+      .select(LEADS_LIST_SELECT)
       .single();
     if (error) {
+      // Handle race-condition unique violation with redirect link
+      if ((error as any).code === '23505') {
+        const phoneNorm = String(lead.phone||'').replace(/\D/g,'');
+        let dupId: string | null = null;
+        try {
+          if (phoneNorm) {
+            const { data: dup } = await supabase.from('leads').select('id').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
+            if (dup) dupId = dup.id;
+          }
+          if (!dupId && lead.email) {
+            const { data: dup } = await supabase.from('leads').select('id').ilike('email', String(lead.email).toLowerCase().trim()).limit(1).maybeSingle();
+            if (dup) dupId = dup.id;
+          }
+        } catch {}
+        (error as any).existingLeadId = dupId;
+        (error as any).redirectLink = dupId ? `/leads/${dupId}` : null;
+        (error as any).message = dupId ? `${error.message} — existing: /leads/${dupId}` : error.message;
+      }
       throw error;
     }
     invalidateCache();
-    // Run side-effects in the background so UI responds immediately.
+    // Notify an assignee when a lead is created already assigned to someone.
     if (data?.assigned_to) {
-      void pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
+      await pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
     }
-    void followUpsService.syncFromLead(data).then(() => emitFollowUpsChanged());
-
-    const mapped = rowToLead(data);
-    const isDupFinal = Boolean(data?.is_duplicate || matchedDup || data?.crm_status === 'Duplicate Leads');
+    await followUpsService.syncFromLead(data);
+    emitFollowUpsChanged();
     return {
-      ...mapped,
-      isDuplicate: isDupFinal,
-      routedToDuplicateCenter: isDupFinal,
-      duplicateOfLeadId: data?.duplicate_of_lead_id || matchedDup?.id || null,
+      ...rowToLead(data),
       referredToName: lead.referredToName || null,
       referredByName: lead.referredByName || null,
     };
@@ -486,13 +436,18 @@ export const leadsService = {
     if (!clean.length) return new Set<string>();
     const supabase = createClient();
     try {
+      const query: any = supabase
+        .from('leads')
+        .select('phone')
+        .or(clean.map((p) => `phone.ilike.%${p}%`).join(','));
+      // The `or` filter may exceed URL length for very large imports; chunk it.
       const found = new Set<string>();
       for (let i = 0; i < clean.length; i += 50) {
         const chunk = clean.slice(i, i + 50);
         const { data, error } = await supabase
           .from('leads')
           .select('phone')
-          .or(chunk.map((p) => `phone.ilike.%${p.slice(-10)}%`).join(','));
+          .or(chunk.map((p) => `phone.ilike.%${p}%`).join(','));
         if (error) continue;
         (data || []).forEach((r: any) => {
           if (r?.phone) found.add(String(r.phone).replace(/\D/g, ''));
@@ -506,9 +461,9 @@ export const leadsService = {
   },
 
   /**
-   * Inserts a batch of pre-validated leads (single round-trip). Duplicate leads
-   * are accepted without blocking and automatically flagged & routed to the
-   * Duplicate Center by the database trigger and service layer.
+   * Inserts a batch of pre-validated leads (single round-trip). createdBy is
+   * the current user id so RLS ownership + the DB trigger work for imported
+   * rows. Returns the inserted leads and syncs any follow-up rows.
    */
   async bulkInsert(rows: any[], userId: string) {
     if (!rows.length) return [];
@@ -529,65 +484,80 @@ export const leadsService = {
     const { data, error } = await supabase
       .from('leads')
       .insert(finalRows.map((r) => leadToRow(r, userId)))
-      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
+      .select(LEADS_LIST_SELECT);
     if (error) {
+      if ((error as any).code === '23505') {
+        // Global dedup uniqueness violated — fetch one existing duplicate for redirect link
+        const phone = String(finalRows[0]?.phone || '').replace(/\D/g,'');
+        let dupId: string | null = null;
+        try {
+          if (phone) {
+            const { data: dup } = await supabase.from('leads').select('id').ilike('phone', `%${phone.slice(-10)}%`).limit(1).maybeSingle();
+            if (dup) dupId = (dup as any).id;
+          }
+        } catch {}
+        (error as any).existingLeadId = dupId;
+        (error as any).redirectLink = dupId ? `/leads/${dupId}` : null;
+        (error as any).message = dupId ? `${error.message} — existing lead: /leads/${dupId} (click to view)` : error.message;
+      }
       throw error;
     }
     invalidateCache();
-    // Notify assignees & sync follow-ups in the background so import finishes immediately.
-    void (async () => {
-      try {
-        const assignees = new Map<string, string[]>();
-        (data || []).forEach((l: any) => {
-          if (l.assigned_to) {
-            assignees.set(l.assigned_to, [...(assignees.get(l.assigned_to) || []), l.id]);
-          }
-        });
-        for (const [to, ids] of assignees.entries()) {
-          await pushAssignmentNotifications(supabase, ids, to, 'Lead import');
-        }
-        await followUpsService.syncFromLead(data || []);
-        emitFollowUpsChanged();
-      } catch {}
-    })();
+    // Notify assignees when imported leads were assigned to them (best-effort).
+    const assignees = new Map<string, string[]>();
+    (data || []).forEach((l: any) => {
+      if (l.assigned_to) {
+        assignees.set(l.assigned_to, [...(assignees.get(l.assigned_to) || []), l.id]);
+      }
+    });
+    for (const [to, ids] of assignees.entries()) {
+      await pushAssignmentNotifications(supabase, ids, to, 'Lead import');
+    }
+    await followUpsService.syncFromLead(data || []);
+    emitFollowUpsChanged();
     return (data || []).map(rowToLead);
   },
 
   async update(id: string, lead: any) {
     const supabase = createClient();
-    const [{ data: prev }, scope] = await Promise.all([
-      supabase.from('leads').select('assigned_to').eq('id', id).maybeSingle(),
-      getCachedActorScope(supabase),
-    ]);
-    const actorId = scope.userId;
+    const { data: prev } = await supabase.from('leads').select('assigned_to').eq('id', id).single();
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
     const payload: any = { ...leadToRow(lead), last_action_at: new Date().toISOString() };
     if (actorId) payload.last_action_by = actorId;
     const { data, error } = await supabase
       .from('leads')
       .update(payload)
       .eq('id', id)
-      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
+      .select(LEADS_LIST_SELECT)
       .single();
     if (error) throw error;
     invalidateCache();
-    // Notify the new assignee when a lead is (re)assigned through the edit modal (non-blocking).
+    // Notify the new assignee when a lead is (re)assigned through the edit modal.
     const nextAssignee = data?.assigned_to || null;
     if (nextAssignee && nextAssignee !== (prev?.assigned_to || null)) {
-      void pushAssignmentNotifications(
+      await pushAssignmentNotifications(
         supabase,
         [id],
         nextAssignee,
         lead.assignedToName || lead.agent
       );
     }
-    void followUpsService.syncFromLead(data).then(() => emitFollowUpsChanged());
+    await followUpsService.syncFromLead(data);
+    emitFollowUpsChanged();
     return rowToLead(data);
   },
 
   async updateStatus(id: string, status: string) {
     const supabase = createClient();
-    const scope = await getCachedActorScope(supabase);
-    const actorId = scope.userId;
+    let actorId: string | null = null;
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      actorId = au?.user?.id ?? null;
+    } catch {}
     const patch: any = {
       crm_status: status,
       lead_status: mapCrmStatusToLegacy(status),
@@ -601,10 +571,10 @@ export const leadsService = {
       );
     }
     invalidateCache();
-    void Promise.allSettled([
-      syncLeadFollowUpRow(id),
-      followUpsService.syncFromLead(data),
-    ]).then(() => emitFollowUpsChanged());
+    await syncLeadFollowUpRow(id);
+    await followUpsService.syncFromLead(data);
+    // Follow-up dashboard: status changes may cancel/create reminders (terminal stages).
+    emitFollowUpsChanged();
     return rowToLead(data);
   },
 
@@ -617,18 +587,21 @@ export const leadsService = {
   async scheduleFollowUp(id: string, dueDate: string, actorId?: string | null) {
     const supabase = createClient();
     if (!actorId) {
-      const scope = await getCachedActorScope(supabase);
-      actorId = scope.userId;
+      try {
+        const { data: au } = await supabase.auth.getUser();
+        actorId = au?.user?.id || null;
+      } catch {}
     }
     const patch: any = { follow_up_due: dueDate, last_action_at: new Date().toISOString() };
     if (actorId) patch.last_action_by = actorId;
     const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').single();
     if (error) throw error;
     invalidateCache();
-    void Promise.allSettled([
-      syncLeadFollowUpRow(id),
-      followUpsService.syncFromLead(data),
-    ]).then(() => emitFollowUpsChanged());
+    // Server-side sync is the primary path (service-role, RLS-proof);
+    // client syncFromLead stays as offline fallback. Both are idempotent.
+    await syncLeadFollowUpRow(id);
+    await followUpsService.syncFromLead(data);
+    emitFollowUpsChanged();
     return rowToLead(data);
   },
 
@@ -800,14 +773,13 @@ export const leadsService = {
     invalidateCache();
   },
 
-  async getStatusCounts(assignedTo?: string) {
+  async getStatusCounts() {
     const supabase = createClient();
     // Prefer the server-side aggregate (single rowset, no full-table transfer).
     // Any failure (including a missing RPC on a DB that's behind on migrations)
     // must degrade to the client-side fallback — never throw.
     try {
-      const rpcParams = assignedTo ? { p_assigned_to: assignedTo } : {};
-      const { data, error } = await supabase.rpc('get_lead_status_counts', rpcParams);
+      const { data, error } = await supabase.rpc('get_lead_status_counts');
       if (!error && Array.isArray(data)) {
         const counts: Record<string, number> = {};
         (data as { status: string; count: number }[]).forEach((r) => {
@@ -818,29 +790,16 @@ export const leadsService = {
     } catch {
       // fall through to client aggregation
     }
-    // Fallback: client-side aggregation over active_leads / leads with range pagination.
-    const cacheKey = assignedTo ? `statusCounts:${assignedTo}` : 'statusCounts:all';
-    return cachedRead(cacheKey, async () => {
+    // Fallback: client-side aggregation over the status columns.
+    return cachedRead('statusCounts', async () => {
       try {
-        const CHUNK = 1000;
-        let page = 0;
+        const { data, error } = await supabase.from('leads').select('crm_status, lead_status');
+        if (error) return {};
         const counts: Record<string, number> = {};
-        while (true) {
-          let q = supabase
-            .from('active_leads')
-            .select('crm_status, lead_status');
-          if (assignedTo) {
-            q = q.eq('assigned_to', assignedTo);
-          }
-          const { data, error } = await q.range(page * CHUNK, (page + 1) * CHUNK - 1);
-          if (error || !data || data.length === 0) break;
-          data.forEach((row: any) => {
-            const s = row.crm_status || row.lead_status || 'Fresh Leads';
-            counts[s] = (counts[s] || 0) + 1;
-          });
-          if (data.length < CHUNK) break;
-          page++;
-        }
+        (data || []).forEach((row: any) => {
+          const s = row.crm_status || row.lead_status || 'Fresh Leads';
+          counts[s] = (counts[s] || 0) + 1;
+        });
         return counts;
       } catch {
         return {};
@@ -1007,18 +966,37 @@ export const leadsService = {
     try {
       let query = supabase
         .from('leads')
-        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', {
+        .select(LEADS_LIST_SELECT, {
           count: 'exact',
         });
 
-      // Role-based privacy isolation: only team leaders and admins can see other members' leads (cached)
+      // Role-based privacy isolation: only team leaders and admins can see other members' leads
       try {
-        const scope = await getCachedActorScope(supabase);
-        if (scope.userId && !isAdminRole(scope.role)) {
-          if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
-            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
-          } else {
-            query = query.eq('assigned_to', scope.userId);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+          const role = profile?.role;
+          if (!isAdminRole(role)) {
+            if (role === 'team_leader' || role === 'Team Lead' || role === 'manager') {
+              // Team Leader: fetch members of teams led by this user
+              const { data: teams } = await supabase.from('teams').select('id').eq('leader_id', user.id);
+              const teamIds = (teams || []).map((t: any) => t.id);
+              let memberIds = [user.id];
+              if (teamIds.length > 0) {
+                const { data: members } = await supabase.from('team_memberships').select('user_id').in('team_id', teamIds);
+                if (members && members.length > 0) {
+                  memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+                }
+              }
+              query = query.or(`assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`);
+            } else {
+              // Regular Agent: only leads assigned to or created by current user
+              query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+            }
           }
         }
       } catch {
@@ -1077,14 +1055,26 @@ export const leadsService = {
       const to = from + pageSize - 1;
 
       // ── Action Taken filter (replaces Contacted) ──────────────────────────
+      // Reads leads.last_action_at directly — covers call, note, stage,
+      // follow-up (every key action bumps the timestamp + user). If the
+      // migration hasn't landed yet, falls back to the legacy
+      // call_logs+follow_ups created today set so the UI never breaks.
       const hasActionFilter = !!actionTaken || !!actionFrom || !!actionTo;
       let useFallbackContacted = false;
       if (hasActionFilter) {
         try {
+          // Date-range overrides the "today" shortcut when provided.
           if (actionFrom || actionTo) {
             if (actionFrom) query = query.gte('last_action_at', `${actionFrom}T00:00:00.000Z`);
             if (actionTo) query = query.lte('last_action_at', `${actionTo}T23:59:59.999Z`);
             if (actionTaken === 'no-action') {
+              // "No Action" in a range = outside the range OR never
+              // For now, treat as: last_action_at is null OR outside range
+              // Handled by client — we invert: fetch inside range then exclude?
+              // Simpler: if no-action + range, we need is null or not between
+              // Use two conditions: is null OR (lt from OR gt to) — PostgREST or
+              // not convenient, so we handle after fetch via in-memory filter?
+              // For v1, no-action with range = last_action_at is null
               query = query.is('last_action_at', null);
             }
           } else if (actionTaken === 'today') {
@@ -1096,13 +1086,19 @@ export const leadsService = {
           } else if (actionTaken === 'no-action') {
             const start = new Date();
             start.setHours(0, 0, 0, 0);
+            // untouched today = null OR before today 00:00
             query = query.or(`last_action_at.is.null,last_action_at.lt.${start.toISOString()}`);
           }
+          // Probe: if the column doesn't exist PostgREST returns 400/PGRST204
+          // and isSchemaError will be true for the follow-up query error, so we
+          // catch there and redo with fallback. No extra round-trip here.
         } catch {
           useFallbackContacted = true;
         }
       }
 
+      // Fallback set for badge when migration missing — still stamps
+      // contactedToday/actionTakenToday so the list never shows blank badges.
       let fallbackSet: Set<string> | null = null;
       if (useFallbackContacted) {
         try {
@@ -1149,6 +1145,7 @@ export const leadsService = {
           } else if (called === 'not-called') {
             if (calledSet.size) query = query.not('id', 'in', `(${[...calledSet].map((id) => `"${id}"`).join(',')})`);
           } else if (calledFrom || calledTo) {
+            // date range without explicit called value => show called in range
             if (!calledSet.size) return { data: [], total: 0, page, pageSize };
             query = query.in('id', [...calledSet]);
           }
@@ -1162,7 +1159,27 @@ export const leadsService = {
         .range(from, to);
 
       if (error) {
+        logPostgrestError('leadsService.getPage', error, {
+          select: LEADS_LIST_SELECT,
+          page,
+          pageSize,
+          filters: {
+            search: q,
+            status,
+            source,
+            agent,
+            project,
+            propertyType,
+            action,
+            actionTaken,
+            called,
+            sortKey,
+            sortDir,
+          },
+        });
         if (isSchemaError(error) && hasActionFilter && !useFallbackContacted) {
+          // Column last_action_at doesn't exist yet (migration not applied) —
+          // retry once with the legacy call_logs+follow_ups logic.
           try {
             const start = new Date();
             start.setHours(0, 0, 0, 0);
@@ -1181,7 +1198,7 @@ export const leadsService = {
             const s = new Set(ids);
             let retryQuery: any = supabase
               .from('leads')
-              .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', { count: 'exact' });
+              .select(LEADS_LIST_SELECT, { count: 'exact' });
             if (q) retryQuery = retryQuery.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`);
             if (status) retryQuery = retryQuery.eq('crm_status', status);
             if (source) retryQuery = retryQuery.eq('source', source);
@@ -1191,6 +1208,9 @@ export const leadsService = {
             if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
               retryQuery = retryQuery.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
             }
+            if (action) {
+              // re-apply action filter (already computed as in: above, for brevity re-query without it if fallback path)
+            }
             if (actionTaken === 'today' || contacted === 'today') {
               if (!s.size) return { data: [], total: 0, page, pageSize };
               retryQuery = retryQuery.in('id', [...s]);
@@ -1198,7 +1218,14 @@ export const leadsService = {
               retryQuery = retryQuery.not('id', 'in', `(${[...s].map((id) => `"${id}"`).join(',')})`);
             }
             const r2: any = await retryQuery.order(column, { ascending: sortDir !== 'desc' }).range(from, to);
-            if (r2.error) throw new Error(r2.error.message || 'Failed to load leads');
+            if (r2.error) {
+              logPostgrestError('leadsService.getPage.retry', r2.error, {
+                select: LEADS_LIST_SELECT,
+                page,
+                pageSize,
+              });
+              throw toPostgrestError(r2.error, 'Failed to load leads');
+            }
             return {
               data: (r2.data || []).map((row: any) => {
                 const mapped = rowToLead(row);
@@ -1209,21 +1236,49 @@ export const leadsService = {
               pageSize,
             };
           } catch (e: any) {
-            throw new Error(error.message || 'Failed to load leads');
+            if (e && (e as any).code) throw e;
+            throw toPostgrestError(error, 'Failed to load leads');
           }
         }
-        throw new Error(error.message || 'Failed to load leads');
+        // Every failure (schema, network, timeout, auth, integrity) propagates
+        // with the real PostgREST diagnostics attached so the UI/devtools can
+        // show more than a bare "Bad Request".
+        throw toPostgrestError(error, 'Failed to load leads');
       }
-      // Derive hasBeenCalled without an extra blocking DB query when calledSet is not active
-      const pageCalledSet: Set<string> | null = calledSet;
+      // Stamp hasBeenCalled badge for current page (even when no called filter)
+      let pageCalledSet: Set<string> | null = calledSet;
+      if (!hasCalledFilter && (data || []).length) {
+        try {
+          const ids = (data || []).map((r: any) => r.id);
+          const chunks: string[][] = [];
+          for (let i = 0; i < ids.length; i += 100) {
+            chunks.push(ids.slice(i, i + 100));
+          }
+          const chunkResults = await Promise.all(
+            chunks.map((chunk) =>
+              supabase.from('call_logs').select('entity_id').in('entity_id', chunk).eq('entity_type', 'lead')
+            )
+          );
+          const found = new Set<string>();
+          chunkResults.forEach((res) => {
+            (res.data || []).forEach((r: any) => {
+              if (r.entity_id) found.add(r.entity_id);
+            });
+          });
+          pageCalledSet = found;
+        } catch {
+          pageCalledSet = new Set<string>();
+        }
+      }
       return {
         data: (data || []).map((row: any) => {
           const mapped = rowToLead(row);
+          // When falling back, override the derived badge with the join set
           if (fallbackSet) {
             const v = fallbackSet.has(row.id);
-            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at) };
+            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : undefined };
           }
-          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at);
+          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : undefined;
           return { ...mapped, hasBeenCalled };
         }),
         total: count ?? (data || []).length,
@@ -1231,6 +1286,9 @@ export const leadsService = {
         pageSize,
       };
     } catch (err: any) {
+      // Always rely on isSchemaError to decide a degraded path; for leads we
+      // want real errors surfaced, so re-throw unless it already describes a
+      // missing-schema situation that the older caller handles.
       if (isSchemaError(err)) throw err;
       throw err;
     }
@@ -1284,9 +1342,6 @@ function rowToLead(row: any) {
     agent: row.agent,
     agentInitials: row.agent_initials,
     status: row.crm_status || row.lead_status || 'Fresh Leads',
-    isDuplicate: Boolean(row.is_duplicate || row.crm_status === 'Duplicate Leads'),
-    duplicateOfLeadId: row.duplicate_of_lead_id || null,
-    routedToDuplicateCenterAt: row.routed_to_duplicate_center_at || null,
     assignedTo: row.assigned_to || null,
     assignedToName: row.assigned_to_profile?.full_name || null,
     referredTo: row.referred_to || null,
@@ -1377,15 +1432,13 @@ export const leadSourcesService = {
 };
 
 function leadToRow(lead: any, userId?: string) {
-  const cleanPhone = String(lead.phone || '').trim();
-  const cleanName = String(lead.name || '').trim() || (cleanPhone ? `Lead (${cleanPhone.slice(-4)})` : 'New Lead');
   const row: any = {
-    name: cleanName,
-    phone: cleanPhone,
-    email: lead.email ? String(lead.email).trim() : '',
-    property_type: lead.propertyType || '',
-    budget_min: lead.budgetMin ?? 0,
-    budget_max: lead.budgetMax ?? 0,
+    name: lead.name,
+    phone: lead.phone,
+    email: lead.email,
+    property_type: lead.propertyType,
+    budget_min: lead.budgetMin,
+    budget_max: lead.budgetMax,
     source: lead.source,
     lead_source_id: lead.leadSourceId || lead.lead_source_id || null,
     agent: lead.agent,
@@ -1424,8 +1477,10 @@ function leadToRow(lead: any, userId?: string) {
     reservation_date: lead.reservationDate || null,
     closing_date: lead.closingDate || null,
     final_price: lead.finalPrice ?? 0,
-    commission: Number(lead.commission ?? 0),
+    commission: lead.commission ?? 0,
   };
+  // If the caller supplies an explicit creation date (e.g. lead import), keep
+  // it; otherwise the DB default applies.
   if (lead.createdAt) {
     const iso = String(lead.createdAt);
     row.created_at = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
@@ -1434,6 +1489,12 @@ function leadToRow(lead: any, userId?: string) {
   return row;
 }
 
+/**
+ * Turn raw Postgres/PostgREST errors into a clear, actionable message for the
+ * lead stage/status flow. The DB triggers that write the activity log must
+ * never be able to silently break a status change — if a write fails we tell
+ * the user exactly why instead of a bare "Failed to update status".
+ */
 function describeLeadWriteError(error: any, action: string): string {
   const msg = typeof error?.message === 'string' ? error.message : String(error || '');
   if (/permission denied|row-level security|violates row-level security/i.test(msg)) {
@@ -1457,7 +1518,6 @@ function mapCrmStatusToLegacy(crmStatus: string): string {
     'Cold Calls': 'Contacted',
     'Pending Leads': 'Contacted',
     'Following Up': 'Qualified',
-    'Follow Up After Meeting': 'Qualified',
     Meeting: 'Site Visit Scheduled',
     Interested: 'Qualified',
     'Not Interested': 'Lost',
@@ -1997,7 +2057,7 @@ export const teamsService = {
           id,
           user_id,
           is_leader,
-          user_profiles(id, full_name, email, role)
+          user:user_profiles!team_memberships_user_id_fkey(id, full_name, email, role)
         `
         )
         .eq('team_id', teamId)
@@ -2009,9 +2069,9 @@ export const teamsService = {
       return (data || []).map((row: any) => ({
         id: row.id,
         userId: row.user_id,
-        userName: row.user_profiles?.full_name || '',
-        userEmail: row.user_profiles?.email || '',
-        userRole: row.user_profiles?.role || 'agent',
+        userName: row.user?.full_name || '',
+        userEmail: row.user?.email || '',
+        userRole: row.user?.role || 'agent',
         isLeader: row.is_leader || false,
       }));
     } catch (err: any) {
@@ -2189,7 +2249,7 @@ export const teamsService = {
         const teamIds = leadership.map((l: any) => l.team_id);
         const { data: members, error: memErr } = await supabase
           .from('team_memberships')
-          .select('user_id, user_profiles(id, full_name, email, role, is_active)')
+          .select('user_id, user:user_profiles!team_memberships_user_id_fkey(id, full_name, email, role, is_active)')
           .in('team_id', teamIds);
         if (memErr) {
           if (isSchemaError(memErr)) throw memErr;
@@ -2199,7 +2259,7 @@ export const teamsService = {
         const seen = new Set<string>();
         const result: { id: string; name: string; role: string }[] = [];
         for (const row of members || []) {
-          const up = (row as any).user_profiles;
+          const up = (row as any).user;
           if (!up || up.is_active === false || seen.has(up.id)) continue;
           seen.add(up.id);
           result.push({
@@ -3315,7 +3375,7 @@ export const leadCommentsService = {
           body,
           created_at,
           user_id,
-          user_profiles(id, full_name, email)
+          author:user_profiles!lead_comments_user_id_fkey(id, full_name, email)
         `
         )
         .eq('lead_id', leadId)
@@ -3328,7 +3388,7 @@ export const leadCommentsService = {
         id: row.id,
         body: row.body,
         userId: row.user_id,
-        authorName: row.user_profiles?.full_name || row.user_profiles?.email || 'Unknown',
+        authorName: row.author?.full_name || row.author?.email || 'Unknown',
         createdAt: row.created_at,
       }));
     } catch (err: any) {
@@ -3348,7 +3408,7 @@ export const leadCommentsService = {
         body,
         created_at,
         user_id,
-        user_profiles(id, full_name, email)
+        author:user_profiles!lead_comments_user_id_fkey(id, full_name, email)
       `
       )
       .single();
@@ -3369,7 +3429,7 @@ export const leadCommentsService = {
       body: data.body,
       userId: data.user_id,
       authorName:
-        (data as any).user_profiles?.full_name || (data as any).user_profiles?.email || 'Unknown',
+        (data as any).author?.full_name || (data as any).author?.email || 'Unknown',
       createdAt: data.created_at,
     };
   },

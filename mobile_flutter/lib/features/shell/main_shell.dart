@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
-import '../assistant/assistant_chat_screen.dart';
 import '../attendance/attendance_screen.dart';
 import '../calculator/unit_calculator_screen.dart';
 import '../call_logs/call_logs_screen.dart';
@@ -166,51 +165,7 @@ class _MainShellState extends State<MainShell> {
                 );
               },
             )
-          : FloatingActionButton.extended(
-              backgroundColor: const Color(0xFF0C1017),
-              foregroundColor: Colors.white,
-              elevation: 6,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(color: AppColors.neonLime.withAlpha(140), width: 1.2),
-              ),
-              icon: Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.neonLime, AppColors.primary],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(LucideIcons.sparkles, size: 13, color: Color(0xFF142407)),
-                ),
-              ),
-              label: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Brokly AI',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'مساعد المبيعات',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.neonLime,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              onPressed: () => AssistantChatScreen.showAsModal(context),
-            ),
+          : null,
     );
   }
 

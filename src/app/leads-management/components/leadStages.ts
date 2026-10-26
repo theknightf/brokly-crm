@@ -10,7 +10,6 @@ export const PIPELINE_STAGES: LeadStatus[] = [
   'Pending Leads',
   'Following Up',
   'Meeting',
-  'Follow Up After Meeting',
   'Interested',
   'Reservation',
   'Done Deal',

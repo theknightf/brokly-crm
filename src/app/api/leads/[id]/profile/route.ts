@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { LEADS_DETAIL_SELECT } from '@/lib/supabase/leadsSelect';
+import { describePostgrestError, logPostgrestError } from '@/lib/supabase/postgrestError';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       rotationRes,
       activityRes,
     ] = await Promise.all([
-      db.from('leads').select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name, email), created_by_profile:user_profiles!leads_created_by_fkey(id, full_name)').eq('id', leadId).maybeSingle(),
+      db.from('leads').select(LEADS_DETAIL_SELECT).eq('id', leadId).maybeSingle(),
       db.from('call_logs').select('*').or(`lead_id.eq.${leadId},entity_id.eq.${leadId}`).order('created_at', { ascending: false }).limit(100),
       db.from('follow_up_tasks').select('*').eq('lead_id', leadId).order('scheduled_at', { ascending: true }).limit(50),
       // fallback to follow_ups table if follow_up_tasks empty
@@ -35,7 +37,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       db.from('activity_log').select('*').eq('entity_type', 'lead').eq('entity_id', leadId).order('created_at', { ascending: false }).limit(100),
     ]);
 
-    if (leadRes.error) return NextResponse.json({ error: leadRes.error.message }, { status: 400 });
+    if (leadRes.error) {
+      logPostgrestError('GET /api/leads/[id]/profile', leadRes.error, { leadId, select: LEADS_DETAIL_SELECT });
+      return NextResponse.json(
+        { error: describePostgrestError(leadRes.error, 'Failed to load lead profile') },
+        { status: 400 }
+      );
+    }
     if (!leadRes.data) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
 
     const lead = leadRes.data;

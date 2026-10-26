@@ -1,22 +1,17 @@
 'use client';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus,
   Loader2,
   Trash2,
   Pencil,
+  Upload,
   Building2,
   Search,
   Image as ImageIcon,
   LayoutGrid,
   Table2,
   BadgeCheck,
-  CheckCircle2,
-  Clock,
-  Check,
-  Filter,
-  Eye,
-  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -24,9 +19,34 @@ import EmptyState from '@/components/ui/EmptyState';
 import UnitCard from '@/components/ui/UnitCard';
 import { unitsService, projectsService, UnitFile } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
-import QuickAddUnitDrawer from './QuickAddUnitDrawer';
 
-const fmt = (n: number) => (n ? n.toLocaleString('en-US') : '0');
+const UNIT_STATUSES = ['Available', 'Reserved', 'Sold'];
+const UNIT_TYPES = [
+  '1 BHK',
+  '2 BHK',
+  '3 BHK',
+  'Penthouse',
+  'Villa',
+  'Townhouse',
+  'Studio',
+  'Commercial',
+];
+
+const fmt = (n: number) => (n ? n.toLocaleString() : '0');
+
+function StatusBadge({ status }: { status: string }) {
+  const cls =
+    status === 'Available'
+      ? 'bg-emerald-100 text-emerald-700'
+      : status === 'Reserved'
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-slate-200 text-slate-700';
+  return (
+    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${cls}`}>
+      {status}
+    </span>
+  );
+}
 
 export default function UnitsScreen() {
   const { user } = useAuth();
@@ -36,20 +56,12 @@ export default function UnitsScreen() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [projectFilter, setProjectFilter] = useState('');
-  const [view, setView] = useState<'table' | 'grid'>('table');
-  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
-
-  // Quick-Add Drawer
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-
-  // Modals
-  const [preview, setPreview] = useState<any | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
   const [deleting, setDeleting] = useState<any | null>(null);
-
-  // Inline Price Editing State
-  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
-  const [inlinePriceValue, setInlinePriceValue] = useState<string>('');
-  const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<any | null>(null);
+  const [view, setView] = useState<'grid' | 'table'>('grid');
+  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,7 +83,6 @@ export default function UnitsScreen() {
     load();
   }, [load]);
 
-  // Load cover image URLs
   useEffect(() => {
     const withImages = units.filter((u) => u.imagePath);
     if (!withImages.length) return;
@@ -89,272 +100,139 @@ export default function UnitsScreen() {
     };
   }, [units]);
 
-  // Quick stats calculations
-  const stats = useMemo(() => {
-    const total = units.length;
-    const available = units.filter((u) => u.status === 'Available' || u.status === 'متاح').length;
-    const reserved = units.filter((u) => u.status === 'Reserved' || u.status === 'محجوز').length;
-    const sold = units.filter((u) => u.status === 'Sold' || u.status === 'مباع').length;
-    return { total, available, reserved, sold };
-  }, [units]);
-
-  // Filtered list
   const filtered = units.filter((u) => {
     const q = search.trim().toLowerCase();
     if (q) {
-      const hay = [u.name, u.unitType, u.projectName, u.paymentPlan, u.notes]
+      const hay = [u.name, u.unitType, u.projectName, u.paymentPlan]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    if (statusFilter) {
-      if (statusFilter === 'Available' && u.status !== 'Available' && u.status !== 'متاح') return false;
-      if (statusFilter === 'Reserved' && u.status !== 'Reserved' && u.status !== 'محجوز') return false;
-      if (statusFilter === 'Sold' && u.status !== 'Sold' && u.status !== 'مباع') return false;
-    }
+    if (statusFilter && u.status !== statusFilter) return false;
     if (projectFilter && u.projectId !== projectFilter) return false;
     return true;
   });
 
-  // Change Unit Status directly with optimistic UI
-  const changeStatus = async (unit: any, newStatus: string) => {
-    const oldStatus = unit.status;
-    setUnits((prev) => prev.map((u) => (u.id === unit.id ? { ...u, status: newStatus } : u)));
+  const saveUnit = async (data: any) => {
     try {
-      await unitsService.update(unit.id, { ...unit, status: newStatus });
-      const statusLabel =
-        newStatus === 'Available' ? 'متاح' : newStatus === 'Reserved' ? 'محجوز' : 'مباع';
-      toast.success(`تم تحديث حالة "${unit.name}" إلى ${statusLabel}`);
+      if (editing) {
+        await unitsService.update(editing.id, { ...editing, ...data });
+        toast.success('Unit updated');
+      } else {
+        await unitsService.create(data, user?.id);
+        toast.success('Unit added');
+      }
+      setFormOpen(false);
+      setEditing(null);
+      load();
     } catch (err: any) {
-      setUnits((prev) => prev.map((u) => (u.id === unit.id ? { ...u, status: oldStatus } : u)));
-      toast.error(err?.message || 'تعذر تحديث الحالة');
+      toast.error(err?.message || 'Failed to save unit');
     }
   };
 
-  // Inline Price Editing
-  const startEditingPrice = (unit: any) => {
-    setEditingPriceId(unit.id);
-    setInlinePriceValue(unit.price ? String(unit.price) : '');
-  };
-
-  const handleSaveInlinePrice = async (unit: any) => {
-    const cleanNum = parseFloat(inlinePriceValue.replace(/,/g, ''));
-    if (isNaN(cleanNum) || cleanNum < 0) {
-      setEditingPriceId(null);
-      return;
-    }
-
-    if (cleanNum === unit.price) {
-      setEditingPriceId(null);
-      return;
-    }
-
-    setSavingPriceId(unit.id);
-    const oldPrice = unit.price;
-    setUnits((prev) => prev.map((u) => (u.id === unit.id ? { ...u, price: cleanNum } : u)));
-
+  const changeStatus = async (unit: any, status: string) => {
     try {
-      await unitsService.update(unit.id, { ...unit, price: cleanNum });
-      toast.success(`تم تحديث سعر "${unit.name}" بنجاح`);
+      await unitsService.update(unit.id, { ...unit, status });
+      setUnits((prev) => prev.map((u) => (u.id === unit.id ? { ...u, status } : u)));
+      toast.success(`"${unit.name}" marked ${status}`);
     } catch (err: any) {
-      setUnits((prev) => prev.map((u) => (u.id === unit.id ? { ...u, price: oldPrice } : u)));
-      toast.error('تعذر حفظ السعر');
-    } finally {
-      setSavingPriceId(null);
-      setEditingPriceId(null);
+      toast.error(err?.message || 'Failed to update status');
     }
   };
 
-  // Delete Unit
   const confirmDelete = async () => {
     if (!deleting) return;
     try {
       await unitsService.delete(deleting.id);
-      toast.success('تم حذف الوحدة بنجاح');
+      toast.success('Unit deleted');
       setDeleting(null);
       load();
     } catch (err: any) {
-      toast.error(err?.message || 'تعذر حذف الوحدة');
+      toast.error(err?.message || 'Failed to delete unit');
     }
   };
 
   return (
-    <div className="space-y-6" dir="rtl">
-      {/* 1. Header & Primary Sticky Quick-Add Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-            إدارة الوحدات والعقارات
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary">
-              {units.length} وحدة
-            </span>
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            إدارة فورية سريعة لوحدات السوق العقاري مع تعديل مباشر للأسعار والحالات
+          <h1 className="page-title">Units</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {units.length} unit{units.length !== 1 ? 's' : ''} in your CRM
           </p>
         </div>
-
-        <div className="flex items-center gap-2.5">
-          {/* View Mode Toggle */}
-          <div className="inline-flex p-1 rounded-xl bg-muted border border-border/60">
-            <button
-              type="button"
-              onClick={() => setView('table')}
-              className={`flex items-center justify-center gap-1.5 px-3 h-8 rounded-lg text-xs font-bold transition-all ${
-                view === 'table' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Table2 size={14} />
-              جدول
-            </button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="inline-flex p-1 rounded-xl bg-muted">
             <button
               type="button"
               onClick={() => setView('grid')}
-              className={`flex items-center justify-center gap-1.5 px-3 h-8 rounded-lg text-xs font-bold transition-all ${
-                view === 'grid' ? 'bg-card text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              className={`flex items-center justify-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                view === 'grid' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground'
               }`}
+              aria-label="Grid view"
             >
               <LayoutGrid size={14} />
-              كروت
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('table')}
+              className={`flex items-center justify-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                view === 'table' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground'
+              }`}
+              aria-label="Table view"
+            >
+              <Table2 size={14} />
             </button>
           </div>
-
-          {/* Prominent Quick-Add Unit Button */}
           <button
-            onClick={() => setQuickAddOpen(true)}
-            className="h-10 px-4 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-md hover:bg-primary/95 active:scale-[0.98] transition-all flex items-center gap-2"
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+            className="btn-primary flex items-center gap-1.5 text-sm"
           >
-            <Plus size={17} className="stroke-[2.5]" />
-            + إضافة وحدة سريعة
+            <Plus size={15} />
+            Add unit
           </button>
         </div>
       </div>
 
-      {/* 2. Quick-Stats Bar with 1-Click Filter */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Total Units */}
-        <button
-          type="button"
-          onClick={() => setStatusFilter('')}
-          className={`p-4 rounded-2xl border text-right transition-all flex items-center justify-between ${
-            statusFilter === ''
-              ? 'bg-card border-primary ring-2 ring-primary/20 shadow-sm'
-              : 'bg-card/70 border-border hover:bg-muted/40'
-          }`}
-        >
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">إجمالي الوحدات</p>
-            <p className="text-2xl font-black text-foreground mt-0.5">{stats.total}</p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-muted-foreground">
-            <Building2 size={20} />
-          </div>
-        </button>
-
-        {/* Available Units */}
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'Available' ? '' : 'Available')}
-          className={`p-4 rounded-2xl border text-right transition-all flex items-center justify-between ${
-            statusFilter === 'Available'
-              ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
-              : 'bg-card/70 border-border hover:bg-emerald-50/20'
-          }`}
-        >
-          <div>
-            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              الوحدات المتاحة
-            </p>
-            <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300 mt-0.5">
-              {stats.available}
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center">
-            <CheckCircle2 size={20} />
-          </div>
-        </button>
-
-        {/* Reserved Units */}
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'Reserved' ? '' : 'Reserved')}
-          className={`p-4 rounded-2xl border text-right transition-all flex items-center justify-between ${
-            statusFilter === 'Reserved'
-              ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-500 ring-2 ring-amber-500/20 shadow-sm'
-              : 'bg-card/70 border-border hover:bg-amber-50/20'
-          }`}
-        >
-          <div>
-            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-              الوحدات المحجوزة
-            </p>
-            <p className="text-2xl font-black text-amber-700 dark:text-amber-300 mt-0.5">
-              {stats.reserved}
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center">
-            <Clock size={20} />
-          </div>
-        </button>
-
-        {/* Sold Units */}
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'Sold' ? '' : 'Sold')}
-          className={`p-4 rounded-2xl border text-right transition-all flex items-center justify-between ${
-            statusFilter === 'Sold'
-              ? 'bg-slate-100 dark:bg-slate-800 border-slate-500 ring-2 ring-slate-500/20 shadow-sm'
-              : 'bg-card/70 border-border hover:bg-slate-100/50'
-          }`}
-        >
-          <div>
-            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-              الوحدات المباعة
-            </p>
-            <p className="text-2xl font-black text-slate-700 dark:text-slate-300 mt-0.5">
-              {stats.sold}
-            </p>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center">
-            <BadgeCheck size={20} />
-          </div>
-        </button>
-      </div>
-
-      {/* 3. Search & Filters Bar */}
-      <div className="card-base !p-3.5 bg-card/60 backdrop-blur-sm border border-border/80">
+      {/* Filters */}
+      <div className="card-base !p-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="relative">
+          <div className="relative sm:col-span-1">
             <Search
-              size={15}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ابحث بالاسم، المشروع، نوع العقار أو التفاصيل..."
-              className="input-base !pr-10 text-xs sm:text-sm h-10 w-full"
+              placeholder="Search unit, project, type…"
+              className="input-base !pl-9"
             />
           </div>
-
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="input-base text-xs sm:text-sm h-10 appearance-none bg-card"
+            className="input-base appearance-none"
           >
-            <option value="">جميع الحالات</option>
-            <option value="Available">متاح (Available)</option>
-            <option value="Reserved">محجوز (Reserved)</option>
-            <option value="Sold">مباع (Sold)</option>
+            <option value="">All statuses</option>
+            {UNIT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
-
           <select
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
-            className="input-base text-xs sm:text-sm h-10 appearance-none bg-card"
+            className="input-base appearance-none"
           >
-            <option value="">جميع المشاريع / الكمبوندات</option>
+            <option value="">All projects</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -364,251 +242,251 @@ export default function UnitsScreen() {
         </div>
       </div>
 
-      {/* 4. Desktop Inline-Editable Table View */}
-      {view === 'table' && (
-        <div className="card-base !p-0 overflow-hidden border border-border shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-muted/50 border-b border-border text-muted-foreground text-xs font-bold uppercase">
-                <tr>
-                  <th className="py-3.5 px-4">الوحدة</th>
-                  <th className="py-3.5 px-4">المشروع / المنطقة</th>
-                  <th className="py-3.5 px-4">النوع</th>
-                  <th className="py-3.5 px-4 text-left">المساحة</th>
-                  <th className="py-3.5 px-4 text-left">
-                    <span className="flex items-center gap-1">السعر (تعديل مباشر) ⚡</span>
-                  </th>
-                  <th className="py-3.5 px-4">نظام الدفع</th>
-                  <th className="py-3.5 px-4">الحالة (تغيير فوري)</th>
-                  <th className="py-3.5 px-4 text-left">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {loading ? (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <Loader2 size={24} className="animate-spin text-primary" />
-                        <span className="text-xs text-muted-foreground">جاري تحميل الوحدات...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-12">
-                      <EmptyState
-                        icon={<Building2 size={28} className="text-muted-foreground" />}
-                        title="لا توجد وحدات مطابقة"
-                        description="جرّب تغيير معايير البحث أو أضف وحدة جديدة الآن بنقرة واحدة."
-                      />
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((u) => {
-                    const isEditingPrice = editingPriceId === u.id;
-                    const isSavingPrice = savingPriceId === u.id;
-                    const isAvailable = u.status === 'Available' || u.status === 'متاح';
-                    const isReserved = u.status === 'Reserved' || u.status === 'محجوز';
-
-                    return (
-                      <tr key={u.id} className="hover:bg-muted/30 transition-colors group">
-                        {/* Unit Name & Image */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            {coverUrls[u.id] ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={coverUrls[u.id]}
-                                alt={u.name}
-                                className="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-border shadow-2xs"
-                              />
-                            ) : (
-                              <div className="w-11 h-11 rounded-xl bg-muted/80 border border-border flex items-center justify-center text-muted-foreground flex-shrink-0">
-                                <ImageIcon size={18} />
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-bold text-foreground text-sm leading-tight">
-                                {u.name}
-                              </p>
-                              <span className="text-[11px] text-muted-foreground">
-                                كود: #{u.id?.slice(0, 6)}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Project / Location */}
-                        <td className="py-3 px-4">
-                          <span className="font-medium text-foreground text-xs">
-                            {u.projectName || 'مشروع عام'}
-                          </span>
-                        </td>
-
-                        {/* Unit Type */}
-                        <td className="py-3 px-4">
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground">
-                            {u.unitType || 'وحدة سكنية'}
-                          </span>
-                        </td>
-
-                        {/* Area */}
-                        <td className="py-3 px-4 text-left font-bold text-xs tabular-nums">
-                          {u.area ? `${u.area} م²` : '—'}
-                        </td>
-
-                        {/* Inline Editable Price */}
-                        <td className="py-3 px-4 text-left">
-                          {isEditingPrice ? (
-                            <div className="flex items-center gap-1.5 justify-end">
-                              <input
-                                autoFocus
-                                type="text"
-                                value={inlinePriceValue}
-                                onChange={(e) => setInlinePriceValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleSaveInlinePrice(u);
-                                  if (e.key === 'Escape') setEditingPriceId(null);
-                                }}
-                                onBlur={() => handleSaveInlinePrice(u)}
-                                className="h-8 w-28 text-xs font-bold px-2 rounded-lg border border-primary bg-background focus:outline-none focus:ring-1 focus:ring-primary text-left"
-                              />
-                              <button
-                                type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  handleSaveInlinePrice(u);
-                                }}
-                                className="h-8 px-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold"
-                              >
-                                حفظ
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => startEditingPrice(u)}
-                              className="group/price flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors text-left"
-                              title="انقر لتعديل السعر فورياً"
-                            >
-                              <span className="font-extrabold text-foreground text-sm tabular-nums">
-                                {isSavingPrice ? (
-                                  <Loader2 size={12} className="animate-spin inline" />
-                                ) : (
-                                  fmt(Number(u.price || 0))
-                                )}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground font-medium">ج.م</span>
-                              <Pencil
-                                size={11}
-                                className="opacity-0 group-hover/price:opacity-100 text-primary transition-opacity"
-                              />
-                            </button>
-                          )}
-                        </td>
-
-                        {/* Payment Plan */}
-                        <td className="py-3 px-4 text-xs text-muted-foreground max-w-[180px] truncate">
-                          {u.paymentPlan || 'كاش'}
-                        </td>
-
-                        {/* Status Toggle (Inline) */}
-                        <td className="py-3 px-4">
-                          <select
-                            value={u.status}
-                            onChange={(e) => changeStatus(u, e.target.value)}
-                            className={`h-8 px-2.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                              isAvailable
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400'
-                                : isReserved
-                                  ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400'
-                                  : 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-400'
-                            }`}
-                          >
-                            <option value="Available">متاح (Available)</option>
-                            <option value="Reserved">محجوز (Reserved)</option>
-                            <option value="Sold">مباع (Sold)</option>
-                          </select>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-3 px-4 text-left">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => setPreview(u)}
-                              className="w-8 h-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
-                              title="معاينة تفاصيل الوحدة"
-                            >
-                              <Eye size={15} />
-                            </button>
-                            <button
-                              onClick={() => setDeleting(u)}
-                              className="w-8 h-8 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors"
-                              title="حذف الوحدة"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {loading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 size={24} className="animate-spin text-primary" />
           </div>
-        </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<Building2 size={22} className="text-muted-foreground" />}
+            title="No units"
+            description="Add units to your inventory to recommend them in the calculator."
+          />
+        ) : (
+          filtered.map((u) => (
+            <div
+              key={u.id}
+              className="bg-card border border-border rounded-2xl p-3.5 shadow-sm space-y-2"
+            >
+              <div className="flex items-start gap-3">
+                {coverUrls[u.id] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={coverUrls[u.id]}
+                    alt={u.name}
+                    className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
+                    <ImageIcon size={18} />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-foreground truncate">{u.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.projectName || '—'}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {[u.unitType, u.area ? `${u.area} m²` : '', u.floor ? `Floor ${u.floor}` : '']
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
+                  </p>
+                </div>
+                <StatusBadge status={u.status} />
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold tabular-nums">EGP {fmt(Number(u.price || 0))}</p>
+                <div className="flex items-center gap-1">
+                  <select
+                    value={u.status}
+                    onChange={(e) => changeStatus(u, e.target.value)}
+                    className="input-base !h-9 !w-28 text-xs appearance-none"
+                  >
+                    {UNIT_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      setEditing(u);
+                      setFormOpen(true);
+                    }}
+                    className="w-9 h-9 rounded-xl hover:bg-secondary text-muted-foreground flex items-center justify-center"
+                    aria-label="Edit unit"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    onClick={() => setDeleting(u)}
+                    className="w-9 h-9 rounded-xl hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center"
+                    aria-label="Delete unit"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop card grid */}
+      <div className={`hidden sm:block ${view === 'grid' ? '' : 'hidden'}`}>
+        {loading ? (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 size={22} className="animate-spin text-primary" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<Building2 size={22} className="text-muted-foreground" />}
+            title="No units"
+            description="Add units to your inventory to recommend them in the calculator."
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+            {filtered.map((u) => (
+              <UnitCard
+                key={u.id}
+                unit={u}
+                imageUrl={coverUrls[u.id]}
+                onReserve={(unit) => changeStatus(unit, 'Reserved')}
+                onPreview={(unit) => setPreview(unit)}
+                onDetails={(unit) => {
+                  setEditing(unit);
+                  setFormOpen(true);
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div
+        className={`hidden sm:block card-base !p-0 overflow-hidden ${view === 'table' ? '' : 'hidden'}`}
+      >
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 border-b border-border">
+            <tr>
+              <th className="table-th">Unit</th>
+              <th className="table-th">Project</th>
+              <th className="table-th">Type</th>
+              <th className="table-th text-right">Area</th>
+              <th className="table-th text-right">Price</th>
+              <th className="table-th">Payment plan</th>
+              <th className="table-th">Status</th>
+              <th className="table-th text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="table-td">
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={20} className="animate-spin text-primary" />
+                  </div>
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="table-td">
+                  <EmptyState
+                    icon={<Building2 size={22} className="text-muted-foreground" />}
+                    title="No units"
+                    description="Add units to your CRM to recommend them in the calculator."
+                  />
+                </td>
+              </tr>
+            ) : (
+              filtered.map((u) => (
+                <tr key={u.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="table-td">
+                    <div className="flex items-center gap-2.5">
+                      {coverUrls[u.id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={coverUrls[u.id]}
+                          alt={u.name}
+                          className="w-9 h-9 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
+                          <ImageIcon size={14} />
+                        </div>
+                      )}
+                      <span className="font-medium text-foreground whitespace-nowrap">
+                        {u.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="table-td text-muted-foreground">{u.projectName || '—'}</td>
+                  <td className="table-td">{u.unitType || '—'}</td>
+                  <td className="table-td text-right tabular-nums">
+                    {u.area ? `${u.area} m²` : '—'}
+                  </td>
+                  <td className="table-td text-right font-semibold tabular-nums">
+                    EGP {fmt(Number(u.price || 0))}
+                  </td>
+                  <td className="table-td text-muted-foreground max-w-[180px] truncate">
+                    {u.paymentPlan || '—'}
+                  </td>
+                  <td className="table-td">
+                    <select
+                      value={u.status}
+                      onChange={(e) => changeStatus(u, e.target.value)}
+                      className="input-base !h-9 !w-32 text-xs appearance-none"
+                    >
+                      {UNIT_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="table-td">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => {
+                          setEditing(u);
+                          setFormOpen(true);
+                        }}
+                        className="w-9 h-9 rounded-xl hover:bg-secondary text-muted-foreground flex items-center justify-center"
+                        aria-label="Edit unit"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => setDeleting(u)}
+                        className="w-9 h-9 rounded-xl hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center"
+                        aria-label="Delete unit"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add / Edit modal */}
+      {formOpen && (
+        <UnitFormModal
+          open={formOpen}
+          onClose={() => {
+            setFormOpen(false);
+            setEditing(null);
+          }}
+          onSave={saveUnit}
+          projects={projects}
+          initial={editing}
+        />
       )}
 
-      {/* 5. Mobile Cards & Desktop Grid View */}
-      {(view === 'grid' || !view) && (
-        <div>
-          {loading ? (
-            <div className="flex items-center justify-center h-48">
-              <Loader2 size={24} className="animate-spin text-primary" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              icon={<Building2 size={28} className="text-muted-foreground" />}
-              title="لا توجد وحدات متاحة"
-              description="أضف وحدات جديدة إلى مخزونك لتظهر هنا وللعملاء."
-            />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtered.map((u) => (
-                <UnitCard
-                  key={u.id}
-                  unit={u}
-                  imageUrl={coverUrls[u.id]}
-                  onReserve={(unit) => changeStatus(unit, 'Reserved')}
-                  onPreview={(unit) => setPreview(unit)}
-                  onDetails={(unit) => setPreview(unit)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 30-Second Quick-Add Drawer */}
-      <QuickAddUnitDrawer
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-        onSuccess={load}
-        projects={projects}
-        userId={user?.id}
-      />
-
-      {/* Quick Preview Modal */}
+      {/* Quick preview modal */}
       <Modal
         open={!!preview}
         onClose={() => setPreview(null)}
-        title={preview?.name || 'تفاصيل العقار'}
+        title={preview?.name || 'Unit'}
         size="md"
       >
         {preview && (
-          <div className="space-y-4" dir="rtl">
-            <div className="relative h-52 bg-muted rounded-t-xl overflow-hidden -mx-6 -mt-6">
+          <div>
+            <div className="relative h-48 bg-muted">
               {coverUrls[preview.id] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -618,100 +496,100 @@ export default function UnitsScreen() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary via-background to-muted">
-                  <Building2 size={36} className="text-primary/40" />
+                  <Building2 size={32} className="text-primary/50" />
                 </div>
               )}
-              <div className="absolute top-3 left-3">
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-sm">
-                  {preview.status === 'Available'
-                    ? 'متاح'
-                    : preview.status === 'Reserved'
-                      ? 'محجوز'
-                      : 'مباع'}
-                </span>
+              <div className="absolute top-3 right-3">
+                <StatusBadge status={preview.status} />
               </div>
             </div>
-
-            <div className="pt-2 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">{preview.name}</h3>
-                  <p className="text-xs text-muted-foreground">{preview.projectName || '—'}</p>
-                </div>
-                <div className="text-left">
-                  <p className="text-xl font-black text-primary">
-                    {fmt(Number(preview.price || 0))} ج.م
-                  </p>
-                </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-[11px] font-semibold text-primary">
+                  {preview.projectName || '—'}
+                </p>
+                <p className="text-lg font-bold text-foreground">
+                  EGP {fmt(Number(preview.price || 0))}
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
-                <div className="bg-muted/50 p-2.5 rounded-xl text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">النوع</p>
-                  <p className="text-xs font-bold mt-0.5">{preview.unitType || '—'}</p>
-                </div>
-                <div className="bg-muted/50 p-2.5 rounded-xl text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">المساحة</p>
-                  <p className="text-xs font-bold mt-0.5">
-                    {preview.area ? `${preview.area} م²` : '—'}
-                  </p>
-                </div>
-                <div className="bg-muted/50 p-2.5 rounded-xl text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">الدور</p>
-                  <p className="text-xs font-bold mt-0.5">{preview.floor || '—'}</p>
-                </div>
-                <div className="bg-muted/50 p-2.5 rounded-xl text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">طريقة السداد</p>
-                  <p className="text-xs font-bold mt-0.5 truncate">
-                    {preview.paymentPlan || 'كاش'}
-                  </p>
-                </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  ['Type', preview.unitType || '—'],
+                  ['Area', preview.area ? `${preview.area} m²` : '—'],
+                  ['Bedrooms', Number(preview.bedrooms) > 0 ? `${preview.bedrooms}` : null],
+                  ['Bathrooms', Number(preview.bathrooms) > 0 ? `${preview.bathrooms}` : null],
+                  ['Floor', preview.floor ? `${preview.floor}` : '—'],
+                  ['Building / Block', preview.building || '—'],
+                  ['Code', preview.unitCode || preview.name || '—'],
+                  ['Status', preview.status || '—'],
+                ]
+                  .filter(([, v]) => v != null)
+                  .map(([k, v]) => (
+                    <div key={String(k)} className="bg-muted/50 rounded-xl p-2.5">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                        {k}
+                      </p>
+                      <p className="text-sm font-semibold text-foreground tabular-nums truncate">
+                        {v}
+                      </p>
+                    </div>
+                  ))}
               </div>
 
-              {preview.notes && (
-                <div className="bg-muted/30 p-3 rounded-xl border border-border/60">
-                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                    {preview.notes}
+              {(Number(preview.downPaymentPct) > 0 ||
+                Number(preview.installmentYears) > 0 ||
+                preview.paymentPlan) && (
+                <div className="bg-blue-50 rounded-xl p-3">
+                  <p className="text-[11px] font-semibold text-blue-800 mb-1">Payment plan</p>
+                  <p className="text-xs text-blue-700">
+                    {[
+                      preview.downPaymentPct ? `${preview.downPaymentPct}% down payment` : '',
+                      preview.installmentYears
+                        ? `${preview.installmentYears} years installments`
+                        : '',
+                      preview.paymentPlan,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || '—'}
                   </p>
                 </div>
               )}
 
-              <div className="pt-2 flex items-center justify-between border-t border-border">
-                <div className="flex items-center gap-2">
-                  {preview.status === 'Available' && (
-                    <button
-                      onClick={() => {
-                        changeStatus(preview, 'Reserved');
-                        setPreview(null);
-                      }}
-                      className="btn-primary text-xs font-bold py-2 px-3 flex items-center gap-1.5"
-                    >
-                      <Check size={14} />
-                      حجز الوحدة
-                    </button>
-                  )}
-                  {preview.status === 'Reserved' && (
-                    <button
-                      onClick={() => {
-                        changeStatus(preview, 'Sold');
-                        setPreview(null);
-                      }}
-                      className="btn-primary text-xs font-bold py-2 px-3 flex items-center gap-1.5"
-                    >
-                      <BadgeCheck size={14} />
-                      تأكيد البيع
-                    </button>
-                  )}
-                </div>
+              {preview.notes && <p className="text-sm text-muted-foreground">{preview.notes}</p>}
+
+              <div className="flex items-center gap-2">
+                {preview.status === 'Available' && (
+                  <button
+                    onClick={() => {
+                      changeStatus(preview, 'Reserved');
+                      setPreview(null);
+                    }}
+                    className="btn-primary flex-1 flex items-center justify-center gap-1.5 text-sm"
+                  >
+                    <BadgeCheck size={14} />
+                    Reserve unit
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setEditing(preview);
+                    setFormOpen(true);
+                    setPreview(null);
+                  }}
+                  className="btn-secondary flex items-center gap-1.5 text-sm"
+                >
+                  <Pencil size={14} />
+                  Edit unit
+                </button>
                 <button
                   onClick={() => {
                     setDeleting(preview);
                     setPreview(null);
                   }}
-                  className="btn-ghost text-xs text-destructive hover:bg-destructive/10"
+                  className="btn-ghost text-sm"
                 >
-                  <Trash2 size={14} className="inline ml-1" />
-                  حذف
+                  <Trash2 size={14} />
                 </button>
               </div>
             </div>
@@ -719,29 +597,344 @@ export default function UnitsScreen() {
         )}
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        open={!!deleting}
-        onClose={() => setDeleting(null)}
-        title="تأكيد حذف الوحدة"
-        size="sm"
-      >
-        <div className="p-4 space-y-4 text-right" dir="rtl">
+      {/* Delete confirm */}
+      <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Delete unit" size="sm">
+        <div className="p-6 space-y-4">
           <p className="text-sm text-foreground">
-            هل أنت متأكد من حذف الوحدة{' '}
-            <span className="font-bold text-destructive">{deleting?.name}</span>؟ لن تظهر في قائمة
-            الوحدات بعد الآن.
+            Delete unit <span className="font-semibold">{deleting?.name}</span>? This removes it
+            from projects and the calculator suggestions.
           </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setDeleting(null)} className="btn-secondary text-xs">
-              إلغاء
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setDeleting(null)} className="btn-secondary">
+              Cancel
             </button>
-            <button onClick={confirmDelete} className="btn-danger text-xs">
-              نعم، حذف الوحدة
-            </button>
+              <button onClick={confirmDelete} className="btn-danger">
+                Remove unit
+              </button>
           </div>
         </div>
       </Modal>
     </div>
+  );
+}
+
+// ─── Unit form modal ─────────────────────────────────────────────────────────
+
+function UnitFormModal({
+  open,
+  onClose,
+  onSave,
+  projects,
+  initial,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: any) => void;
+  projects: any[];
+  initial?: any | null;
+}) {
+  const [form, setForm] = useState<any>({
+    projectId: initial?.projectId || '',
+    name: initial?.name || '',
+    unitType: initial?.unitType || '',
+    area: initial?.area ?? 0,
+    floor: initial?.floor ?? 0,
+    price: initial?.price ?? 0,
+    paymentPlan: initial?.paymentPlan || '',
+    downPaymentPct: initial?.downPaymentPct ?? 0,
+    installmentYears: initial?.installmentYears ?? 0,
+    installmentFrequency: initial?.installmentFrequency ?? 12,
+    status: initial?.status || 'Available',
+    notes: initial?.notes || '',
+    imagePath: initial?.imagePath || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [coverUrl, setCoverUrl] = useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        projectId: initial?.projectId || '',
+        name: initial?.name || '',
+        unitType: initial?.unitType || '',
+        area: initial?.area ?? 0,
+        floor: initial?.floor ?? 0,
+        price: initial?.price ?? 0,
+        paymentPlan: initial?.paymentPlan || '',
+        downPaymentPct: initial?.downPaymentPct ?? 0,
+        installmentYears: initial?.installmentYears ?? 0,
+        installmentFrequency: initial?.installmentFrequency ?? 12,
+        status: initial?.status || 'Available',
+        notes: initial?.notes || '',
+        imagePath: initial?.imagePath || '',
+      });
+      setCoverUrl('');
+      if (initial?.imagePath) {
+        unitsService.getFileUrl({ filePath: initial.imagePath } as UnitFile).then(setCoverUrl);
+      }
+    }
+  }, [open, initial]);
+
+  const num = (v: any, fallback = 0) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.projectId) {
+      toast.error('Project is required');
+      return;
+    }
+    if (!form.name?.trim()) {
+      toast.error('Unit name / number is required');
+      return;
+    }
+    setSaving(true);
+    await new Promise((r) => setTimeout(r, 300));
+    onSave({ ...form, name: form.name.trim() });
+    setSaving(false);
+  };
+
+  const onPickCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!initial?.id) {
+      toast.error('Save the unit first, then upload its cover photo');
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
+    setUploading(true);
+    try {
+      const row = await unitsService.uploadFile(initial.id, f);
+      setForm((prev: any) => ({ ...prev, imagePath: row.file_path }));
+      const url = await unitsService.getFileUrl({ filePath: row.file_path } as UnitFile);
+      setCoverUrl(url);
+      toast.success('Cover photo uploaded — remember to save');
+    } catch (err: any) {
+      toast.error(err?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+              title={initial ? 'Edit unit' : 'Add unit'}
+              subtitle="Unit details — shown to your sales team and the calculator"
+      size="lg"
+    >
+      <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label-base">Project</label>
+            <select
+              value={form.projectId}
+              onChange={(e) => setForm((f: any) => ({ ...f, projectId: e.target.value }))}
+              className="input-base appearance-none"
+            >
+              <option value="">— Select project —</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label-base">Status</label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f: any) => ({ ...f, status: e.target.value }))}
+              className="input-base appearance-none"
+            >
+              {UNIT_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label-base">Unit name / number</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))}
+              className="input-base"
+              placeholder="e.g. 14B / Apartment 12"
+            />
+          </div>
+          <div>
+            <label className="label-base">Unit type</label>
+            <select
+              value={form.unitType}
+              onChange={(e) => setForm((f: any) => ({ ...f, unitType: e.target.value }))}
+              className="input-base appearance-none"
+            >
+              <option value="">— Select —</option>
+              {UNIT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="label-base">Area (m²)</label>
+            <input
+              type="number"
+              min={0}
+              value={form.area || ''}
+              onChange={(e) => setForm((f: any) => ({ ...f, area: num(e.target.value) }))}
+              className="input-base"
+            />
+          </div>
+          <div>
+            <label className="label-base">Floor</label>
+            <input
+              type="number"
+              value={form.floor || ''}
+              onChange={(e) => setForm((f: any) => ({ ...f, floor: num(e.target.value) }))}
+              className="input-base"
+            />
+          </div>
+          <div>
+            <label className="label-base">Price (EGP)</label>
+            <input
+              type="number"
+              min={0}
+              value={form.price || ''}
+              onChange={(e) => setForm((f: any) => ({ ...f, price: num(e.target.value) }))}
+              className="input-base"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="label-base">Payment plan</label>
+          <input
+            type="text"
+            value={form.paymentPlan}
+            onChange={(e) => setForm((f: any) => ({ ...f, paymentPlan: e.target.value }))}
+            className="input-base"
+            placeholder='e.g. "10% down / 6 years / quarterly"'
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="label-base">Down payment %</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={form.downPaymentPct || ''}
+              onChange={(e) => setForm((f: any) => ({ ...f, downPaymentPct: num(e.target.value) }))}
+              className="input-base"
+            />
+          </div>
+          <div>
+            <label className="label-base">Years</label>
+            <input
+              type="number"
+              min={0}
+              value={form.installmentYears || ''}
+              onChange={(e) =>
+                setForm((f: any) => ({ ...f, installmentYears: num(e.target.value) }))
+              }
+              className="input-base"
+            />
+          </div>
+          <div>
+            <label className="label-base">Installments per year</label>
+            <select
+              value={String(form.installmentFrequency || 12)}
+              onChange={(e) =>
+                setForm((f: any) => ({ ...f, installmentFrequency: num(e.target.value, 12) }))
+              }
+              className="input-base appearance-none"
+            >
+              {[1, 2, 4, 12].map((n) => (
+                <option key={n} value={n}>
+                  {n === 12
+                    ? 'Monthly'
+                    : n === 4
+                      ? 'Quarterly'
+                      : n === 2
+                        ? 'Semi-annual'
+                        : 'Annual'}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Cover photo */}
+        <div>
+          <label className="label-base">Cover photo</label>
+          <div className="flex items-center gap-3">
+            {coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={coverUrl} alt="Cover" className="w-16 h-16 rounded-xl object-cover" />
+            ) : (
+              <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center text-muted-foreground">
+                <ImageIcon size={20} />
+              </div>
+            )}
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onPickCover}
+            />
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading || !initial?.id}
+              className="btn-secondary text-xs flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+              {uploading
+                ? 'Uploading…'
+                : initial?.id
+                  ? 'Upload cover photo'
+                  : 'Save unit first, then upload'}
+            </button>
+            {form.imagePath && !initial?.id && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <ImageIcon size={12} /> pending
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="label-base">Notes</label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm((f: any) => ({ ...f, notes: e.target.value }))}
+            className="input-base min-h-[70px]"
+            placeholder="Optional notes about this unit"
+          />
+        </div>
+
+        <div className="pt-2 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="btn-secondary">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="btn-primary flex items-center gap-1.5">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+            {initial?.id ? 'Save changes' : 'Add unit'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

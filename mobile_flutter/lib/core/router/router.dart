@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../features/assistant/assistant_chat_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/calculator/unit_calculator_screen.dart';
 import '../../features/leads/add_lead_screen.dart';
@@ -47,10 +46,6 @@ GoRouter buildRouter({required Listenable refreshListenable}) {
       GoRoute(
         path: '/calculator',
         builder: (context, state) => const UnitCalculatorScreen(),
-      ),
-      GoRoute(
-        path: '/assistant',
-        builder: (context, state) => const AssistantChatScreen(),
       ),
     ],
   );

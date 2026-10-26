@@ -96,6 +96,9 @@ class LeadsProvider extends ChangeNotifier {
     for (final l in base) {
       final norm = LeadStages.normalize(l.status);
       counts[norm] = (counts[norm] ?? 0) + 1;
+      if (l.status != norm) {
+        counts[l.status] = (counts[l.status] ?? 0) + 1;
+      }
     }
     return counts;
   }
