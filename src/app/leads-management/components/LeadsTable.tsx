@@ -218,7 +218,15 @@ const ICON_BTN =
   'w-8 h-8 rounded-lg text-zinc-500 dark:text-zinc-400 transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 disabled:opacity-30 disabled:cursor-not-allowed [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11';
 
 /** Shared dense cell: tight padding, hairline divider (white/5 on the obsidian theme). */
-const TD = 'px-3 py-1.5 text-[13px] text-foreground whitespace-nowrap border-b border-black/5 dark:border-white/5';
+const TD = 'px-3 py-2 text-[13px] text-foreground whitespace-nowrap border-b border-black/5 dark:border-white/5';
+
+function formatBudgetRange(min?: number, max?: number): string {
+  const a = Number(min) || 0;
+  const b = Number(max) || 0;
+  if (!a && !b) return '';
+  if (a && b && a !== b) return `${a.toLocaleString()}–${b.toLocaleString()}`;
+  return (b || a).toLocaleString();
+}
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -280,31 +288,32 @@ const LeadTableRow = React.memo(function LeadTableRow({
   const called = !!lead.hasBeenCalled;
   const hasPhone = !!(lead.phone && lead.phone.replace(/\D/g, ''));
   const next = nextPipelineStage(lead.status);
+  const shortId = String(lead.id || '').replace(/-/g, '').slice(0, 6);
+  const budget = formatBudgetRange(lead.budgetMin, lead.budgetMax);
+  const hot = !!lead.priority && lead.priority !== 'Normal';
 
-  // Everything that used to have its own column stays one hover away.
   const tooltip = [
     lead.createdAt ? `${t('leads.colCreated')}: ${shortDate(lead.createdAt, lang)}` : '',
-    lead.lastActionAt ? `${t('leads.colLastAction')}: ${timeAgo(lead.lastActionAt, lang)}` : '',
-    lead.followUpDue ? `${t('leads.colFollowUp')}: ${shortDate(lead.followUpDue, lang)}${overdue ? ` (${t('leads.overdue')})` : ''}` : '',
-    called ? t('leads.called') : t('leads.notCalled'),
+    lead.followUpDue
+      ? `${t('leads.colFollowUp')}: ${shortDate(lead.followUpDue, lang)}${overdue ? ` (${t('leads.overdue')})` : ''}`
+      : '',
     lead.email ? String(lead.email) : '',
     lead.location ? String(lead.location) : '',
   ]
     .filter(Boolean)
     .join(' · ');
 
-  const sourceLine = [lead.source, lead.lastActionAt ? timeAgo(lead.lastActionAt, lang) : '']
-    .filter(Boolean)
-    .join(' · ');
-
   const rowBg = isSelected
     ? 'bg-lime-50 dark:bg-[#141a0c]'
     : 'bg-white dark:bg-[#0a0a0f] group-hover:bg-zinc-50 dark:group-hover:bg-[#12121a]';
+  const accentBar = isSelected
+    ? 'shadow-[inset_3px_0_0_#a3e635] rtl:shadow-[inset_-3px_0_0_#a3e635]'
+    : 'group-hover:shadow-[inset_2px_0_0_#a3e635] rtl:group-hover:shadow-[inset_-2px_0_0_#a3e635]';
 
-  const copyId = async () => {
+  const copyText = async (text: string, okMsg: string) => {
     try {
-      await navigator.clipboard.writeText(lead.id);
-      toast.success(t('leads.idCopied'));
+      await navigator.clipboard.writeText(text);
+      toast.success(okMsg);
     } catch {
       /* clipboard unavailable — ignore */
     }
@@ -320,9 +329,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
 
   return (
     <tr className="group">
-      <td
-        className={`${TD} sticky start-0 z-[1] w-9 ${rowBg} group-hover:shadow-[inset_2px_0_0_#a3e635] rtl:group-hover:shadow-[inset_-2px_0_0_#a3e635]`}
-      >
+      <td className={`${TD} sticky start-0 z-[1] w-9 ${rowBg} ${accentBar}`}>
         <input
           type="checkbox"
           checked={isSelected}
@@ -332,54 +339,73 @@ const LeadTableRow = React.memo(function LeadTableRow({
         />
       </td>
 
-      {/* 1. Lead info — name (bold) with the source underneath */}
-      <td className={`${TD} sticky start-9 z-[1] min-w-[240px] border-e border-black/5 dark:border-white/5 ${rowBg}`} title={tooltip}>
+      {/* Lead identity & source */}
+      <td className={`${TD} sticky start-9 z-[1] min-w-[250px] border-e border-black/5 dark:border-white/5 ${rowBg}`} title={tooltip}>
         <div className="flex items-center gap-2.5 min-w-0">
           <div
-            className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${
               hasName
                 ? 'bg-lime-500/15 text-lime-700 dark:bg-lime-400/15 dark:text-lime-300'
                 : 'bg-zinc-200 text-zinc-500 dark:bg-white/5 dark:text-zinc-400'
             }`}
             aria-hidden
           >
-            {hasName ? initials : <User size={14} />}
+            {hasName ? initials : <User size={15} />}
           </div>
           <div className="min-w-0 leading-tight">
             <div className="flex items-center gap-1.5">
               <a
                 href={`/leads/${lead.id}`}
-                className="font-semibold text-[13px] text-zinc-900 dark:text-zinc-50 truncate max-w-[190px] hover:text-lime-600 dark:hover:text-lime-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 rounded"
+                className="font-semibold text-[13px] text-zinc-900 dark:text-zinc-50 truncate max-w-[170px] hover:text-lime-600 dark:hover:text-lime-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 rounded"
               >
                 {title}
               </a>
-              {overdue && (
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title={t('leads.overdue')} />
+              {shortId && (
+                <button
+                  type="button"
+                  onClick={() => copyText(lead.id, t('leads.idCopied'))}
+                  title={`${t('leads.copyId')} (${lead.id})`}
+                  aria-label={t('leads.copyId')}
+                  className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 hover:text-lime-600 dark:hover:text-lime-400 rounded px-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
+                >
+                  #{shortId}
+                </button>
               )}
+              {hot && <Zap size={11} className="text-amber-500 fill-amber-500 flex-shrink-0" aria-label={String(lead.priority)} />}
+              {overdue && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title={t('leads.overdue')} />}
               {canDelete && lead.isDuplicate && (
                 <span className="flex-shrink-0 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-semibold px-1.5">
                   {t('leads.duplicate')}
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[230px]">
-              {sourceLine || (hasName ? '' : t('leads.noName'))}
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[250px]">
+              {lead.source || (hasName ? '' : t('leads.noName'))}
             </p>
           </div>
         </div>
       </td>
 
-      {/* 2. Contact — phone, monospace */}
+      {/* Contact number */}
       <td className={TD}>
         {hasPhone && (
           <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-zinc-600 dark:text-zinc-300">
             <Phone size={12} className="text-lime-600 dark:text-lime-400 flex-shrink-0" />
             <span dir="ltr">{lead.phone}</span>
+            <button
+              type="button"
+              onClick={() => copyText(lead.phone, t('leads.phoneCopied'))}
+              title={t('leads.copyPhone')}
+              aria-label={t('leads.copyPhone')}
+              className="w-6 h-6 rounded flex items-center justify-center text-zinc-400 hover:text-foreground hover:bg-zinc-100 dark:hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
+            >
+              <Copy size={12} />
+            </button>
           </span>
         )}
       </td>
 
-      {/* 3. Status — colour-coded pill, still clickable to change stage */}
+      {/* Status / stage */}
       <td className={TD}>
         <StatusDropdown
           currentStatus={lead.status || 'Fresh Leads'}
@@ -389,7 +415,28 @@ const LeadTableRow = React.memo(function LeadTableRow({
         />
       </td>
 
-      {/* 4. Assigned agent */}
+      {/* Project & budget */}
+      <td className={`${TD} min-w-[170px]`}>
+        {lead.project || budget ? (
+          <div className="leading-tight">
+            <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate max-w-[190px]">
+              {lead.project || lead.propertyType || ''}
+            </p>
+            {(lead.unit || (lead.project && lead.propertyType)) && (
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[190px]">
+                {lead.unit || lead.propertyType}
+              </p>
+            )}
+            {budget && (
+              <p className="text-[11px] font-semibold tabular-nums text-lime-700 dark:text-lime-300">
+                {budget} {t('leads.egp')}
+              </p>
+            )}
+          </div>
+        ) : null}
+      </td>
+
+      {/* Assigned agent */}
       <td className={TD}>
         {agentFirst ? (
           <div className="flex items-center gap-2" title={agentNames.join(', ')}>
@@ -408,26 +455,30 @@ const LeadTableRow = React.memo(function LeadTableRow({
         )}
       </td>
 
-      {/* 5. Actions — centered icon buttons */}
-      <td className={`${TD} w-[190px]`}>
+      {/* Last contact */}
+      <td className={TD}>
+        <div className="leading-tight" title={lead.lastActionAt ? new Date(lead.lastActionAt).toLocaleString(localeOf(lang)) : undefined}>
+          <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">
+            {lead.lastActionAt ? timeAgo(lead.lastActionAt, lang) : <span className="font-normal text-zinc-500 dark:text-zinc-400">{t('leads.noAction')}</span>}
+          </p>
+          <p className={`text-[11px] ${called ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>
+            {called ? t('leads.called') : t('leads.notCalled')}
+          </p>
+        </div>
+      </td>
+
+      {/* Quick actions */}
+      <td className={`${TD} w-[170px]`}>
         <div className="flex items-center justify-center gap-0.5">
           <button
             type="button"
-            onClick={() => onView?.(lead)}
-            title={t('leads.viewProfile')}
-            aria-label={`${t('leads.viewProfile')}: ${title}`}
-            className={`${ICON_BTN} hover:bg-lime-500/10 hover:text-lime-600 dark:hover:text-lime-400`}
+            onClick={handleCall}
+            disabled={!hasPhone}
+            title={t('leads.call')}
+            aria-label={`${t('leads.call')}: ${title}`}
+            className={`${ICON_BTN} hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400`}
           >
-            <Eye size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onEdit?.(lead)}
-            title={t('leads.editQuick')}
-            aria-label={`${t('leads.editQuick')}: ${title}`}
-            className={`${ICON_BTN} hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400`}
-          >
-            <Pencil size={15} />
+            <Phone size={15} />
           </button>
           {hasPhone ? (
             <a
@@ -443,13 +494,12 @@ const LeadTableRow = React.memo(function LeadTableRow({
           ) : null}
           <button
             type="button"
-            onClick={handleCall}
-            disabled={!hasPhone}
-            title={t('leads.call')}
-            aria-label={`${t('leads.call')}: ${title}`}
-            className={`${ICON_BTN} hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400`}
+            onClick={() => onView?.(lead)}
+            title={t('leads.viewProfile')}
+            aria-label={`${t('leads.viewProfile')}: ${title}`}
+            className={`${ICON_BTN} hover:bg-lime-500/10 hover:text-lime-600 dark:hover:text-lime-400`}
           >
-            <Phone size={15} />
+            <Eye size={15} />
           </button>
           <button
             ref={menuAnchorRef}
@@ -469,13 +519,23 @@ const LeadTableRow = React.memo(function LeadTableRow({
               onClose={() => setMenuOpen(false)}
               anchorRef={menuAnchorRef}
               minWidth={210}
-              preferredMaxHeight={280}
+              preferredMaxHeight={300}
               zIndex={100}
               role="menu"
               aria-label={t('leads.more')}
               className="stage-dropdown-panel"
             >
               <div className="py-1">
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEdit?.(lead);
+                  }}
+                  className={menuItem}
+                >
+                  <Pencil size={14} /> {t('leads.editQuick')}
+                </button>
                 {next && next !== lead.status && (
                   <button
                     role="menuitem"
@@ -500,16 +560,6 @@ const LeadTableRow = React.memo(function LeadTableRow({
                     <Phone size={14} /> {t('leads.logCall')}
                   </button>
                 )}
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void copyId();
-                  }}
-                  className={menuItem}
-                >
-                  <Copy size={14} /> {t('leads.copyId')}
-                </button>
                 {canDelete && (
                   <button
                     role="menuitem"
@@ -547,20 +597,20 @@ function SkeletonRows({ count = 14 }: { count?: number }) {
           </td>
           <td className={`${TD} sticky start-9 bg-white dark:bg-[#0a0a0f] border-e border-black/5 dark:border-white/5`}>
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" />
+              <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" />
               <div className="space-y-1.5">
                 <div className="h-3 w-28 rounded bg-zinc-200 dark:bg-white/10 animate-pulse" />
                 <div className="h-2.5 w-20 rounded bg-zinc-200/70 dark:bg-white/5 animate-pulse" />
               </div>
             </div>
           </td>
-          {[28, 24, 24].map((w, c) => (
+          {[112, 88, 120, 96, 72].map((w, c) => (
             <td key={c} className={TD}>
-              <div className="h-4 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" style={{ width: `${w * 4}px` }} />
+              <div className="h-4 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" style={{ width: `${w}px` }} />
             </td>
           ))}
           <td className={TD}>
-            <div className="h-7 w-40 rounded-lg bg-zinc-200 dark:bg-white/10 animate-pulse mx-auto" />
+            <div className="h-7 w-32 rounded-lg bg-zinc-200 dark:bg-white/10 animate-pulse mx-auto" />
           </td>
         </tr>
       ))}
@@ -820,7 +870,7 @@ export default function LeadsTable({
           tabIndex={0}
           aria-label={t('leads.title')}
         >
-          <table className="w-full min-w-[920px] border-separate border-spacing-0">
+          <table className="w-full min-w-[1180px] border-separate border-spacing-0">
             <thead>
               <tr>
                 <th className={`${TH} w-9 start-0 z-[3]`}>
@@ -832,11 +882,13 @@ export default function LeadsTable({
                     aria-label={t('leads.selectAll')}
                   />
                 </th>
-                {sortableCol(t('leads.colInfo'), 'name', 'start-9 z-[3] min-w-[240px] border-e border-black/5 dark:border-white/5')}
-                {plainCol(t('leads.colContact'))}
-                {sortableCol(t('leads.colStatus'), 'status')}
+                {sortableCol(t('leads.colIdentity'), 'name', 'start-9 z-[3] min-w-[250px] border-e border-black/5 dark:border-white/5')}
+                {plainCol(t('leads.colContactNumber'))}
+                {sortableCol(t('leads.colStage'), 'status')}
+                {sortableCol(t('leads.colProject'), 'budgetMin')}
                 {sortableCol(t('leads.colAssigned'), 'agent')}
-                {plainCol(t('leads.colActions'), 'text-center')}
+                {plainCol(t('leads.colLastContact'))}
+                {plainCol(t('leads.colQuick'), 'text-center')}
               </tr>
             </thead>
             <tbody>
@@ -844,7 +896,7 @@ export default function LeadsTable({
                 <SkeletonRows />
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>{emptyState}</td>
+                  <td colSpan={8}>{emptyState}</td>
                 </tr>
               ) : (
                 visibleLeads.map((lead) => (
@@ -865,7 +917,7 @@ export default function LeadsTable({
               )}
               {visibleLeads.length < leads.length && (
                 <tr>
-                  <td colSpan={6} className="py-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={8} className="py-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
                     <div className="inline-flex items-center gap-3">
                       <span>
                         {t('leads.showing', {

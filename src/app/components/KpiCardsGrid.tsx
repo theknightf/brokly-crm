@@ -59,7 +59,7 @@ const ACCENTS: { match: RegExp; bar: string; dot: string }[] = [
   { match: /rotation/i, bar: 'bg-teal-500', dot: 'bg-teal-500' },
   { match: /no answer/i, bar: 'bg-zinc-500', dot: 'bg-zinc-500' },
 ];
-function accentFor(stage: string) {
+export function accentFor(stage: string) {
   return ACCENTS.find((a) => a.match.test(stage)) || { bar: 'bg-muted-foreground', dot: 'bg-muted-foreground' };
 }
 

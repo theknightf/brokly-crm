@@ -41,6 +41,7 @@ import LeadsTable from './LeadsTable';
 import LeadBoard from './LeadBoard';
 import LeadsFilters, { useLeadFilterOptions, activityOf } from './LeadsFilters';
 import LeadsToolbar, { LeadsFilterDrawer } from './LeadsToolbar';
+import LeadsStatusStrip from './LeadsStatusStrip';
 import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
@@ -1696,6 +1697,16 @@ export default function LeadsManagementScreen({
           }
         }}
         onClearAll={clearFilters}
+      />
+
+      <LeadsStatusStrip
+        filters={filters}
+        statusCounts={statusCounts}
+        total={total}
+        onSelect={(status) => {
+          setFilters((f) => ({ ...f, status }));
+          setCurrentPage(1);
+        }}
       />
 
       <LeadsFilterDrawer
