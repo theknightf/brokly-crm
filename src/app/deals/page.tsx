@@ -4,7 +4,7 @@ import LeadsManagementScreen from '@/app/leads-management/components/LeadsManage
 
 export default function DealsPage() {
   return (
-    <AppLayout>
+    <AppLayout fill>
       {/* Suspense boundary required: the screen reads useSearchParams(). */}
       <Suspense
         fallback={

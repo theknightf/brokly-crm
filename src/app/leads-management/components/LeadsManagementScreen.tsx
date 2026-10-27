@@ -1622,7 +1622,7 @@ export default function LeadsManagementScreen({
   };
 
   return (
-    <div className="page-aurora min-h-[calc(100dvh-8rem)] lg:min-h-full space-y-5 rounded-[2rem] p-3 sm:p-5 pb-24 flex flex-col">
+    <div className="page-aurora min-h-[calc(100dvh-8rem)] sm:min-h-[34rem] sm:flex-1 space-y-5 rounded-[2rem] p-3 sm:p-5 pb-24 sm:pb-5 flex flex-col">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-[1.75rem] border border-border/70 bg-card/80 p-4 sm:p-5 shadow-sm backdrop-blur-xl">
         <div className="animate-rise-in">
@@ -1730,7 +1730,7 @@ export default function LeadsManagementScreen({
           </button>
         </div>
       )}
-      <div className="card-base !p-0 overflow-hidden animate-in fade-in">
+      <div className="card-base !p-0 overflow-hidden animate-in fade-in sm:flex-1 sm:min-h-0 sm:flex sm:flex-col">
         {viewMode === 'board' && loading && leads.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3" aria-hidden>
             {Array.from({ length: 8 }).map((_, i) => (
@@ -1738,6 +1738,7 @@ export default function LeadsManagementScreen({
             ))}
           </div>
         ) : viewMode === 'board' ? (
+          <div className="sm:flex-1 sm:min-h-0 sm:overflow-auto">
           <LeadBoard
             leads={leads}
             statusCounts={statusCounts}
@@ -1751,6 +1752,7 @@ export default function LeadsManagementScreen({
             isAdmin={isAdminRole(user?.role)}
             onPostCall={handlePostCallTrigger}
           />
+          </div>
         ) : (
           <LeadsTable
             leads={leads}

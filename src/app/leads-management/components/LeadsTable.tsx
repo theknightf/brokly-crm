@@ -777,8 +777,8 @@ export default function LeadsTable({
       </div>
 
       {/* Desktop dense table — obsidian surface, hairline borders, neon-lime accents */}
-      <div className="hidden sm:block bg-white dark:bg-[#0a0a0f]">
-        <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-black/5 dark:border-white/10 bg-white dark:bg-[#12121a]">
+      <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-h-0 bg-white dark:bg-[#0a0a0f]">
+        <div className="flex items-center justify-between gap-3 px-4 py-2 shrink-0 border-b border-black/5 dark:border-white/10 bg-white dark:bg-[#12121a]">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{t('leads.title')}</h2>
             <span
@@ -816,7 +816,7 @@ export default function LeadsTable({
 
         <div
           ref={scrollerRef}
-          className="overflow-auto max-h-[calc(100vh-17rem)] min-h-[320px]"
+          className="overflow-auto flex-1 min-h-[240px]"
           tabIndex={0}
           aria-label={t('leads.title')}
         >
@@ -891,7 +891,7 @@ export default function LeadsTable({
       </div>
 
       {totalCount > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-border">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-border shrink-0 bg-white dark:bg-[#0a0a0f]">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span aria-live="polite">
               {t('leads.showing', {

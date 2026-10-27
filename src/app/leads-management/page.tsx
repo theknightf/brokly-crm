@@ -12,7 +12,7 @@ function LeadsFallback() {
 
 export default function LeadsManagementPage() {
   return (
-    <AppLayout>
+    <AppLayout fill>
       {/* Suspense boundary required: the screen reads useSearchParams()
           (?stage= / ?status= deep-links from dashboard cards). */}
       <Suspense fallback={<LeadsFallback />}>
