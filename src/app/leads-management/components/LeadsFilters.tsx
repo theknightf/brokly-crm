@@ -1,44 +1,23 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { FilterState } from './LeadsManagementScreen';
 import { teamsService, projectsService, adminSettingsService, leadSourcesService } from '@/lib/services/crmService';
-import {
-  ALL_STATUSES,
-  ALL_SOURCES,
-  ALL_PROPERTY_TYPES,
-  LEAD_ACTIONS,
-  LeadStatus,
-  LeadSource,
-  PropertyType,
-  LeadAction,
-} from './mockLeads';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { ALL_STATUSES, ALL_SOURCES, LEAD_ACTIONS, LeadAction } from './mockLeads';
 
-interface LeadsFiltersProps {
-  filters: FilterState;
-  onChange: (f: FilterState) => void;
+export interface LeadFilterOptions {
+  statusOptions: string[];
+  agentOptions: string[];
+  sourceOptions: string[];
+  projectOptions: string[];
 }
 
-export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
-  const [localSearch, setLocalSearch] = useState(filters.search);
-
-  // Sync incoming search prop (e.g. from URL or clear)
-  useEffect(() => {
-    setLocalSearch(filters.search);
-  }, [filters.search]);
-
-  // Debounce search update to parent (300ms)
-  useEffect(() => {
-    if (localSearch === filters.search) return;
-    const timer = setTimeout(() => {
-      onChange({ ...filters, search: localSearch });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [localSearch, filters, onChange]);
-
-  const update = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
-    onChange({ ...filters, [key]: value });
-
+/**
+ * Loads the dropdown options once (status / agent / source / project) so the
+ * toolbar and the filter drawer share a single set of requests.
+ */
+export function useLeadFilterOptions(): LeadFilterOptions {
   const [agentOptions, setAgentOptions] = useState<string[]>([]);
   const [projectOptions, setProjectOptions] = useState<string[]>([]);
   const [statusOptions, setStatusOptions] = useState<string[]>(ALL_STATUSES);
@@ -136,300 +115,209 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
     };
   }, []);
 
+  return { statusOptions, agentOptions, sourceOptions, projectOptions };
+}
+
+// ─── Activity: ONE filter that replaces Called / Action taken ───────────────
+//
+// It only maps to the same FilterState fields the query layer already reads
+// (called, calledFrom/To, actionTaken, actionFrom/To) — no data logic changes.
+
+export type ActivityValue = '' | 'called' | 'not-called' | 'action-today' | 'no-action';
+
+export function activityOf(f: FilterState): ActivityValue {
+  if (f.called === 'called' || f.calledFrom || f.calledTo) return 'called';
+  if (f.called === 'not-called') return 'not-called';
+  const taken =
+    f.actionTaken ||
+    (f.contacted === 'today' ? 'today' : f.contacted === 'not-today' ? 'no-action' : '');
+  if (taken === 'today' || f.actionFrom || f.actionTo) return 'action-today';
+  if (taken === 'no-action') return 'no-action';
+  return '';
+}
+
+export function applyActivity(f: FilterState, value: ActivityValue): FilterState {
+  const next: FilterState = {
+    ...f,
+    called: '',
+    calledFrom: '',
+    calledTo: '',
+    actionTaken: '',
+    actionFrom: '',
+    actionTo: '',
+    contacted: '',
+  };
+  if (value === 'called') next.called = 'called';
+  else if (value === 'not-called') next.called = 'not-called';
+  else if (value === 'action-today') next.actionTaken = 'today';
+  else if (value === 'no-action') next.actionTaken = 'no-action';
+  return next;
+}
+
+export function activityRange(f: FilterState): { from: string; to: string } {
+  return activityOf(f) === 'called'
+    ? { from: f.calledFrom, to: f.calledTo }
+    : { from: f.actionFrom, to: f.actionTo };
+}
+
+export function applyActivityRange(f: FilterState, from: string, to: string): FilterState {
+  return activityOf(f) === 'called'
+    ? { ...f, calledFrom: from, calledTo: to }
+    : { ...f, actionFrom: from, actionTo: to };
+}
+
+export const ACTIVITY_OPTIONS: { value: ActivityValue; labelKey: string }[] = [
+  { value: '', labelKey: 'leads.activity.any' },
+  { value: 'called', labelKey: 'leads.activity.called' },
+  { value: 'not-called', labelKey: 'leads.activity.notCalled' },
+  { value: 'action-today', labelKey: 'leads.activity.actionToday' },
+  { value: 'no-action', labelKey: 'leads.activity.noAction' },
+];
+
+// ─── Drawer body ─────────────────────────────────────────────────────────────
+
+interface LeadsFiltersProps {
+  filters: FilterState;
+  onChange: (f: FilterState) => void;
+  options: LeadFilterOptions;
+}
+
+function SelectField({
+  id,
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-wrap gap-2 mt-3">
-      {/* Search */}
-      <div className="relative flex-1 min-w-[200px]">
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          type="search"
-          placeholder="Search by name, email, phone, city…"
-          value={localSearch}
-          onChange={(e) => setLocalSearch(e.target.value)}
-          className="input-base pl-8 h-9 text-sm"
-        />
-      </div>
-
-      {/* Status */}
-      <div className="relative w-full sm:w-auto max-w-full box-border">
-        <select
-          value={filters.status}
-          onChange={(e) => update('status', e.target.value as LeadStatus | '')}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[160px] max-w-full w-full sm:w-auto box-border truncate"
-        >
-          <option value="">All Statuses</option>
-          {statusOptions.map((s) => (
-            <option key={`filter-status-${s}`} value={s} className="whitespace-normal">
-              {s}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={13}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-        />
-      </div>
-
-      {/* Source */}
-      <div className="relative w-full sm:w-auto">
-        <select
-          value={filters.source}
-          onChange={(e) => update('source', e.target.value as LeadSource | '')}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[130px] w-full sm:w-auto"
-        >
-          <option value="">All Sources</option>
-          {sourceOptions.map((s) => (
-            <option key={`filter-source-${s}`} value={s}>
-              {s}
-            </option>
-          ))}
-          {/* Ensure currently selected custom source is visible even if not yet in options */}
-          {filters.source && !sourceOptions.includes(filters.source) && (
-            <option value={filters.source}>{filters.source}</option>
-          )}
-        </select>
-        <ChevronDown
-          size={13}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-        />
-      </div>
-
-      {/* Agent */}
-      <div className="relative w-full sm:w-auto">
-        <select
-          value={filters.agent}
-          onChange={(e) => update('agent', e.target.value)}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[140px] w-full sm:w-auto"
-        >
-          <option value="">All Agents</option>
-          {agentOptions.map((a) => (
-            <option key={`filter-agent-${a}`} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={13}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-        />
-      </div>
-
-      {/* Project */}
-      <div className="relative w-full sm:w-auto">
-        <select
-          value={filters.project}
-          onChange={(e) => update('project', e.target.value)}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[150px] w-full sm:w-auto"
-        >
-          <option value="">All Projects</option>
-          {projectOptions.map((p) => (
-            <option key={`filter-project-${p}`} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={13}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-        />
-      </div>
-
-
-
-      {/* Action taken on lead */}
+    <div>
+      <label htmlFor={id} className="label-base">
+        {label}
+      </label>
       <div className="relative">
         <select
-          value={filters.action}
-          onChange={(e) => update('action', e.target.value as LeadAction | '')}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[180px]"
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="input-base h-11 appearance-none ps-3 pe-9 truncate"
         >
-          <option value="">All Actions</option>
-          {LEAD_ACTIONS.map((a) => (
-            <option key={`filter-action-${a}`} value={a}>
-              {a}
-            </option>
-          ))}
+          {children}
         </select>
         <ChevronDown
-          size={13}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          size={14}
+          className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
       </div>
+    </div>
+  );
+}
 
-      {/* Action Taken — replaces Contacted. Covers call, note, stage, follow-up (last_action_at). */}
-      <div
-        className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 min-h-[44px] h-11 max-w-full overflow-x-auto"
-        role="group"
-        aria-label="Action taken filter"
+export default function LeadsFilters({ filters, onChange, options }: LeadsFiltersProps) {
+  const { t } = useLanguage();
+  const activity = activityOf(filters);
+  const range = activityRange(filters);
+  const showRange = activity === 'called' || activity === 'action-today';
+
+  return (
+    <div className="space-y-4">
+      <SelectField
+        id="lf-source"
+        label={t('leads.source')}
+        value={filters.source}
+        onChange={(v) => onChange({ ...filters, source: v as FilterState['source'] })}
       >
-        {(
-          [
-            { value: '', label: 'All Leads' },
-            {
-              value: 'today',
-              label:
-                filters.actionFrom || filters.actionTo
-                  ? 'Action Taken (Range)'
-                  : filters.actionTaken === 'today'
-                  ? 'Action Taken (Today)'
-                  : 'Action Taken (Today / Date Range)',
-            },
-            { value: 'no-action', label: 'No Action Taken' },
-          ] as const
-        ).map((opt) => {
-          const cur =
-            filters.actionTaken ||
-            (filters.contacted === 'today'
-              ? 'today'
-              : filters.contacted === 'not-today'
-              ? 'no-action'
-              : '');
-          const active =
-            opt.value === ''
-              ? !cur && !filters.actionFrom && !filters.actionTo
-              : opt.value === 'today'
-              ? cur === 'today' || !!filters.actionFrom || !!filters.actionTo
-              : cur === 'no-action';
-          const nextVal = opt.value as FilterState['actionTaken'];
-          return (
-            <button
-              key={opt.value || 'all'}
-              type="button"
-              onClick={() => {
-                const next: FilterState = {
-                  ...filters,
-                  actionTaken: nextVal,
-                  contacted: '' as FilterState['contacted'],
-                };
-                if (nextVal !== 'today') {
-                  next.actionFrom = '';
-                  next.actionTo = '';
-                }
-                onChange(next);
-              }}
-              aria-pressed={active}
-              className={`min-h-[36px] h-9 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
-                active
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Date range refinement — visible when Action Taken is active */}
-      {(filters.actionTaken === 'today' || !!filters.actionFrom || !!filters.actionTo) &&
-        filters.actionTaken !== 'no-action' && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs text-muted-foreground font-medium">From:</span>
-            <input
-              type="date"
-              value={filters.actionFrom}
-              onChange={(e) => update('actionFrom', e.target.value)}
-              className="input-base h-9 text-xs px-2 w-[140px]"
-              aria-label="Action from date"
-              title="From date — filter Action Taken in range"
-            />
-            <span className="text-xs text-muted-foreground font-medium">To:</span>
-            <input
-              type="date"
-              value={filters.actionTo}
-              onChange={(e) => update('actionTo', e.target.value)}
-              className="input-base h-9 text-xs px-2 w-[140px]"
-              aria-label="Action to date"
-              title="To date — filter Action Taken in range"
-            />
-            {(filters.actionFrom || filters.actionTo) ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onChange({ ...filters, actionFrom: '', actionTo: '', actionTaken: 'today' });
-                }}
-                className="h-9 px-2.5 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-                title="Reset to today"
-              >
-                Today Only
-              </button>
-            ) : null}
-          </div>
+        <option value="">{t('leads.allSources')}</option>
+        {options.sourceOptions.map((s) => (
+          <option key={`filter-source-${s}`} value={s}>
+            {s}
+          </option>
+        ))}
+        {/* Keep a custom/deep-linked source visible even if it is not in the options yet */}
+        {filters.source && !options.sourceOptions.includes(filters.source) && (
+          <option value={filters.source}>{filters.source}</option>
         )}
+      </SelectField>
 
-      {/* Called — has sales logged a call? */}
-      <div
-        className="inline-flex items-center rounded-lg border border-border bg-card p-0.5 min-h-[44px] h-11 max-w-full overflow-x-auto"
-        role="group"
-        aria-label="Called filter"
+      <SelectField
+        id="lf-project"
+        label={t('leads.project')}
+        value={filters.project}
+        onChange={(v) => onChange({ ...filters, project: v })}
       >
-        {(
-          [
-            { value: '', label: 'All' },
-            { value: 'called', label: 'Called' },
-            { value: 'not-called', label: 'Not Called' },
-          ] as const
-        ).map((opt) => {
-          const active = filters.called === opt.value;
-          const nextVal = opt.value as FilterState['called'];
-          return (
-            <button
-              key={opt.value || 'all-called'}
-              type="button"
-              onClick={() => {
-                const next: FilterState = { ...filters, called: nextVal };
-                if (nextVal !== 'called') {
-                  next.calledFrom = '';
-                  next.calledTo = '';
-                }
-                onChange(next);
-              }}
-              aria-pressed={active}
-              className={`min-h-[36px] h-9 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
-                active
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
+        <option value="">{t('leads.allProjects')}</option>
+        {options.projectOptions.map((p) => (
+          <option key={`filter-project-${p}`} value={p}>
+            {p}
+          </option>
+        ))}
+      </SelectField>
 
-      {/* Called date range — visible when Called is active */}
-      {(filters.called === 'called' || !!filters.calledFrom || !!filters.calledTo) && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs text-muted-foreground font-medium">Called From:</span>
-          <input
-            type="date"
-            value={filters.calledFrom}
-            onChange={(e) => update('calledFrom', e.target.value)}
-            className="input-base h-9 text-xs px-2 w-[140px]"
-            aria-label="Called from date"
-          />
-          <span className="text-xs text-muted-foreground font-medium">To:</span>
-          <input
-            type="date"
-            value={filters.calledTo}
-            onChange={(e) => update('calledTo', e.target.value)}
-            className="input-base h-9 text-xs px-2 w-[140px]"
-            aria-label="Called to date"
-          />
-          {(filters.calledFrom || filters.calledTo) ? (
-            <button
-              type="button"
-              onClick={() => onChange({ ...filters, calledFrom: '', calledTo: '' })}
-              className="h-9 px-2.5 rounded-lg text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
-            >
-              Clear
-            </button>
-          ) : null}
-        </div>
+      <SelectField
+        id="lf-activity"
+        label={t('leads.activity')}
+        value={activity}
+        onChange={(v) => onChange(applyActivity(filters, v as ActivityValue))}
+      >
+        {ACTIVITY_OPTIONS.map((o) => (
+          <option key={o.value || 'any'} value={o.value}>
+            {t(o.labelKey)}
+          </option>
+        ))}
+      </SelectField>
+
+      {showRange && (
+        <fieldset className="rounded-xl border border-border p-3">
+          <legend className="px-1 text-xs font-medium text-muted-foreground">
+            {t('leads.activityRange')}
+          </legend>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="lf-from" className="text-xs text-muted-foreground">
+                {t('leads.dateFrom')}
+              </label>
+              <input
+                id="lf-from"
+                type="date"
+                value={range.from}
+                onChange={(e) => onChange(applyActivityRange(filters, e.target.value, range.to))}
+                className="input-base h-11 text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="lf-to" className="text-xs text-muted-foreground">
+                {t('leads.dateTo')}
+              </label>
+              <input
+                id="lf-to"
+                type="date"
+                value={range.to}
+                onChange={(e) => onChange(applyActivityRange(filters, range.from, e.target.value))}
+                className="input-base h-11 text-sm"
+              />
+            </div>
+          </div>
+        </fieldset>
       )}
+
+      <SelectField
+        id="lf-action"
+        label={t('leads.actionType')}
+        value={filters.action}
+        onChange={(v) => onChange({ ...filters, action: v as LeadAction | '' })}
+      >
+        <option value="">{t('leads.allActionTypes')}</option>
+        {LEAD_ACTIONS.map((a) => (
+          <option key={`filter-action-${a}`} value={a}>
+            {a}
+          </option>
+        ))}
+      </SelectField>
     </div>
   );
 }

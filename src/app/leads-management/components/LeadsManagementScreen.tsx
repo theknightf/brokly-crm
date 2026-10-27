@@ -39,7 +39,8 @@ import dynamic from 'next/dynamic';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
 import LeadBoard from './LeadBoard';
-import LeadsFilters from './LeadsFilters';
+import LeadsFilters, { useLeadFilterOptions, activityOf } from './LeadsFilters';
+import LeadsToolbar, { LeadsFilterDrawer } from './LeadsToolbar';
 import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
@@ -299,6 +300,7 @@ export default function LeadsManagementScreen({
 }: LeadsManagementScreenProps = {}) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const filterOptions = useLeadFilterOptions();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
@@ -380,7 +382,8 @@ export default function LeadsManagementScreen({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
-  const [showFilters, setShowFilters] = useState(true);
+  // Filters drawer — collapsed by default so the table is visible above the fold.
+  const [showFilters, setShowFilters] = useState(false);
   const [viewTab, setViewTab] = useState<'overview' | 'activity' | 'units' | 'comments'>('overview');
   const [sortKey, setSortKey] = useState<keyof Lead>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -508,6 +511,22 @@ export default function LeadsManagementScreen({
 
     if (filters.search) url.searchParams.set('search', filters.search);
     else url.searchParams.delete('search');
+
+    const optionalParams: [string, string][] = [
+      ['source', filters.source],
+      ['agent', filters.agent],
+      ['project', filters.project],
+      ['propertyType', filters.propertyType],
+      ['action', filters.action],
+      ['actionFrom', filters.actionFrom],
+      ['actionTo', filters.actionTo],
+      ['calledFrom', filters.calledFrom],
+      ['calledTo', filters.calledTo],
+    ];
+    for (const [k, v] of optionalParams) {
+      if (v) url.searchParams.set(k, v);
+      else url.searchParams.delete(k);
+    }
 
     window.history.replaceState({}, '', url.toString());
   }, [filters]);
@@ -1064,6 +1083,44 @@ export default function LeadsManagementScreen({
     [handleCallLogged],
   );
 
+  /** Apply one status to every selected lead (reuses leadsService.updateStatus, 5 at a time). */
+  const handleBulkStatusChange = async (newStatus: string) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    const okIds: string[] = [];
+    let failed = 0;
+    for (let i = 0; i < ids.length; i += 5) {
+      const chunk = ids.slice(i, i + 5);
+      const results = await Promise.allSettled(
+        chunk.map((id) => leadsService.updateStatus(id, newStatus))
+      );
+      results.forEach((r, k) => {
+        if (r.status === 'fulfilled') okIds.push(chunk[k]);
+        else failed += 1;
+      });
+    }
+    if (okIds.length) {
+      const ok = new Set(okIds);
+      // Same rule as the single-lead change: with a status filter active, leads that no
+      // longer match leave the list immediately.
+      if (filters.status && filters.status !== newStatus) {
+        setLeads((prev) => prev.filter((l) => !ok.has(l.id)));
+        setTotal((n) => Math.max(0, n - okIds.length));
+      } else {
+        setLeads((prev) =>
+          prev.map((l) => (ok.has(l.id) ? { ...l, status: newStatus as LeadStatus } : l))
+        );
+      }
+      setSelectedIds(new Set());
+      void loadStatusCounts();
+    }
+    if (failed > 0) {
+      toast.error(t('leads.bulkStatusPartial', { ok: okIds.length, failed }));
+    } else {
+      toast.success(t('leads.bulkStatusDone', { count: okIds.length }));
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (!isAdminRole(user?.role)) {
       toast.error('Only owner and admin can delete leads.');
@@ -1540,28 +1597,22 @@ export default function LeadsManagementScreen({
 
   const activeFilterCount = [
     filters.status,
-    filters.source,
     filters.agent,
+    filters.source,
+    filters.project,
+    filters.propertyType,
     filters.action,
+    activityOf(filters),
   ].filter(Boolean).length;
 
-  if (loading) {
-    return (
-      <div className="space-y-5 animate-in fade-in">
-        <div className="h-9 w-44 bg-muted rounded-lg animate-pulse" />
-        <div className="h-11 bg-muted rounded-xl animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={`sk-${i}`}
-              className="h-36 bg-muted rounded-2xl animate-pulse"
-              style={{ animationDelay: `${Math.min(i, 7) * 60}ms` }}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  // Filters that live in the drawer (badge on the Filters button)
+  const drawerFilterCount = [
+    filters.source,
+    filters.project,
+    filters.propertyType,
+    filters.action,
+    activityOf(filters),
+  ].filter(Boolean).length;
 
   const formatDisplayBudget = (lead: Lead) => {
     const parts: string[] = [];
@@ -1571,7 +1622,7 @@ export default function LeadsManagementScreen({
   };
 
   return (
-    <div className="page-aurora min-h-[calc(100dvh-8rem)] lg:min-h-full space-y-5 rounded-[2rem] p-3 sm:p-5 flex flex-col">
+    <div className="page-aurora min-h-[calc(100dvh-8rem)] lg:min-h-full space-y-5 rounded-[2rem] p-3 sm:p-5 pb-24 flex flex-col">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-[1.75rem] border border-border/70 bg-card/80 p-4 sm:p-5 shadow-sm backdrop-blur-xl">
         <div className="animate-rise-in">
@@ -1626,124 +1677,67 @@ export default function LeadsManagementScreen({
         </div>
       </div>
 
-      {/* Sticky toolbar */}
-      <div
-        className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2.5 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm transition-all flex flex-col sm:flex-row gap-2 animate-rise-in"
-        style={{ animationDelay: '140ms' }}
-      >
-        <div className="relative flex-1">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-          />
-          <input
-            value={filters.search}
-            onChange={(e) => {
-              setFilters((f) => ({ ...f, search: e.target.value }));
-              setCurrentPage(1);
-            }}
-            placeholder={t('leads.search')}
-            className="input-base h-11 pl-9 pr-3 w-full bg-card/90 shadow-sm"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className={`btn-secondary h-11 flex items-center gap-1.5 text-sm ${
-              activeFilterCount > 0 ? 'ring-1 ring-primary/40 text-primary' : ''
-            }`}
-          >
-            <SlidersHorizontal size={15} />
-            <span className="hidden sm:inline">{t('leads.filters')}</span>
-            {activeFilterCount > 0 && (
-              <span className="bg-primary text-primary-foreground text-[10px] px-1.5 rounded-full font-semibold">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-          <div className="flex items-center bg-muted rounded-xl p-1 h-11">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-card text-primary shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              aria-label="List view"
-            >
-              <List size={15} />
-              <span className="hidden md:inline">{t('leads.list')}</span>
-            </button>
-            <button
-              onClick={() => {
-                setViewMode('board');
-                if (pageSize < 500) {
-                  setPageSize(500);
-                  setCurrentPage(1);
-                }
-              }}
-              className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                viewMode === 'board'
-                  ? 'bg-card text-primary shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-              aria-label="Board view"
-            >
-              <LayoutGrid size={15} />
-              <span className="hidden md:inline">{t('leads.board')}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <LeadsToolbar
+        filters={filters}
+        onChange={(f) => {
+          setFilters(f);
+          setCurrentPage(1);
+        }}
+        options={filterOptions}
+        drawerCount={drawerFilterCount}
+        onOpenFilters={() => setShowFilters(true)}
+        filtersOpen={showFilters}
+        viewMode={viewMode}
+        onViewModeChange={(mode) => {
+          setViewMode(mode);
+          if (mode === 'board' && pageSize < 500) {
+            setPageSize(500);
+            setCurrentPage(1);
+          }
+        }}
+        onClearAll={clearFilters}
+      />
 
-      {/* Filters */}
-      {showFilters && (
-        <div className="card-base !p-4 mt-2 animate-in fade-in slide-in-from-top-2 relative z-10 shadow-sm">
-          <div className="flex items-center gap-2 mb-0.5">
-            <SlidersHorizontal size={14} className="text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">Filters</span>
-            {activeFilterCount > 0 && (
-              <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full font-semibold">
-                {activeFilterCount}
-              </span>
-            )}
-            {(activeFilterCount > 0 || filters.search) && (
-              <button
-                onClick={clearFilters}
-                className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-          <LeadsFilters
-            filters={filters}
-            onChange={(f) => {
-              setFilters(f);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
-      )}
+      <LeadsFilterDrawer
+        open={showFilters}
+        onClose={() => setShowFilters(false)}
+        onClear={clearFilters}
+        count={drawerFilterCount}
+      >
+        <LeadsFilters
+          filters={filters}
+          options={filterOptions}
+          onChange={(f) => {
+            setFilters(f);
+            setCurrentPage(1);
+          }}
+        />
+      </LeadsFilterDrawer>
 
       {/* Table / Board */}
       {loadError && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-center justify-between gap-4">
+        <div role="alert" className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <TriangleAlert size={18} className="flex-shrink-0" />
             <div>
-              <p className="text-sm font-semibold">Failed to load leads</p>
+              <p className="text-sm font-semibold">{t('leads.loadFailed')}</p>
               <p className="text-xs opacity-80">{loadError}</p>
             </div>
           </div>
-          <button onClick={() => fetchLeads()} className="btn-secondary shrink-0">
+          <button onClick={() => fetchLeads()} className="btn-secondary shrink-0 min-h-[44px]">
             <RefreshCw size={14} />
-            Retry
+            {t('leads.retry')}
           </button>
         </div>
       )}
       <div className="card-base !p-0 overflow-hidden animate-in fade-in">
-        {viewMode === 'board' ? (
+        {viewMode === 'board' && loading && leads.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3" aria-hidden>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={`bsk-${i}`} className="h-36 bg-muted rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        ) : viewMode === 'board' ? (
           <LeadBoard
             leads={leads}
             statusCounts={statusCounts}
@@ -1780,6 +1774,9 @@ export default function LeadsManagementScreen({
             onOpenLogCall={handleOpenLogCall}
             onAddNote={handleAddNote}
             onPostCall={handlePostCallTrigger}
+            loading={loading}
+            hasActiveFilters={activeFilterCount > 0 || !!filters.search}
+            onClearFilters={clearFilters}
           />
         )}
       </div>
@@ -1792,6 +1789,7 @@ export default function LeadsManagementScreen({
         onAssignMany={handleBulkAssignMany}
         onAssignTeam={handleBulkAssignTeam}
         onRefer={handleBulkRefer}
+        onChangeStatus={handleBulkStatusChange}
         onClear={() => setSelectedIds(new Set())}
       />
 

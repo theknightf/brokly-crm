@@ -16,6 +16,7 @@ import {
   CalendarClock,
   Zap,
   Loader2,
+  User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Lead, LeadStatus } from './mockLeads';
@@ -27,6 +28,7 @@ import ViewportPopover from '@/components/ui/ViewportPopover';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface MobileLeadCardProps {
   lead: Lead;
@@ -103,6 +105,7 @@ function MobileLeadCardInner({
   onPostCall,
 }: MobileLeadCardProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [statusOpen, setStatusOpen] = useState(false);
   const stageAnchorRef = useRef<HTMLButtonElement>(null);
   const initials = getInitials(lead.name || '', lead.id?.toString().slice(0, 2));
@@ -169,40 +172,72 @@ function MobileLeadCardInner({
         selected ? 'border-primary ring-1 ring-primary/30' : 'border-border'
       }`}
     >
-      {/* Hidden bulk checkbox */}
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={(e) => onSelect(lead.id, e.target.checked)}
-        className="sr-only"
-        aria-label={`Select ${lead.name || lead.id}`}
-      />
 
       {/* 1. Header Section */}
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
-        {/* Left: avatar + name/location */}
+        <label className="flex items-center justify-center w-11 h-11 -ms-2 -mt-1 flex-shrink-0 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onSelect(lead.id, e.target.checked)}
+            className="w-5 h-5 rounded border-input accent-primary cursor-pointer"
+            aria-label={`${t('leads.colLead')}: ${lead.name || lead.phone || t('leads.noName')}`}
+          />
+        </label>
+        {/* Left: avatar + name (or phone) */}
         <button
           onClick={() => onView(lead)}
-          className="flex items-start gap-3 min-w-0 flex-1 text-left group cursor-pointer"
-          aria-label={`Open ${lead.name || lead.id}`}
+          className="flex items-start gap-3 min-w-0 flex-1 text-start group cursor-pointer"
+          aria-label={`${t('leads.open')}: ${lead.name || lead.phone || t('leads.noName')}`}
         >
           <div
-            className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-[15px] font-bold flex-shrink-0"
-            style={{ backgroundColor: '#48bb78' }}
+            className={`w-11 h-11 rounded-xl flex items-center justify-center text-[15px] font-bold flex-shrink-0 ${
+              lead.name?.trim() ? 'text-white' : 'bg-muted text-muted-foreground'
+            }`}
+            style={lead.name?.trim() ? { backgroundColor: '#48bb78' } : undefined}
+            aria-hidden
           >
-            {initials}
+            {lead.name?.trim() ? initials : <User size={20} />}
           </div>
           <div className="min-w-0 pt-0.5">
-            <p className="font-bold text-foreground group-hover:text-primary group-hover:underline cursor-pointer text-[15px] leading-tight truncate transition-colors">
-              {lead.name || `Lead ${lead.id}`}
+            <p className="font-bold text-foreground group-hover:text-primary group-hover:underline cursor-pointer text-[15px] leading-tight truncate transition-colors flex items-center gap-1.5">
+              <span className="truncate">{lead.name?.trim() || lead.phone || t('leads.noName')}</span>
+              {isAdminRole(user?.role) && lead.isDuplicate && (
+                <span className="flex-shrink-0 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-semibold px-1.5 py-px">
+                  {t('leads.duplicate')}
+                </span>
+              )}
             </p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <MapPin size={12} className="flex-shrink-0" />
-              <span className="truncate">{lead.location || '—'}</span>
-            </p>
+            {(lead.name?.trim() ? lead.phone : t('leads.noName')) && (
+              <p className="text-xs text-muted-foreground mt-1 truncate" dir={lead.name?.trim() ? 'ltr' : undefined}>
+                {lead.name?.trim() ? lead.phone : t('leads.noName')}
+              </p>
+            )}
+            {lead.location?.trim() && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                <MapPin size={12} className="flex-shrink-0" />
+                <span className="truncate">{lead.location}</span>
+              </p>
+            )}
             <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-              <ActionTakenBadge actionTakenToday={lead.actionTakenToday ?? lead.contactedToday} compact />
-              <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
+              <span
+                className={`inline-flex items-center rounded-full text-[11px] font-semibold px-2 py-0.5 ${
+                  lead.hasBeenCalled
+                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                }`}
+              >
+                {lead.hasBeenCalled ? t('leads.called') : t('leads.notCalled')}
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full text-[11px] font-semibold px-2 py-0.5 ${
+                  (lead.actionTakenToday ?? lead.contactedToday)
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {(lead.actionTakenToday ?? lead.contactedToday) ? t('leads.actionToday') : t('leads.noAction')}
+              </span>
             </div>
           </div>
         </button>

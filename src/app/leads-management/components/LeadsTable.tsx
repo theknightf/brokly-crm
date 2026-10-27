@@ -9,12 +9,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Phone,
-  Mail,
-  MapPin,
   Users,
   UserCheck,
   Zap,
+  User,
+  Copy,
+  MessageCircle,
+  MoreHorizontal,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import {
@@ -25,11 +28,11 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
-import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
-import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -55,12 +58,17 @@ interface LeadsTableProps {
   /** Mobile-only: open the Add Note sheet for a lead */
   onAddNote?: (lead: Lead) => void;
   onPostCall?: (lead: Lead) => void;
+  /** First load in flight: render skeleton rows instead of the empty state. */
+  loading?: boolean;
+  /** Any filter/search active: the empty state offers a "clear filters" CTA. */
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   return (
     <span
-      className={`ml-1 inline-flex flex-col ${active ? 'text-primary' : 'text-muted-foreground/40'}`}
+      className={`ms-1 inline-flex flex-col ${active ? 'text-primary' : 'text-muted-foreground/40'}`}
     >
       <ChevronUp size={10} className={active && dir === 'asc' ? 'text-primary' : ''} />
       <ChevronDown
@@ -93,7 +101,7 @@ function StageSelector({
           e.stopPropagation();
           setOpen((o) => !o);
         }}
-        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted/70 transition-colors text-left max-w-full"
+        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted/70 transition-colors text-start max-w-full"
         aria-label={`Change status from ${currentStatus}`}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -128,7 +136,7 @@ function StageSelector({
                 onStatusChange(leadId, s as LeadStatus);
                 setOpen(false);
               }}
-              className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
+              className={`w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
                 s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
               }`}
             >
@@ -148,7 +156,7 @@ function StageSelector({
                 onStatusChange(leadId, s as LeadStatus);
                 setOpen(false);
               }}
-              className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
+              className={`w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
                 s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
               }`}
             >
@@ -164,26 +172,61 @@ function StageSelector({
 
 const StatusDropdown = StageSelector;
 
-const formatBudget = (min?: number, max?: number) => {
-  if (min == null && max == null) return '—';
-  const parts: string[] = [];
-  if (min != null) parts.push(min.toLocaleString());
-  if (max != null) parts.push(max.toLocaleString());
-  return `${parts.join('–')} ج.م`;
-};
+// ─── Formatting helpers (localized) ──────────────────────────────────────────
 
-const formatDate = (dateStr?: string) => {
-  if (!dateStr) return '—';
-  const [y, m, d] = dateStr.split('-');
-  return `${m}/${d}/${y?.slice(2)}`;
-};
+function localeOf(lang: string) {
+  return lang === 'ar' ? 'ar-EG' : 'en-GB';
+}
+
+function timeAgo(iso: string | null | undefined, lang: string): string {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const diff = Math.round((then - Date.now()) / 1000);
+  const abs = Math.abs(diff);
+  const rtf = new Intl.RelativeTimeFormat(lang === 'ar' ? 'ar' : 'en', { numeric: 'auto' });
+  if (abs < 60) return rtf.format(diff, 'second');
+  if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
+  if (abs < 86400 * 30) return rtf.format(Math.round(diff / 86400), 'day');
+  if (abs < 86400 * 365) return rtf.format(Math.round(diff / (86400 * 30)), 'month');
+  return rtf.format(Math.round(diff / (86400 * 365)), 'year');
+}
+
+function shortDate(iso: string | null | undefined, lang: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(localeOf(lang), { day: 'numeric', month: 'short', year: '2-digit' });
+}
 
 const isOverdue = (dueDate?: string) => {
   if (!dueDate) return false;
   const due = new Date(dueDate);
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   return due < today;
 };
+
+/** One compact, consistently-ordered badge (max two per lead cell). */
+function LeadBadge({ tone, children }: { tone: 'sky' | 'amber' | 'emerald' | 'muted'; children: React.ReactNode }) {
+  const tones: Record<string, string> = {
+    sky: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    emerald: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    muted: 'bg-muted text-muted-foreground',
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full text-[11px] font-semibold px-2 py-0.5 whitespace-nowrap ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+const ICON_BTN =
+  'w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed';
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -194,6 +237,8 @@ interface LeadTableRowProps {
   onView?: (lead: Lead) => void;
   onEdit?: (lead: Lead) => void;
   onDeletePrompt: (id: string) => void;
+  onPostCall?: (lead: Lead) => void;
+  onOpenLogCall?: (lead: Lead) => void;
 }
 
 const LeadTableRow = React.memo(function LeadTableRow({
@@ -205,103 +250,155 @@ const LeadTableRow = React.memo(function LeadTableRow({
   onView,
   onEdit,
   onDeletePrompt,
+  onPostCall,
+  onOpenLogCall,
 }: LeadTableRowProps) {
+  const { t, lang } = useLanguage();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuAnchorRef = useRef<HTMLButtonElement>(null);
+
+  const name = (lead.name || '').trim();
+  const hasName = !!name;
+  const title = hasName ? name : lead.phone || t('leads.noName');
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2);
+
+  const agentNames: string[] =
+    lead.assignedToNames && lead.assignedToNames.length > 0
+      ? lead.assignedToNames
+      : lead.assignedToName
+        ? lead.assignedToName.split(' & ')
+        : lead.agent
+          ? [lead.agent]
+          : [];
+
+  const overdue = isOverdue(lead.followUpDue);
+  const called = !!lead.hasBeenCalled;
+  const actionToday = !!(lead.actionTakenToday ?? lead.contactedToday);
+  const stickyBg = isSelected ? 'bg-secondary' : 'bg-card group-hover:bg-muted';
+  const hasPhone = !!(lead.phone && lead.phone.replace(/\D/g, ''));
+  const details = [lead.email, lead.location].filter((v) => !!v && String(v).trim());
+
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(lead.id);
+      toast.success(t('leads.idCopied'));
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
+  };
+
+  const handleCall = () => {
+    if (onPostCall) onPostCall(lead);
+    else if (hasPhone) window.location.href = `tel:${lead.phone.replace(/[^0-9+]/g, '')}`;
+  };
+
   return (
-    <tr
-      className={`hover:bg-muted/30 transition-colors group ${isSelected ? 'bg-secondary/20' : ''}`}
-    >
-      <td className="table-td">
+    <tr className={`group transition-colors ${isSelected ? 'bg-secondary/20' : 'hover:bg-muted/30'}`}>
+      <td className={`table-td sticky start-0 z-[1] w-10 ${stickyBg}`}>
         <input
           type="checkbox"
           checked={isSelected}
           onChange={(e) => onSelectRow(lead.id, e.target.checked)}
-          className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
-          aria-label={`Select ${lead.name || lead.id}`}
+          className="w-5 h-5 rounded border-input accent-primary cursor-pointer"
+          aria-label={`${t('leads.colLead')}: ${title}`}
         />
       </td>
-      <td className="table-td">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-            {(lead.name || lead.id)
-              .split(' ')
-              .map((n) => n[0])
-              .join('')
-              .slice(0, 2)}
+
+      {/* Lead: avatar/icon + name (or phone) + phone + at most two badges */}
+      <td className={`table-td sticky start-10 z-[1] min-w-[250px] border-e border-border/40 ${stickyBg}`}>
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+              hasName ? 'bg-primary/10 text-primary text-xs font-bold' : 'bg-muted text-muted-foreground'
+            }`}
+            aria-hidden
+          >
+            {hasName ? initials : <User size={16} />}
           </div>
           <div className="min-w-0">
-            <a
-              href={`/leads/${lead.id}`}
-              className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block"
-            >
-              {lead.name || `Lead ${lead.id}`}
-            </a>
-            <ActionTakenBadge
-              actionTakenToday={lead.actionTakenToday ?? lead.contactedToday}
-              compact
-            />
-            <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
-            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-              <MapPin size={10} />
-              {lead.location || '—'}
-            </span>
-          </div>
-        </div>
-      </td>
-      <td className="table-td">
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Phone size={10} className="flex-shrink-0" />
-            <span className="font-mono-data">{lead.phone}</span>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Mail size={10} className="flex-shrink-0" />
-            <span className="truncate max-w-[150px]">{lead.email || '—'}</span>
+            <div className="flex items-center gap-1.5 min-h-[20px]">
+              <a
+                href={`/leads/${lead.id}`}
+                className="font-semibold text-foreground text-sm truncate max-w-[170px] hover:text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                title={title}
+              >
+                {title}
+              </a>
+              {canDelete && lead.isDuplicate && (
+                <span className="flex-shrink-0 inline-flex items-center rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-semibold px-1.5 py-px">
+                  {t('leads.duplicate')}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {hasName ? (
+                lead.phone && (
+                  <>
+                    <Phone size={10} className="flex-shrink-0" />
+                    <span className="font-mono-data" dir="ltr">
+                      {lead.phone}
+                    </span>
+                  </>
+                )
+              ) : (
+                <span>{t('leads.noName')}</span>
+              )}
+              <button
+                type="button"
+                onClick={copyId}
+                title={`${t('leads.copyId')} (${lead.id})`}
+                aria-label={t('leads.copyId')}
+                className="ms-1 w-6 h-6 rounded flex items-center justify-center text-muted-foreground/70 hover:text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Copy size={11} />
+              </button>
+            </div>
+            <div className="mt-1 flex items-center gap-1 min-h-[20px]">
+              <LeadBadge tone={called ? 'sky' : 'amber'}>
+                {called ? t('leads.called') : t('leads.notCalled')}
+              </LeadBadge>
+              <LeadBadge tone={actionToday ? 'emerald' : 'muted'}>
+                {actionToday ? t('leads.actionToday') : t('leads.noAction')}
+              </LeadBadge>
+            </div>
+            {details.length > 0 && (
+              <p className="mt-0.5 text-xs text-muted-foreground truncate max-w-[220px]">
+                {details.join(' · ')}
+              </p>
+            )}
           </div>
         </div>
       </td>
 
       <td className="table-td">
-        <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
-          {lead.source || '—'}
-        </span>
-      </td>
-      <td className="table-td">
-        <div className="flex items-center gap-1.5">
-          <div className="w-6 h-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-            {lead.agentInitials || '—'}
-          </div>
-          <span className="text-sm text-foreground truncate max-w-[100px]">
-            {lead.agent?.split(' ')[0] || '—'}
+        {lead.source ? (
+          <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
+            {lead.source}
           </span>
-        </div>
+        ) : null}
       </td>
+
       <td className="table-td">
-        {(lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName || lead.adminName ? (
-          <div className="flex flex-col gap-0.5">
-            {((lead.assignedToNames && lead.assignedToNames.length > 0)
-              ? lead.assignedToNames
-              : lead.assignedToName
-              ? lead.assignedToName.split(' & ')
-              : []
-            ).map((name, idx) => (
-              <div key={idx} className="flex items-center gap-1.5" title={name}>
-                <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
-                <span className="text-xs text-foreground truncate max-w-[120px]">
-                  {name}
-                </span>
-              </div>
-            ))}
-            {lead.adminName && (
-              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                {(lead.assignedToNames?.length || lead.assignedToName) ? 'admin: ' : ''}
-                {lead.adminName}
+        {agentNames.length > 0 ? (
+          <div className="flex items-center gap-1.5" title={agentNames.join(', ')}>
+            <UserCheck size={14} className="text-emerald-500 flex-shrink-0" />
+            <span className="text-sm text-foreground truncate max-w-[120px]">{agentNames[0]}</span>
+            {agentNames.length > 1 && (
+              <span className="text-[11px] font-semibold text-muted-foreground bg-muted rounded-full px-1.5">
+                +{agentNames.length - 1}
               </span>
             )}
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">Unassigned</span>
+          <span className="text-xs text-muted-foreground">{t('leads.unassigned')}</span>
         )}
       </td>
+
       <td className="table-td">
         <div className="flex items-center gap-1.5">
           <StatusDropdown
@@ -315,53 +412,148 @@ const LeadTableRow = React.memo(function LeadTableRow({
               if (next && next !== lead.status) onStatusChange(lead.id, next);
             }}
             disabled={!nextPipelineStage(lead.status)}
-            className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap"
+            className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             title={
               nextPipelineStage(lead.status)
-                ? `One-click: move to ${nextPipelineStage(lead.status)}`
-                : 'At final pipeline stage'
+                ? `${nextPipelineStage(lead.status)}`
+                : ''
             }
             aria-label="Advance lead status one step"
           >
             <Zap size={13} />
-            {nextPipelineStage(lead.status) || 'Done'}
+            {nextPipelineStage(lead.status) || '✓'}
           </button>
         </div>
       </td>
-      <td className="table-td">
-        <span
-          className={`font-mono-data text-sm tabular-nums ${isOverdue(lead.followUpDue) ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}
-        >
-          {formatDate(lead.followUpDue)}
-          {isOverdue(lead.followUpDue) && (
-            <span className="ml-1 text-xs text-red-400">overdue</span>
-          )}
-        </span>
+
+      <td className="table-td text-muted-foreground text-xs">
+        {lead.lastActionAt ? (
+          <span title={new Date(lead.lastActionAt).toLocaleString(localeOf(lang))}>
+            {timeAgo(lead.lastActionAt, lang)}
+          </span>
+        ) : (
+          <span className="opacity-70">{t('leads.noAction')}</span>
+        )}
       </td>
+
       <td className="table-td">
-        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
-          <button
-            onClick={() => onView?.(lead)}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            title="View lead details"
+        {lead.followUpDue ? (
+          <span
+            className={`text-sm tabular-nums ${overdue ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}
           >
-            <Eye size={14} />
-          </button>
+            {shortDate(lead.followUpDue, lang)}
+            {overdue && <span className="ms-1 text-xs text-red-400">{t('leads.overdue')}</span>}
+          </span>
+        ) : null}
+      </td>
+
+      <td className="table-td text-muted-foreground text-xs">{shortDate(lead.createdAt, lang)}</td>
+
+      {/* Quick actions: call · WhatsApp · open · ⋯ */}
+      <td className="table-td">
+        <div className="flex items-center gap-0.5 justify-end">
           <button
-            onClick={() => onEdit?.(lead)}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            title="Edit lead"
+            type="button"
+            onClick={handleCall}
+            disabled={!hasPhone}
+            title={t('leads.call')}
+            aria-label={`${t('leads.call')}: ${title}`}
+            className={`${ICON_BTN} hover:bg-emerald-500/10 hover:text-emerald-600`}
           >
-            <Pencil size={14} />
+            <Phone size={16} />
           </button>
-          {canDelete && (
-            <button
-              onClick={() => onDeletePrompt(lead.id)}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
-              title="Delete lead"
+          {hasPhone ? (
+            <a
+              href={getWhatsAppLinkForLead(lead.phone, lead.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={t('leads.whatsapp')}
+              aria-label={`${t('leads.whatsapp')}: ${title}`}
+              className={`${ICON_BTN} hover:bg-green-500/10 hover:text-green-600`}
             >
-              <Trash2 size={14} />
-            </button>
+              <MessageCircle size={16} />
+            </a>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => onView?.(lead)}
+            title={t('leads.open')}
+            aria-label={`${t('leads.open')}: ${title}`}
+            className={`${ICON_BTN} hover:bg-secondary hover:text-primary`}
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            ref={menuAnchorRef}
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            title={t('leads.more')}
+            aria-label={t('leads.more')}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className={`${ICON_BTN} hover:bg-secondary hover:text-foreground`}
+          >
+            <MoreHorizontal size={16} />
+          </button>
+          {menuOpen && (
+            <ViewportPopover
+              open={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              anchorRef={menuAnchorRef}
+              minWidth={190}
+              preferredMaxHeight={260}
+              zIndex={100}
+              role="menu"
+              aria-label={t('leads.more')}
+              className="stage-dropdown-panel"
+            >
+              <div className="py-1">
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEdit?.(lead);
+                  }}
+                  className="w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted min-h-[44px] flex items-center gap-2"
+                >
+                  <Pencil size={14} /> {t('leads.edit')}
+                </button>
+                {onOpenLogCall && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onOpenLogCall(lead);
+                    }}
+                    className="w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted min-h-[44px] flex items-center gap-2"
+                  >
+                    <Phone size={14} /> {t('leads.logCall')}
+                  </button>
+                )}
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void copyId();
+                  }}
+                  className="w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted min-h-[44px] flex items-center gap-2"
+                >
+                  <Copy size={14} /> {t('leads.copyId')}
+                </button>
+                {canDelete && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDeletePrompt(lead.id);
+                    }}
+                    className="w-full text-start px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10 min-h-[44px] flex items-center gap-2"
+                  >
+                    <Trash2 size={14} /> {t('leads.delete')}
+                  </button>
+                )}
+              </div>
+            </ViewportPopover>
           )}
         </div>
       </td>
@@ -374,6 +566,37 @@ const LeadTableRow = React.memo(function LeadTableRow({
     prev.canDelete === next.canDelete
   );
 });
+
+function SkeletonRows({ count = 8 }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <tr key={`sk-${i}`} aria-hidden>
+          <td className="table-td sticky start-0 bg-card">
+            <div className="w-5 h-5 rounded bg-muted animate-pulse" />
+          </td>
+          <td className="table-td sticky start-10 bg-card border-e border-border/40">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
+              <div className="space-y-1.5">
+                <div className="h-3.5 w-32 rounded bg-muted animate-pulse" />
+                <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+              </div>
+            </div>
+          </td>
+          {Array.from({ length: 6 }).map((__, c) => (
+            <td key={c} className="table-td">
+              <div className="h-4 w-20 rounded bg-muted animate-pulse" />
+            </td>
+          ))}
+          <td className="table-td">
+            <div className="h-9 w-32 rounded-lg bg-muted animate-pulse ms-auto" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
 
 export default function LeadsTable({
   leads,
@@ -396,8 +619,12 @@ export default function LeadsTable({
   onOpenLogCall,
   onAddNote,
   onPostCall,
+  loading = false,
+  hasActiveFilters = false,
+  onClearFilters,
 }: LeadsTableProps) {
   const { user } = useAuth();
+  const { t, lang } = useLanguage();
   const canDelete = isAdminRole(user?.role);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
@@ -409,20 +636,28 @@ export default function LeadsTable({
     }
   };
 
-  const sortableCol = (label: string, key: keyof Lead) => (
+  const sortableCol = (label: string, key: keyof Lead, extra = '') => (
     <th
-      className="table-th cursor-pointer select-none hover:text-foreground transition-colors"
-      onClick={() => onSort(key)}
+      className={`table-th text-start sticky top-0 z-[2] bg-muted ${extra}`}
+      aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
-      <span className="flex items-center gap-0.5">
+      <button
+        type="button"
+        onClick={() => onSort(key)}
+        className="flex items-center gap-0.5 uppercase tracking-wider hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+      >
         {label}
         <SortIcon active={sortKey === key} dir={sortDir} />
-      </span>
+      </button>
     </th>
   );
+  const plainCol = (label: string, extra = '') => (
+    <th className={`table-th text-start sticky top-0 z-[2] bg-muted ${extra}`}>{label}</th>
+  );
 
-  const startItem = (currentPage - 1) * pageSize + 1;
+  const startItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalCount);
+  const nf = new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US');
 
   const getPageNumbers = () => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -436,31 +671,39 @@ export default function LeadsTable({
   };
 
   const [renderLimit, setRenderLimit] = useState(50);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   // Reset render window whenever page or dataset changes
   useEffect(() => {
     setRenderLimit(50);
   }, [leads, currentPage]);
 
-  // Window-scroll progressive expansion (smooth 60fps windowing without recursive observer loops)
+  // Progressive expansion: the table body scrolls inside its own container (sticky
+  // header) AND the page may scroll, so listen to both.
   useEffect(() => {
     if (renderLimit >= leads.length) return;
     let ticking = false;
-    const handleScroll = () => {
+    const check = () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        const scrollY = window.scrollY || document.documentElement.scrollTop;
-        const viewportHeight = window.innerHeight;
-        const fullHeight = document.documentElement.scrollHeight;
-        if (fullHeight - (scrollY + viewportHeight) < 700) {
+        const el = scrollerRef.current;
+        const nearInner = el ? el.scrollHeight - (el.scrollTop + el.clientHeight) < 500 : false;
+        const nearPage =
+          document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) < 700;
+        if (nearInner || nearPage) {
           setRenderLimit((prev) => Math.min(prev + 50, leads.length));
         }
       });
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    const el = scrollerRef.current;
+    window.addEventListener('scroll', check, { passive: true });
+    el?.addEventListener('scroll', check, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', check);
+      el?.removeEventListener('scroll', check);
+    };
   }, [renderLimit, leads.length]);
 
   const visibleLeads = leads.slice(0, renderLimit);
@@ -473,6 +716,21 @@ export default function LeadsTable({
   const emptyFn = useCallback(() => {}, []);
   const safeOnView = onView ?? emptyFn;
   const safeOnEdit = onEdit ?? emptyFn;
+
+  const emptyState = (
+    <EmptyState
+      icon={<Users size={24} className="text-muted-foreground" />}
+      title={hasActiveFilters ? t('leads.noResults') : t('leads.noLeads')}
+      description={hasActiveFilters ? t('leads.noResultsHint') : ''}
+      action={
+        hasActiveFilters && onClearFilters ? (
+          <button type="button" onClick={onClearFilters} className="btn-primary h-11">
+            {t('leads.clearFilters')}
+          </button>
+        ) : undefined
+      }
+    />
+  );
 
   return (
     <>
@@ -500,17 +758,17 @@ export default function LeadsTable({
         </div>
       )}
 
-      {/* Mobile full-width card list — pinned to top, safe-area aware so bottom card never hides behind nav */}
+      {/* Mobile full-width card list — safe-area aware so the last card never hides behind the nav / AI button */}
       <div
         className="sm:hidden flex flex-col gap-4 px-1 pt-2 pb-32"
         style={{ paddingBottom: 'max(8rem, calc(7rem + env(safe-area-inset-bottom)))' }}
       >
-        {leads.length === 0 ? (
-          <EmptyState
-            icon={<Users size={24} className="text-muted-foreground" />}
-            title="No leads found"
-            description="No leads match your current filters. Try adjusting your search criteria or add a new lead."
-          />
+        {loading && leads.length === 0 ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={`msk-${i}`} className="h-44 rounded-2xl bg-muted animate-pulse" aria-hidden />
+          ))
+        ) : leads.length === 0 ? (
+          emptyState
         ) : (
           visibleLeads.map((lead) => (
             <MobileLeadCard
@@ -530,56 +788,71 @@ export default function LeadsTable({
         )}
         {visibleLeads.length < leads.length && (
           <div className="py-3 text-center flex flex-col items-center justify-center gap-2">
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-              Showing {visibleLeads.length} of {leads.length} leads
+            <span className="text-xs text-muted-foreground">
+              {t('leads.showing', {
+                from: nf.format(1),
+                to: nf.format(visibleLeads.length),
+                total: nf.format(leads.length),
+              })}
             </span>
             <button
               type="button"
               onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
-              className="text-xs text-primary font-medium hover:underline py-1 px-3 rounded-lg border border-primary/20 bg-primary/5 active:scale-95 transition-all"
+              className="min-h-[44px] text-sm text-primary font-medium hover:underline py-1 px-4 rounded-lg border border-primary/20 bg-primary/5 active:scale-95 transition-all"
             >
-              Load more leads (+50)
+              +50
             </button>
           </div>
         )}
       </div>
 
-      {/* Desktop table */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full min-w-[1300px] table-mobile">
-          <thead className="bg-muted/40 border-b border-border">
+      {/* Desktop table: own scroll container so the header and the first columns stay put */}
+      <div
+        ref={scrollerRef}
+        className="hidden sm:block overflow-auto max-h-[calc(100vh-15rem)] min-h-[320px]"
+        tabIndex={0}
+        aria-label={t('leads.title')}
+      >
+        <table className="w-full min-w-[1180px] border-separate border-spacing-0">
+          <thead>
             <tr>
-              <th className="table-th w-10">
+              <th className="table-th w-10 sticky top-0 start-0 z-[3] bg-muted">
                 <input
                   type="checkbox"
                   checked={allSelected}
                   onChange={(e) => onSelectAll(e.target.checked)}
-                  className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
-                  aria-label="Select all leads on this page"
+                  className="w-5 h-5 rounded border-input accent-primary cursor-pointer"
+                  aria-label={t('leads.selectAll')}
                 />
               </th>
-              {sortableCol('Lead Name', 'name')}
-              <th className="table-th">Lead ID</th>
-              <th className="table-th">Contact</th>
-              {sortableCol('Source', 'source')}
-              {sortableCol('Agent', 'agent')}
-              <th className="table-th">Assigned To</th>
-              {sortableCol('Status', 'status')}
-              {sortableCol('Follow-up Due', 'followUpDue')}
-              <th className="table-th text-right">Actions</th>
+              <th
+                className="table-th text-start sticky top-0 start-10 z-[3] bg-muted min-w-[250px] border-e border-border/40"
+                aria-sort={sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSort('name')}
+                  className="flex items-center gap-0.5 uppercase tracking-wider hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                >
+                  {t('leads.colLead')}
+                  <SortIcon active={sortKey === 'name'} dir={sortDir} />
+                </button>
+              </th>
+              {sortableCol(t('leads.colSource'), 'source')}
+              {sortableCol(t('leads.colAgent'), 'agent')}
+              {sortableCol(t('leads.colStatus'), 'status')}
+              {plainCol(t('leads.colLastAction'))}
+              {sortableCol(t('leads.colFollowUp'), 'followUpDue')}
+              {sortableCol(t('leads.colCreated'), 'createdAt' as keyof Lead)}
+              {plainCol(t('leads.colActions'), 'text-end')}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
-            {leads.length === 0 ? (
+          <tbody className="[&>tr>td]:border-b [&>tr>td]:border-border">
+            {loading && leads.length === 0 ? (
+              <SkeletonRows />
+            ) : leads.length === 0 ? (
               <tr>
-                <td colSpan={10}>
-                  <EmptyState
-                    icon={<Users size={24} className="text-muted-foreground" />}
-                    title="No leads found"
-                    description="No leads match your current filters. Try adjusting your search criteria or add a new lead."
-                  />
-                </td>
+                <td colSpan={9}>{emptyState}</td>
               </tr>
             ) : (
               visibleLeads.map((lead) => (
@@ -593,23 +866,28 @@ export default function LeadsTable({
                   onView={safeOnView}
                   onEdit={safeOnEdit}
                   onDeletePrompt={handleDeletePrompt}
+                  onPostCall={onPostCall}
+                  onOpenLogCall={onOpenLogCall}
                 />
               ))
             )}
             {visibleLeads.length < leads.length && (
               <tr>
-                <td colSpan={12} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
+                <td colSpan={9} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
                   <div className="inline-flex items-center gap-3">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                      Showing {visibleLeads.length} of {leads.length} leads — scroll or click to load more
+                    <span>
+                      {t('leads.showing', {
+                        from: nf.format(1),
+                        to: nf.format(visibleLeads.length),
+                        total: nf.format(leads.length),
+                      })}
                     </span>
                     <button
                       type="button"
                       onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
-                      className="text-xs text-primary font-medium hover:underline py-0.5 px-2.5 rounded-md border border-primary/20 bg-primary/5 active:scale-95 transition-all"
+                      className="min-h-[36px] text-xs text-primary font-medium hover:underline px-3 rounded-md border border-primary/20 bg-primary/5 active:scale-95 transition-all"
                     >
-                      Load more (+50)
+                      +50
                     </button>
                   </div>
                 </td>
@@ -622,15 +900,20 @@ export default function LeadsTable({
       {totalCount > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-border">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>
-              Showing {startItem}–{endItem} of {totalCount} leads
+            <span aria-live="polite">
+              {t('leads.showing', {
+                from: nf.format(startItem),
+                to: nf.format(endItem),
+                total: nf.format(totalCount),
+              })}
             </span>
             <div className="flex items-center gap-1.5">
-              <span>Rows:</span>
+              <label htmlFor="leads-page-size">{t('leads.rowsPerPage')}</label>
               <select
+                id="leads-page-size"
                 value={pageSize}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="input-base min-h-[44px] h-9 text-xs py-0 px-2 w-20"
+                className="input-base min-h-[44px] h-11 text-xs py-0 px-2 w-20"
               >
                 {[10, 25, 50, 100, 250, 500].map((s) => (
                   <option key={`pagesize-${s}`} value={s}>
@@ -640,14 +923,14 @@ export default function LeadsTable({
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <nav className="flex items-center gap-1" aria-label="Pagination">
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              aria-label="Previous page"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={t('leads.prev')}
             >
-              <ChevronLeft size={14} />
+              <ChevronLeft size={14} className="rtl:rotate-180" />
             </button>
             {getPageNumbers().map((p, i) =>
               p === '...' ? (
@@ -661,21 +944,22 @@ export default function LeadsTable({
                 <button
                   key={`page-${p}`}
                   onClick={() => onPageChange(p as number)}
-                  className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-sm font-medium transition-colors ${currentPage === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
+                  aria-current={currentPage === p ? 'page' : undefined}
+                  className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${currentPage === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
                 >
-                  {p}
+                  {nf.format(p as number)}
                 </button>
               )
             )}
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              aria-label="Next page"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={t('leads.next')}
             >
-              <ChevronRight size={14} />
+              <ChevronRight size={14} className="rtl:rotate-180" />
             </button>
-          </div>
+          </nav>
         </div>
       )}
     </>

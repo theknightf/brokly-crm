@@ -108,6 +108,8 @@ export interface Lead {
   actionTakenToday?: boolean;
   /** Called vs Not Called — derived from call_logs, display-only. */
   hasBeenCalled?: boolean;
+  /** Marked by the DB when another lead with the same phone existed first. */
+  isDuplicate?: boolean;
   lastCallAt?: string | null;
   lastCallOutcome?: string;
   createdAt?: string;

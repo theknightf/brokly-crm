@@ -17,6 +17,7 @@ import {
   XCircle,
   Check,
   AlertTriangle,
+  Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -25,6 +26,9 @@ import { teamsService, messageLogsService } from '@/lib/services/crmService';
 import { sanitizeEgyptPhone } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
+import { useLanguage } from '@/contexts/LanguageContext';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 
 interface AssignableUser {
   id: string;
@@ -66,6 +70,8 @@ interface BulkActionBarProps {
   onAssignMany: (users: AssignableUser[]) => Promise<void>;
   onAssignTeam: (teamName: string) => void;
   onRefer?: (userId: string, userName: string) => Promise<void>;
+  /** Apply one status to every selected lead. */
+  onChangeStatus?: (status: string) => Promise<void>;
   onClear: () => void;
 }
 
@@ -88,9 +94,14 @@ export default function BulkActionBar({
   onAssignMany,
   onAssignTeam,
   onRefer,
+  onChangeStatus,
   onClear,
 }: BulkActionBarProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const statusBtnRef = useRef<HTMLButtonElement>(null);
   const canDelete = isAdminRole(user?.role);
   const [open, setOpen] = useState<'none' | 'whatsapp' | 'team'>('none');
   const [composer, setComposer] = useState<'none' | 'email' | 'sms'>('none');
@@ -231,9 +242,13 @@ export default function BulkActionBar({
         className="fixed bottom-[max(5.5rem,calc(5rem+env(safe-area-inset-bottom)))] lg:bottom-6 z-[45] flex justify-center pointer-events-none slide-up-enter px-3 left-0 right-0 lg:left-0"
         style={{ paddingLeft: 'calc(var(--sidebar-w) + 0.75rem)' }}
       >
-        <div className="bg-foreground text-background rounded-2xl shadow-modal px-5 py-3 flex items-center gap-4 min-w-[min(380px,90vw)] max-w-full overflow-x-auto pointer-events-auto">
-          <span className="text-sm font-semibold flex-shrink-0">
-            {selectedCount} lead{selectedCount !== 1 ? 's' : ''} selected
+        <div
+          role="toolbar"
+          aria-label={t('leads.selectedCount', { count: selectedCount })}
+          className="bg-foreground text-background rounded-2xl shadow-modal px-5 py-3 flex items-center gap-4 min-w-[min(380px,90vw)] max-w-full overflow-x-auto pointer-events-auto"
+        >
+          <span className="text-sm font-semibold flex-shrink-0" aria-live="polite">
+            {t('leads.selectedCount', { count: selectedCount })}
           </span>
 
           <div className="h-4 w-px bg-background/20 flex-shrink-0" />
@@ -322,9 +337,63 @@ export default function BulkActionBar({
               className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors min-h-[44px] px-2"
             >
               <UserCheck size={15} />
-              Assign lead
+              {t('leads.assign')}
             </button>
           </div>
+
+          {onChangeStatus && (
+            <>
+              <div className="h-4 w-px bg-background/20 flex-shrink-0" />
+              <div className="relative flex-shrink-0">
+                <button
+                  ref={statusBtnRef}
+                  type="button"
+                  onClick={() => setStatusOpen((o) => !o)}
+                  disabled={statusBusy}
+                  aria-haspopup="listbox"
+                  aria-expanded={statusOpen}
+                  className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors min-h-[44px] px-2 disabled:opacity-50"
+                >
+                  {statusBusy ? <Loader2 size={15} className="animate-spin" /> : <Tag size={15} />}
+                  {t('leads.bulkStatus')}
+                  <ChevronDown size={13} />
+                </button>
+                <ViewportPopover
+                  open={statusOpen}
+                  onClose={() => setStatusOpen(false)}
+                  anchorRef={statusBtnRef}
+                  minWidth={250}
+                  preferredMaxHeight={380}
+                  zIndex={100}
+                  role="listbox"
+                  aria-label={t('leads.bulkStatus')}
+                  className="stage-dropdown-panel"
+                >
+                  <div className="py-1">
+                    {[...PIPELINE_STAGES, ...OUTCOME_STAGES].map((st) => (
+                      <button
+                        key={`bulk-status-${st}`}
+                        role="option"
+                        aria-selected={false}
+                        onClick={async () => {
+                          setStatusOpen(false);
+                          setStatusBusy(true);
+                          try {
+                            await onChangeStatus(st);
+                          } finally {
+                            setStatusBusy(false);
+                          }
+                        }}
+                        className="w-full text-start px-3.5 py-2.5 text-sm text-foreground hover:bg-muted transition-colors min-h-[44px] flex items-center"
+                      >
+                        <StatusBadge status={st} showDot />
+                      </button>
+                    ))}
+                  </div>
+                </ViewportPopover>
+              </div>
+            </>
+          )}
 
           <div className="h-4 w-px bg-background/20 flex-shrink-0" />
 
@@ -432,10 +501,10 @@ export default function BulkActionBar({
               {!confirmDelete ? (
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-red-400 hover:text-red-300 transition-colors flex-shrink-0"
+                  className="flex items-center gap-1.5 text-sm font-medium text-red-400 hover:text-red-300 transition-colors flex-shrink-0 min-h-[44px] px-2"
                 >
                   <Trash2 size={15} />
-                  Remove lead
+                  {t('leads.delete')}
                 </button>
               ) : (
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -464,8 +533,9 @@ export default function BulkActionBar({
           {/* Clear */}
           <button
             onClick={onClear}
-            className="flex items-center gap-1 text-sm text-background/60 hover:text-background transition-colors flex-shrink-0"
-            aria-label="Clear selection"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] text-sm text-background/60 hover:text-background transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-background/60 rounded-lg"
+            aria-label={t('leads.clearSelection')}
+            title={t('leads.clearSelection')}
           >
             <X size={15} />
           </button>

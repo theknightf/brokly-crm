@@ -124,11 +124,12 @@ export default function AssistantChatWidget() {
         {!isOpen && (
           <button
             onClick={() => setIsOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-primary to-lime-500 text-black font-extrabold shadow-xl hover:scale-105 active:scale-95 transition-all text-xs tracking-wide"
+            className="group flex items-center justify-center gap-2 h-12 w-12 hover:w-auto hover:px-4 focus-visible:w-auto focus-visible:px-4 rounded-full bg-gradient-to-r from-primary to-lime-500 text-black font-extrabold shadow-xl active:scale-95 transition-all text-xs tracking-wide overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Open AI Assistant"
+            title="مساعد بروكلي الذكي"
           >
-            <Sparkles size={18} className="animate-spin" style={{ animationDuration: '4s' }} />
-            <span>مساعد بروكلي الذكي</span>
+            <Sparkles size={18} className="flex-shrink-0 animate-spin" style={{ animationDuration: '4s' }} />
+            <span className="hidden group-hover:inline group-focus-visible:inline whitespace-nowrap">مساعد بروكلي الذكي</span>
           </button>
         )}
       </div>
