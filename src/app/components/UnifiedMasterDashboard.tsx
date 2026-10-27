@@ -127,7 +127,7 @@ export default function UnifiedMasterDashboard() {
   const filteredLeads = pipelineLeads;
 
   return (
-    <div className="bg-background text-foreground min-h-screen transition-colors duration-200 space-y-6 p-4 md:p-6 -m-4 md:-m-6">
+    <div className="bg-background text-foreground min-h-dvh transition-colors duration-200 space-y-6 p-4 md:p-6 -m-4 md:-m-6">
       {/* Header — brand-aligned, uses design tokens */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -143,9 +143,9 @@ export default function UnifiedMasterDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          <button onClick={() => setRange('week')} aria-pressed={range==='week'} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
-          <button onClick={() => setRange('month')} aria-pressed={range==='month'} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
-          <button onClick={() => load(false)} aria-label="Refresh" className="w-9 h-9 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RefreshCw size={14}/></button>
+          <button onClick={() => setRange('week')} aria-pressed={range==='week'} className={`px-3.5 py-1.5 [@media(pointer:coarse)]:min-h-[44px] rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
+          <button onClick={() => setRange('month')} aria-pressed={range==='month'} className={`px-3.5 py-1.5 [@media(pointer:coarse)]:min-h-[44px] rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
+          <button onClick={() => load(false)} aria-label="Refresh" className="w-9 h-9 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RefreshCw size={14}/></button>
         </div>
       </div>
 
@@ -154,7 +154,7 @@ export default function UnifiedMasterDashboard() {
         <button
           onClick={() => setMode('sales')}
           aria-pressed={mode==='sales'}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode==='sales' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 [@media(pointer:coarse)]:min-h-[44px] rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode==='sales' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card font-medium'}`}
         >
           <Users size={16}/> Sales & Team Performance
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='sales' ? 'bg-card text-primary' : 'bg-muted text-muted-foreground'}`}>{data.leaderboard.length}</span>
@@ -162,7 +162,7 @@ export default function UnifiedMasterDashboard() {
         <button
           onClick={() => setMode('leads')}
           aria-pressed={mode==='leads'}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode==='leads' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card font-medium'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 [@media(pointer:coarse)]:min-h-[44px] rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode==='leads' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card font-medium'}`}
         >
           <Target size={16}/> Leads Pipeline & Data Hub
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-card text-primary' : 'bg-muted text-muted-foreground'}`}>{data.summary?.totalLeads ?? 0}</span>
@@ -199,7 +199,7 @@ export default function UnifiedMasterDashboard() {
                   <p className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase truncate pt-1">{card.label}</p>
                   <div className={`dash-icon-chip ${card.color}`}><card.icon size={15}/></div>
                 </div>
-                <p className="text-3xl font-extrabold text-foreground mt-2 tabular-nums tracking-tight">{card.value}</p>
+                <p className="text-3xl font-extrabold text-foreground mt-2 tabular-nums tracking-tight">{typeof card.value === 'number' ? card.value.toLocaleString() : card.value}</p>
                 {card.sub && <p className="text-muted-foreground text-xs mt-1.5 truncate">{card.sub}</p>}
               </div>
             ))}
@@ -208,7 +208,7 @@ export default function UnifiedMasterDashboard() {
           {/* Sales KPIs + Conversion */}
           {data.conversionMetrics && (
             <div className="dash-card p-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2"><ShoppingBag size={16} className="text-emerald-600"/><h3 className="text-sm font-bold">Sales Performance KPIs ↔ Lead Analytics</h3></div>
+              <div className="flex items-center gap-2"><ShoppingBag size={16} className="text-emerald-600"/><h2 className="text-sm font-bold">Sales Performance KPIs ↔ Lead Analytics</h2></div>
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
                   Conversion: <strong className="text-lime-600 dark:text-lime-400">{data.conversionMetrics.conversionRate}%</strong>
@@ -232,7 +232,7 @@ export default function UnifiedMasterDashboard() {
           {/* Live Leaderboard table for 360 drill-down */}
           <div id="leaderboard-table" className="dash-card overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Live Leaderboard (Unified) — 40% Valid Calls · 30% Attendance · 30% Dress</h3>
+              <h2 className="text-sm font-bold flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Live Leaderboard (Unified) — 40% Valid Calls · 30% Attendance · 30% Dress</h2>
               <span className="text-xs text-muted-foreground">{data.leaderboard.length} ranked</span>
             </div>
             <div className="overflow-x-auto">
@@ -245,9 +245,9 @@ export default function UnifiedMasterDashboard() {
                     <tr key={r.id} className="hover:bg-muted transition-colors">
                       <td className="px-4 py-2.5"><span className={`inline-flex w-7 h-7 items-center justify-center rounded-full text-xs font-bold ${r.rank===1?'bg-gradient-to-br from-amber-300 to-amber-500 text-white':r.rank===2?'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800':r.rank===3?'bg-gradient-to-br from-orange-300 to-orange-500 text-white':'bg-muted text-muted-foreground'}`}>{r.rank}</span></td>
                       <td className="px-2 py-2"><span className="font-medium">{r.name}</span> <span className="text-xs text-muted-foreground">· {r.role}</span></td>
-                      <td className="text-center">{r.scores.callScore}</td>
-                      <td className="text-center">{r.scores.attendanceScore}</td>
-                      <td className="text-center">{r.scores.dressScore}</td>
+                      <td className="text-center tabular-nums">{r.scores.callScore}</td>
+                      <td className="text-center tabular-nums">{r.scores.attendanceScore}</td>
+                      <td className="text-center tabular-nums">{r.scores.dressScore}</td>
                       <td className="text-center font-extrabold text-primary tabular-nums">{r.totalScore}</td>
                       <td className="text-end px-4"><a href={`/admin/employees/${r.id}/360`} className="text-lime-700 dark:text-lime-400 hover:underline inline-flex items-center gap-1 text-xs">360 <ExternalLink size={12}/></a></td>
                     </tr>
@@ -260,7 +260,7 @@ export default function UnifiedMasterDashboard() {
           {/* Payroll & Deductions Hub */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="dash-card p-4">
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Banknote size={14} className="text-amber-600"/> Payroll & Deductions Hub</h3>
+              <h2 className="text-sm font-bold flex items-center gap-2 mb-3"><Banknote size={14} className="text-amber-600"/> Payroll & Deductions Hub</h2>
               {data.deductions.recent.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No deductions this period.</p>
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.deductions.recent.map((d:any)=>(
@@ -273,7 +273,7 @@ export default function UnifiedMasterDashboard() {
               }
             </div>
             <div className="dash-card p-4">
-              <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Bell size={14} className="text-lime-700 dark:text-lime-400"/> Instant Alerts (NotificationLog) — {data.notifications.unread} unread</h3>
+              <h2 className="text-sm font-bold flex items-center gap-2 mb-3"><Bell size={14} className="text-lime-700 dark:text-lime-400"/> Instant Alerts (NotificationLog) — {data.notifications.unread} unread</h2>
               {data.notifications.recent.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No alerts.</p>
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.notifications.recent.map((n:any)=>(
@@ -317,8 +317,8 @@ export default function UnifiedMasterDashboard() {
             </div>
             <div className="flex items-center gap-2">
               <div className="flex bg-muted rounded-lg p-1">
-                <button onClick={()=>setPipelineView('kanban')} aria-pressed={pipelineView==='kanban'} className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pipelineView==='kanban'?'bg-card shadow text-foreground':'text-muted-foreground hover:text-foreground'}`}><LayoutGrid size={12}/> Kanban</button>
-                <button onClick={()=>setPipelineView('table')} aria-pressed={pipelineView==='table'} className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pipelineView==='table'?'bg-card shadow text-foreground':'text-muted-foreground hover:text-foreground'}`}><List size={12}/> Table</button>
+                <button onClick={()=>setPipelineView('kanban')} aria-pressed={pipelineView==='kanban'} className={`px-3 py-1 [@media(pointer:coarse)]:min-h-[44px] rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pipelineView==='kanban'?'bg-card shadow text-foreground':'text-muted-foreground hover:text-foreground'}`}><LayoutGrid size={12}/> Kanban</button>
+                <button onClick={()=>setPipelineView('table')} aria-pressed={pipelineView==='table'} className={`px-3 py-1 [@media(pointer:coarse)]:min-h-[44px] rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pipelineView==='table'?'bg-card shadow text-foreground':'text-muted-foreground hover:text-foreground'}`}><List size={12}/> Table</button>
               </div>
               <a href="/leads-management" className="text-xs text-lime-700 hover:underline flex items-center gap-1">Full Leads <ExternalLink size={12}/></a>
             </div>
@@ -363,7 +363,7 @@ export default function UnifiedMasterDashboard() {
 
           {/* Mini timeline for leads */}
           <div className="dash-card p-4">
-            <h3 className="text-sm font-bold mb-3">Recent Activity</h3>
+            <h2 className="text-sm font-bold mb-3">Recent Activity</h2>
             <div className="space-y-1 max-h-[200px] overflow-auto">
               {data.timeline.slice(0,12).map((t:any,i:number)=>(
                 <div key={i} className="flex gap-2 text-xs py-1 border-b border-zinc-500/20 last:border-0"><span className="text-muted-foreground font-mono whitespace-nowrap">{String(t.createdAt).slice(0,16).replace('T',' ')}</span><span className="font-medium truncate">{t.employee}: {t.action}</span></div>

@@ -393,7 +393,7 @@
     @apply relative bg-card border border-border rounded-2xl shadow-sm;
   }
   .dash-card-hover {
-    @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-lime-500/40 hover:shadow-[0_14px_32px_-16px_rgba(132,204,22,0.5)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-lime-500/40 hover:shadow-[0_14px_32px_-16px_rgba(132,204,22,0.5)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0;
   }
   .dash-icon-chip {
     @apply w-9 h-9 rounded-xl flex items-center justify-center shrink-0;
@@ -628,4 +628,11 @@ body.modal-open [data-fab="mobile-add-lead"] {
 /* Notification dot positioned on the "right" in LTR reads fine in RTL too */
 [dir='rtl'] .text-right {
   text-align: left;
+}
+
+/* reduced motion: skeleton pulses */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
 }

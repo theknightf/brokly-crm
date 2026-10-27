@@ -126,20 +126,20 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
             <span className="flex items-start justify-between gap-1">
               <span className="flex items-center gap-1.5 min-w-0">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${accent.dot}`} aria-hidden />
-                <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase truncate">{c.stage}</p>
+                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase truncate">{c.stage}</p>
               </span>
-              <ArrowUpRight size={14} className="text-muted-foreground group-hover:text-primary rtl:-scale-x-100 transition-colors shrink-0" />
+              <ArrowUpRight size={14} aria-hidden className="text-muted-foreground group-hover:text-primary rtl:-scale-x-100 transition-colors shrink-0" />
             </span>
             <p className="text-3xl font-extrabold text-foreground mt-2 tabular-nums tracking-tight">{c.count.toLocaleString()}</p>
             <span
-              className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
                 up
                   ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                   : 'bg-red-500/10 text-red-600 dark:text-red-400'
               }`}
             >
               {up ? <TrendingUp size={11} aria-hidden /> : <TrendingDown size={11} aria-hidden />}
-              {c.trend}
+              {String(c.trend).replace(/^[\u2191\u2193\u25B2\u25BC]\s*/, '')}
             </span>
           </Link>
         );

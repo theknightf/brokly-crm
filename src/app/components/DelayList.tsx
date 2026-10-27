@@ -20,16 +20,16 @@ export default function DelayList() {
   return (
     <div className="dash-card overflow-hidden">
       <div className="p-4 border-b border-border flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-bold flex items-center gap-2 text-foreground">
+        <h2 className="font-bold flex items-center gap-2 text-foreground">
           <span className="dash-icon-chip bg-sky-500/10 text-sky-500"><Clock size={16}/></span> Follow-ups
-        </h3>
+        </h2>
         <div className="flex bg-muted rounded-full p-1 gap-1" role="group" aria-label="Follow-up filter">
           {(['all','delayed','pending'] as const).map(f=>(
             <button
               key={f}
               onClick={()=>setFilter(f)}
               aria-pressed={filter===f}
-              className={`px-3.5 py-1 rounded-full text-xs font-medium capitalize transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter===f?'bg-primary text-primary-foreground font-bold shadow-sm':'text-muted-foreground hover:text-foreground'}`}
+              className={`px-3.5 py-1 [@media(pointer:coarse)]:min-h-[44px] rounded-full text-xs font-medium capitalize transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter===f?'bg-primary text-primary-foreground font-bold shadow-sm':'text-muted-foreground hover:text-foreground'}`}
             >{f}</button>
           ))}
         </div>

@@ -12,6 +12,7 @@ export default function DressCodeEvaluationForm() {
   const [rating, setRating] = useState<number>(5);
   const [notes, setNotes] = useState('');
   const [flags, setFlags] = useState('');
+  const [employeeError, setEmployeeError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
@@ -32,7 +33,12 @@ export default function DressCodeEvaluationForm() {
   }, []);
 
   const submit = async () => {
-    if (!employeeId) { toast.error('Select an employee'); return; }
+    if (!employeeId) {
+      setEmployeeError('Select an employee');
+      toast.error('Select an employee');
+      document.getElementById('dc-employee')?.focus();
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/evaluations/dress-code', {
@@ -64,34 +70,35 @@ export default function DressCodeEvaluationForm() {
       <div className="flex items-center gap-2 mb-4">
         <div className="dash-icon-chip bg-lime-500/15 text-lime-600 dark:text-lime-400"><Shirt size={16} /></div>
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Daily Dress Code Evaluation</h3>
+          <h2 className="text-sm font-semibold text-foreground">Daily Dress Code Evaluation</h2>
           <p className="text-xs text-muted-foreground">Admin input → feeds Leaderboard (30%) & Owner 360 in real-time</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1.5">Employee *</label>
-          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="input-base">
+          <label htmlFor="dc-employee" className="block text-xs font-medium text-foreground mb-1.5">Employee *</label>
+          <select id="dc-employee" value={employeeId} onChange={e => { setEmployeeId(e.target.value); setEmployeeError(''); }} aria-required="true" aria-invalid={!!employeeError} aria-describedby={employeeError ? 'dc-employee-error' : undefined} className="input-base [@media(pointer:coarse)]:h-11">
             <option value="">Select employee…</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} · {e.role}</option>)}
           </select>
+          {employeeError && <p id="dc-employee-error" role="alert" className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{employeeError}</p>}
         </div>
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1"><Calendar size={12}/> Date *</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} className="input-base" />
+          <label htmlFor="dc-date" className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1"><Calendar size={12}/> Date *</label>
+          <input id="dc-date" type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} aria-required="true" className="input-base [@media(pointer:coarse)]:h-11" />
         </div>
       </div>
 
       <div className="mt-4">
-        <label className="block text-xs font-medium text-foreground mb-2">Dress Code Rating *</label>
-        <div className="grid grid-cols-3 gap-2">
+        <p id="dc-rating-label" className="block text-xs font-medium text-foreground mb-2">Dress Code Rating *</p>
+        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-labelledby="dc-rating-label">
           {[
             { v: 1, label: 'Casual', sub: 'Score 1 · Low' },
             { v: 2, label: 'Semi-Formal', sub: 'Score 2 · Medium' },
             { v: 3, label: 'Classic / Formal', sub: 'Score 3 · High' },
           ].map(o => (
-            <button key={o.v} type="button" onClick={() => setRating(o.v)} className={`p-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 border-2 ${rating===o.v ? 'bg-lime-500/15 border-lime-400 text-lime-600 dark:text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100'}`}>
+            <button key={o.v} type="button" role="radio" aria-checked={rating===o.v} onClick={() => setRating(o.v)} className={`p-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 border-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${rating===o.v ? 'bg-lime-500/15 border-lime-400 text-lime-600 dark:text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100'}`}>
               <span className="text-sm">{o.label}</span>
               <span className="text-[11px] opacity-70">{o.sub}</span>
             </button>
@@ -101,15 +108,15 @@ export default function DressCodeEvaluationForm() {
       </div>
 
       <div className="mt-4">
-        <label className="block text-xs font-medium text-foreground mb-1.5">Behavioral Flags (comma separated)</label>
-        <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="input-base" />
+        <label htmlFor="dc-flags" className="block text-xs font-medium text-foreground mb-1.5">Behavioral Flags (comma separated)</label>
+        <input id="dc-flags" type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="input-base [@media(pointer:coarse)]:h-11" />
       </div>
       <div className="mt-3">
-        <label className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="input-base" />
+        <label htmlFor="dc-notes" className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
+        <textarea id="dc-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="input-base" />
       </div>
 
-      <button onClick={submit} disabled={submitting || !employeeId} className="bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold rounded-xl py-3 w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-sm hover:shadow-[0_0_16px_rgba(163,230,53,0.3)]">
+      <button onClick={submit} disabled={submitting} className="bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold rounded-xl py-3 w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shadow-sm hover:shadow-[0_0_16px_rgba(163,230,53,0.3)]">
         {submitting ? <Loader2 size={14} className="animate-spin text-zinc-950"/> : <Check size={14} className="text-zinc-950"/>} Submit Evaluation
       </button>
       <p className="text-[11px] text-muted-foreground text-center mt-2">Writes to <code>evaluations</code> → <code>activity_log</code> → Leaderboard & 360 profile update instantly</p>

@@ -20,7 +20,7 @@ function RankIcon({ rank }: { rank: number }) {
 function ScoreBar({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
   return (
     <div className="flex-1 min-w-0">
-      <div className="flex items-center justify-between gap-1 text-[10px] text-muted-foreground mb-1">
+      <div className="flex items-center justify-between gap-1 text-[11px] text-muted-foreground mb-1">
         <span className="flex items-center gap-1 min-w-0">{icon}<span className="truncate">{label}</span></span>
         <span className="text-[11px] font-bold text-foreground tabular-nums">{value}</span>
       </div>
@@ -62,10 +62,10 @@ export default function WeightedLeaderboard() {
         <div className="flex items-center gap-2">
           <div className="flex bg-muted rounded-full p-1">
             {(['day','week','month'] as Period[]).map(p => (
-              <button key={p} onClick={() => setPeriod(p)} className={`px-3.5 py-1 rounded-full text-xs font-medium capitalize transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${period===p ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>{p}</button>
+              <button key={p} onClick={() => setPeriod(p)} className={`px-3.5 py-1 [@media(pointer:coarse)]:min-h-[44px] rounded-full text-xs font-medium capitalize transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${period===p ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>{p}</button>
             ))}
           </div>
-          <button onClick={load} aria-label="Refresh" className="p-2 rounded-lg hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RefreshCw size={14} className={loading ? 'animate-spin' : ''}/></button>
+          <button onClick={load} aria-label="Refresh" className="p-2 [@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px] rounded-lg hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RefreshCw size={14} className={loading ? 'animate-spin' : ''}/></button>
         </div>
       </div>
 
@@ -74,7 +74,7 @@ export default function WeightedLeaderboard() {
       : users.length===0 ? <p className="text-sm text-muted-foreground text-center py-12">No data for this period.</p>
       : <div className="divide-y divide-border">
           {users.map(u => (
-            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3.5 flex items-center gap-3 hover:bg-muted transition-colors cursor-pointer focus:outline-none focus-visible:bg-muted ${u.rank<=3 ? 'bg-gradient-to-r from-lime-500/10 via-lime-500/5 to-transparent' : ''}`}>
+            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3.5 flex items-center gap-3 hover:bg-muted transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:bg-muted ${u.rank<=3 ? 'bg-gradient-to-r from-lime-500/10 via-lime-500/5 to-transparent' : ''}`}>
               <RankIcon rank={u.rank}/>
               <div className="w-9 h-9 rounded-full bg-lime-500/10 border border-lime-500/20 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-primary">{(u.full_name||u.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</span></div>
               <div className="min-w-0 flex-1">
