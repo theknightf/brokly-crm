@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
 import { ALL_STATUSES } from '@/lib/ui';
@@ -90,7 +91,8 @@ export async function GET(request: Request) {
   const leadsQuery = buildLeadsQuery(true);
   const [settingsRes, leadsResRaw, teamsRes] = await Promise.all([
     db.from('admin_settings').select('name, sort_order').eq('category', 'pipelineStages').eq('is_active', true).order('sort_order', { ascending: true }),
-    leadsQuery ? leadsQuery : Promise.resolve({ data: [], error: null }),
+    // Paged: a single select is capped at 1000 rows by PostgREST.
+    leadsQuery ? fetchAllRows((from, to) => buildLeadsQuery(true)!.order('id').range(from, to)) : Promise.resolve({ data: [], error: null }),
     (isAdminRole(actor.role) || actor.role === 'team_leader')
       ? db.from('teams').select('id, name').limit(50)
       : Promise.resolve({ data: [] }),
@@ -100,7 +102,7 @@ export async function GET(request: Request) {
   if (leadsResRaw?.error && /team/i.test(leadsResRaw.error.message || '')) {
     const retryQ = buildLeadsQuery(false);
     if (retryQ) {
-      const r2 = await retryQ;
+      const r2 = await fetchAllRows((from, to) => buildLeadsQuery(false)!.order('id').range(from, to));
       leadRows = r2?.data || [];
     }
   }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
 import { loadOfficeHours } from '@/lib/officeHours';
@@ -86,8 +87,9 @@ export async function GET(request: Request) {
     supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', thisMonth.from).lte('expense_date', thisMonth.to),
     supabase.from('expenses').select('amount, expense_date, category').gte('expense_date', prevMonth.from).lte('expense_date', prevMonth.to),
     supabase.from('activity_log').select('user_id, action_type, detail, created_at').order('created_at', { ascending: false }).limit(80),
-    supabase.from('leads').select('crm_status, lead_status, assigned_to, source, total_price, final_price, budget_min, budget_max, created_at, updated_at'),
-    supabase.from('call_logs').select('user_id, outcome, is_valid, created_at, duration_seconds').gte('created_at', `${period.from}T00:00:00`).lte('created_at', `${period.to}T23:59:59.999`),
+    // Paged: a single select is capped at 1000 rows by PostgREST, which made every KPI stop at 1000.
+    fetchAllRows((from, to) => supabase.from('leads').select('crm_status, lead_status, assigned_to, source, total_price, final_price, budget_min, budget_max, created_at, updated_at').order('id').range(from, to)),
+    fetchAllRows((from, to) => supabase.from('call_logs').select('user_id, outcome, is_valid, created_at, duration_seconds').gte('created_at', `${period.from}T00:00:00`).lte('created_at', `${period.to}T23:59:59.999`).order('created_at').range(from, to)),
     supabase.from('evaluations').select('employee_id, dress_code_rating, date').gte('date', period.from).lte('date', period.to),
     supabase.from('payroll_deductions').select('id, user_id, reason, amount, month_year, is_applied, source_ref, created_at').order('created_at', { ascending: false }).limit(50),
     supabase.from('notifications').select('id, user_id, title, message, is_read, created_at').order('created_at', { ascending: false }).limit(20),
