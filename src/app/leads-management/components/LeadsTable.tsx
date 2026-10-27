@@ -84,10 +84,12 @@ function StageSelector({
   leadId,
   currentStatus,
   onStatusChange,
+  compact = false,
 }: {
   leadId: string;
   currentStatus: LeadStatus;
   onStatusChange: (id: string, s: LeadStatus) => void;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -101,7 +103,11 @@ function StageSelector({
           e.stopPropagation();
           setOpen((o) => !o);
         }}
-        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted transition-colors text-start max-w-full"
+        className={`inline-flex items-center gap-1 rounded-full transition-colors text-start max-w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 ${
+          compact
+            ? 'min-h-[28px] px-0.5 py-0.5 hover:bg-black/5 dark:hover:bg-white/5 [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-2'
+            : 'min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted'
+        }`}
         aria-label={`Change status from ${currentStatus}`}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -208,25 +214,11 @@ const isOverdue = (dueDate?: string) => {
   return due < today;
 };
 
-/** One compact, consistently-ordered badge (max two per lead cell). */
-function LeadBadge({ tone, children }: { tone: 'sky' | 'amber' | 'emerald' | 'muted'; children: React.ReactNode }) {
-  const tones: Record<string, string> = {
-    sky: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
-    amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-    emerald: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    muted: 'bg-muted text-muted-foreground',
-  };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full text-[11px] font-semibold px-2 py-0.5 whitespace-nowrap ${tones[tone]}`}
-    >
-      {children}
-    </span>
-  );
-}
-
 const ICON_BTN =
-  'w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed';
+  'w-8 h-8 rounded-lg text-zinc-500 dark:text-zinc-400 transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 disabled:opacity-30 disabled:cursor-not-allowed [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11';
+
+/** Shared dense cell: tight padding, hairline divider (white/5 on the obsidian theme). */
+const TD = 'px-3 py-1.5 text-[13px] text-foreground whitespace-nowrap border-b border-black/5 dark:border-white/5';
 
 interface LeadTableRowProps {
   lead: Lead;
@@ -275,13 +267,39 @@ const LeadTableRow = React.memo(function LeadTableRow({
         : lead.agent
           ? [lead.agent]
           : [];
+  const agentFirst = agentNames[0] || '';
+  const agentInitials =
+    agentFirst
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2) || '';
 
   const overdue = isOverdue(lead.followUpDue);
   const called = !!lead.hasBeenCalled;
-  const actionToday = !!(lead.actionTakenToday ?? lead.contactedToday);
-  const stickyBg = isSelected ? 'bg-secondary' : 'bg-card group-hover:bg-muted';
   const hasPhone = !!(lead.phone && lead.phone.replace(/\D/g, ''));
-  const details = [lead.email, lead.location].filter((v) => !!v && String(v).trim());
+  const next = nextPipelineStage(lead.status);
+
+  // Everything that used to have its own column stays one hover away.
+  const tooltip = [
+    lead.createdAt ? `${t('leads.colCreated')}: ${shortDate(lead.createdAt, lang)}` : '',
+    lead.lastActionAt ? `${t('leads.colLastAction')}: ${timeAgo(lead.lastActionAt, lang)}` : '',
+    lead.followUpDue ? `${t('leads.colFollowUp')}: ${shortDate(lead.followUpDue, lang)}${overdue ? ` (${t('leads.overdue')})` : ''}` : '',
+    called ? t('leads.called') : t('leads.notCalled'),
+    lead.email ? String(lead.email) : '',
+    lead.location ? String(lead.location) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const sourceLine = [lead.source, lead.lastActionAt ? timeAgo(lead.lastActionAt, lang) : '']
+    .filter(Boolean)
+    .join(' · ');
+
+  const rowBg = isSelected
+    ? 'bg-lime-50 dark:bg-[#141a0c]'
+    : 'bg-white dark:bg-[#0a0a0f] group-hover:bg-zinc-50 dark:group-hover:bg-[#12121a]';
 
   const copyId = async () => {
     try {
@@ -297,170 +315,119 @@ const LeadTableRow = React.memo(function LeadTableRow({
     else if (hasPhone) window.location.href = `tel:${lead.phone.replace(/[^0-9+]/g, '')}`;
   };
 
+  const menuItem =
+    'w-full text-start px-3.5 py-2 text-sm hover:bg-muted min-h-[40px] flex items-center gap-2 focus:outline-none focus-visible:bg-muted';
+
   return (
-    <tr className={`group transition-colors ${isSelected ? 'bg-secondary' : 'hover:bg-muted'}`}>
-      <td className={`table-td sticky start-0 z-[1] w-10 ${stickyBg}`}>
+    <tr className="group">
+      <td
+        className={`${TD} sticky start-0 z-[1] w-9 ${rowBg} group-hover:shadow-[inset_2px_0_0_#a3e635] rtl:group-hover:shadow-[inset_-2px_0_0_#a3e635]`}
+      >
         <input
           type="checkbox"
           checked={isSelected}
           onChange={(e) => onSelectRow(lead.id, e.target.checked)}
-          className="w-5 h-5 rounded border-input accent-primary cursor-pointer"
+          className="w-4 h-4 rounded border-input accent-lime-500 cursor-pointer"
           aria-label={`${t('leads.colLead')}: ${title}`}
         />
       </td>
 
-      {/* Lead: avatar/icon + name (or phone) + phone + at most two badges */}
-      <td className={`table-td sticky start-10 z-[1] min-w-[250px] border-e border-border ${stickyBg}`}>
-        <div className="flex items-center gap-3">
+      {/* 1. Lead info — name (bold) with the source underneath */}
+      <td className={`${TD} sticky start-9 z-[1] min-w-[240px] border-e border-black/5 dark:border-white/5 ${rowBg}`} title={tooltip}>
+        <div className="flex items-center gap-2.5 min-w-0">
           <div
-            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-              hasName ? 'bg-lime-500/10 text-primary text-xs font-bold' : 'bg-muted text-muted-foreground'
+            className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${
+              hasName
+                ? 'bg-lime-500/15 text-lime-700 dark:bg-lime-400/15 dark:text-lime-300'
+                : 'bg-zinc-200 text-zinc-500 dark:bg-white/5 dark:text-zinc-400'
             }`}
             aria-hidden
           >
-            {hasName ? initials : <User size={16} />}
+            {hasName ? initials : <User size={14} />}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 min-h-[20px]">
+          <div className="min-w-0 leading-tight">
+            <div className="flex items-center gap-1.5">
               <a
                 href={`/leads/${lead.id}`}
-                className="font-semibold text-foreground text-sm truncate max-w-[170px] hover:text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                title={title}
+                className="font-semibold text-[13px] text-zinc-900 dark:text-zinc-50 truncate max-w-[190px] hover:text-lime-600 dark:hover:text-lime-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 rounded"
               >
                 {title}
               </a>
+              {overdue && (
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title={t('leads.overdue')} />
+              )}
               {canDelete && lead.isDuplicate && (
-                <span className="flex-shrink-0 inline-flex items-center rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-semibold px-1.5 py-px">
+                <span className="flex-shrink-0 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-semibold px-1.5">
                   {t('leads.duplicate')}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {hasName ? (
-                lead.phone && (
-                  <>
-                    <Phone size={10} className="flex-shrink-0" />
-                    <span className="font-mono-data" dir="ltr">
-                      {lead.phone}
-                    </span>
-                  </>
-                )
-              ) : (
-                <span>{t('leads.noName')}</span>
-              )}
-              <button
-                type="button"
-                onClick={copyId}
-                title={`${t('leads.copyId')} (${lead.id})`}
-                aria-label={t('leads.copyId')}
-                className="ms-1 w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Copy size={11} />
-              </button>
-            </div>
-            <div className="mt-1 flex items-center gap-1 min-h-[20px]">
-              <LeadBadge tone={called ? 'sky' : 'amber'}>
-                {called ? t('leads.called') : t('leads.notCalled')}
-              </LeadBadge>
-              <LeadBadge tone={actionToday ? 'emerald' : 'muted'}>
-                {actionToday ? t('leads.actionToday') : t('leads.noAction')}
-              </LeadBadge>
-            </div>
-            {details.length > 0 && (
-              <p className="mt-0.5 text-xs text-muted-foreground truncate max-w-[220px]">
-                {details.join(' · ')}
-              </p>
-            )}
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[230px]">
+              {sourceLine || (hasName ? '' : t('leads.noName'))}
+            </p>
           </div>
         </div>
       </td>
 
-      <td className="table-td">
-        {lead.source ? (
-          <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
-            {lead.source}
+      {/* 2. Contact — phone, monospace */}
+      <td className={TD}>
+        {hasPhone && (
+          <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-zinc-600 dark:text-zinc-300">
+            <Phone size={12} className="text-lime-600 dark:text-lime-400 flex-shrink-0" />
+            <span dir="ltr">{lead.phone}</span>
           </span>
-        ) : null}
+        )}
       </td>
 
-      <td className="table-td">
-        {agentNames.length > 0 ? (
-          <div className="flex items-center gap-1.5" title={agentNames.join(', ')}>
-            <UserCheck size={14} className="text-emerald-500 flex-shrink-0" />
-            <span className="text-sm text-foreground truncate max-w-[120px]">{agentNames[0]}</span>
+      {/* 3. Status — colour-coded pill, still clickable to change stage */}
+      <td className={TD}>
+        <StatusDropdown
+          currentStatus={lead.status || 'Fresh Leads'}
+          leadId={lead.id}
+          onStatusChange={onStatusChange}
+          compact
+        />
+      </td>
+
+      {/* 4. Assigned agent */}
+      <td className={TD}>
+        {agentFirst ? (
+          <div className="flex items-center gap-2" title={agentNames.join(', ')}>
+            <span className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-zinc-200 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+              {agentInitials}
+            </span>
+            <span className="text-[13px] truncate max-w-[110px]">{agentFirst}</span>
             {agentNames.length > 1 && (
-              <span className="text-[11px] font-semibold text-muted-foreground bg-muted rounded-full px-1.5">
+              <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-white/5 rounded-full px-1.5">
                 +{agentNames.length - 1}
               </span>
             )}
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">{t('leads.unassigned')}</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{t('leads.unassigned')}</span>
         )}
       </td>
 
-      <td className="table-td">
-        <div className="flex items-center gap-1.5">
-          <StatusDropdown
-            currentStatus={lead.status || 'Fresh Leads'}
-            leadId={lead.id}
-            onStatusChange={onStatusChange}
-          />
-          <button
-            onClick={() => {
-              const next = nextPipelineStage(lead.status);
-              if (next && next !== lead.status) onStatusChange(lead.id, next);
-            }}
-            disabled={!nextPipelineStage(lead.status)}
-            className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-lime-500/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title={
-              nextPipelineStage(lead.status)
-                ? `${nextPipelineStage(lead.status)}`
-                : ''
-            }
-            aria-label="Advance lead status one step"
-          >
-            <Zap size={13} />
-            {nextPipelineStage(lead.status) || '✓'}
-          </button>
-        </div>
-      </td>
-
-      <td className="table-td text-muted-foreground text-xs">
-        {lead.lastActionAt ? (
-          <span title={new Date(lead.lastActionAt).toLocaleString(localeOf(lang))}>
-            {timeAgo(lead.lastActionAt, lang)}
-          </span>
-        ) : (
-          <span className="opacity-70">{t('leads.noAction')}</span>
-        )}
-      </td>
-
-      <td className="table-td">
-        {lead.followUpDue ? (
-          <span
-            className={`text-sm tabular-nums ${overdue ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}
-          >
-            {shortDate(lead.followUpDue, lang)}
-            {overdue && <span className="ms-1 text-xs text-red-400">{t('leads.overdue')}</span>}
-          </span>
-        ) : null}
-      </td>
-
-      <td className="table-td text-muted-foreground text-xs">{shortDate(lead.createdAt, lang)}</td>
-
-      {/* Quick actions: call · WhatsApp · open · ⋯ */}
-      <td className="table-td">
-        <div className="flex items-center gap-0.5 justify-end">
+      {/* 5. Actions — centered icon buttons */}
+      <td className={`${TD} w-[190px]`}>
+        <div className="flex items-center justify-center gap-0.5">
           <button
             type="button"
-            onClick={handleCall}
-            disabled={!hasPhone}
-            title={t('leads.call')}
-            aria-label={`${t('leads.call')}: ${title}`}
-            className={`${ICON_BTN} hover:bg-emerald-500/10 hover:text-emerald-600`}
+            onClick={() => onView?.(lead)}
+            title={t('leads.viewProfile')}
+            aria-label={`${t('leads.viewProfile')}: ${title}`}
+            className={`${ICON_BTN} hover:bg-lime-500/10 hover:text-lime-600 dark:hover:text-lime-400`}
           >
-            <Phone size={16} />
+            <Eye size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit?.(lead)}
+            title={t('leads.editQuick')}
+            aria-label={`${t('leads.editQuick')}: ${title}`}
+            className={`${ICON_BTN} hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400`}
+          >
+            <Pencil size={15} />
           </button>
           {hasPhone ? (
             <a
@@ -469,19 +436,20 @@ const LeadTableRow = React.memo(function LeadTableRow({
               rel="noopener noreferrer"
               title={t('leads.whatsapp')}
               aria-label={`${t('leads.whatsapp')}: ${title}`}
-              className={`${ICON_BTN} hover:bg-green-500/10 hover:text-green-600`}
+              className={`${ICON_BTN} hover:bg-green-500/10 hover:text-green-600 dark:hover:text-green-400`}
             >
-              <MessageCircle size={16} />
+              <MessageCircle size={15} />
             </a>
           ) : null}
           <button
             type="button"
-            onClick={() => onView?.(lead)}
-            title={t('leads.open')}
-            aria-label={`${t('leads.open')}: ${title}`}
-            className={`${ICON_BTN} hover:bg-secondary hover:text-primary`}
+            onClick={handleCall}
+            disabled={!hasPhone}
+            title={t('leads.call')}
+            aria-label={`${t('leads.call')}: ${title}`}
+            className={`${ICON_BTN} hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400`}
           >
-            <Eye size={16} />
+            <Phone size={15} />
           </button>
           <button
             ref={menuAnchorRef}
@@ -491,33 +459,35 @@ const LeadTableRow = React.memo(function LeadTableRow({
             aria-label={t('leads.more')}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className={`${ICON_BTN} hover:bg-secondary hover:text-foreground`}
+            className={`${ICON_BTN} hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-foreground`}
           >
-            <MoreHorizontal size={16} />
+            <MoreHorizontal size={15} />
           </button>
           {menuOpen && (
             <ViewportPopover
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               anchorRef={menuAnchorRef}
-              minWidth={190}
-              preferredMaxHeight={260}
+              minWidth={210}
+              preferredMaxHeight={280}
               zIndex={100}
               role="menu"
               aria-label={t('leads.more')}
               className="stage-dropdown-panel"
             >
               <div className="py-1">
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onEdit?.(lead);
-                  }}
-                  className="w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted min-h-[44px] flex items-center gap-2"
-                >
-                  <Pencil size={14} /> {t('leads.edit')}
-                </button>
+                {next && next !== lead.status && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onStatusChange(lead.id, next);
+                    }}
+                    className={menuItem}
+                  >
+                    <Zap size={14} /> {t('leads.advanceTo', { stage: next })}
+                  </button>
+                )}
                 {onOpenLogCall && (
                   <button
                     role="menuitem"
@@ -525,7 +495,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
                       setMenuOpen(false);
                       onOpenLogCall(lead);
                     }}
-                    className="w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted min-h-[44px] flex items-center gap-2"
+                    className={menuItem}
                   >
                     <Phone size={14} /> {t('leads.logCall')}
                   </button>
@@ -536,7 +506,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
                     setMenuOpen(false);
                     void copyId();
                   }}
-                  className="w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted min-h-[44px] flex items-center gap-2"
+                  className={menuItem}
                 >
                   <Copy size={14} /> {t('leads.copyId')}
                 </button>
@@ -547,7 +517,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
                       setMenuOpen(false);
                       onDeletePrompt(lead.id);
                     }}
-                    className="w-full text-start px-3.5 py-2.5 text-sm text-red-500 hover:bg-red-500/10 min-h-[44px] flex items-center gap-2"
+                    className={`${menuItem} text-red-500 hover:bg-red-500/10`}
                   >
                     <Trash2 size={14} /> {t('leads.delete')}
                   </button>
@@ -567,30 +537,30 @@ const LeadTableRow = React.memo(function LeadTableRow({
   );
 });
 
-function SkeletonRows({ count = 8 }: { count?: number }) {
+function SkeletonRows({ count = 14 }: { count?: number }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
         <tr key={`sk-${i}`} aria-hidden>
-          <td className="table-td sticky start-0 bg-card">
-            <div className="w-5 h-5 rounded bg-muted animate-pulse" />
+          <td className={`${TD} sticky start-0 bg-white dark:bg-[#0a0a0f]`}>
+            <div className="w-4 h-4 rounded bg-zinc-200 dark:bg-white/10 animate-pulse" />
           </td>
-          <td className="table-td sticky start-10 bg-card border-e border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
+          <td className={`${TD} sticky start-9 bg-white dark:bg-[#0a0a0f] border-e border-black/5 dark:border-white/5`}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" />
               <div className="space-y-1.5">
-                <div className="h-3.5 w-32 rounded bg-muted animate-pulse" />
-                <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+                <div className="h-3 w-28 rounded bg-zinc-200 dark:bg-white/10 animate-pulse" />
+                <div className="h-2.5 w-20 rounded bg-zinc-200/70 dark:bg-white/5 animate-pulse" />
               </div>
             </div>
           </td>
-          {Array.from({ length: 6 }).map((__, c) => (
-            <td key={c} className="table-td">
-              <div className="h-4 w-20 rounded bg-muted animate-pulse" />
+          {[28, 24, 24].map((w, c) => (
+            <td key={c} className={TD}>
+              <div className="h-4 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" style={{ width: `${w * 4}px` }} />
             </td>
           ))}
-          <td className="table-td">
-            <div className="h-9 w-32 rounded-lg bg-muted animate-pulse ms-auto" />
+          <td className={TD}>
+            <div className="h-7 w-40 rounded-lg bg-zinc-200 dark:bg-white/10 animate-pulse mx-auto" />
           </td>
         </tr>
       ))}
@@ -636,24 +606,24 @@ export default function LeadsTable({
     }
   };
 
+  const TH =
+    'sticky top-0 z-[2] px-3 py-2 text-start text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-[#12121a] border-b border-black/5 dark:border-white/10 whitespace-nowrap';
   const sortableCol = (label: string, key: keyof Lead, extra = '') => (
     <th
-      className={`table-th text-start sticky top-0 z-[2] bg-muted ${extra}`}
+      className={`${TH} ${extra}`}
       aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
       <button
         type="button"
         onClick={() => onSort(key)}
-        className="flex items-center gap-0.5 uppercase tracking-wider hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+        className="flex items-center gap-0.5 uppercase tracking-wider hover:text-lime-600 dark:hover:text-lime-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 rounded"
       >
         {label}
         <SortIcon active={sortKey === key} dir={sortDir} />
       </button>
     </th>
   );
-  const plainCol = (label: string, extra = '') => (
-    <th className={`table-th text-start sticky top-0 z-[2] bg-muted ${extra}`}>{label}</th>
-  );
+  const plainCol = (label: string, extra = '') => <th className={`${TH} ${extra}`}>{label}</th>;
 
   const startItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalCount);
@@ -806,95 +776,118 @@ export default function LeadsTable({
         )}
       </div>
 
-      {/* Desktop table: own scroll container so the header and the first columns stay put */}
-      <div
-        ref={scrollerRef}
-        className="hidden sm:block overflow-auto max-h-[calc(100vh-15rem)] min-h-[320px]"
-        tabIndex={0}
-        aria-label={t('leads.title')}
-      >
-        <table className="w-full min-w-[1180px] border-separate border-spacing-0">
-          <thead>
-            <tr>
-              <th className="table-th w-10 sticky top-0 start-0 z-[3] bg-muted">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={(e) => onSelectAll(e.target.checked)}
-                  className="w-5 h-5 rounded border-input accent-primary cursor-pointer"
-                  aria-label={t('leads.selectAll')}
-                />
-              </th>
-              <th
-                className="table-th text-start sticky top-0 start-10 z-[3] bg-muted min-w-[250px] border-e border-border"
-                aria-sort={sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      {/* Desktop dense table — obsidian surface, hairline borders, neon-lime accents */}
+      <div className="hidden sm:block bg-white dark:bg-[#0a0a0f]">
+        <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-black/5 dark:border-white/10 bg-white dark:bg-[#12121a]">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{t('leads.title')}</h2>
+            <span
+              className="rounded-full bg-lime-500/15 text-lime-700 dark:bg-lime-400/15 dark:text-lime-300 border border-lime-500/25 text-[11px] font-bold px-2 py-0.5 tabular-nums"
+              aria-label={`${t('leads.total')}: ${nf.format(totalCount)}`}
+            >
+              {nf.format(totalCount)}
+            </span>
+          </div>
+          <div className="flex items-center gap-1" role="group" aria-label={t('leads.sortBy')}>
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 me-1">{t('leads.sortBy')}</span>
+            {(
+              [
+                { key: 'createdAt', label: t('leads.colCreated') },
+                { key: 'followUpDue', label: t('leads.colFollowUp') },
+              ] as { key: keyof Lead; label: string }[]
+            ).map((s) => (
+              <button
+                key={String(s.key)}
+                type="button"
+                onClick={() => onSort(s.key)}
+                aria-pressed={sortKey === s.key}
+                className={`inline-flex items-center gap-0.5 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 ${
+                  sortKey === s.key
+                    ? 'border-lime-500/40 bg-lime-500/10 text-lime-700 dark:text-lime-300'
+                    : 'border-black/10 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:border-lime-500/40'
+                }`}
               >
-                <button
-                  type="button"
-                  onClick={() => onSort('name')}
-                  className="flex items-center gap-0.5 uppercase tracking-wider hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                >
-                  {t('leads.colLead')}
-                  <SortIcon active={sortKey === 'name'} dir={sortDir} />
-                </button>
-              </th>
-              {sortableCol(t('leads.colSource'), 'source')}
-              {sortableCol(t('leads.colAgent'), 'agent')}
-              {sortableCol(t('leads.colStatus'), 'status')}
-              {plainCol(t('leads.colLastAction'))}
-              {sortableCol(t('leads.colFollowUp'), 'followUpDue')}
-              {sortableCol(t('leads.colCreated'), 'createdAt' as keyof Lead)}
-              {plainCol(t('leads.colActions'), 'text-end')}
-            </tr>
-          </thead>
-          <tbody className="[&>tr>td]:border-b [&>tr>td]:border-border">
-            {loading && leads.length === 0 ? (
-              <SkeletonRows />
-            ) : leads.length === 0 ? (
+                {s.label}
+                {sortKey === s.key && <SortIcon active dir={sortDir} />}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div
+          ref={scrollerRef}
+          className="overflow-auto max-h-[calc(100vh-17rem)] min-h-[320px]"
+          tabIndex={0}
+          aria-label={t('leads.title')}
+        >
+          <table className="w-full min-w-[920px] border-separate border-spacing-0">
+            <thead>
               <tr>
-                <td colSpan={9}>{emptyState}</td>
+                <th className={`${TH} w-9 start-0 z-[3]`}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) => onSelectAll(e.target.checked)}
+                    className="w-4 h-4 rounded border-input accent-lime-500 cursor-pointer"
+                    aria-label={t('leads.selectAll')}
+                  />
+                </th>
+                {sortableCol(t('leads.colInfo'), 'name', 'start-9 z-[3] min-w-[240px] border-e border-black/5 dark:border-white/5')}
+                {plainCol(t('leads.colContact'))}
+                {sortableCol(t('leads.colStatus'), 'status')}
+                {sortableCol(t('leads.colAssigned'), 'agent')}
+                {plainCol(t('leads.colActions'), 'text-center')}
               </tr>
-            ) : (
-              visibleLeads.map((lead) => (
-                <LeadTableRow
-                  key={lead.id}
-                  lead={lead}
-                  isSelected={selectedIds.has(lead.id)}
-                  canDelete={canDelete}
-                  onSelectRow={onSelectRow}
-                  onStatusChange={onStatusChange}
-                  onView={safeOnView}
-                  onEdit={safeOnEdit}
-                  onDeletePrompt={handleDeletePrompt}
-                  onPostCall={onPostCall}
-                  onOpenLogCall={onOpenLogCall}
-                />
-              ))
-            )}
-            {visibleLeads.length < leads.length && (
-              <tr>
-                <td colSpan={9} className="py-2.5 text-center text-xs text-muted-foreground bg-muted">
-                  <div className="inline-flex items-center gap-3">
-                    <span>
-                      {t('leads.showing', {
-                        from: nf.format(1),
-                        to: nf.format(visibleLeads.length),
-                        total: nf.format(leads.length),
-                      })}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
-                      className="min-h-[36px] text-xs text-primary font-medium hover:underline px-3 rounded-md border border-lime-500/20 bg-lime-500/5 active:scale-95 transition-all"
-                    >
-                      +50
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading && leads.length === 0 ? (
+                <SkeletonRows />
+              ) : leads.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>{emptyState}</td>
+                </tr>
+              ) : (
+                visibleLeads.map((lead) => (
+                  <LeadTableRow
+                    key={lead.id}
+                    lead={lead}
+                    isSelected={selectedIds.has(lead.id)}
+                    canDelete={canDelete}
+                    onSelectRow={onSelectRow}
+                    onStatusChange={onStatusChange}
+                    onView={safeOnView}
+                    onEdit={safeOnEdit}
+                    onDeletePrompt={handleDeletePrompt}
+                    onPostCall={onPostCall}
+                    onOpenLogCall={onOpenLogCall}
+                  />
+                ))
+              )}
+              {visibleLeads.length < leads.length && (
+                <tr>
+                  <td colSpan={6} className="py-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                    <div className="inline-flex items-center gap-3">
+                      <span>
+                        {t('leads.showing', {
+                          from: nf.format(1),
+                          to: nf.format(visibleLeads.length),
+                          total: nf.format(leads.length),
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
+                        className="min-h-[32px] text-xs text-lime-700 dark:text-lime-300 font-medium hover:underline px-3 rounded-md border border-lime-500/30 bg-lime-500/10 active:scale-95 transition-all"
+                      >
+                        +50
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {totalCount > 0 && (
