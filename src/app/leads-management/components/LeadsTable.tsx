@@ -218,7 +218,7 @@ const ICON_BTN =
   'w-8 h-8 rounded-lg text-zinc-500 dark:text-zinc-400 transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 disabled:opacity-30 disabled:cursor-not-allowed [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11';
 
 /** Shared dense cell: tight padding, hairline divider (white/5 on the obsidian theme). */
-const TD = 'px-3 py-2 text-[13px] text-foreground whitespace-nowrap overflow-hidden border-b border-black/5 dark:border-white/5';
+const TD = 'px-3 py-1.5 text-[13px] text-foreground whitespace-nowrap overflow-hidden border-b border-black/5 dark:border-white/5';
 
 function formatBudgetRange(min?: number, max?: number): string {
   const a = Number(min) || 0;
@@ -239,6 +239,8 @@ interface LeadTableRowProps {
   onDeletePrompt: (id: string) => void;
   onPostCall?: (lead: Lead) => void;
   onOpenLogCall?: (lead: Lead) => void;
+  showProject: boolean;
+  showLast: boolean;
 }
 
 const LeadTableRow = React.memo(function LeadTableRow({
@@ -252,6 +254,8 @@ const LeadTableRow = React.memo(function LeadTableRow({
   onDeletePrompt,
   onPostCall,
   onOpenLogCall,
+  showProject,
+  showLast,
 }: LeadTableRowProps) {
   const { t, lang } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -390,7 +394,6 @@ const LeadTableRow = React.memo(function LeadTableRow({
       <td className={TD}>
         {hasPhone && (
           <span className="inline-flex max-w-full items-center gap-1.5 font-mono text-[12px] text-zinc-600 dark:text-zinc-300">
-            <Phone size={12} className="text-lime-600 dark:text-lime-400 flex-shrink-0" />
             <span dir="ltr">{lead.phone}</span>
             <button
               type="button"
@@ -415,26 +418,27 @@ const LeadTableRow = React.memo(function LeadTableRow({
         />
       </td>
 
-      {/* Project & budget */}
-      <td className={`${TD} hidden xl:table-cell`}>
-        {lead.project || budget ? (
-          <div className="leading-tight">
-            <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate">
-              {lead.project || lead.propertyType || ''}
-            </p>
-            {(lead.unit || (lead.project && lead.propertyType)) && (
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
-                {lead.unit || lead.propertyType}
+      {/* Project & budget — only when the table is wide enough to show it cleanly */}
+      {showProject && (
+        <td className={TD}>
+          {lead.project || budget ? (
+            <div className="leading-tight">
+              <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                {lead.project || lead.propertyType || ''}
               </p>
-            )}
-            {budget && (
-              <p className="text-[11px] font-semibold tabular-nums text-lime-700 dark:text-lime-300">
-                {budget} {t('leads.egp')}
+              <p className="text-[11px] truncate text-zinc-500 dark:text-zinc-400">
+                {lead.unit || (lead.project && lead.propertyType) || ''}
+                {budget && (
+                  <span className="font-semibold tabular-nums text-lime-700 dark:text-lime-300">
+                    {lead.unit || (lead.project && lead.propertyType) ? ' · ' : ''}
+                    {budget} {t('leads.egp')}
+                  </span>
+                )}
               </p>
-            )}
-          </div>
-        ) : null}
-      </td>
+            </div>
+          ) : null}
+        </td>
+      )}
 
       {/* Assigned agent */}
       <td className={TD}>
@@ -456,7 +460,8 @@ const LeadTableRow = React.memo(function LeadTableRow({
       </td>
 
       {/* Last contact */}
-      <td className={`${TD} hidden 2xl:table-cell`}>
+      {showLast && (
+      <td className={TD}>
         <div className="leading-tight" title={lead.lastActionAt ? new Date(lead.lastActionAt).toLocaleString(localeOf(lang)) : undefined}>
           <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">
             {lead.lastActionAt ? timeAgo(lead.lastActionAt, lang) : <span className="font-normal text-zinc-500 dark:text-zinc-400">{t('leads.noAction')}</span>}
@@ -466,6 +471,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
           </p>
         </div>
       </td>
+      )}
 
       {/* Quick actions */}
       <td className={TD}>
@@ -583,11 +589,13 @@ const LeadTableRow = React.memo(function LeadTableRow({
   return (
     prev.lead === next.lead &&
     prev.isSelected === next.isSelected &&
-    prev.canDelete === next.canDelete
+    prev.canDelete === next.canDelete &&
+    prev.showProject === next.showProject &&
+    prev.showLast === next.showLast
   );
 });
 
-function SkeletonRows({ count = 14 }: { count?: number }) {
+function SkeletonRows({ count = 14, showProject, showLast }: { count?: number; showProject: boolean; showLast: boolean }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
@@ -606,9 +614,9 @@ function SkeletonRows({ count = 14 }: { count?: number }) {
           </td>
           <td className={TD}><div className="h-4 w-24 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
           <td className={TD}><div className="h-4 w-20 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
-          <td className={`${TD} hidden xl:table-cell`}><div className="h-4 w-24 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
+          {showProject && <td className={TD}><div className="h-4 w-24 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>}
           <td className={TD}><div className="h-4 w-16 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
-          <td className={`${TD} hidden 2xl:table-cell`}><div className="h-4 w-14 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
+          {showLast && <td className={TD}><div className="h-4 w-14 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>}
           <td className={TD}>
             <div className="h-7 w-32 rounded-lg bg-zinc-200 dark:bg-white/10 animate-pulse mx-auto" />
           </td>
@@ -692,6 +700,24 @@ export default function LeadsTable({
 
   const [renderLimit, setRenderLimit] = useState(50);
   const scrollerRef = useRef<HTMLDivElement>(null);
+
+  // Column set follows the width the table really has (viewport breakpoints lie once
+  // the sidebar and browser zoom are involved). Minimums: 36 checkbox + 140 actions
+  // + identity 220 + contact 150 + status 150 + agent 110, project +150, last +100.
+  const [tableW, setTableW] = useState(0);
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setTableW(el.clientWidth));
+    ro.observe(el);
+    setTableW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  const showProject = tableW === 0 || tableW >= 960;
+  const showLast = tableW === 0 || tableW >= 1070;
+  const colWidths = [36, 220, 150, 150, ...(showProject ? [150] : []), 110, ...(showLast ? [100] : []), 140];
+  const colCount = colWidths.length;
+  const tableMinWidth = colWidths.reduce((a, b) => a + b, 0);
 
   // Reset render window whenever page or dataset changes
   useEffect(() => {
@@ -828,7 +854,7 @@ export default function LeadsTable({
 
       {/* Desktop dense table — obsidian surface, hairline borders, neon-lime accents */}
       <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-h-0 bg-white dark:bg-[#0a0a0f]">
-        <div className="flex items-center justify-between gap-3 px-4 py-2 shrink-0 border-b border-black/5 dark:border-white/10 bg-white dark:bg-[#12121a]">
+        <div className="flex items-center justify-between gap-3 px-4 py-1.5 shrink-0 border-b border-black/5 dark:border-white/10 bg-white dark:bg-[#12121a]">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{t('leads.title')}</h2>
             <span
@@ -870,18 +896,12 @@ export default function LeadsTable({
           tabIndex={0}
           aria-label={t('leads.title')}
         >
-          <table className="table-fixed w-full min-w-[880px] xl:min-w-[980px] 2xl:min-w-[1100px] border-separate border-spacing-0">
-            {/* Checkbox + actions are fixed; the rest share the width proportionally.
-                Project & budget appears from xl, Last contact from 2xl. */}
+          <table className="table-fixed w-full border-separate border-spacing-0" style={{ minWidth: tableMinWidth }}>
+            {/* Pixel minimums per column; any extra width is shared proportionally. */}
             <colgroup>
-              <col style={{ width: 36 }} />
-              <col className="w-[30%] xl:w-[24%] 2xl:w-[21%]" />
-              <col className="w-[18%] xl:w-[14%] 2xl:w-[13%]" />
-              <col className="w-[18%] xl:w-[15%] 2xl:w-[13%]" />
-              <col className="hidden xl:table-column xl:w-[15%] 2xl:w-[14%]" />
-              <col className="w-[12%] xl:w-[10%] 2xl:w-[9%]" />
-              <col className="hidden 2xl:table-column 2xl:w-[8%]" />
-              <col style={{ width: 140 }} />
+              {colWidths.map((w, i) => (
+                <col key={i} style={{ width: w }} />
+              ))}
             </colgroup>
             <thead>
               <tr>
@@ -897,18 +917,18 @@ export default function LeadsTable({
                 {sortableCol(t('leads.colIdentity'), 'name', 'start-9 z-[3] border-e border-black/5 dark:border-white/5')}
                 {plainCol(t('leads.colContactNumber'))}
                 {sortableCol(t('leads.colStage'), 'status')}
-                {sortableCol(t('leads.colProject'), 'budgetMin', 'hidden xl:table-cell')}
+                {showProject && sortableCol(t('leads.colProject'), 'budgetMin')}
                 {sortableCol(t('leads.colAssigned'), 'agent')}
-                {plainCol(t('leads.colLastContact'), 'hidden 2xl:table-cell')}
+                {showLast && plainCol(t('leads.colLastContact'))}
                 {plainCol(t('leads.colQuick'), 'text-center')}
               </tr>
             </thead>
             <tbody>
               {loading && leads.length === 0 ? (
-                <SkeletonRows />
+                <SkeletonRows showProject={showProject} showLast={showLast} />
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>{emptyState}</td>
+                  <td colSpan={colCount}>{emptyState}</td>
                 </tr>
               ) : (
                 visibleLeads.map((lead) => (
@@ -924,12 +944,14 @@ export default function LeadsTable({
                     onDeletePrompt={handleDeletePrompt}
                     onPostCall={onPostCall}
                     onOpenLogCall={onOpenLogCall}
+                    showProject={showProject}
+                    showLast={showLast}
                   />
                 ))
               )}
               {visibleLeads.length < leads.length && (
                 <tr>
-                  <td colSpan={8} className="py-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                  <td colSpan={colCount} className="py-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
                     <div className="inline-flex items-center gap-3">
                       <span>
                         {t('leads.showing', {
@@ -955,7 +977,7 @@ export default function LeadsTable({
       </div>
 
       {totalCount > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-border shrink-0 bg-white dark:bg-[#0a0a0f]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2 sm:pe-20 rtl:sm:pe-4 rtl:sm:ps-20 border-t border-border shrink-0 bg-white dark:bg-[#0a0a0f]">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span aria-live="polite">
               {t('leads.showing', {
@@ -970,7 +992,7 @@ export default function LeadsTable({
                 id="leads-page-size"
                 value={pageSize}
                 onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                className="input-base min-h-[44px] h-11 text-xs py-0 px-2 w-20"
+                className="input-base min-h-[36px] h-9 text-xs py-0 px-2 w-20 [@media(pointer:coarse)]:h-11"
               >
                 {[10, 25, 50, 100, 250, 500].map((s) => (
                   <option key={`pagesize-${s}`} value={s}>
@@ -984,7 +1006,7 @@ export default function LeadsTable({
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-9 h-9 min-w-[36px] min-h-[36px] [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={t('leads.prev')}
             >
               <ChevronLeft size={14} className="rtl:rotate-180" />
@@ -993,7 +1015,7 @@ export default function LeadsTable({
               p === '...' ? (
                 <span
                   key={`ellipsis-${i}`}
-                  className="w-11 min-w-[44px] text-center text-muted-foreground text-sm flex items-center justify-center"
+                  className="w-9 min-w-[36px] text-center text-muted-foreground text-sm flex items-center justify-center"
                 >
                   …
                 </span>
@@ -1002,7 +1024,7 @@ export default function LeadsTable({
                   key={`page-${p}`}
                   onClick={() => onPageChange(p as number)}
                   aria-current={currentPage === p ? 'page' : undefined}
-                  className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${currentPage === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
+                  className={`w-9 h-9 min-w-[36px] min-h-[36px] [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11 rounded-lg text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${currentPage === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
                 >
                   {nf.format(p as number)}
                 </button>
@@ -1011,7 +1033,7 @@ export default function LeadsTable({
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-9 h-9 min-w-[36px] min-h-[36px] [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={t('leads.next')}
             >
               <ChevronRight size={14} className="rtl:rotate-180" />

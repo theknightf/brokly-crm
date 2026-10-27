@@ -35,7 +35,7 @@ function ToolbarSelect({
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="input-base h-11 appearance-none ps-3 pe-9 truncate bg-card shadow-sm"
+        className="input-base h-11 sm:h-10 appearance-none ps-3 pe-9 truncate bg-card shadow-sm"
       >
         {children}
       </select>
@@ -116,7 +116,7 @@ export default function LeadsToolbar({
 
   return (
     <div
-      className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2.5 bg-background backdrop-blur-md border-b border-border shadow-sm animate-rise-in"
+      className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2 bg-background backdrop-blur-md border-b border-border shadow-sm animate-rise-in"
       style={{ animationDelay: '140ms' }}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -132,7 +132,7 @@ export default function LeadsToolbar({
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
             placeholder={t('leads.searchPlaceholder')}
             aria-label={t('leads.searchPlaceholder')}
-            className="input-base h-11 ps-9 pe-3 w-full bg-card shadow-sm"
+            className="input-base h-11 sm:h-10 ps-9 pe-3 w-full bg-card shadow-sm"
           />
         </div>
 
@@ -173,7 +173,7 @@ export default function LeadsToolbar({
           onClick={onOpenFilters}
           aria-haspopup="dialog"
           aria-expanded={filtersOpen}
-          className={`btn-secondary h-11 min-w-[44px] flex items-center justify-center gap-1.5 text-sm ${
+          className={`btn-secondary h-11 sm:h-10 min-w-[44px] flex items-center justify-center gap-1.5 text-sm ${
             drawerCount > 0 ? 'ring-1 ring-lime-500/40 text-primary' : ''
           }`}
         >
@@ -187,7 +187,7 @@ export default function LeadsToolbar({
         </button>
 
         <div
-          className="flex items-center bg-muted rounded-xl p-1 h-11"
+          className="flex items-center bg-muted rounded-xl p-1 h-11 sm:h-10"
           role="group"
           aria-label="View mode"
         >
@@ -203,7 +203,7 @@ export default function LeadsToolbar({
               onClick={() => onViewModeChange(v.mode)}
               aria-pressed={viewMode === v.mode}
               aria-label={v.label}
-              className={`h-9 min-w-[44px] px-3 rounded-lg flex items-center justify-center gap-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`h-9 sm:h-8 min-w-[44px] px-3 rounded-lg flex items-center justify-center gap-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 viewMode === v.mode
                   ? 'bg-card text-primary shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'

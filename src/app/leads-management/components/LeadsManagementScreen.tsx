@@ -1623,12 +1623,12 @@ export default function LeadsManagementScreen({
   };
 
   return (
-    <div className="page-aurora min-h-[calc(100dvh-8rem)] sm:min-h-[34rem] sm:flex-1 space-y-5 rounded-[2rem] p-3 sm:p-5 pb-24 sm:pb-5 flex flex-col">
+    <div className="page-aurora min-h-[calc(100dvh-8rem)] sm:min-h-[34rem] sm:flex-1 space-y-5 sm:space-y-3 rounded-[2rem] p-3 sm:p-4 pb-24 sm:pb-4 flex flex-col">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-[1.75rem] border border-border/70 bg-card/80 p-4 sm:p-5 shadow-sm backdrop-blur-xl">
-        <div className="animate-rise-in">
-          <h1 className="page-title">{title || t('leads.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 sm:px-4 sm:py-2.5 shadow-sm backdrop-blur-xl">
+        <div className="animate-rise-in min-w-0 sm:flex sm:items-baseline sm:gap-3">
+          <h1 className="page-title sm:text-xl">{title || t('leads.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5 sm:mt-0 truncate">
             {subtitle ||
               `${total} lead${total !== 1 ? 's' : ''} in your list${
                 filters.status ? ` · status: ${filters.status}` : initialStatus ? ` · status: ${initialStatus}` : ''
@@ -1667,7 +1667,7 @@ export default function LeadsManagementScreen({
             <button
               id="add-lead-btn"
               onClick={() => setAddModalOpen(true)}
-              className="relative flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-[0_8px_24px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_12px_30px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 whitespace-nowrap"
+              className="relative flex items-center gap-2 px-5 py-2.5 sm:py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-[0_8px_24px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_12px_30px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 whitespace-nowrap"
               title="Add lead (press N)"
             >
               <Plus size={16} strokeWidth={2.5} />

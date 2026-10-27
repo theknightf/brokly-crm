@@ -25,7 +25,7 @@ export default function LeadsStatusStrip({ filters, statusCounts, total, onSelec
   const allCount = counted > 0 ? counted : total;
 
   const pill = (active: boolean) =>
-    `inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3.5 min-h-[36px] text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 [@media(pointer:coarse)]:min-h-[44px] ${
+    `inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3.5 min-h-[32px] text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 [@media(pointer:coarse)]:min-h-[44px] ${
       active
         ? 'border-lime-500/60 bg-lime-400/15 text-lime-800 dark:text-lime-300 shadow-[0_0_0_1px_rgba(163,230,53,0.15)]'
         : 'border-black/10 dark:border-white/10 bg-white dark:bg-[#12121a] text-zinc-600 dark:text-zinc-300 hover:border-lime-500/40 hover:text-foreground'
@@ -43,7 +43,7 @@ export default function LeadsStatusStrip({ filters, statusCounts, total, onSelec
 
   return (
     <div
-      className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1 snap-x"
+      className="flex items-center gap-2 overflow-x-auto sm:overflow-visible sm:flex-wrap snap-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       role="group"
       aria-label={t('leads.colStage')}
     >

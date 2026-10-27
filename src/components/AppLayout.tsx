@@ -58,14 +58,14 @@ export default function AppLayout({ children, fill = false }: AppLayoutProps) {
         />
         <main className={`flex-1 overscroll-contain ${fill ? 'overflow-y-auto sm:flex sm:flex-col' : 'overflow-y-auto'}`}>
           <div
-            className={`pwa-content max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-32 lg:pb-6 ${fill ? 'sm:w-full sm:!max-w-none sm:flex-1 sm:min-h-0 sm:flex sm:flex-col sm:!pb-16' : ''}`}
+            className={`pwa-content max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-32 lg:pb-6 ${fill ? 'sm:w-full sm:!max-w-none sm:flex-1 sm:min-h-0 sm:flex sm:flex-col sm:!pb-4 sm:!pt-3' : ''}`}
             style={{ paddingBottom: 'max(8rem, calc(7rem + env(safe-area-inset-bottom)))' }}
           >
             {!isDashboard && (
               <button
                 type="button"
                 onClick={goBack}
-                className="mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground active:scale-95"
+                className={`${fill ? 'sm:hidden ' : ''}mb-4 inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground active:scale-95`}
                 aria-label={t('common.back')}
               >
                 {lang === 'ar' ? <ArrowRight size={15} /> : <ArrowLeft size={15} />}
