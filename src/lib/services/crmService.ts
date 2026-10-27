@@ -3,24 +3,6 @@
 import { createClient } from '@/lib/supabase/client';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 import { isAdminRole } from '@/lib/roles';
-import { describePostgrestError, logPostgrestError, toPostgrestError } from '@/lib/supabase/postgrestError';
-
-export function isAllOrEmpty(val?: string | null): boolean {
-  if (val === undefined || val === null) return true;
-  if (typeof val !== 'string') return false;
-  const trimmed = val.trim().toLowerCase();
-  return (
-    trimmed === '' ||
-    trimmed === 'all' ||
-    trimmed === 'undefined' ||
-    trimmed === 'null' ||
-    trimmed.startsWith('all ')
-  );
-}
-
-const isUuid = (val: unknown): val is string =>
-  typeof val === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
 
 export function getLocalTodayDateString(): string {
   const d = new Date();
@@ -269,45 +251,340 @@ async function computeRotationAssignments(
 async function pushAssignmentNotifications(
   supabase: any,
   ids: string[],
-  assignedTo: string | null,
+  assignedTo: string | string[] | null,
   assigneeName?: string
 ) {
   if (!assignedTo || !ids.length) return;
+  const targetUserIds = (Array.isArray(assignedTo) ? assignedTo : [assignedTo]).filter(Boolean);
+  if (!targetUserIds.length) return;
   try {
     const { data: leads } = await supabase.from('leads').select('id, name').in('id', ids);
     if (!leads?.length) return;
-    const rows = leads.map((l: any) => ({
-      user_id: assignedTo,
-      action_type: 'Lead Assigned',
-      entity_type: 'lead',
-      entity_id: l.id,
-      detail: l.name || 'A lead',
-      meta: assigneeName ? JSON.stringify({ by: assigneeName }) : '',
-    }));
-    await supabase.from('activity_log').insert(rows);
-    // Also fire a real phone push to the assignee (best-effort).
-    try {
-      await fetch(`/api/push/send?target=${encodeURIComponent(assignedTo)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: assigneeName
-            ? `${assigneeName} assigned a lead to you`
-            : 'New lead assigned to you',
-          body:
-            ids.length > 1
-              ? `${ids.length} leads assigned to you`
-              : leads[0]?.name || 'A lead was assigned to you',
-          url: '/',
-          tag: 'brokly-assignment',
-        }),
+    const rows: any[] = [];
+    for (const uid of targetUserIds) {
+      leads.forEach((l: any) => {
+        rows.push({
+          user_id: uid,
+          action_type: 'Lead Assigned',
+          entity_type: 'lead',
+          entity_id: l.id,
+          detail: l.name || 'A lead',
+          meta: assigneeName ? JSON.stringify({ by: assigneeName }) : '',
+        });
       });
-    } catch {
-      // ignore — push is best-effort
+    }
+    await supabase.from('activity_log').insert(rows);
+    // Also fire a real phone push to each assignee (best-effort).
+    for (const uid of targetUserIds) {
+      try {
+        await fetch(`/api/push/send?target=${encodeURIComponent(uid)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: assigneeName
+              ? `${assigneeName} assigned a lead to you`
+              : 'New lead assigned to you',
+            body:
+              ids.length > 1
+                ? `${ids.length} leads assigned to you`
+                : leads[0]?.name || 'A lead was assigned to you',
+            url: '/',
+            tag: 'brokly-assignment',
+          }),
+        });
+      } catch {
+        // ignore — push is best-effort
+      }
     }
   } catch {
     // ignore — notifications are best-effort
   }
+}
+
+export interface LeadQueryFilters {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  source?: string;
+  agent?: string;
+  project?: string;
+  propertyType?: string;
+  action?: string;
+  contacted?: string;
+  actionTaken?: '' | 'today' | 'no-action';
+  actionFrom?: string;
+  actionTo?: string;
+  called?: '' | 'called' | 'not-called';
+  calledFrom?: string;
+  calledTo?: string;
+  recentlyCalledIds?: string[];
+  assignedTo?: string;
+}
+
+async function applyLeadFilters(
+  supabase: any,
+  baseQuery: any,
+  params: LeadQueryFilters,
+  options: { excludeStatus?: boolean } = {}
+) {
+  let query = baseQuery;
+  const {
+    search = '',
+    status = '',
+    source = '',
+    agent = '',
+    project = '',
+    propertyType = '',
+    action = '',
+    contacted = '',
+    actionTaken: rawActionTaken = '' as '' | 'today' | 'no-action',
+    actionFrom = '',
+    actionTo = '',
+    called = '' as '' | 'called' | 'not-called',
+    calledFrom = '',
+    calledTo = '',
+    recentlyCalledIds = [],
+    assignedTo = '',
+  } = params || {};
+
+  let actionTaken: '' | 'today' | 'no-action' = rawActionTaken;
+  if (!actionTaken && contacted) {
+    if (contacted === 'today') actionTaken = 'today';
+    else if (contacted === 'not-today') actionTaken = 'no-action';
+  }
+
+  // Role-based privacy isolation: only team leaders and admins can see other members' leads (cached)
+  try {
+    const scope = await getCachedActorScope(supabase);
+    if (scope.userId && !isAdminRole(scope.role)) {
+      if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
+        query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
+      } else {
+        try {
+          const { data: laRows } = await supabase
+            .from('lead_assignees')
+            .select('lead_id')
+            .eq('user_id', scope.userId);
+          const assignedLeadIds = (laRows || []).map((r: any) => r.lead_id);
+          if (assignedLeadIds.length > 0) {
+            query = query.or(`assigned_to.eq.${scope.userId},id.in.(${assignedLeadIds.join(',')})`);
+          } else {
+            query = query.eq('assigned_to', scope.userId);
+          }
+        } catch {
+          query = query.eq('assigned_to', scope.userId);
+        }
+      }
+    }
+  } catch {
+    // Fall back to DB RLS
+  }
+
+  if (assignedTo) {
+    try {
+      const { data: laRows } = await supabase
+        .from('lead_assignees')
+        .select('lead_id')
+        .eq('user_id', assignedTo);
+      const assignedLeadIds = (laRows || []).map((r: any) => r.lead_id);
+      if (assignedLeadIds.length > 0) {
+        query = query.or(`assigned_to.eq.${assignedTo},id.in.(${assignedLeadIds.join(',')})`);
+      } else {
+        query = query.eq('assigned_to', assignedTo);
+      }
+    } catch {
+      query = query.eq('assigned_to', assignedTo);
+    }
+  }
+
+  if (action) {
+    let leadIds: string[] = [];
+    try {
+      const { data: logRows, error: logErr } = await supabase
+        .from('activity_log')
+        .select('entity_id')
+        .eq('entity_type', 'lead')
+        .eq('action_type', action);
+      if (logErr) {
+        if (isSchemaError(logErr)) throw logErr;
+        leadIds = [];
+      } else {
+        leadIds = (logRows || [])
+          .map((r: any) => r.entity_id)
+          .filter((v: string | null | undefined): v is string => !!v);
+      }
+    } catch (err: any) {
+      if (isSchemaError(err)) throw err;
+      leadIds = [];
+    }
+    if (!leadIds.length) {
+      return {
+        query,
+        isFilteredOut: true,
+        hasActionFilter: false,
+        useFallbackContacted: false,
+        fallbackSet: null,
+        calledSet: null,
+      };
+    }
+    query = query.in('id', leadIds);
+  }
+
+  const q = search.trim();
+  if (q) {
+    query = query.or(
+      `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
+    );
+  }
+  if (status && !options.excludeStatus) query = query.eq('crm_status', status);
+  if (source) query = query.eq('source', source);
+  if (agent) {
+    try {
+      const { data: matchedUsers } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .ilike('full_name', `%${agent}%`);
+      const userIds = (matchedUsers || []).map((u: any) => u.id);
+      if (userIds.length > 0) {
+        const { data: laRows } = await supabase
+          .from('lead_assignees')
+          .select('lead_id')
+          .in('user_id', userIds);
+        const extraIds = (laRows || []).map((r: any) => r.lead_id);
+        if (extraIds.length > 0) {
+          query = query.or(`agent.ilike.%${agent}%,id.in.(${extraIds.join(',')})`);
+        } else {
+          query = query.or(`agent.ilike.%${agent}%,assigned_to.in.(${userIds.join(',')})`);
+        }
+      } else {
+        query = query.ilike('agent', `%${agent}%`);
+      }
+    } catch {
+      query = query.ilike('agent', `%${agent}%`);
+    }
+  }
+  if (project) query = query.eq('project', project);
+  if (propertyType) query = query.eq('property_type', propertyType);
+
+  if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
+    query = query.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
+  }
+
+  const hasActionFilter = !!actionTaken || !!actionFrom || !!actionTo;
+  let useFallbackContacted = false;
+  if (hasActionFilter) {
+    try {
+      if (actionFrom || actionTo) {
+        if (actionFrom) query = query.gte('last_action_at', `${actionFrom}T00:00:00.000Z`);
+        if (actionTo) query = query.lte('last_action_at', `${actionTo}T23:59:59.999Z`);
+        if (actionTaken === 'no-action') {
+          query = query.is('last_action_at', null);
+        }
+      } else if (actionTaken === 'today') {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date();
+        end.setHours(23, 59, 59, 999);
+        query = query.gte('last_action_at', start.toISOString()).lte('last_action_at', end.toISOString());
+      } else if (actionTaken === 'no-action') {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        query = query.or(`last_action_at.is.null,last_action_at.lt.${start.toISOString()}`);
+      }
+    } catch {
+      useFallbackContacted = true;
+    }
+  }
+
+  let fallbackSet: Set<string> | null = null;
+  if (useFallbackContacted) {
+    try {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+      const [{ data: todayLogs }, { data: todayFUs }] = await Promise.all([
+        supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead').gte('created_at', startIso).lte('created_at', endIso),
+        supabase.from('follow_ups').select('lead_id').gte('created_at', startIso).lte('created_at', endIso),
+      ]);
+      const ids = [
+        ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
+        ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
+      ].filter((v): v is string => !!v);
+      fallbackSet = new Set(ids);
+      if (actionTaken === 'today' || contacted === 'today') {
+        if (!fallbackSet.size) {
+          return {
+            query,
+            isFilteredOut: true,
+            hasActionFilter,
+            useFallbackContacted,
+            fallbackSet,
+            calledSet: null,
+          };
+        }
+        query = query.in('id', [...fallbackSet]);
+      } else if ((actionTaken === 'no-action' || contacted === 'not-today') && fallbackSet.size) {
+        query = query.not('id', 'in', `(${[...fallbackSet].map((id) => `"${id}"`).join(',')})`);
+      }
+    } catch {
+      fallbackSet = new Set<string>();
+    }
+  }
+
+  const hasCalledFilter = !!called || !!calledFrom || !!calledTo;
+  let calledSet: Set<string> | null = null;
+  if (hasCalledFilter) {
+    try {
+      let qLogs: any = supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead');
+      if (calledFrom) qLogs = qLogs.gte('created_at', `${calledFrom}T00:00:00.000Z`);
+      if (calledTo) qLogs = qLogs.lte('created_at', `${calledTo}T23:59:59.999Z`);
+      const { data: callRows } = await qLogs;
+      const ids = ((callRows || []).map((r: any) => r.entity_id) as (string | null | undefined)[]).filter((v): v is string => !!v);
+      calledSet = new Set(ids);
+      if (called === 'called') {
+        if (!calledSet.size) {
+          return {
+            query,
+            isFilteredOut: true,
+            hasActionFilter,
+            useFallbackContacted,
+            fallbackSet,
+            calledSet,
+          };
+        }
+        query = query.in('id', [...calledSet]);
+      } else if (called === 'not-called') {
+        if (calledSet.size) query = query.not('id', 'in', `(${[...calledSet].map((id) => `"${id}"`).join(',')})`);
+      } else if (calledFrom || calledTo) {
+        if (!calledSet.size) {
+          return {
+            query,
+            isFilteredOut: true,
+            hasActionFilter,
+            useFallbackContacted,
+            fallbackSet,
+            calledSet,
+          };
+        }
+        query = query.in('id', [...calledSet]);
+      }
+    } catch {
+      calledSet = new Set<string>();
+    }
+  }
+
+  return {
+    query,
+    isFilteredOut: false,
+    hasActionFilter,
+    useFallbackContacted,
+    fallbackSet,
+    calledSet,
+  };
 }
 
 export const leadsService = {
@@ -316,19 +593,29 @@ export const leadsService = {
     try {
       let query = supabase
         .from('leads')
-        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
+        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name), lead_assignees(id, user_id, assigned_at, user_profiles:user_profiles!lead_assignees_user_id_fkey(id, full_name))');
 
       // Apply role-based query isolation for privacy (cached)
       try {
         const scope = await getCachedActorScope(supabase);
         if (scope.userId && !isAdminRole(scope.role)) {
           if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
-            const validMembers = (scope.memberIds || []).filter(isUuid);
-            if (validMembers.length > 0) {
-              query = query.or(`assigned_to.in.(${validMembers.join(',')}),created_by.in.(${validMembers.join(',')})`);
+            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
+          } else {
+            try {
+              const { data: laRows } = await supabase
+                .from('lead_assignees')
+                .select('lead_id')
+                .eq('user_id', scope.userId);
+              const assignedLeadIds = (laRows || []).map((r: any) => r.lead_id);
+              if (assignedLeadIds.length > 0) {
+                query = query.or(`assigned_to.eq.${scope.userId},id.in.(${assignedLeadIds.join(',')})`);
+              } else {
+                query = query.eq('assigned_to', scope.userId);
+              }
+            } catch {
+              query = query.eq('assigned_to', scope.userId);
             }
-          } else if (isUuid(scope.userId)) {
-            query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
           }
         }
       } catch {
@@ -337,14 +624,12 @@ export const leadsService = {
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) {
-        logPostgrestError('leadsService.getAll', error);
-        if (isSchemaError(error)) throw toPostgrestError(error, 'Failed to load leads');
+        if (isSchemaError(error)) throw error;
         return [];
       }
       return (data || []).map(rowToLead);
     } catch (err: any) {
-      logPostgrestError('leadsService.getAll.catch', err);
-      if (isSchemaError(err)) throw toPostgrestError(err, 'Failed to load leads');
+      if (isSchemaError(err)) throw err;
       return [];
     }
   },
@@ -482,8 +767,11 @@ export const leadsService = {
     }
     invalidateCache();
     // Run side-effects in the background so UI responds immediately.
-    if (data?.assigned_to) {
-      void pushAssignmentNotifications(supabase, [data.id], data.assigned_to, lead.agent);
+    const assigneeIds = Array.isArray(lead.assignedToIds) && lead.assignedToIds.length > 0
+      ? lead.assignedToIds
+      : (data?.assigned_to ? [data.assigned_to] : []);
+    if (assigneeIds.length > 0) {
+      void leadsService.setAssignees(data.id, assigneeIds, lead.agent ? [lead.agent] : undefined);
     }
     void followUpsService.syncFromLead(data).then(() => emitFollowUpsChanged());
 
@@ -552,7 +840,7 @@ export const leadsService = {
     const { data, error } = await supabase
       .from('leads')
       .insert(finalRows.map((r) => leadToRow(r, userId)))
-      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)');
+      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name), lead_assignees(id, user_id, assigned_at, user_profiles:user_profiles!lead_assignees_user_id_fkey(id, full_name))');
     if (error) {
       throw error;
     }
@@ -594,14 +882,18 @@ export const leadsService = {
     if (error) throw error;
     invalidateCache();
     // Notify the new assignee when a lead is (re)assigned through the edit modal (non-blocking).
-    const nextAssignee = data?.assigned_to || null;
-    if (nextAssignee && nextAssignee !== (prev?.assigned_to || null)) {
-      void pushAssignmentNotifications(
-        supabase,
-        [id],
-        nextAssignee,
-        lead.assignedToName || lead.agent
-      );
+    if (Array.isArray(lead.assignedToIds)) {
+      await leadsService.setAssignees(id, lead.assignedToIds, lead.assignedToNames || (lead.agent ? [lead.agent] : undefined));
+    } else {
+      const nextAssignee = data?.assigned_to || null;
+      if (nextAssignee && nextAssignee !== (prev?.assigned_to || null)) {
+        void pushAssignmentNotifications(
+          supabase,
+          [id],
+          nextAssignee,
+          lead.assignedToName || lead.agent
+        );
+      }
     }
     void followUpsService.syncFromLead(data).then(() => emitFollowUpsChanged());
     return rowToLead(data);
@@ -637,13 +929,14 @@ export const leadsService = {
    * `follow_ups` row in sync, which is what the Workspace Late/Today/Tomorrow
    * tabs read from.
    */
-  async scheduleFollowUp(id: string, dueDate: string, actorId?: string | null) {
+  async scheduleFollowUp(id: string, dueDate: string, actorId?: string | null, notes?: string) {
     const supabase = createClient();
     if (!actorId) {
       const scope = await getCachedActorScope(supabase);
       actorId = scope.userId;
     }
     const patch: any = { follow_up_due: dueDate, last_action_at: new Date().toISOString() };
+    if (notes !== undefined && notes !== '') patch.notes = notes;
     if (actorId) patch.last_action_by = actorId;
     const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').single();
     if (error) throw error;
@@ -655,21 +948,65 @@ export const leadsService = {
     return rowToLead(data);
   },
 
-  async assignLead(id: string, assignedTo: string | null) {
+  /** Update only the lead notes without touching other fields */
+  async updateNotes(id: string, notes: string) {
     const supabase = createClient();
-    let actorId: string | null = null;
-    try {
-      const { data: au } = await supabase.auth.getUser();
-      actorId = au?.user?.id ?? null;
-    } catch {}
-    const patch: any = { assigned_to: assignedTo, last_action_at: new Date().toISOString() };
-    if (actorId) patch.last_action_by = actorId;
-    const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('id, assigned_to, agent, agent_initials, crm_status, lead_status').single();
+    const scope = await getCachedActorScope(supabase);
+    const patch: any = {
+      notes,
+      last_action_at: new Date().toISOString(),
+    };
+    if (scope.userId) patch.last_action_by = scope.userId;
+    const { data, error } = await supabase
+      .from('leads')
+      .update(patch)
+      .eq('id', id)
+      .select('*')
+      .single();
     if (error) throw error;
-    if (assignedTo) {
-      await pushAssignmentNotifications(supabase, [id], assignedTo);
+    invalidateCache();
+    return rowToLead(data);
+  },
+
+  async setAssignees(id: string, userIds: string[], assigneeNames?: string[]) {
+    const supabase = createClient();
+    const cleanUserIds = Array.from(new Set(userIds.filter(Boolean))).slice(0, 2);
+    try {
+      const { error } = await supabase.rpc('set_lead_assignees', {
+        p_lead_id: id,
+        p_user_ids: cleanUserIds,
+      });
+      if (error) {
+        // Fallback to direct table operations if RPC missing
+        await supabase.from('lead_assignees').delete().eq('lead_id', id);
+        if (cleanUserIds.length > 0) {
+          const rows = cleanUserIds.map((uid) => ({ lead_id: id, user_id: uid }));
+          await supabase.from('lead_assignees').insert(rows);
+          await supabase.from('leads').update({ assigned_to: cleanUserIds[0] }).eq('id', id);
+        } else {
+          await supabase.from('leads').update({ assigned_to: null }).eq('id', id);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    if (cleanUserIds.length > 0) {
+      await pushAssignmentNotifications(supabase, [id], cleanUserIds, assigneeNames?.join(' & '));
     }
     invalidateCache();
+  },
+
+  async assignLead(id: string, assignedTo: string | string[] | null, assigneeNames?: string[]) {
+    const targetUserIds = Array.isArray(assignedTo)
+      ? assignedTo
+      : (assignedTo ? [assignedTo] : []);
+    await this.setAssignees(id, targetUserIds, assigneeNames);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('leads')
+      .select('id, assigned_to, agent, agent_initials, crm_status, lead_status, lead_assignees(id, user_id, assigned_at, user_profiles:user_profiles!lead_assignees_user_id_fkey(id, full_name))')
+      .eq('id', id)
+      .single();
     return data;
   },
 
@@ -747,27 +1084,28 @@ export const leadsService = {
     invalidateCache();
   },
 
-  async bulkAssignUsers(ids: string[], assignedTo: string | null, assigneeName?: string) {
+  async bulkAssignUsers(ids: string[], userIds: string | string[] | null, assigneeNames?: string | string[]) {
     const supabase = createClient();
-    let actorId: string | null = null;
+    const targetUserIds = (Array.isArray(userIds) ? userIds : (userIds ? [userIds] : [])).slice(0, 2);
     try {
-      const { data: au } = await supabase.auth.getUser();
-      actorId = au?.user?.id ?? null;
-    } catch {}
-    const payload: any = { assigned_to: assignedTo, last_action_at: new Date().toISOString() };
-    if (actorId) payload.last_action_by = actorId;
-    if (assigneeName) {
-      payload.agent = assigneeName;
-      payload.agent_initials = assigneeName
-        .split(' ')
-        .map((p: string) => p[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
+      const { error } = await supabase.rpc('bulk_set_lead_assignees', {
+        p_lead_ids: ids,
+        p_user_ids: targetUserIds,
+      });
+      if (error) {
+        for (const id of ids) {
+          await this.setAssignees(id, targetUserIds);
+        }
+      }
+    } catch {
+      for (const id of ids) {
+        await this.setAssignees(id, targetUserIds);
+      }
     }
-    const { error } = await supabase.from('leads').update(payload).in('id', ids);
-    if (error) throw error;
-    await pushAssignmentNotifications(supabase, ids, assignedTo, assigneeName);
+    const namesStr = Array.isArray(assigneeNames) ? assigneeNames.join(' & ') : assigneeNames;
+    if (targetUserIds.length > 0) {
+      await pushAssignmentNotifications(supabase, ids, targetUserIds, namesStr);
+    }
     const { data: synced } = await supabase.from('leads').select('*').in('id', ids);
     await followUpsService.syncFromLead(synced || []);
     invalidateCache();
@@ -823,38 +1161,61 @@ export const leadsService = {
     invalidateCache();
   },
 
-  async getStatusCounts() {
+  async getStatusCounts(filterOrAssignee?: string | LeadQueryFilters) {
     const supabase = createClient();
-    // Prefer the server-side aggregate (single rowset, no full-table transfer).
-    // Any failure (including a missing RPC on a DB that's behind on migrations)
-    // must degrade to the client-side fallback — never throw.
+    const params: LeadQueryFilters =
+      typeof filterOrAssignee === 'string'
+        ? { assignedTo: filterOrAssignee }
+        : (filterOrAssignee || {});
+
     try {
-      const { data, error } = await supabase.rpc('get_lead_status_counts');
-      if (!error && Array.isArray(data)) {
-        const counts: Record<string, number> = {};
-        (data as { status: string; count: number }[]).forEach((r) => {
-          counts[r.status] = Number(r.count);
-        });
-        if (Object.keys(counts).length) return counts;
-      }
-    } catch {
-      // fall through to client aggregation
-    }
-    // Fallback: client-side aggregation over the status columns.
-    return cachedRead('statusCounts', async () => {
-      try {
-        const { data, error } = await supabase.from('leads').select('crm_status, lead_status');
-        if (error) return {};
-        const counts: Record<string, number> = {};
-        (data || []).forEach((row: any) => {
-          const s = row.crm_status || row.lead_status || 'Fresh Leads';
-          counts[s] = (counts[s] || 0) + 1;
-        });
-        return counts;
-      } catch {
+      const baseQuery = supabase
+        .from('leads')
+        .select('crm_status, lead_status');
+
+      const { query: filteredQuery, isFilteredOut } = await applyLeadFilters(
+        supabase,
+        baseQuery,
+        params,
+        { excludeStatus: true }
+      );
+
+      if (isFilteredOut) {
         return {};
       }
-    });
+
+      const { data, error } = await filteredQuery;
+      if (error || !Array.isArray(data)) {
+        // Fallback to rpc if available and no extra filters
+        const hasExtraFilters = Boolean(
+          params.search || params.agent || params.source || params.project ||
+          params.propertyType || params.action || params.actionTaken || params.called
+        );
+        if (!hasExtraFilters) {
+          try {
+            const rpcParams = params.assignedTo ? { p_assigned_to: params.assignedTo } : {};
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('get_lead_status_counts', rpcParams);
+            if (!rpcErr && Array.isArray(rpcData)) {
+              const c: Record<string, number> = {};
+              (rpcData as { status: string; count: number }[]).forEach((r) => {
+                c[r.status] = Number(r.count);
+              });
+              if (Object.keys(c).length) return c;
+            }
+          } catch {}
+        }
+        return {};
+      }
+
+      const counts: Record<string, number> = {};
+      data.forEach((row: any) => {
+        const s = row.crm_status || row.lead_status || 'Fresh Leads';
+        counts[s] = (counts[s] || 0) + 1;
+      });
+      return counts;
+    } catch {
+      return {};
+    }
   },
 
   /**
@@ -1001,6 +1362,7 @@ export const leadsService = {
       if (contacted === 'today') actionTaken = 'today';
       else if (contacted === 'not-today') actionTaken = 'no-action';
     }
+    const q = search.trim();
 
     const columnMap: Record<string, string> = {
       name: 'name',
@@ -1014,250 +1376,33 @@ export const leadsService = {
     const column = columnMap[sortKey] || 'created_at';
 
     try {
-      let query = supabase
+      const baseQuery = supabase
         .from('leads')
-        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', {
+        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name), lead_assignees(id, user_id, assigned_at, user_profiles:user_profiles!lead_assignees_user_id_fkey(id, full_name))', {
           count: 'exact',
         });
 
-      // Role-based privacy isolation: only team leaders and admins can see other members' leads (cached)
-      try {
-        const scope = await getCachedActorScope(supabase);
-        if (scope.userId && !isAdminRole(scope.role)) {
-          if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
-            const validMembers = (scope.memberIds || []).filter(isUuid);
-            if (validMembers.length > 0) {
-              query = query.or(`assigned_to.in.(${validMembers.join(',')}),created_by.in.(${validMembers.join(',')})`);
-            }
-          } else if (isUuid(scope.userId)) {
-            query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
-          }
-        }
-      } catch {
-        // Fall back to DB RLS
-      }
+      const {
+        query,
+        isFilteredOut,
+        hasActionFilter,
+        useFallbackContacted,
+        fallbackSet,
+        calledSet,
+      } = await applyLeadFilters(supabase, baseQuery, params || {});
 
-      // Action filter: restrict to leads touched by a specific activity-log
-      // action (e.g. "Lead Assigned"). Respects activity_log RLS which keeps
-      // agents on their own actions and admins on everything.
-      if (!isAllOrEmpty(action)) {
-        let leadIds: string[] = [];
-        try {
-          const { data: logRows, error: logErr } = await supabase
-            .from('activity_log')
-            .select('entity_id')
-            .eq('entity_type', 'lead')
-            .eq('action_type', action);
-          if (logErr) {
-            if (isSchemaError(logErr)) throw logErr;
-            // non-schema read error — treat as empty so the filter degrades
-            leadIds = [];
-          } else {
-            leadIds = (logRows || [])
-              .map((r: any) => r.entity_id)
-              .filter((v: string | null | undefined): v is string => isUuid(v));
-          }
-        } catch (err: any) {
-          if (isSchemaError(err)) throw err;
-          leadIds = [];
-        }
-        if (!leadIds.length) {
-          return { data: [], total: 0, page, pageSize };
-        }
-        // Chunk or limit to prevent URL query string limit overflow
-        query = query.in('id', leadIds.slice(0, 150));
-      }
-
-      const q = search.trim();
-      if (q) {
-        query = query.or(
-          `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
-        );
-      }
-
-      // Sentinel checks: skip filters if value is 'all', empty, or undefined.
-      // Also verify column types (UUID vs text).
-      if (!isAllOrEmpty(status)) query = query.eq('crm_status', status);
-      if (!isAllOrEmpty(source)) query = query.eq('source', source);
-      if (!isAllOrEmpty(agent)) {
-        if (isUuid(agent)) {
-          query = query.eq('assigned_to', agent);
-        } else {
-          query = query.eq('agent', agent);
-        }
-      }
-      if (!isAllOrEmpty(project)) query = query.eq('project', project);
-      if (!isAllOrEmpty(propertyType)) query = query.eq('property_type', propertyType);
-
-      // Exclude leads the agent just called so the queue updates instantly.
-      // The "not.in" filter is safe — empty arrays must NOT be passed or
-      // PostgREST will return zero rows.
-      if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
-        const validRecent = recentlyCalledIds.filter(isUuid).slice(0, 50);
-        if (validRecent.length > 0) {
-          query = query.not('id', 'in', `(${validRecent.map((id) => `"${id}"`).join(',')})`);
-        }
+      if (isFilteredOut) {
+        return { data: [], total: 0, page, pageSize };
       }
 
       const from = Math.max(0, (page - 1) * pageSize);
       const to = from + pageSize - 1;
-
-      // ── Action Taken filter (replaces Contacted) ──────────────────────────
-      const hasActionFilter = (!isAllOrEmpty(actionTaken) && actionTaken !== '') || !isAllOrEmpty(actionFrom) || !isAllOrEmpty(actionTo);
-      let useFallbackContacted = false;
-      if (hasActionFilter) {
-        try {
-          if (actionFrom || actionTo) {
-            if (actionFrom) query = query.gte('last_action_at', `${actionFrom}T00:00:00.000Z`);
-            if (actionTo) query = query.lte('last_action_at', `${actionTo}T23:59:59.999Z`);
-            if (actionTaken === 'no-action') {
-              query = query.is('last_action_at', null);
-            }
-          } else if (actionTaken === 'today') {
-            const start = new Date();
-            start.setHours(0, 0, 0, 0);
-            const end = new Date();
-            end.setHours(23, 59, 59, 999);
-            query = query.gte('last_action_at', start.toISOString()).lte('last_action_at', end.toISOString());
-          } else if (actionTaken === 'no-action') {
-            const start = new Date();
-            start.setHours(0, 0, 0, 0);
-            query = query.or(`last_action_at.is.null,last_action_at.lt.${start.toISOString()}`);
-          }
-        } catch {
-          useFallbackContacted = true;
-        }
-      }
-
-      let fallbackSet: Set<string> | null = null;
-      if (useFallbackContacted) {
-        try {
-          const start = new Date();
-          start.setHours(0, 0, 0, 0);
-          const end = new Date();
-          end.setHours(23, 59, 59, 999);
-          const startIso = start.toISOString();
-          const endIso = end.toISOString();
-          const [{ data: todayLogs }, { data: todayFUs }] = await Promise.all([
-            supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead').gte('created_at', startIso).lte('created_at', endIso),
-            supabase.from('follow_ups').select('lead_id').gte('created_at', startIso).lte('created_at', endIso),
-          ]);
-          const ids = [
-            ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
-            ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
-          ].filter((v): v is string => isUuid(v));
-          fallbackSet = new Set(ids);
-          if (actionTaken === 'today' || contacted === 'today') {
-            if (!fallbackSet.size) return { data: [], total: 0, page, pageSize };
-            query = query.in('id', [...fallbackSet].slice(0, 150));
-          } else if ((actionTaken === 'no-action' || contacted === 'not-today') && fallbackSet.size) {
-            const idsToExclude = [...fallbackSet].slice(0, 150);
-            query = query.not('id', 'in', `(${idsToExclude.map((id) => `"${id}"`).join(',')})`);
-          }
-        } catch {
-          fallbackSet = new Set<string>();
-        }
-      }
-
-      // ── Called filter: has sales logged a call? (ever or in range) ──────────
-      const hasCalledFilter = (!isAllOrEmpty(called) && called !== '') || !isAllOrEmpty(calledFrom) || !isAllOrEmpty(calledTo);
-      let calledSet: Set<string> | null = null;
-      let usedComputedHasCall = false;
-
-      if (hasCalledFilter) {
-        if (!calledFrom && !calledTo) {
-          // Fast-path: use computed column `has_call` (zero URL query length explosion)
-          if (called === 'called') {
-            query = query.eq('has_call', true);
-            usedComputedHasCall = true;
-          } else if (called === 'not-called') {
-            query = query.eq('has_call', false);
-            usedComputedHasCall = true;
-          }
-        } else {
-          // Date range filter on call_logs
-          try {
-            let qLogs: any = supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead');
-            if (calledFrom) qLogs = qLogs.gte('created_at', `${calledFrom}T00:00:00.000Z`);
-            if (calledTo) qLogs = qLogs.lte('created_at', `${calledTo}T23:59:59.999Z`);
-            const { data: callRows } = await qLogs;
-            const ids = ((callRows || []).map((r: any) => r.entity_id) as (string | null | undefined)[]).filter((v): v is string => isUuid(v));
-            calledSet = new Set(ids);
-            if (called === 'called') {
-              if (!calledSet.size) return { data: [], total: 0, page, pageSize };
-              query = query.in('id', [...calledSet].slice(0, 150));
-            } else if (called === 'not-called') {
-              if (calledSet.size && calledSet.size <= 150) {
-                query = query.not('id', 'in', `(${[...calledSet].map((id) => `"${id}"`).join(',')})`);
-              } else {
-                query = query.eq('has_call', false);
-              }
-            } else if (calledFrom || calledTo) {
-              if (!calledSet.size) return { data: [], total: 0, page, pageSize };
-              query = query.in('id', [...calledSet].slice(0, 150));
-            }
-          } catch {
-            calledSet = new Set<string>();
-          }
-        }
-      }
-
-      // Log the final request: exact PostgREST URL and applied filters
-      const finalUrl = (query as any)?.url?.toString() || '';
-      console.info('[leadsService.getPage] Final PostgREST request:', {
-        url: finalUrl,
-        sentinelFiltered: {
-          status: isAllOrEmpty(status) ? '(skipped sentinel)' : status,
-          source: isAllOrEmpty(source) ? '(skipped sentinel)' : source,
-          agent: isAllOrEmpty(agent) ? '(skipped sentinel)' : agent,
-          project: isAllOrEmpty(project) ? '(skipped sentinel)' : project,
-          propertyType: isAllOrEmpty(propertyType) ? '(skipped sentinel)' : propertyType,
-          action: isAllOrEmpty(action) ? '(skipped sentinel)' : action,
-          called: isAllOrEmpty(called) ? '(skipped sentinel)' : called,
-          actionTaken: isAllOrEmpty(actionTaken) ? '(skipped sentinel)' : actionTaken,
-        },
-        page,
-        pageSize,
-        sortKey,
-        sortDir,
-      });
 
       const { data, error, count } = await query
         .order(column, { ascending: sortDir !== 'desc' })
         .range(from, to);
 
       if (error) {
-        logPostgrestError('leadsService.getPage', error, {
-          url: finalUrl,
-          params: { status, source, agent, project, propertyType, action, called, actionTaken, search },
-        });
-
-        // If computed column has_call failed because migration wasn't loaded, retry without it
-        if (usedComputedHasCall && String(error.message || '').includes('has_call')) {
-          let fallbackQ = supabase
-            .from('leads')
-            .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', { count: 'exact' });
-          if (q) fallbackQ = fallbackQ.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`);
-          if (!isAllOrEmpty(status)) fallbackQ = fallbackQ.eq('crm_status', status);
-          if (!isAllOrEmpty(source)) fallbackQ = fallbackQ.eq('source', source);
-          if (!isAllOrEmpty(agent)) {
-            if (isUuid(agent)) fallbackQ = fallbackQ.eq('assigned_to', agent);
-            else fallbackQ = fallbackQ.eq('agent', agent);
-          }
-          if (!isAllOrEmpty(project)) fallbackQ = fallbackQ.eq('project', project);
-          if (!isAllOrEmpty(propertyType)) fallbackQ = fallbackQ.eq('property_type', propertyType);
-
-          const rFallback = await fallbackQ.order(column, { ascending: sortDir !== 'desc' }).range(from, to);
-          if (!rFallback.error) {
-            return {
-              data: (rFallback.data || []).map(rowToLead),
-              total: rFallback.count ?? (rFallback.data || []).length,
-              page,
-              pageSize,
-            };
-          }
-        }
-
         if (isSchemaError(error) && hasActionFilter && !useFallbackContacted) {
           try {
             const start = new Date();
@@ -1273,35 +1418,28 @@ export const leadsService = {
             const ids = [
               ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
               ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
-            ].filter((v): v is string => isUuid(v));
+            ].filter((v): v is string => !!v);
             const s = new Set(ids);
             let retryQuery: any = supabase
               .from('leads')
               .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', { count: 'exact' });
             if (q) retryQuery = retryQuery.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`);
-            if (!isAllOrEmpty(status)) retryQuery = retryQuery.eq('crm_status', status);
-            if (!isAllOrEmpty(source)) retryQuery = retryQuery.eq('source', source);
-            if (!isAllOrEmpty(agent)) {
-              if (isUuid(agent)) retryQuery = retryQuery.eq('assigned_to', agent);
-              else retryQuery = retryQuery.eq('agent', agent);
-            }
-            if (!isAllOrEmpty(project)) retryQuery = retryQuery.eq('project', project);
-            if (!isAllOrEmpty(propertyType)) retryQuery = retryQuery.eq('property_type', propertyType);
+            if (status) retryQuery = retryQuery.eq('crm_status', status);
+            if (source) retryQuery = retryQuery.eq('source', source);
+            if (agent) retryQuery = retryQuery.eq('agent', agent);
+            if (project) retryQuery = retryQuery.eq('project', project);
+            if (propertyType) retryQuery = retryQuery.eq('property_type', propertyType);
             if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
-              const validRecent = recentlyCalledIds.filter(isUuid).slice(0, 50);
-              if (validRecent.length > 0) {
-                retryQuery = retryQuery.not('id', 'in', `(${validRecent.map((id) => `"${id}"`).join(',')})`);
-              }
+              retryQuery = retryQuery.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
             }
             if (actionTaken === 'today' || contacted === 'today') {
               if (!s.size) return { data: [], total: 0, page, pageSize };
-              retryQuery = retryQuery.in('id', [...s].slice(0, 150));
+              retryQuery = retryQuery.in('id', [...s]);
             } else if ((actionTaken === 'no-action' || contacted === 'not-today') && s.size) {
-              const idsToExclude = [...s].slice(0, 150);
-              retryQuery = retryQuery.not('id', 'in', `(${idsToExclude.map((id) => `"${id}"`).join(',')})`);
+              retryQuery = retryQuery.not('id', 'in', `(${[...s].map((id) => `"${id}"`).join(',')})`);
             }
             const r2: any = await retryQuery.order(column, { ascending: sortDir !== 'desc' }).range(from, to);
-            if (r2.error) throw toPostgrestError(r2.error, 'Failed to load leads');
+            if (r2.error) throw new Error(r2.error.message || 'Failed to load leads');
             return {
               data: (r2.data || []).map((row: any) => {
                 const mapped = rowToLead(row);
@@ -1312,12 +1450,11 @@ export const leadsService = {
               pageSize,
             };
           } catch (e: any) {
-            throw toPostgrestError(e || error, 'Failed to load leads');
+            throw new Error(error.message || 'Failed to load leads');
           }
         }
-        throw toPostgrestError(error, 'Failed to load leads');
+        throw new Error(error.message || 'Failed to load leads');
       }
-
       // Derive hasBeenCalled without an extra blocking DB query when calledSet is not active
       const pageCalledSet: Set<string> | null = calledSet;
       return {
@@ -1325,9 +1462,9 @@ export const leadsService = {
           const mapped = rowToLead(row);
           if (fallbackSet) {
             const v = fallbackSet.has(row.id);
-            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : (row.has_call ?? Boolean(row.last_contact || row.last_action_at)) };
+            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at) };
           }
-          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : (row.has_call ?? Boolean(row.last_contact || row.last_action_at));
+          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at);
           return { ...mapped, hasBeenCalled };
         }),
         total: count ?? (data || []).length,
@@ -1335,9 +1472,8 @@ export const leadsService = {
         pageSize,
       };
     } catch (err: any) {
-      logPostgrestError('leadsService.getPage.catch', err);
-      if (err?.code || err?.details) throw err;
-      throw toPostgrestError(err, 'Failed to load leads');
+      if (isSchemaError(err)) throw err;
+      throw err;
     }
   },
 
@@ -1386,14 +1522,38 @@ function rowToLead(row: any) {
     budgetMin: Number(row.budget_min),
     budgetMax: Number(row.budget_max),
     source: row.source,
+    leadSourceId: row.lead_source_id || null,
     agent: row.agent,
     agentInitials: row.agent_initials,
     status: row.crm_status || row.lead_status || 'Fresh Leads',
     isDuplicate: Boolean(row.is_duplicate || row.crm_status === 'Duplicate Leads'),
     duplicateOfLeadId: row.duplicate_of_lead_id || null,
     routedToDuplicateCenterAt: row.routed_to_duplicate_center_at || null,
-    assignedTo: row.assigned_to || null,
-    assignedToName: row.assigned_to_profile?.full_name || null,
+    ...(() => {
+      const rawAssignees: any[] = Array.isArray(row.lead_assignees) ? row.lead_assignees : [];
+      const assignees = rawAssignees.map((la: any) => ({
+        userId: la.user_id,
+        userName: la.user_profiles?.full_name || la.user_profile?.full_name || null,
+        assignedAt: la.assigned_at || null,
+      }));
+      if (assignees.length === 0 && row.assigned_to) {
+        assignees.push({
+          userId: row.assigned_to,
+          userName: row.assigned_to_profile?.full_name || null,
+          assignedAt: null,
+        });
+      }
+      const assignedToIds = assignees.map((a: any) => a.userId).filter(Boolean);
+      const assignedToNames = assignees.map((a: any) => a.userName).filter(Boolean) as string[];
+      const assignedToName = assignedToNames.length > 0 ? assignedToNames.join(' & ') : (row.assigned_to_profile?.full_name || null);
+      return {
+        assignedTo: assignedToIds[0] || row.assigned_to || null,
+        assignedToName,
+        assignees,
+        assignedToIds,
+        assignedToNames,
+      };
+    })(),
     referredTo: row.referred_to || null,
     referredToName: row.referred_to_profile?.full_name || null,
     referredBy: row.referred_by || null,
@@ -1482,13 +1642,15 @@ export const leadSourcesService = {
 };
 
 function leadToRow(lead: any, userId?: string) {
+  const cleanPhone = String(lead.phone || '').trim();
+  const cleanName = String(lead.name || '').trim() || (cleanPhone ? `Lead (${cleanPhone.slice(-4)})` : 'New Lead');
   const row: any = {
-    name: lead.name,
-    phone: lead.phone,
-    email: lead.email,
-    property_type: lead.propertyType,
-    budget_min: lead.budgetMin,
-    budget_max: lead.budgetMax,
+    name: cleanName,
+    phone: cleanPhone,
+    email: lead.email ? String(lead.email).trim() : '',
+    property_type: lead.propertyType || '',
+    budget_min: lead.budgetMin ?? 0,
+    budget_max: lead.budgetMax ?? 0,
     source: lead.source,
     lead_source_id: lead.leadSourceId || lead.lead_source_id || null,
     agent: lead.agent,
@@ -2100,7 +2262,7 @@ export const teamsService = {
           id,
           user_id,
           is_leader,
-          user_profiles(id, full_name, email, role)
+          user:user_profiles!team_memberships_user_id_fkey(id, full_name, email, role)
         `
         )
         .eq('team_id', teamId)
@@ -2112,9 +2274,9 @@ export const teamsService = {
       return (data || []).map((row: any) => ({
         id: row.id,
         userId: row.user_id,
-        userName: row.user_profiles?.full_name || '',
-        userEmail: row.user_profiles?.email || '',
-        userRole: row.user_profiles?.role || 'agent',
+        userName: row.user?.full_name || '',
+        userEmail: row.user?.email || '',
+        userRole: row.user?.role || 'agent',
         isLeader: row.is_leader || false,
       }));
     } catch (err: any) {
@@ -2292,7 +2454,7 @@ export const teamsService = {
         const teamIds = leadership.map((l: any) => l.team_id);
         const { data: members, error: memErr } = await supabase
           .from('team_memberships')
-          .select('user_id, user_profiles(id, full_name, email, role, is_active)')
+          .select('user_id, user:user_profiles!team_memberships_user_id_fkey(id, full_name, email, role, is_active)')
           .in('team_id', teamIds);
         if (memErr) {
           if (isSchemaError(memErr)) throw memErr;
@@ -2302,7 +2464,7 @@ export const teamsService = {
         const seen = new Set<string>();
         const result: { id: string; name: string; role: string }[] = [];
         for (const row of members || []) {
-          const up = (row as any).user_profiles;
+          const up = (row as any).user;
           if (!up || up.is_active === false || seen.has(up.id)) continue;
           seen.add(up.id);
           result.push({
@@ -3418,7 +3580,7 @@ export const leadCommentsService = {
           body,
           created_at,
           user_id,
-          user_profiles(id, full_name, email)
+          author:user_profiles!lead_comments_user_id_fkey(id, full_name, email)
         `
         )
         .eq('lead_id', leadId)
@@ -3431,7 +3593,7 @@ export const leadCommentsService = {
         id: row.id,
         body: row.body,
         userId: row.user_id,
-        authorName: row.user_profiles?.full_name || row.user_profiles?.email || 'Unknown',
+        authorName: row.author?.full_name || row.author?.email || 'Unknown',
         createdAt: row.created_at,
       }));
     } catch (err: any) {
@@ -3451,7 +3613,7 @@ export const leadCommentsService = {
         body,
         created_at,
         user_id,
-        user_profiles(id, full_name, email)
+        author:user_profiles!lead_comments_user_id_fkey(id, full_name, email)
       `
       )
       .single();
@@ -3472,7 +3634,7 @@ export const leadCommentsService = {
       body: data.body,
       userId: data.user_id,
       authorName:
-        (data as any).user_profiles?.full_name || (data as any).user_profiles?.email || 'Unknown',
+        (data as any).author?.full_name || (data as any).author?.email || 'Unknown',
       createdAt: data.created_at,
     };
   },
@@ -3544,6 +3706,7 @@ function rowToCustomer(row: any) {
     budgetMin: Number(row.budget_min),
     budgetMax: Number(row.budget_max),
     source: row.source,
+    leadSourceId: row.lead_source_id || null,
     agent: row.agent,
     agentInitials: row.agent_initials,
     location: row.location,

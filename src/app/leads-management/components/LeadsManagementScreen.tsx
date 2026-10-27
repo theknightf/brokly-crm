@@ -20,7 +20,7 @@ import {
   BadgeCheck,
   Handshake,
   Pencil,
-  Building,
+  Building2,
   Tag,
   TriangleAlert,
   RefreshCw,
@@ -62,7 +62,6 @@ import LeadCommentsSection from './LeadCommentsSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
 import LeadTimeline from './LeadTimeline';
 import PostCallOutcomeModal from './PostCallOutcomeModal';
-import LeadProfileSidePanel from './LeadProfileSidePanel';
 
 const ImportLeadsModal = dynamic(() => import('./ImportLeadsModal'), { ssr: false });
 const DealStatusModal = dynamic(() => import('./DealStatusModal'), { ssr: false });
@@ -126,6 +125,49 @@ export function resolveStatusParam(raw: string | null): LeadStatus | '' {
   // (e.g. Leaders Pending) so the applied filter always matches the card.
   // The API exact-matches crm_status, so unknown values simply yield no rows.
   return v as LeadStatus;
+}
+
+export function leadMatchesFilters(lead: Partial<Lead>, f: FilterState): boolean {
+  if (f.status) {
+    const s = lead.status || 'Fresh Leads';
+    if (s !== f.status) return false;
+  }
+  if (f.search && f.search.trim()) {
+    const q = f.search.trim().toLowerCase();
+    const nameMatch = lead.name?.toLowerCase().includes(q);
+    const emailMatch = lead.email?.toLowerCase().includes(q);
+    const phoneMatch = lead.phone?.toLowerCase().includes(q);
+    const locMatch = (lead as any)?.location?.toLowerCase().includes(q);
+    if (!nameMatch && !emailMatch && !phoneMatch && !locMatch) return false;
+  }
+  if (f.source) {
+    if (!lead.source || lead.source !== f.source) return false;
+  }
+  if (f.agent) {
+    const qAgent = f.agent.toLowerCase();
+    const agentMatch = lead.agent?.toLowerCase().includes(qAgent);
+    const assignedToMatch = lead.assignedToName?.toLowerCase().includes(qAgent);
+    const assignedNamesMatch = lead.assignedToNames?.some((n) => n.toLowerCase().includes(qAgent));
+    const assigneesMatch = lead.assignees?.some((a) => a.userName?.toLowerCase().includes(qAgent));
+    if (!agentMatch && !assignedToMatch && !assignedNamesMatch && !assigneesMatch) return false;
+  }
+  if (f.project) {
+    if ((lead as any)?.project !== f.project) return false;
+  }
+  if (f.propertyType) {
+    if (lead.propertyType !== f.propertyType) return false;
+  }
+  if (f.called === 'called') {
+    if (!lead.hasBeenCalled && !lead.lastContact && !lead.lastCallAt) return false;
+  } else if (f.called === 'not-called') {
+    if (lead.hasBeenCalled || lead.lastCallAt) return false;
+  }
+  if (f.actionTaken === 'today') {
+    if (!lead.actionTakenToday && !lead.contactedToday) return false;
+  } else if (f.actionTaken === 'no-action') {
+    if (lead.actionTakenToday || lead.contactedToday) return false;
+  }
+  return true;
 }
 
 interface CallHistoryRow {
@@ -259,13 +301,10 @@ export default function LeadsManagementScreen({
   const { t } = useLanguage();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<{
-    message: string;
-    code?: string | null;
-    details?: string | null;
-    hint?: string | null;
-  } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [filters, setFilters] = useState<FilterState>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
@@ -376,6 +415,10 @@ export default function LeadsManagementScreen({
   leadsRef.current = leads;
   const viewLeadRef = useRef(viewLead);
   viewLeadRef.current = viewLead;
+  const totalRef = useRef(total);
+  totalRef.current = total;
+  const statusCountsRef = useRef(statusCounts);
+  statusCountsRef.current = statusCounts;
 
   // Lock body scroll when View Lead drawer is open (Add Lead modal handled by Modal portal)
   useEffect(() => {
@@ -420,6 +463,34 @@ export default function LeadsManagementScreen({
   sortKeyRef.current = sortKey;
   const sortDirRef = useRef(sortDir);
   sortDirRef.current = sortDir;
+
+  const loadStatusCounts = useCallback(async (overrideFilters?: FilterState) => {
+    try {
+      const activeFilters = overrideFilters || filtersRef.current;
+      const counts = await leadsService.getStatusCounts({
+        search: activeFilters.search || undefined,
+        agent: activeFilters.agent || undefined,
+        source: activeFilters.source || undefined,
+        project: activeFilters.project || undefined,
+        propertyType: activeFilters.propertyType || undefined,
+        action: activeFilters.action || undefined,
+        actionTaken: activeFilters.actionTaken || undefined,
+        actionFrom: activeFilters.actionFrom || undefined,
+        actionTo: activeFilters.actionTo || undefined,
+        called: activeFilters.called || undefined,
+        calledFrom: activeFilters.calledFrom || undefined,
+        calledTo: activeFilters.calledTo || undefined,
+        recentlyCalledIds: Array.from(recentlyCalledRef.current),
+      });
+      if (counts && typeof counts === 'object') {
+        setStatusCounts(counts);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    void loadStatusCounts();
+  }, [loadStatusCounts]);
 
   // Keep URL search params in sync with active filters so opening a lead,
   // logging a call, drawer closes, or router navigation never wipes active filters
@@ -530,26 +601,19 @@ export default function LeadsManagementScreen({
       setLeads((res.data || []) as Lead[]);
       setTotal(res.total);
       setLoadError(null);
+      void loadStatusCounts(activeFilters);
     } catch (err: any) {
       if (requestId !== fetchRef.current) return;
-      const code = err?.code || null;
-      const details = err?.details || null;
-      const hint = err?.hint || null;
-      const rawMessage = err?.message || 'Failed to load leads';
-      setLoadError({
-        message: rawMessage,
-        code,
-        details,
-        hint,
-      });
+      setLoadError(err?.message || 'Failed to load leads');
       setLeads([]);
+      setTotal(0);
     } finally {
       if (requestId === fetchRef.current) {
         setLoading(false);
         firstLoadRef.current = false;
       }
     }
-  }, []);
+  }, [loadStatusCounts]);
 
   const prevSearchRef = useRef(filters.search);
 
@@ -592,23 +656,26 @@ export default function LeadsManagementScreen({
                   : (rawStatus as LeadStatus);
 
             if (row.id) {
-              setLeads((prev) =>
-                prev.map((l) =>
-                  l.id === row.id
-                    ? {
-                        ...l,
-                        name: row.name ?? l.name,
-                        phone: row.phone ?? l.phone,
-                        email: row.email ?? l.email,
-                        status: normalizedStatus || l.status,
-                        notes: row.notes ?? l.notes,
-                        followUpDue: row.follow_up_due
-                          ? String(row.follow_up_due).slice(0, 10)
-                          : l.followUpDue,
-                      }
-                    : l
-                )
-              );
+              const existing = leadsRef.current.find((l) => l.id === row.id);
+              if (existing) {
+                const updated: Lead = {
+                  ...existing,
+                  name: row.name ?? existing.name,
+                  phone: row.phone ?? existing.phone,
+                  email: row.email ?? existing.email,
+                  status: normalizedStatus || existing.status,
+                  notes: row.notes ?? existing.notes,
+                  followUpDue: row.follow_up_due
+                    ? String(row.follow_up_due).slice(0, 10)
+                    : existing.followUpDue,
+                };
+                if (!leadMatchesFilters(updated, filtersRef.current)) {
+                  setLeads((prev) => prev.filter((l) => l.id !== row.id));
+                  setTotal((t) => Math.max(0, t - 1));
+                } else {
+                  setLeads((prev) => prev.map((l) => (l.id === row.id ? updated : l)));
+                }
+              }
               setViewLead((prev) =>
                 prev && prev.id === row.id
                   ? {
@@ -624,6 +691,7 @@ export default function LeadsManagementScreen({
                     }
                   : prev
               );
+              void loadStatusCounts();
             }
           } else {
             if (refreshTimer) clearTimeout(refreshTimer);
@@ -659,29 +727,60 @@ export default function LeadsManagementScreen({
   const handleStatusChange = useCallback(async (id: string, newStatus: LeadStatus) => {
     if (statusPendingRef.current.has(id)) return;
     statusPendingRef.current.add(id);
-    // Snapshot the previous status so we can roll the UI back if the server
-    // rejects the change (prevents the preview from lying about the stage).
+    // Snapshot the previous state so we can roll the UI back if the server rejects the change
     const prevLeads = leadsRef.current;
+    const prevTotal = totalRef.current;
     const prevView = viewLeadRef.current;
+    const prevStatusCounts = statusCountsRef.current;
+
+    const existingLead = prevLeads.find((x) => x.id === id) || (prevView?.id === id ? prevView : null);
+    const oldStatus = (existingLead?.status || 'Fresh Leads') as LeadStatus;
+
+    if (existingLead && oldStatus === newStatus) {
+      statusPendingRef.current.delete(id);
+      return;
+    }
+
+    const updatedLead: Lead = existingLead
+      ? { ...existingLead, status: newStatus, actionTakenToday: true, contactedToday: true }
+      : ({ id, status: newStatus, actionTakenToday: true, contactedToday: true } as any);
+
+    const stillMatches = leadMatchesFilters(updatedLead, filtersRef.current);
+
     try {
-      setLeads((prev) =>
-        prev.map((l) =>
-          l.id === id
-            ? { ...l, status: newStatus, actionTakenToday: true, contactedToday: true }
-            : l
-        )
-      );
+      setLeads((prev) => {
+        if (!stillMatches) {
+          return prev.filter((l) => l.id !== id);
+        }
+        return prev.map((l) => (l.id === id ? updatedLead : l));
+      });
+
+      if (!stillMatches) {
+        setTotal((t) => Math.max(0, t - 1));
+      }
+
       setViewLead((prev) =>
         prev?.id === id
           ? { ...prev, status: newStatus, actionTakenToday: true, contactedToday: true }
           : prev
       );
+
+      setStatusCounts((prev) => {
+        const next = { ...prev };
+        if (oldStatus && next[oldStatus] !== undefined) {
+          next[oldStatus] = Math.max(0, next[oldStatus] - 1);
+        }
+        next[newStatus] = (next[newStatus] || 0) + 1;
+        return next;
+      });
+
       toast.success(`Lead status updated to ${newStatus}`);
       await leadsService.updateStatus(id, newStatus);
+      void loadStatusCounts();
       // Unified fix: status "Following Up" / "Follow Up After Meeting" must also guarantee a follow_ups row.
       const needsFollowUp = new Set(['Following Up', 'Follow Up After Meeting', 'Pending Leads', 'Interested', 'Meeting', 'Reservation']).has(newStatus);
       if (needsFollowUp) {
-        const src = prevLeads.find((x) => x.id === id) || prevView;
+        const src = existingLead || prevView;
         if (!src?.followUpDue) {
           const tomorrow = new Date();
           tomorrow.setDate(tomorrow.getDate() + 1);
@@ -717,22 +816,15 @@ export default function LeadsManagementScreen({
         }
       }
     } catch (err: any) {
-      setLeads((prev) =>
-        prev.map((l) => {
-          const orig = prevLeads.find((x) => x.id === id);
-          return l.id === id && orig ? { ...l, status: orig.status } : l;
-        })
-      );
-      setViewLead((prev) => {
-        if (prev?.id !== id) return prev;
-        const orig = prevView && prevView.id === id ? prevView : prevLeads.find((x) => x.id === id);
-        return orig ? { ...prev, status: orig.status } : prev;
-      });
+      setLeads(prevLeads);
+      setTotal(prevTotal);
+      setViewLead(prevView);
+      setStatusCounts(prevStatusCounts);
       toast.error(err?.message || 'Failed to update status');
     } finally {
       statusPendingRef.current.delete(id);
     }
-  }, [user?.id]);
+  }, [user?.id, loadStatusCounts]);
 
   const handleScheduleFollowUp = async () => {
     if (!viewLead) return;
@@ -760,21 +852,10 @@ export default function LeadsManagementScreen({
         return;
       }
     } catch {}
-    const prev = viewLead;
-    // Optimistic: reflect date immediately on card/list + drawer, and mark action taken
-    setViewLead((v) =>
-      v?.id === id ? { ...v, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : v
-    );
-    setLeads((prevLeads) =>
-      prevLeads.map((l) =>
-        l.id === id ? { ...l, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : l
-      )
-    );
-    toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
-    setScheduleSaving(false);
+    setScheduleSaving(true);
     try {
       await Promise.all([
-        leadsService.scheduleFollowUp(id, dueDate, user?.id).catch(() => {}),
+        leadsService.scheduleFollowUp(id, dueDate, user?.id, notes || undefined),
         followUpsService.create(
           {
             title: `Follow up: ${viewLead.name || 'Lead'}`,
@@ -796,16 +877,24 @@ export default function LeadsManagementScreen({
           user?.id || ''
         ),
       ]);
-    } catch (err: any) {
-      setViewLead(prev ?? null);
+      // Update local state ONLY after success
+      setViewLead((v) =>
+        v?.id === id
+          ? { ...v, followUpDue: dueDate, notes: notes || v.notes, actionTakenToday: true, contactedToday: true }
+          : v
+      );
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === id
-            ? { ...l, followUpDue: prev?.followUpDue || '', actionTakenToday: prev?.actionTakenToday }
+            ? { ...l, followUpDue: dueDate, notes: notes || l.notes, actionTakenToday: true, contactedToday: true }
             : l
         )
       );
+      toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
+    } catch (err: any) {
       toast.error(err?.message || 'Failed to schedule follow-up');
+    } finally {
+      setScheduleSaving(false);
     }
   };
 
@@ -830,6 +919,7 @@ export default function LeadsManagementScreen({
       toast.error('Only owner and admin can delete leads.');
       return;
     }
+    const targetLead = leadsRef.current.find((l) => l.id === id);
     try {
       await leadsService.delete(id);
       setLeads((prev) => prev.filter((l) => l.id !== id));
@@ -839,11 +929,19 @@ export default function LeadsManagementScreen({
         n.delete(id);
         return n;
       });
+      if (targetLead?.status) {
+        const s = targetLead.status;
+        setStatusCounts((prev) => ({
+          ...prev,
+          [s]: Math.max(0, (prev[s] || 0) - 1),
+        }));
+      }
+      void loadStatusCounts();
       toast.success('Lead deleted');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to delete lead');
     }
-  }, [user?.role]);
+  }, [user?.role, loadStatusCounts]);
 
   const handleViewLead = useCallback((lead: Lead) => {
     setViewLead(lead);
@@ -861,11 +959,11 @@ export default function LeadsManagementScreen({
   const handleAddNote = useCallback((lead: Lead) => {
     setLeads((prev) =>
       prev.map((l) =>
-        l.id === lead.id ? { ...l, actionTakenToday: true, contactedToday: true } : l
+        l.id === lead.id ? { ...l, notes: lead.notes, actionTakenToday: true, contactedToday: true } : l
       )
     );
     setViewLead((prev) =>
-      prev?.id === lead.id ? { ...prev, actionTakenToday: true, contactedToday: true } : prev
+      prev?.id === lead.id ? { ...prev, notes: lead.notes, actionTakenToday: true, contactedToday: true } : prev
     );
   }, []);
 
@@ -882,30 +980,27 @@ export default function LeadsManagementScreen({
    */
   const handleCallLogged = useCallback((loggedLead: Lead, outcome: string) => {
     const leadId = loggedLead.id;
+    const existing = leadsRef.current.find((l) => l.id === leadId);
+    const updatedLead: Lead = {
+      ...(existing || loggedLead),
+      ...loggedLead,
+      hasBeenCalled: true,
+      lastCallOutcome: outcome,
+      lastCallAt: new Date().toISOString(),
+      actionTakenToday: true,
+      contactedToday: true,
+    };
 
-    // 1. Optimistic local update/removal:
-    // When filtering by 'not-called', the lead has now been called, so remove it from the list.
-    // When not filtering by 'not-called', update the lead in-place with called status so it doesn't vanish unnecessarily.
-    const isFilteredNotCalled = filtersRef.current.called === 'not-called';
+    const stillMatches = leadMatchesFilters(updatedLead, filtersRef.current);
 
     setLeads((prev) => {
-      if (isFilteredNotCalled) {
+      if (!stillMatches) {
         return prev.filter((l) => l.id !== leadId);
       }
-      return prev.map((l) =>
-        l.id === leadId
-          ? {
-              ...l,
-              hasBeenCalled: true,
-              lastCallOutcome: outcome,
-              lastCallAt: new Date().toISOString(),
-              actionTakenToday: true,
-            }
-          : l
-      );
+      return prev.map((l) => (l.id === leadId ? updatedLead : l));
     });
 
-    if (isFilteredNotCalled) {
+    if (!stillMatches) {
       setTotal((t) => Math.max(0, t - 1));
     }
 
@@ -917,18 +1012,19 @@ export default function LeadsManagementScreen({
       return n;
     });
 
-    // 3. Close the lead preview drawer if this lead was open
-    setViewLead((curr) => (curr?.id === leadId ? null : curr));
+    // 3. Close the lead preview drawer if this lead no longer matches
+    setViewLead((curr) => (curr?.id === leadId ? (stillMatches ? updatedLead : null) : curr));
 
     // 4. Track ID so server query excludes it when filtering not-called
-    if (isFilteredNotCalled) {
+    if (filtersRef.current.called === 'not-called') {
       recentlyCalledRef.current.add(leadId);
       setTimeout(() => recentlyCalledRef.current.delete(leadId), 5 * 60 * 1000);
     }
 
-    // 5. Trigger a silent background refresh with active filters preserved
+    // 5. Update counts and trigger background refresh
+    void loadStatusCounts();
     void fetchLeads();
-  }, [fetchLeads]);
+  }, [fetchLeads, loadStatusCounts]);
 
   // Post-Call Outcome: triggered by Call button — shows modal immediately + dials tel:
   const handlePostCallTrigger = useCallback((lead: Lead) => {
@@ -965,6 +1061,7 @@ export default function LeadsManagementScreen({
       await leadsService.bulkDelete(ids);
       setLeads((prev) => prev.filter((l) => !selectedIds.has(l.id)));
       setTotal((t) => Math.max(0, t - ids.length));
+      void loadStatusCounts();
       toast.success(`${ids.length} leads deleted`);
       setSelectedIds(new Set());
     } catch (err: any) {
@@ -972,12 +1069,39 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleBulkAssignMany = async (users: { id: string; name: string }[]) => {
+  const handleBulkAssignMany = async (
+    users: { id: string; name: string }[],
+    mode: 'co_assign' | 'round_robin' = 'co_assign'
+  ) => {
     const ids = Array.from(selectedIds);
     if (!ids.length || !users.length) return;
     try {
-      // Single RPC call: deterministic round-robin, fully atomic on the server.
-      // If any lead can't be reassigned the whole batch rolls back.
+      if (mode === 'co_assign' || users.length <= 2) {
+        const userIds = users.slice(0, 2).map((u) => u.id);
+        const userNames = users.slice(0, 2).map((u) => u.name);
+        await leadsService.bulkAssignUsers(ids, userIds, userNames);
+        setLeads((prev) =>
+          prev.map((l) => {
+            if (!selectedIds.has(l.id)) return l;
+            return {
+              ...l,
+              agent: userNames[0] || l.agent,
+              agentInitials: (userNames[0] || l.agent || '')
+                .split(' ')
+                .map((p) => p[0])
+                .join(''),
+              assignedTo: userIds[0] || undefined,
+              assignedToName: userNames.join(' & '),
+              assignedToIds: userIds,
+              assignedToNames: userNames,
+              assignees: userIds.map((id, i) => ({ userId: id, userName: userNames[i] })),
+            };
+          })
+        );
+        toast.success(`Assigned ${ids.length} leads to ${userNames.join(' & ')}`);
+        setSelectedIds(new Set());
+        return;
+      }
       const result = await leadsService.bulkAssignRoundRobin(ids, users);
       const done: { id: string; userId: string; name: string }[] = (result || []).map((r) => ({
         id: r.lead_id,
@@ -997,6 +1121,9 @@ export default function LeadsManagementScreen({
               .join(''),
             assignedTo: a.userId,
             assignedToName: a.name,
+            assignedToIds: [a.userId],
+            assignedToNames: [a.name],
+            assignees: [{ userId: a.userId, userName: a.name }],
           };
         })
       );
@@ -1009,8 +1136,6 @@ export default function LeadsManagementScreen({
       );
       setSelectedIds(new Set());
     } catch (err: any) {
-      // The RPC is atomic — nothing was persisted, so there is nothing to
-      // un-assign. State already reflects the failure (toast only).
       toast.error(err?.message || 'Assignment failed — no leads were changed');
     }
   };
@@ -1051,25 +1176,35 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleAddLead = async (lead: Lead) => {
+  const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     setDupChecking(false);
     setDupWarning(null);
-    await createLead(lead);
+    return createLead(lead, options);
   };
 
-  const createLead = async (lead: Lead) => {
+  const createLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     try {
-      setAddModalOpen(false);
+      // "Save & add another" keeps the modal open so the agent can type the
+      // next number straight away.
+      if (!options?.keepOpen) setAddModalOpen(false);
       const created = await leadsService.create(lead, user?.id || '');
-      setLeads((prev) => [created as Lead, ...prev]);
-      setTotal((t) => t + 1);
+      const createdLead = created as Lead;
+      const matches = leadMatchesFilters(createdLead, filtersRef.current);
+      if (matches) {
+        setLeads((prev) => [createdLead, ...prev]);
+        setTotal((t) => t + 1);
+      }
+      void loadStatusCounts();
+      void fetchLeads();
       if ((created as any)?.isDuplicate || (created as any)?.routedToDuplicateCenter) {
         toast.success(`Lead "${lead.name}" accepted and routed to Duplicate Center for review`);
       } else {
         toast.success(`Lead "${lead.name}" added successfully`);
       }
+      return true;
     } catch (err: any) {
       toast.error(err?.message || 'Failed to add lead');
+      return false;
     }
   };
 
@@ -1084,23 +1219,49 @@ export default function LeadsManagementScreen({
   const handleEditSave = async (updated: Lead) => {
     try {
       const original = editLead;
+      const isAssigneesChanged =
+        JSON.stringify(original?.assignedToIds || (original?.assignedTo ? [original.assignedTo] : [])) !==
+        JSON.stringify(updated.assignedToIds || (updated.assignedTo ? [updated.assignedTo] : []));
       const assignmentOnly =
         original &&
-        original.assignedTo !== updated.assignedTo &&
+        isAssigneesChanged &&
         Object.keys(updated).every((key) => {
-          if (key === 'assignedTo' || key === 'assignedToName') return true;
+          if (
+            key === 'assignedTo' ||
+            key === 'assignedToName' ||
+            key === 'assignedToIds' ||
+            key === 'assignedToNames' ||
+            key === 'assignees' ||
+            key === 'agent' ||
+            key === 'agentInitials'
+          )
+            return true;
           return (updated as any)[key] === (original as any)[key];
         });
       const saved = assignmentOnly
-        ? await leadsService.assignLead(updated.id, updated.assignedTo || null).then((row: any) => ({
-            ...updated,
-            assignedTo: row.assigned_to,
-            assignedToName: row.assigned_to ? updated.assignedToName : null,
-          }))
+        ? await leadsService
+            .assignLead(
+              updated.id,
+              updated.assignedToIds || updated.assignedTo || null,
+              updated.assignedToNames
+            )
+            .then((row: any) => ({
+              ...updated,
+              assignedTo: row.assigned_to,
+              assignedToName: updated.assignedToName || (row.assigned_to ? updated.assignedToName : null),
+            }))
         : await leadsService.update(updated.id, updated);
-      setLeads((prev) => prev.map((l) => (l.id === updated.id ? (saved as Lead) : l)));
-      setViewLead((current) => (current?.id === updated.id ? (saved as Lead) : current));
+      const savedLead = saved as Lead;
+      const stillMatches = leadMatchesFilters(savedLead, filtersRef.current);
+      if (!stillMatches) {
+        setLeads((prev) => prev.filter((l) => l.id !== updated.id));
+        setTotal((t) => Math.max(0, t - 1));
+      } else {
+        setLeads((prev) => prev.map((l) => (l.id === updated.id ? savedLead : l)));
+      }
+      setViewLead((current) => (current?.id === updated.id ? savedLead : current));
       setEditLead(null);
+      void loadStatusCounts();
       toast.success(assignmentOnly ? 'Lead reassigned successfully' : `Lead "${updated.name}" updated`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update lead');
@@ -1133,8 +1294,23 @@ export default function LeadsManagementScreen({
     };
     try {
       const saved = await leadsService.update(next.id, next);
-      setLeads((prev) => prev.map((l) => (l.id === next.id ? (saved as Lead) : l)));
-      setViewLead(saved as Lead);
+      const savedLead = saved as Lead;
+      const stillMatches = leadMatchesFilters(savedLead, filtersRef.current);
+      if (!stillMatches) {
+        setLeads((prev) => prev.filter((l) => l.id !== next.id));
+        setTotal((t) => Math.max(0, t - 1));
+      } else {
+        setLeads((prev) => prev.map((l) => (l.id === next.id ? savedLead : l)));
+      }
+      setViewLead(savedLead);
+      setStatusCounts((prev) => {
+        const nextC = { ...prev };
+        const oldS = lead.status || 'Fresh Leads';
+        if (nextC[oldS] !== undefined) nextC[oldS] = Math.max(0, nextC[oldS] - 1);
+        nextC[status] = (nextC[status] || 0) + 1;
+        return nextC;
+      });
+      void loadStatusCounts();
       toast.success(`Lead marked as ${status}`);
       try {
         const supabase = createClient();
@@ -1162,9 +1338,6 @@ export default function LeadsManagementScreen({
       'Phone',
       'Email',
       'Location',
-      'Property Type',
-      'Budget Min',
-      'Budget Max',
       'Source',
       'Agent',
       'Status',
@@ -1188,7 +1361,6 @@ export default function LeadsManagementScreen({
         status: filters.status || undefined,
         source: filters.source || undefined,
         agent: filters.agent || undefined,
-        propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
         contacted: filters.contacted || undefined,
         actionTaken: filters.actionTaken || undefined,
@@ -1203,9 +1375,6 @@ export default function LeadsManagementScreen({
         l.phone,
         l.email,
         l.location,
-        l.propertyType,
-        l.budgetMin,
-        l.budgetMax,
         l.source,
         l.agent,
         l.status,
@@ -1364,7 +1533,6 @@ export default function LeadsManagementScreen({
     filters.status,
     filters.source,
     filters.agent,
-    filters.propertyType,
     filters.action,
   ].filter(Boolean).length;
 
@@ -1402,7 +1570,7 @@ export default function LeadsManagementScreen({
           <p className="text-sm text-muted-foreground mt-0.5">
             {subtitle ||
               `${total} lead${total !== 1 ? 's' : ''} in your list${
-                initialStatus ? ` · status: ${initialStatus}` : ''
+                filters.status ? ` · status: ${filters.status}` : initialStatus ? ` · status: ${initialStatus}` : ''
               }`}
           </p>
         </div>
@@ -1450,7 +1618,10 @@ export default function LeadsManagementScreen({
       </div>
 
       {/* Sticky toolbar */}
-      <div className="sticky top-2 z-20 flex flex-col sm:flex-row gap-2 animate-rise-in" style={{ animationDelay: '140ms' }}>
+      <div
+        className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2.5 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm transition-all flex flex-col sm:flex-row gap-2 animate-rise-in"
+        style={{ animationDelay: '140ms' }}
+      >
         <div className="relative flex-1">
           <Search
             size={16}
@@ -1495,7 +1666,13 @@ export default function LeadsManagementScreen({
               <span className="hidden md:inline">{t('leads.list')}</span>
             </button>
             <button
-              onClick={() => setViewMode('board')}
+              onClick={() => {
+                setViewMode('board');
+                if (pageSize < 500) {
+                  setPageSize(500);
+                  setCurrentPage(1);
+                }
+              }}
               className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
                 viewMode === 'board'
                   ? 'bg-card text-primary shadow-sm'
@@ -1512,7 +1689,7 @@ export default function LeadsManagementScreen({
 
       {/* Filters */}
       {showFilters && (
-        <div className="card-base !p-4 animate-in fade-in slide-in-from-top-2">
+        <div className="card-base !p-4 mt-2 animate-in fade-in slide-in-from-top-2 relative z-10 shadow-sm">
           <div className="flex items-center gap-2 mb-0.5">
             <SlidersHorizontal size={14} className="text-muted-foreground" />
             <span className="text-sm font-medium text-foreground">Filters</span>
@@ -1541,63 +1718,26 @@ export default function LeadsManagementScreen({
       )}
 
       {/* Table / Board */}
-      {loadError && (() => {
-        const isDev = process.env.NODE_ENV !== 'production';
-        const isAdmin = user?.role === 'admin' || user?.role === 'owner' || user?.role === 'manager';
-        const hasExtra = Boolean(loadError.code || loadError.details || loadError.hint);
-        const displaySubtitle = isDev
-          ? loadError.message
-          : loadError.message === 'Failed to load leads'
-          ? 'Could not retrieve lead records from the database.'
-          : loadError.message;
-
-        return (
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <TriangleAlert size={18} className="flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">Failed to load leads</p>
-                <p className="text-xs opacity-90 break-words mt-0.5">{displaySubtitle}</p>
-                {(isDev || isAdmin) && (hasExtra || loadError.message) && (
-                  <details className="mt-2 text-[11px] font-mono text-destructive/90 cursor-pointer">
-                    <summary className="hover:underline select-none font-semibold">
-                      Technical error details {loadError.code ? `(${loadError.code})` : ''}
-                    </summary>
-                    <div className="mt-1.5 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs space-y-1">
-                      {loadError.code && (
-                        <div>
-                          <span className="font-semibold">Code:</span> {loadError.code}
-                        </div>
-                      )}
-                      {loadError.details && (
-                        <div>
-                          <span className="font-semibold">Details:</span> {loadError.details}
-                        </div>
-                      )}
-                      {loadError.hint && (
-                        <div>
-                          <span className="font-semibold">Hint:</span> {loadError.hint}
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-semibold">Full error:</span> {loadError.message}
-                      </div>
-                    </div>
-                  </details>
-                )}
-              </div>
+      {loadError && (
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <TriangleAlert size={18} className="flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Failed to load leads</p>
+              <p className="text-xs opacity-80">{loadError}</p>
             </div>
-            <button onClick={() => fetchLeads()} className="btn-secondary shrink-0">
-              <RefreshCw size={14} />
-              Retry
-            </button>
           </div>
-        );
-      })()}
+          <button onClick={() => fetchLeads()} className="btn-secondary shrink-0">
+            <RefreshCw size={14} />
+            Retry
+          </button>
+        </div>
+      )}
       <div className="card-base !p-0 overflow-hidden animate-in fade-in">
         {viewMode === 'board' ? (
           <LeadBoard
             leads={leads}
+            statusCounts={statusCounts}
             onView={(lead) => {
               setViewLead(lead);
               setViewTab('overview');
@@ -1652,7 +1792,8 @@ export default function LeadsManagementScreen({
         onClose={() => setAddModalOpen(false)}
         title="Add lead"
         subtitle="Enter a phone number — everything else is optional"
-        size="xl"
+        size="md"
+        mobileFullScreen={false}
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
       </Modal>
@@ -1738,34 +1879,522 @@ export default function LeadsManagementScreen({
         }}
       />
 
-      {/* View Lead Drawer — Redesigned Material 3 Stitch Lead Profile Side Panel */}
+      {/* View Lead Drawer — portal + fixed ensures viewport overlay regardless of scroll */}
       {viewLead && typeof document !== 'undefined' && createPortal(
-        <LeadProfileSidePanel
-          lead={viewLead}
-          onClose={() => setViewLead(null)}
-          onStatusChange={handleStatusChange}
-          onPostCallTrigger={handlePostCallTrigger}
-          onLogCall={(l) => setLogCallLead(l)}
-          onEdit={(l) => {
-            setEditLead(l);
-            setViewLead(null);
-          }}
-          onSiteVisit={fetchAndOpenSiteVisit}
-          onDealModal={(l, status) => setDealModal({ lead: l, status })}
-          onPayPlan={(l) => setPayPlanLead(l)}
-          onWhatsAppAction={handleWhatsAppAction}
-          scheduleDate={scheduleDate}
-          setScheduleDate={setScheduleDate}
-          scheduleTime={scheduleTime}
-          setScheduleTime={setScheduleTime}
-          scheduleNotes={scheduleNotes}
-          setScheduleNotes={setScheduleNotes}
-          handleScheduleFollowUp={handleScheduleFollowUp}
-          scheduleSaving={scheduleSaving}
-          callHistoryKey={callHistoryKey}
-        />,
-        document.body
-      )}
+        <div className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end">
+          <div
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm animate-in fade-in"
+            onClick={() => setViewLead(null)}
+          />
+          <div
+            className="relative flex flex-col bg-card border-border shadow-modal w-full sm:max-w-md sm:w-full sm:h-full sm:border-l sm:rounded-none rounded-t-2xl max-h-[85dvh] sm:max-h-full overflow-hidden animate-in fade-in slide-in-from-right-4"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border flex-shrink-0 bg-card z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+                  {viewLead.name
+                    ?.split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .slice(0, 2) || '—'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {viewLead.name || `Lead ${viewLead.id}`}
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    {viewLead.source && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-foreground bg-muted rounded-full px-2 py-0.5">
+                        <Tag size={11} className="text-primary" />
+                        {viewLead.source}
+                      </span>
+                    )}
+                    {viewLead.project && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-foreground bg-muted rounded-full px-2 py-0.5">
+                        <Building2 size={11} className="text-primary" />
+                        {viewLead.project}
+                      </span>
+                    )}
+                    {viewLead.developer && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {viewLead.developer}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">{viewLead.location || ''}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewLead(null)}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 sm:px-8 py-6 space-y-5">
+              {/* Stage (pipeline status) — first thing a Sales user changes */}
+              <div className="bg-muted/40 rounded-2xl px-4 py-3">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-foreground">Stage</p>
+                  <StatusBadge status={viewLead.status || 'Fresh Leads'} showDot />
+                </div>
+                <div className="space-y-3">
+                  {/* Forward pipeline stepper — progress bar with tappable stages */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+                    {PIPELINE_STAGES.map((s, i) => {
+                      const curIdx = pipelineIndex(viewLead.status);
+                      const isActive = s === (viewLead.status || 'Fresh Leads');
+                      const isDone = curIdx > -1 && i < curIdx;
+                      return (
+                        <React.Fragment key={`pipe-step-${viewLead.id}-${s}`}>
+                          {i > 0 && (
+                            <span
+                              className={`h-0.5 w-3 flex-shrink-0 rounded-full ${
+                                isDone ? 'bg-primary' : 'bg-border'
+                              }`}
+                            />
+                          )}
+                          <button
+                            onClick={() => {
+                              if (isActive) return;
+                              handleStatusChange(viewLead.id, s);
+                            }}
+                            title={s}
+                            className={`whitespace-nowrap shrink-0 px-3 h-9 rounded-full text-xs flex items-center gap-1.5 transition-all active:scale-[0.98] border ${
+                              isActive
+                                ? 'bg-primary text-primary-foreground border-primary font-semibold'
+                                : isDone
+                                ? 'text-primary bg-primary/5 border-primary/40 hover:bg-primary/10 font-medium'
+                                : 'text-foreground bg-card border-border hover:bg-muted font-medium'
+                            }`}
+                          >
+                            {isActive ? (
+                              <Check size={12} className="flex-shrink-0" />
+                            ) : isDone ? (
+                              <CheckCircle2 size={12} className="flex-shrink-0" />
+                            ) : (
+                              <span className="text-[10px] font-bold opacity-50">{i + 1}</span>
+                            )}
+                            {s}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  {/* Negative / terminal outcomes */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {OUTCOME_STAGES.map((s) => {
+                      const isActive = s === (viewLead.status || 'Fresh Leads');
+                      return (
+                        <button
+                          key={`view-outcome-${viewLead.id}-${s}`}
+                          onClick={() => {
+                            if (isActive) return;
+                            handleStatusChange(viewLead.id, s);
+                          }}
+                          className={`px-2.5 h-7 rounded-full text-[11px] border transition-all active:scale-[0.98] ${
+                            isActive
+                              ? 'bg-clay-soft text-clay border-clay/40 font-semibold'
+                              : 'text-muted-foreground bg-card border-border hover:bg-muted font-medium'
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Primary actions — one-tap reach at the top */}
+              <div className="grid grid-cols-2 gap-2">
+                {viewLead.phone && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handlePostCallTrigger(viewLead)}
+                      className="h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <PhoneCall size={15} />
+                      Call
+                    </button>
+                    <a
+                      href={getWhatsAppLinkForLead(viewLead.phone, viewLead.name)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                    >
+                      <MessageCircle size={16} />
+                      WhatsApp
+                    </a>
+                  </>
+                )}
+                <button
+                  onClick={() => setLogCallLead(viewLead)}
+                  className="h-11 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                >
+                  <PhoneCall size={15} />
+                  Log Call
+                </button>
+                <button
+                  onClick={() => {
+                    setEditLead(viewLead);
+                    setViewLead(null);
+                  }}
+                  className="h-11 rounded-xl bg-secondary text-secondary-foreground flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                >
+                  <Pencil size={15} />
+                  Edit
+                </button>
+              </div>
+
+              {/* Key info — most important fields, visible without scrolling */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  {
+                    label: 'Phone',
+                    value: viewLead.phone || '—',
+                    href: viewLead.phone
+                      ? `tel:${viewLead.phone.replace(/[^\d+]/g, '')}`
+                      : undefined,
+                  },
+                  { label: 'Email', value: viewLead.email || '—' },
+                  { label: 'Source', value: viewLead.source || '—' },
+                  { label: 'Project', value: viewLead.project || viewLead.developer || '—' },
+                  { label: 'Agent', value: viewLead.agent || 'Unassigned' },
+                  { label: 'Assigned To', value: (viewLead.assignedToNames && viewLead.assignedToNames.length > 0) ? viewLead.assignedToNames.join(' & ') : (viewLead.assignedToName || 'Unassigned') },
+                  ...(viewLead.referredTo
+                    ? [{ label: 'Referred To', value: viewLead.referredToName || 'Second user' }]
+                    : []),
+                  ...(viewLead.referredBy
+                    ? [{ label: 'Referred By', value: viewLead.referredByName || 'Recorded user' }]
+                    : []),
+                ].map(({ label, value, href }) => (
+                  <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
+                    <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>
+                    {href ? (
+                      <a href={href} className="text-sm font-semibold text-primary truncate block">
+                        {value}
+                      </a>
+                    ) : (
+                      <p className="text-sm font-medium text-foreground truncate">{value}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Schedule follow-up — synced to dashboard + follow-up partition */}
+              <div className="bg-muted/40 rounded-xl px-4 py-3 space-y-2">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CalendarClock size={12} /> Schedule follow-up
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    className="input-base h-9 text-sm"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    aria-label="Follow-up date"
+                  />
+                  <input
+                    type="time"
+                    className="input-base h-9 text-sm"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    aria-label="Follow-up time"
+                  />
+                </div>
+                <textarea
+                  className="input-base min-h-[56px] text-sm resize-none"
+                  placeholder="Notes (optional) — e.g. call about 2BHK in Sohna Road"
+                  value={scheduleNotes}
+                  onChange={(e) => setScheduleNotes(e.target.value)}
+                  rows={2}
+                />
+                <button
+                  type="button"
+                  onClick={handleScheduleFollowUp}
+                  disabled={scheduleSaving || !scheduleDate}
+                  className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {scheduleSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  {scheduleSaving ? 'Scheduling…' : 'Schedule follow-up'}
+                </button>
+                {viewLead.followUpDue && (
+                  <p className="text-[11px] text-muted-foreground">Current: {viewLead.followUpDue} · queue auto-syncs to dashboard</p>
+                )}
+              </div>
+
+              {/* Reservation / Done Deal quick actions */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setDealModal({ lead: viewLead, status: 'Reservation' })}
+                  disabled={viewLead.status === 'Reservation'}
+                  className="h-10 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <BadgeCheck size={14} />
+                  Reservation
+                </button>
+                <button
+                  onClick={() => setDealModal({ lead: viewLead, status: 'Done Deal' })}
+                  disabled={viewLead.status === 'Done Deal'}
+                  className="h-10 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <Handshake size={14} />
+                  Done Deal
+                </button>
+              </div>
+
+              {/* Log call quick action */}
+              <button
+                onClick={() => setLogCallLead(viewLead)}
+                className="w-full h-10 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <PhoneCall size={14} />
+                Log Call
+              </button>
+
+              {/* Payment plan summary */}
+              {Number(viewLead.totalPrice) > 0 ? (
+                <div className="bg-muted/40 rounded-xl px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  <p className="text-xs text-muted-foreground">Total price</p>
+                  <p className="text-sm font-semibold text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.totalPrice).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Down payment</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.downPayment || 0).toLocaleString()}
+                    {Number(viewLead.downPaymentPct) > 0 && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({Number(viewLead.downPaymentPct)}%)
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Reservation</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.reservationAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.remainingAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Installment</p>
+                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                    EGP {Number(viewLead.installmentAmount || 0).toLocaleString()}
+                    {Number(viewLead.installmentCount) > 0 && ` × ${viewLead.installmentCount}`}
+                  </p>
+                  {viewLead.reservationDate && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Reservation date</p>
+                      <p className="text-sm font-medium text-foreground text-right">
+                        {viewLead.reservationDate}
+                      </p>
+                    </>
+                  )}
+                  {viewLead.closingDate && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Closing date</p>
+                      <p className="text-sm font-medium text-foreground text-right">
+                        {viewLead.closingDate}
+                      </p>
+                    </>
+                  )}
+                  {Number(viewLead.commission) > 0 && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Commission</p>
+                      <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                        EGP {Number(viewLead.commission).toLocaleString()}
+                      </p>
+                    </>
+                  )}
+                  {viewLead.paymentStatus && (
+                    <>
+                      <p className="text-xs text-muted-foreground">Payment status</p>
+                      <p className="text-sm font-medium text-foreground text-right">
+                        {viewLead.paymentStatus}
+                      </p>
+                    </>
+                  )}
+                  <div className="col-span-2 pt-1 border-t border-border">
+                    <button
+                      onClick={() => setPayPlanLead(viewLead)}
+                      className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <Pencil size={10} /> Edit payment plan
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-muted/40 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">No payment plan added</p>
+                  <button
+                    onClick={() => setPayPlanLead(viewLead)}
+                    className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <Plus size={11} /> Add payment plan
+                  </button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Follow-up Due', value: viewLead.followUpDue || '—' },
+                  { label: 'Priority', value: viewLead.priority || '—' },
+                  { label: 'Rating', value: viewLead.leadRating || '—' },
+                  { label: 'Team', value: viewLead.team || '—' },
+                  { label: 'CS Agent', value: viewLead.csAgent || '—' },
+                  ...(viewLead.developer
+                    ? [{ label: 'Developer', value: viewLead.developer }]
+                    : []),
+                  ...(viewLead.project ? [{ label: 'Project', value: viewLead.project }] : []),
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
+                    <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+                    <p className="text-sm font-medium text-foreground">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {viewLead.notes && (
+                <div className="bg-muted/40 rounded-xl px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
+                  <p className="text-sm text-foreground">{viewLead.notes}</p>
+                </div>
+              )}
+
+              {viewLead.phone && (
+                <details className="bg-muted/40 rounded-xl px-3 py-2.5 group" open>
+                  <summary className="cursor-pointer list-none text-xs text-muted-foreground flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle size={11} />
+                      WhatsApp Activity
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground group-open:hidden">
+                      Expand
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hidden group-open:inline">
+                      Collapse
+                    </span>
+                  </summary>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {[
+                      {
+                        label: 'WA Sent',
+                        icon: <CheckCircle2 size={13} />,
+                        cls: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+                        outcome: 'WhatsApp Sent',
+                      },
+                      {
+                        label: 'Customer Replied',
+                        icon: <ThumbsUp size={13} />,
+                        cls: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
+                        outcome: 'Customer Replied',
+                      },
+                      {
+                        label: 'No Reply',
+                        icon: <UserX size={13} />,
+                        cls: 'bg-muted text-muted-foreground hover:bg-muted/80',
+                        outcome: 'No Reply',
+                      },
+                      {
+                        label: 'WA Follow-up',
+                        icon: <CalendarClock size={13} />,
+                        cls: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+                        outcome: 'WhatsApp Follow-up',
+                      },
+                    ].map((a) => (
+                      <button
+                        key={a.outcome}
+                        onClick={() => handleWhatsAppAction(viewLead, a.outcome)}
+                        className={`w-full h-10 rounded-lg px-3 text-left text-sm font-medium flex items-center gap-2 active:scale-[0.98] transition-all ${
+                          a.cls
+                        }`}
+                      >
+                        {a.icon}
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {/* Section tabs */}
+              <div className="sticky top-0 z-10 -mx-5 sm:-mx-6 px-5 sm:px-6 py-2 bg-card/95 backdrop-blur border-b border-border flex gap-1 animate-in fade-in">
+                {(
+                  [
+                    ['overview', 'Overview', ClipboardList],
+                    ['activity', 'Activity', Activity],
+                    ['units', 'Units', Building2],
+                    ['comments', 'Comments', MessageSquare],
+                  ] as const
+                ).map(([key, label, Icon]) => (
+                  <button
+                    key={key}
+                    onClick={() => setViewTab(key)}
+                    className={`flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold transition-colors ${
+                      viewTab === key
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Icon size={14} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {viewTab === 'overview' && (
+                <div className="space-y-4">
+                  <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
+                </div>
+              )}
+              {viewTab === 'activity' && (
+                <div className="space-y-4">
+                  <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
+                  <LeadTimeline leadId={viewLead.id} />
+                </div>
+              )}
+              {viewTab === 'units' && (
+                <div className="space-y-4">
+                  <RecommendedUnitsSection leadId={viewLead.id} />
+                </div>
+              )}
+              {viewTab === 'comments' && (
+                <div className="space-y-4">
+                  <LeadCommentsSection leadId={viewLead.id} />
+                </div>
+              )}
+            </div>
+            <div className="px-5 sm:px-6 py-4 border-t border-border flex items-center justify-between gap-2 flex-shrink-0">
+              <button
+                onClick={() => fetchAndOpenSiteVisit(viewLead)}
+                className="btn-secondary flex items-center gap-1.5 text-sm"
+                title="Start a GPS-verified site visit for this lead's project"
+              >
+                <MapPin size={14} />
+                <span>Site Visit</span>
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setViewLead(null)} className="btn-secondary">
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setEditLead(viewLead);
+                    setViewLead(null);
+                  }}
+                  className="btn-primary"
+                >
+                  Edit lead
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      , document.body)}
 
       {/* Edit Lead Modal — dedicated edit interface (not AddLeadForm) */}
       {editLead && (

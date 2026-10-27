@@ -25,23 +25,16 @@ export type LeadStatus =
   | 'Reservation';
 
 export type LeadSource =
-  | 'Facebook'
+  | 'MagicBricks'
+  | 'Referral'
+  | '99acres'
+  | 'Walk-in'
   | 'Facebook Ads'
+  | 'Cold Call'
   | 'Instagram'
-  | 'TikTok'
   | 'WhatsApp'
   | 'Website'
-  | 'Referral'
-  | 'Sales Referral'
-  | 'Walk-in'
-  | 'Cold Dial'
-  | 'Cold Call'
-  | 'Property Portal'
-  | 'Word of Mouth'
-  | 'MagicBricks'
-  | '99acres'
-  | 'Other'
-  | (string & {});
+  | 'Other';
 
 export type PropertyType =
   | '1BHK Apartment'
@@ -74,6 +67,12 @@ export const LEAD_ACTIONS: LeadAction[] = [
   'Call Logged',
 ];
 
+export interface LeadAssignee {
+  userId: string;
+  userName?: string | null;
+  assignedAt?: string | null;
+}
+
 export interface Lead {
   id: string;
   name?: string;
@@ -83,11 +82,15 @@ export interface Lead {
   budgetMin?: number;
   budgetMax?: number;
   source?: LeadSource;
+  leadSourceId?: string | null;
   agent?: string;
   agentInitials?: string;
   status?: LeadStatus;
   assignedTo?: string;
   assignedToName?: string;
+  assignees?: LeadAssignee[];
+  assignedToIds?: string[];
+  assignedToNames?: string[];
   referredTo?: string | null;
   referredToName?: string | null;
   referredBy?: string | null;
@@ -106,6 +109,7 @@ export interface Lead {
   /** Called vs Not Called — derived from call_logs, display-only. */
   hasBeenCalled?: boolean;
   lastCallAt?: string | null;
+  lastCallOutcome?: string;
   createdAt?: string;
   notes?: string;
   location?: string;
@@ -140,17 +144,15 @@ export interface Lead {
 export const mockLeads: Lead[] = [];
 
 export const ALL_SOURCES: LeadSource[] = [
-  'Facebook',
+  'MagicBricks',
+  'Referral',
+  '99acres',
+  'Walk-in',
+  'Facebook Ads',
+  'Cold Call',
   'Instagram',
-  'TikTok',
   'WhatsApp',
   'Website',
-  'Referral',
-  'Sales Referral',
-  'Walk-in',
-  'Cold Dial',
-  'Property Portal',
-  'Word of Mouth',
   'Other',
 ];
 

@@ -1,8 +1,20 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
-import { Loader2, ChevronDown, Plus } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import {
+  Loader2,
+  ChevronDown,
+  Plus,
+  UserCheck,
+  Check,
+  X,
+  AlertTriangle,
+  ExternalLink,
+  SlidersHorizontal,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole } from '@/lib/roles';
 import {
   Lead,
@@ -13,7 +25,20 @@ import {
   ALL_SOURCES,
   ALL_PROPERTY_TYPES,
 } from './mockLeads';
-import { projectsService, teamService, teamsService, leadSourcesService } from '@/lib/services/crmService';
+import {
+  projectsService,
+  teamService,
+  teamsService,
+  leadSourcesService,
+} from '@/lib/services/crmService';
+import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
+import {
+  formatEgyptianPhone,
+  phoneCanonicalKey,
+  phoneToStore,
+  phoneDigits,
+  caretAfterDigits,
+} from './leadPhone';
 
 interface AddLeadFormData {
   name: string;
@@ -21,8 +46,8 @@ interface AddLeadFormData {
   email: string;
   location: string;
   propertyType: PropertyType;
-  budgetMin: number;
-  budgetMax: number;
+  budgetMin?: number;
+  budgetMax?: number;
   source: LeadSource;
   agent: string;
   assignedTo: string;
@@ -34,84 +59,177 @@ interface AddLeadFormData {
   project: string;
 }
 
+/** Shape returned by duplicateLeadsService.findByPhone(). */
+interface DuplicateMatch {
+  id: string;
+  name: string;
+  phone: string;
+  status: string;
+  createdBy: string;
+  createdAt: string;
+  assignedTo: string;
+  matches: number;
+}
+
 interface AddLeadFormProps {
-  onSubmit: (lead: Lead) => void;
+  /**
+   * `options.keepOpen` is true for "Save & add another" — the modal stays open
+   * and the form resets instead of closing.
+   * Resolve to `false` to signal a failed save so the form keeps the input.
+   */
+  onSubmit: (
+    lead: Lead,
+    options?: { keepOpen?: boolean }
+  ) => void | boolean | Promise<void | boolean>;
   onCancel: () => void;
   initialData?: Partial<Lead>;
 }
 
 let leadCounter = 13;
 
-function AccordionSection({
-  num,
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  num: number;
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
+/**
+ * Session memory — survives closing and reopening the modal, so a sales agent
+ * adding lead after lead does not have to re-pick the same source/stage.
+ */
+let lastUsedSource = '';
+let lastUsedStatus = '';
+
+const DEFAULT_SOURCE: LeadSource = 'Facebook Ads';
+const DEFAULT_STATUS: LeadStatus = 'Fresh Leads';
+
+/**
+ * Height (px) of the on-screen keyboard, derived from the Visual Viewport API.
+ * Used to lift the sticky submit row so the keyboard never covers it.
+ */
+function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const overlap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        setInset((prev) => (Math.abs(prev - overlap) > 1 ? overlap : prev));
+      });
+    };
+
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      cancelAnimationFrame(frame);
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
+  return inset;
+}
+
+/** Small chevron used on select elements, anchored to the inline-end edge. */
+function SelectChevron() {
   return (
-    <div className="border border-border rounded-xl overflow-hidden bg-card">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="btn-press w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors active:scale-[0.99]"
-      >
-        <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-          {num}
-        </span>
-        <span className="text-sm font-semibold text-foreground flex-1">{title}</span>
-        <ChevronDown
-          size={16}
-          className={`text-muted-foreground transition-transform duration-300 ${
-            open ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
-      <div
-        className={`grid transition-all duration-300 ease-out ${
-          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-      >
-        <div className="overflow-hidden">
-          <div className="px-4 pb-4 pt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ChevronDown
+      size={14}
+      className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+    />
   );
 }
 
 export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLeadFormProps) {
-  const { profile } = useAuth();
-  const canEditProtectedFields = isAdminRole(profile?.role);
+  const { user, profile } = useAuth();
+  const { t } = useLanguage();
+  const isPrivileged = isAdminRole(profile?.role) || profile?.role === 'manager';
   const [selectedDeveloperId, setSelectedDeveloperId] = useState('');
   const [agentList, setAgentList] = useState<string[]>([]);
   const [userList, setUserList] = useState<{ id: string; name: string }[]>([]);
   const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
   const [newSourceName, setNewSourceName] = useState('');
   const [creatingSource, setCreatingSource] = useState(false);
+  const [showAddSourceInput, setShowAddSourceInput] = useState(false);
   const [developers, setDevelopers] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string; status: string }[]
   >([]);
   const [showDetails, setShowDetails] = useState(false);
-  const [openSection, setOpenSection] = useState<'dev' | 'prop' | 'pipe' | null>(null);
   const [referralEnabled, setReferralEnabled] = useState(Boolean(initialData?.referredTo));
+  const [dupState, setDupState] = useState<{ checking: boolean; existing: DuplicateMatch | null }>({
+    checking: false,
+    existing: null,
+  });
   const phoneRef = useRef<HTMLInputElement>(null);
+  const dupSeqRef = useRef(0);
+  const submitModeRef = useRef<'single' | 'another'>('single');
+  const selfAssignIdRef = useRef('');
+  const selfAssignNameRef = useRef('');
+  const autoAssignDoneRef = useRef(false);
+  const keyboardInset = useKeyboardInset();
 
-  useEffect(() => {
-    // Auto-focus only on devices with a precise pointer (mouse/trackpad).
-    // On touch devices this would pop the keyboard and push the modal under it.
-    if (typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches) {
-      phoneRef.current?.focus();
+  const currentUserId = profile?.id || user?.id || '';
+
+  /** Initial + reset values. `source`/`status` fall back to the session memory. */
+  const makeDefaults = useCallback(
+    (src?: string, st?: string): AddLeadFormData => ({
+      name: initialData?.name || '',
+      phone: initialData?.phone || '',
+      email: initialData?.email || '',
+      location: initialData?.location || '',
+      propertyType: (initialData?.propertyType as PropertyType) || '2BHK Apartment',
+      budgetMin: initialData?.budgetMin || undefined,
+      budgetMax: initialData?.budgetMax || undefined,
+      source: (src ||
+        (initialData?.source as LeadSource) ||
+        (lastUsedSource as LeadSource) ||
+        DEFAULT_SOURCE) as LeadSource,
+      agent: initialData?.agent || '',
+      assignedTo: initialData?.assignedTo || '',
+      referralTo: initialData?.referredTo || '',
+      status: (st ||
+        (initialData?.status as LeadStatus) ||
+        (lastUsedStatus as LeadStatus) ||
+        DEFAULT_STATUS) as LeadStatus,
+      followUpDue: initialData?.followUpDue || '',
+      notes: initialData?.notes || '',
+      developer: initialData?.developer || '',
+      project: initialData?.project || '',
+    }),
+    [initialData]
+  );
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    setValue,
+    getValues,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<AddLeadFormData>({
+    mode: 'onTouched',
+    defaultValues: makeDefaults(),
+  });
+
+  const assignedTo = watch('assignedTo');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(() => {
+    if (initialData?.assignedToIds && initialData.assignedToIds.length > 0) {
+      return initialData.assignedToIds.slice(0, 2);
     }
+    return initialData?.assignedTo ? [initialData.assignedTo] : [];
+  });
+
+  // Autofocus the Phone field immediately on mount
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      phoneRef.current?.focus({ preventScroll: true });
+      phoneRef.current?.scrollIntoView({ block: 'nearest' });
+    }, 120);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -147,62 +265,45 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
         }))
       );
 
-      setUserList(
-        (assignableUsers as { id: string; name: string }[]).map((u) => ({
-          id: u.id,
-          name: u.name,
-        }))
-      );
-      const loadedSources = (sources as any[]).map((s: any) => ({ id: s.id, name: s.name }));
-      setSourceList(loadedSources);
-      const currentSource = watch('source');
-      if (!currentSource || currentSource === 'Facebook Ads') {
-        const defaultSource =
-          loadedSources.find((s) => s.name === 'Facebook' || s.name === 'Facebook Ads') ||
-          loadedSources[0];
-        if (defaultSource) {
-          setValue('source', defaultSource.name, { shouldValidate: true });
-        }
-      } else {
-        const match = loadedSources.find(
-          (s) => s.name.toLowerCase() === currentSource.toLowerCase()
-        );
-        if (match && match.name !== currentSource) {
-          setValue('source', match.name, { shouldValidate: true });
-        }
-      }
+      const users = (assignableUsers as { id: string; name: string }[]).map((u) => ({
+        id: u.id,
+        name: u.name,
+      }));
+      setUserList(users);
+      setSourceList((sources as any[]).map((s: any) => ({ id: s.id, name: s.name })));
     });
   }, []);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors, isSubmitting },
-  } = useForm<AddLeadFormData>({
-    defaultValues: {
-      status: (initialData?.status as LeadStatus) || 'Fresh Leads',
-      source: (initialData?.source as LeadSource) || 'Facebook',
-      agent: initialData?.agent || '',
-      assignedTo: initialData?.assignedTo || '',
-      referralTo: initialData?.referredTo || '',
-      propertyType: (initialData?.propertyType as PropertyType) || '2BHK Apartment',
-      developer: initialData?.developer || '',
-      project: initialData?.project || '',
-      name: initialData?.name || '',
-      phone: initialData?.phone || '',
-      email: initialData?.email || '',
-      location: initialData?.location || '',
-      budgetMin: initialData?.budgetMin || undefined,
-      budgetMax: initialData?.budgetMax || undefined,
-      followUpDue: initialData?.followUpDue || '',
-      notes: initialData?.notes || '',
-    },
-  });
+  // Default the assignee to the current user (unless caller preset one)
+  useEffect(() => {
+    if (autoAssignDoneRef.current) return;
+    if (!userList.length || !currentUserId) return;
+    autoAssignDoneRef.current = true;
 
-  const budgetMin = watch('budgetMin');
-  const assignedTo = watch('assignedTo');
+    const me = userList.find((u) => u.id === currentUserId);
+    if (!me) return;
+    if (initialData?.assignedToIds?.length || initialData?.assignedTo) return;
+
+    selfAssignIdRef.current = me.id;
+    selfAssignNameRef.current = me.name || '';
+    setSelectedUserIds([me.id]);
+    setValue('assignedTo', me.id);
+    if (!initialData?.agent && agentList.includes(me.name)) setValue('agent', me.name);
+  }, [userList, agentList, currentUserId, initialData, setValue]);
+
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      if (prev.includes(userId)) {
+        const next = prev.filter((id) => id !== userId);
+        setValue('assignedTo', next[0] || '');
+        return next;
+      }
+      if (prev.length >= 2) return prev;
+      const next = [...prev, userId];
+      setValue('assignedTo', next[0] || '');
+      return next;
+    });
+  };
 
   const filteredProjects = selectedDeveloperId
     ? projects.filter((p) => p.developerId === selectedDeveloperId && p.status === 'Active')
@@ -215,37 +316,84 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     setValue('project', '');
   };
 
+  /** Inline duplicate check — never blocks saving, warns agent */
+  const checkDuplicate = async (value: string) => {
+    const digits = phoneDigits(value);
+    if (digits.length < 8) {
+      setDupState({ checking: false, existing: null });
+      return;
+    }
+    const key = phoneCanonicalKey(value);
+    const seq = ++dupSeqRef.current;
+    setDupState({ checking: true, existing: null });
+    try {
+      const found = await duplicateLeadsService.findByPhone(key);
+      if (seq !== dupSeqRef.current) return;
+      if (!found || phoneCanonicalKey(found.phone || '') !== key) {
+        setDupState({ checking: false, existing: null });
+        return;
+      }
+      setDupState({ checking: false, existing: found as DuplicateMatch });
+    } catch {
+      if (seq === dupSeqRef.current) setDupState({ checking: false, existing: null });
+    }
+  };
+
+  const handlePhoneChange = (raw: string, caret: number) => {
+    const digitsBefore = phoneDigits(raw.slice(0, caret)).length;
+    const next = formatEgyptianPhone(raw);
+    if (dupState.existing) setDupState({ checking: false, existing: null });
+    return { value: next, caret: caretAfterDigits(next, digitsBefore) };
+  };
+
   const onFormSubmit = async (data: AddLeadFormData) => {
+    const mode = submitModeRef.current;
     const today = new Date().toISOString().split('T')[0];
-    const assignedUser = userList.find((u) => u.id === data.assignedTo);
-    const chosenSource = data.source || watch('source') || initialData?.source || (sourceList[0]?.name ?? 'Facebook');
+    const primaryId = selectedUserIds[0] || data.assignedTo || '';
+    const assignedNames = selectedUserIds
+      .map((id) => userList.find((u) => u.id === id)?.name)
+      .filter(Boolean) as string[];
+    const primaryAgentName = assignedNames[0] || data.agent || '';
     const matchedSource =
-      sourceList.find((s) => s.name === chosenSource) ||
-      sourceList.find((s) => s.name.toLowerCase() === chosenSource?.toLowerCase()) ||
-      (ALL_SOURCES.includes(chosenSource as any) ? ({ id: '', name: chosenSource } as any) : null);
+      sourceList.find(
+        (s) => s.name.trim().toLowerCase() === String(data.source || '').trim().toLowerCase()
+      ) ||
+      sourceList.find((s) => s.id === (data.source as any)) ||
+      null;
     const leadSourceId = matchedSource?.id || null;
-    const finalSource = matchedSource?.name || chosenSource;
+    const cleanPhone = phoneToStore(data.phone);
+    // Name is optional — falls back to phone number as requested
+    const fallbackName = cleanPhone || 'New Lead';
+    const cleanName = (data.name || '').trim() || fallbackName;
+
     const newLead: Lead & { leadSourceId?: string | null } = {
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
-      name: data.name,
-      phone: data.phone,
-      email: data.email,
-      location: data.location,
+      name: cleanName,
+      phone: cleanPhone,
+      email: (data.email || '').trim(),
+      location: data.location || '',
       propertyType: data.propertyType,
       budgetMin: data.budgetMin ? Number(data.budgetMin) : undefined,
       budgetMax: data.budgetMax ? Number(data.budgetMax) : undefined,
-      source: finalSource,
+      source: data.source || initialData?.source || DEFAULT_SOURCE,
       leadSourceId,
-      agent: data.agent,
-      agentInitials: data.agent
-        ? data.agent
-            .split(' ')
-            .map((p) => p[0])
-            .join('')
-        : '',
+      agent: primaryAgentName || data.agent,
+      agentInitials:
+        primaryAgentName || data.agent
+          ? (primaryAgentName || data.agent)
+              .split(' ')
+              .map((p) => p[0])
+              .join('')
+          : '',
       status: data.status,
-      assignedTo: data.assignedTo || undefined,
-      assignedToName: assignedUser?.name,
+      assignedTo: primaryId || undefined,
+      assignedToName: assignedNames.length > 0 ? assignedNames.join(' & ') : undefined,
+      assignedToIds: selectedUserIds,
+      assignedToNames: assignedNames,
+      assignees: selectedUserIds.map((id) => ({
+        userId: id,
+        userName: userList.find((u) => u.id === id)?.name || null,
+      })),
       referredTo: data.referralTo || null,
       referredBy: data.referralTo ? profile?.id || null : null,
       referredToName: userList.find((u) => u.id === data.referralTo)?.name || null,
@@ -257,194 +405,538 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       developer: data.developer || undefined,
       project: data.project || undefined,
     };
-    onSubmit(newLead);
+
+    const result = await onSubmit(newLead, { keepOpen: mode === 'another' });
+    if (result === false) return;
+
+    lastUsedSource = data.source || '';
+    lastUsedStatus = data.status || '';
+
+    if (mode !== 'another') return;
+
+    reset({
+      name: '',
+      phone: '',
+      email: '',
+      location: '',
+      propertyType: data.propertyType,
+      budgetMin: undefined,
+      budgetMax: undefined,
+      source: data.source,
+      agent: selfAssignNameRef.current || '',
+      assignedTo: selfAssignIdRef.current || '',
+      referralTo: '',
+      status: data.status,
+      followUpDue: '',
+      notes: '',
+      developer: '',
+      project: '',
+    });
+    setSelectedUserIds(selfAssignIdRef.current ? [selfAssignIdRef.current] : []);
+    setReferralEnabled(false);
+    setSelectedDeveloperId('');
+    setShowDetails(false);
+    setDupState({ checking: false, existing: null });
+    dupSeqRef.current += 1;
+
+    window.setTimeout(() => {
+      phoneRef.current?.focus({ preventScroll: true });
+      phoneRef.current?.scrollIntoView({ block: 'nearest' });
+    }, 60);
   };
 
-  const selectClass = (hasError: boolean) =>
-    `input-base appearance-none pr-8 ${hasError ? 'border-red-400' : ''}`;
+  /** Enter anywhere (except a textarea) submits the form */
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'TEXTAREA') return;
+    e.preventDefault();
+    submitModeRef.current = 'single';
+    void handleSubmit(onFormSubmit)();
+  };
 
-  const phoneField = register('phone', {
-    required: 'Phone number is required',
-    minLength: { value: 7, message: 'Enter a valid phone number' },
-  });
+  const createNewSource = async () => {
+    const name = newSourceName.trim();
+    if (!name || creatingSource) return;
+    setCreatingSource(true);
+    try {
+      const created = await leadSourcesService.create(name);
+      setSourceList((prev) =>
+        [...prev, { id: created.id, name: created.name }].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
+      );
+      setValue('source', created.name as LeadSource, { shouldValidate: true, shouldDirty: true });
+      setNewSourceName('');
+      setShowAddSourceInput(false);
+      toast.success(t('leadForm.sourceAdded', { name: created.name }));
+    } catch (e: any) {
+      toast.error(e?.message || t('leadForm.sourceFailed'));
+    } finally {
+      setCreatingSource(false);
+    }
+  };
+
+  // Merge database sources with standard canonical sources, preserving IDs when available
+  const sourcesToDisplay = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { id?: string; name: string }[] = [];
+    sourceList.forEach((s) => {
+      const lower = s.name.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(s);
+      }
+    });
+    ALL_SOURCES.forEach((s) => {
+      const lower = s.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push({ id: '', name: s });
+      }
+    });
+    return list;
+  }, [sourceList]);
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} noValidate>
-      <div className="px-6 py-5 space-y-5 pop-in">
-        {/* Phone — the ONE required field, front and center */}
+    <form
+      onSubmit={handleSubmit(onFormSubmit)}
+      onKeyDown={handleFormKeyDown}
+      noValidate
+      className="w-full max-w-md mx-auto flex flex-col justify-between min-h-full"
+    >
+      <div className="px-4 sm:px-6 py-4 space-y-4">
+        {/* ── 1. Phone (Required, autofocus, type="tel", inputMode="numeric") ── */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="add-phone" className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
-              Phone number
-              <span className="text-xs font-normal text-red-500 ml-0.5">*</span>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <label
+              htmlFor="add-phone"
+              className="text-xs font-semibold text-foreground flex items-center gap-1"
+            >
+              <span>{t('leadForm.phone')}</span>
+              <span className="text-red-500">*</span>
             </label>
             <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5 tracking-wide">
-              Required
+              {t('leadForm.required')}
+            </span>
+          </div>
+
+          <Controller
+            name="phone"
+            control={control}
+            rules={{
+              required: t('leadForm.phoneRequired'),
+              minLength: { value: 7, message: t('leadForm.phoneInvalid') },
+            }}
+            render={({ field, fieldState }) => (
+              <>
+                <input
+                  id="add-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  dir="ltr"
+                  placeholder="010 1234 5678"
+                  value={field.value || ''}
+                  onChange={(e) => {
+                    const el = e.target;
+                    const caret = el.selectionStart ?? el.value.length;
+                    const next = handlePhoneChange(el.value, caret);
+                    field.onChange(next.value);
+                    window.requestAnimationFrame(() => {
+                      const node = phoneRef.current;
+                      if (!node) return;
+                      try {
+                        node.setSelectionRange(next.caret, next.caret);
+                      } catch {
+                        /* ignore */
+                      }
+                    });
+                  }}
+                  onBlur={(e) => {
+                    field.onBlur();
+                    void checkDuplicate(e.target.value);
+                  }}
+                  ref={(el) => {
+                    field.ref(el);
+                    phoneRef.current = el;
+                  }}
+                  aria-invalid={fieldState.invalid || undefined}
+                  aria-describedby={
+                    fieldState.error
+                      ? 'add-phone-error'
+                      : dupState.existing
+                        ? 'add-phone-duplicate'
+                        : undefined
+                  }
+                  className={`input-base text-base font-mono-data h-12 min-h-[44px] ${
+                    fieldState.error
+                      ? 'border-red-400 focus:border-red-500 ring-1 ring-red-400/20'
+                      : 'border-border/80 focus:border-primary'
+                  }`}
+                />
+                {fieldState.error && (
+                  <p id="add-phone-error" className="mt-1 text-xs text-red-500 font-medium">
+                    {fieldState.error.message}
+                  </p>
+                )}
+              </>
+            )}
+          />
+
+          {/* Inline duplicate warning */}
+          {dupState.existing ? (
+            <div
+              id="add-phone-duplicate"
+              role="status"
+              className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3"
+            >
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                <AlertTriangle size={13} className="flex-shrink-0" />
+                {t('leadForm.duplicateTitle')}
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                {t('leadForm.duplicateBody', {
+                  name: dupState.existing.name,
+                  status: dupState.existing.status,
+                  by: dupState.existing.createdBy,
+                })}
+              </p>
+              <a
+                href={`/leads/${dupState.existing.id}`}
+                className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                {t('leadForm.openExisting')}
+                <ExternalLink size={12} />
+              </a>
+            </div>
+          ) : (
+            dupState.checking && (
+              <p className="mt-1.5 text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <Loader2 size={11} className="animate-spin" />
+                {t('leadForm.phoneHint')}
+              </p>
+            )
+          )}
+        </div>
+
+        {/* ── 2. Name (Optional) ── */}
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <label htmlFor="add-name" className="text-xs font-semibold text-foreground">
+              {t('leadForm.name')}
+            </label>
+            <span className="text-[10px] font-normal text-muted-foreground">
+              {t('leadForm.optional')}
             </span>
           </div>
           <input
-            id="add-phone"
-            type="tel"
-            className={`input-base text-base h-12 ${errors.phone ? 'border-red-400' : 'border-primary/30 focus:border-primary'}`}
-            placeholder="+20 10 0000 0000"
-            {...phoneField}
-            ref={(el) => {
-              phoneField.ref(el);
-              phoneRef.current = el;
-            }}
+            id="add-name"
+            type="text"
+            autoComplete="name"
+            className="input-base text-sm h-11 min-h-[44px] border-border/80"
+            placeholder="Ahmed Hassan"
+            {...register('name')}
           />
-          {errors.phone && <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>}
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Enter the phone number, select or add a lead source, then add the lead.
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-rise-in">
-          <div>
-            <label htmlFor="add-source" className="label-base">
-              Lead source <span className="text-xs font-normal text-red-500">*</span>
+        {/* ── 3. Source (Selectable chips instead of dropdown, single select) ── */}
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+              <span>{t('leadForm.source')}</span>
+              <span className="text-red-500">*</span>
             </label>
-            <div className="relative flex gap-2">
-              <div className="relative flex-1">
-                <select
-                  id="add-source"
-                  className={selectClass(!!errors.source)}
-                  {...register('source', { required: 'Lead source is required' })}
-                  value={watch('source') || ''}
-                  onChange={(e) => {
-                    setValue('source', e.target.value as any, { shouldValidate: true, shouldDirty: true });
-                  }}
-                >
-                  {sourceList.length ? sourceList.map((s) => (
-                    <option key={`quick-source-${s.id}`} value={s.name}>{s.name}</option>
-                  )) : ALL_SOURCES.map((s) => (
-                    <option key={`quick-source-${s}`} value={s}>{s}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              </div>
-              <div className="flex gap-1">
-                <input value={newSourceName} onChange={e=>setNewSourceName(e.target.value)} placeholder="New source" className="input-base h-9 text-xs w-28" />
-                <button type="button" disabled={creatingSource || !newSourceName.trim()} onClick={async()=>{
-                  if(!newSourceName.trim()) return;
-                  setCreatingSource(true);
-                  try{
-                    const created = await leadSourcesService.create(newSourceName.trim());
-                    setSourceList(prev=> [...prev, {id: created.id, name: created.name}].sort((a,b)=>a.name.localeCompare(b.name)));
-                    setValue('source', created.name);
-                    setNewSourceName('');
-                  }catch(e:any){ alert(e.message); } finally{ setCreatingSource(false); }
-                }} className="h-9 px-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1"><Plus size={12}/>{creatingSource?'…':'+'}</button>
-              </div>
-            </div>
-            {errors.source && <p className="mt-1 text-xs text-red-500">{errors.source.message}</p>}
+            {!showAddSourceInput && (
+              <button
+                type="button"
+                onClick={() => setShowAddSourceInput(true)}
+                className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-0.5"
+              >
+                <Plus size={11} />
+                <span>{t('leadForm.newSource')}</span>
+              </button>
+            )}
           </div>
+
+          <Controller
+            name="source"
+            control={control}
+            rules={{ required: t('leadForm.sourceRequired') || 'Source is required' }}
+            render={({ field }) => (
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="radiogroup"
+                aria-label={t('leadForm.source')}
+              >
+                {sourcesToDisplay.map((s) => {
+                  const isSelected = field.value === s.name;
+                  return (
+                    <button
+                      key={`chip-source-${s.id || s.name}`}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => field.onChange(s.name)}
+                      className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 select-none ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground font-semibold shadow-sm ring-2 ring-primary/30'
+                          : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60'
+                      }`}
+                    >
+                      {isSelected && <Check size={12} className="stroke-[2.5]" />}
+                      <span>{s.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          />
+
+          {/* Optional inline input for new custom source */}
+          {showAddSourceInput && (
+            <div className="flex items-center gap-1.5 mt-2 animate-rise-in">
+              <input
+                value={newSourceName}
+                onChange={(e) => setNewSourceName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  void createNewSource();
+                }}
+                placeholder={t('leadForm.newSource')}
+                className="input-base h-10 min-h-[44px] text-xs flex-1"
+                autoFocus
+              />
+              <button
+                type="button"
+                disabled={creatingSource || !newSourceName.trim()}
+                onClick={() => void createNewSource()}
+                className="min-h-[44px] px-3.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
+              >
+                {creatingSource ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                <span>{t('leadForm.addSource')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddSourceInput(false);
+                  setNewSourceName('');
+                }}
+                className="min-h-[44px] px-2.5 rounded-xl text-muted-foreground hover:bg-muted"
+                aria-label={t('leadForm.cancel')}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {errors.source && (
+            <p className="mt-1 text-xs text-red-500 font-medium">{errors.source.message}</p>
+          )}
         </div>
 
-        {/* Expandable extra details */}
+        {/* ── 4. Assign To (Visible ONLY for admin/manager, otherwise hidden) ── */}
+        {isPrivileged && (
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label htmlFor="add-assignee" className="text-xs font-semibold text-foreground">
+                {t('leadForm.assignTo')}
+              </label>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                {t('leadForm.assignCount', { n: selectedUserIds.length })}
+              </span>
+            </div>
+
+            {/* Selected assignees badge list */}
+            {selectedUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {selectedUserIds.map((id) => {
+                  const u = userList.find((user) => user.id === id);
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                    >
+                      <UserCheck size={12} className="text-emerald-500" />
+                      <span>{u?.name || 'Agent'}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleUser(id)}
+                        className="hover:text-red-500 ms-0.5 text-muted-foreground p-0.5 rounded"
+                        aria-label={t('leadForm.removeAgent', { name: u?.name || 'agent' })}
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Agent Select Dropdown */}
+            <div className="relative">
+              <select
+                id="add-assignee"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) toggleUser(e.target.value);
+                }}
+                className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+              >
+                <option value="">
+                  {selectedUserIds.length >= 2
+                    ? 'Max 2 agents chosen'
+                    : t('leadForm.selectAgent')}
+                </option>
+                {userList.map((u) => {
+                  const isSelected = selectedUserIds.includes(u.id);
+                  return (
+                    <option key={`assign-opt-${u.id}`} value={u.id} disabled={isSelected}>
+                      {isSelected ? `✓ ${u.name}` : u.name}
+                    </option>
+                  );
+                })}
+              </select>
+              <SelectChevron />
+            </div>
+          </div>
+        )}
+
+        {/* ── Toggle "More Details" (Collapsed by default) ── */}
+        <button
+          type="button"
+          onClick={() => setShowDetails((prev) => !prev)}
+          aria-expanded={showDetails}
+          aria-controls="add-more-details-panel"
+          className="w-full flex items-center justify-between px-3.5 py-2.5 min-h-[44px] rounded-xl border border-border/70 bg-muted/30 hover:bg-muted/60 text-xs font-semibold text-foreground transition-colors active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-2">
+            <SlidersHorizontal size={14} className="text-primary" />
+            <span>{showDetails ? t('leadForm.hideDetails') : `+ ${t('leadForm.moreDetails')}`}</span>
+          </span>
+          <ChevronDown
+            size={15}
+            className={`text-muted-foreground transition-transform duration-200 ${
+              showDetails ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+
+        {/* ── Collapsed Content: All other fields (budget, area, property type, notes, etc.) ── */}
         <div
+          id="add-more-details-panel"
           className={`grid transition-all duration-300 ease-out ${
-            showDetails ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+            showDetails ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
           }`}
         >
           <div className="overflow-hidden">
-            <div className="space-y-5 pt-1">
-              {/* Quick contact fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label htmlFor="add-name" className="label-base">
-                    Full name{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <input
-                    id="add-name"
-                    type="text"
-                    className={`input-base ${errors.name ? 'border-red-400' : ''}`}
-                    placeholder="Ahmed Hassan"
-                    {...register('name')}
-                  />
-                  {errors.name && (
-                    <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>
-                  )}
+            <div className="space-y-3.5 pt-2 pb-1 border-t border-border/50">
+              {/* Status / Stage */}
+              <div>
+                <label htmlFor="add-status" className="text-xs font-semibold text-foreground block mb-1">
+                  {t('leadForm.status')}
+                </label>
+                <div className="relative">
+                  <select
+                    id="add-status"
+                    autoComplete="off"
+                    className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                    {...register('status')}
+                  >
+                    {ALL_STATUSES.map((s) => (
+                      <option key={`add-status-${s}`} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  <SelectChevron />
                 </div>
+              </div>
+
+              {/* Email & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="add-email" className="label-base">
-                    Email address{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                  <label htmlFor="add-email" className="text-xs font-semibold text-foreground block mb-1">
+                    {t('leadForm.email')}{' '}
+                    <span className="text-muted-foreground font-normal text-[10px]">
+                      {t('leadForm.optional')}
+                    </span>
                   </label>
                   <input
                     id="add-email"
                     type="email"
-                    className={`input-base ${errors.email ? 'border-red-400' : ''}`}
+                    inputMode="email"
+                    autoComplete="email"
+                    className={`input-base min-h-[44px] text-xs ${errors.email ? 'border-red-400' : ''}`}
                     placeholder="ahmed@email.com"
                     {...register('email', {
-                      pattern: { value: /^\S+@\S+\.\S+$/, message: 'Enter a valid email address' },
+                      pattern: { value: /^\S+@\S+\.\S+$/, message: t('leadForm.emailInvalid') },
                     })}
                   />
                   {errors.email && (
-                    <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
+                    <p className="mt-1 text-xs text-red-500 font-medium">{errors.email.message}</p>
                   )}
                 </div>
+
                 <div>
-                  <label htmlFor="add-location" className="label-base">
-                    City / Location{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                  <label htmlFor="add-location" className="text-xs font-semibold text-foreground block mb-1">
+                    {t('leadForm.location')}{' '}
+                    <span className="text-muted-foreground font-normal text-[10px]">
+                      {t('leadForm.optional')}
+                    </span>
                   </label>
                   <input
                     id="add-location"
                     type="text"
-                    className={`input-base ${errors.location ? 'border-red-400' : ''}`}
-                    placeholder="Cairo"
+                    autoComplete="address-level2"
+                    className="input-base min-h-[44px] text-xs"
+                    placeholder="Cairo / New Cairo"
                     {...register('location')}
                   />
-                  {errors.location && (
-                    <p className="mt-1 text-xs text-red-500">{errors.location.message}</p>
-                  )}
                 </div>
               </div>
 
-              {/* Accordion sections */}
-              <AccordionSection
-                num={2}
-                title="Developer & Project"
-                open={openSection === 'dev'}
-                onToggle={() => setOpenSection(openSection === 'dev' ? null : 'dev')}
-              >
+              {/* Developer & Project */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="add-developer" className="label-base">
-                    Developer{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                  <label htmlFor="add-developer" className="text-xs font-semibold text-foreground block mb-1">
+                    {t('leadForm.developer')}{' '}
+                    <span className="text-muted-foreground font-normal text-[10px]">
+                      {t('leadForm.optional')}
+                    </span>
                   </label>
                   <div className="relative">
                     <select
                       id="add-developer"
-                      className="input-base appearance-none pr-8"
+                      autoComplete="off"
+                      className="input-base appearance-none pe-8 min-h-[44px] text-xs"
                       value={selectedDeveloperId}
                       onChange={(e) => handleDeveloperChange(e.target.value)}
                     >
-                      <option value="">— Select Developer —</option>
+                      <option value="">{t('leadForm.selectDeveloper')}</option>
                       {developers.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}
                         </option>
                       ))}
                     </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
+                    <SelectChevron />
                   </div>
                 </div>
+
                 <div>
-                  <label htmlFor="add-project" className="label-base">
-                    Project{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                  <label htmlFor="add-project" className="text-xs font-semibold text-foreground block mb-1">
+                    {t('leadForm.project')}{' '}
+                    <span className="text-muted-foreground font-normal text-[10px]">
+                      {t('leadForm.optional')}
+                    </span>
                   </label>
                   <div className="relative">
                     <select
                       id="add-project"
-                      className={`input-base appearance-none pr-8 ${
+                      autoComplete="off"
+                      className={`input-base appearance-none pe-8 min-h-[44px] text-xs ${
                         !selectedDeveloperId ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                       disabled={!selectedDeveloperId}
@@ -454,7 +946,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                         {selectedDeveloperId
                           ? filteredProjects.length === 0
                             ? 'No active projects'
-                            : '— Select Project —'
+                            : t('leadForm.selectProject')
                           : 'Select a developer first'}
                       </option>
                       {filteredProjects.map((p) => (
@@ -463,298 +955,142 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                         </option>
                       ))}
                     </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
+                    <SelectChevron />
                   </div>
                 </div>
-              </AccordionSection>
+              </div>
 
-              <AccordionSection
-                num={3}
-                title="Property Requirements"
-                open={openSection === 'prop'}
-                onToggle={() => setOpenSection(openSection === 'prop' ? null : 'prop')}
-              >
-                <div>
-                  <label htmlFor="add-proptype" className="label-base">
-                    Property type{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="add-proptype"
-                      className={selectClass(!!errors.propertyType)}
-                      {...register('propertyType')}
-                    >
-                      {ALL_PROPERTY_TYPES.map((p) => (
-                        <option key={`add-prop-${p}`} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
-                  </div>
-                  {errors.propertyType && (
-                    <p className="mt-1 text-xs text-red-500">{errors.propertyType.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="add-budgetmin" className="label-base">
-                    Budget min <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <input
-                    id="add-budgetmin"
-                    type="number"
-                    min={1}
-                    className={`input-base font-mono-data ${
-                      errors.budgetMin ? 'border-red-400' : ''
-                    }`}
-                    placeholder="500000"
-                    {...register('budgetMin', {
-                      min: { value: 1, message: 'Must be at least 1 ج.م' },
-                      valueAsNumber: true,
-                    })}
-                  />
-                  {errors.budgetMin && (
-                    <p className="mt-1 text-xs text-red-500">{errors.budgetMin.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="add-budgetmax" className="label-base">
-                    Budget max <span className="text-muted-foreground font-normal">(ج.م)</span>{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <input
-                    id="add-budgetmax"
-                    type="number"
-                    min={1}
-                    className={`input-base font-mono-data ${
-                      errors.budgetMax ? 'border-red-400' : ''
-                    }`}
-                    placeholder="800000"
-                    {...register('budgetMax', {
-                      min: { value: 1, message: 'Must be at least 1 ج.م' },
-                      valueAsNumber: true,
-                      validate: (val) =>
-                        !budgetMin ||
-                        !val ||
-                        val >= Number(budgetMin) ||
-                        'Max must be ≥ min budget',
-                    })}
-                  />
-                  {errors.budgetMax && (
-                    <p className="mt-1 text-xs text-red-500">{errors.budgetMax.message}</p>
-                  )}
-                </div>
-              </AccordionSection>
 
-              <AccordionSection
-                num={4}
-                title="Pipeline & Assignment"
-                open={openSection === 'pipe'}
-                onToggle={() => setOpenSection(openSection === 'pipe' ? null : 'pipe')}
-              >
-                <div>
-                  <label htmlFor="add-status" className="label-base">
-                    Lead status / stage{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="add-status"
-                      className={selectClass(!!errors.status)}
-                      {...register('status')}
-                    >
-                      {ALL_STATUSES.map((s) => (
-                        <option key={`add-status-${s}`} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
-                  </div>
-                  {errors.status && (
-                    <p className="mt-1 text-xs text-red-500">{errors.status.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="add-agent" className="label-base">
-                    Agent name{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="add-agent"
-                      className={selectClass(!!errors.agent)}
-                      {...register('agent')}
-                    >
-                      <option value="">— Select Agent —</option>
-                      {agentList.map((a) => (
-                        <option key={`add-agent-${a}`} value={a}>
-                          {a}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
-                  </div>
-                  {errors.agent && (
-                    <p className="mt-1 text-xs text-red-500">{errors.agent.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="add-assignedto" className="label-base">
-                    Assign to user{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Admin: any user · Team leader: own team only
-                  </p>
-                  <div className="relative">
-                    <select
-                      id="add-assignedto"
-                      className="input-base appearance-none pr-8"
-                      {...register('assignedTo')}
-                    >
-                      <option value="">— Unassigned —</option>
-                      {userList.map((u) => (
-                        <option key={`add-user-${u.id}`} value={u.id}>
-                          {u.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                    />
-                  </div>
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={referralEnabled}
-                      onChange={(e) => {
-                        setReferralEnabled(e.target.checked);
-                        if (!e.target.checked) setValue('referralTo', '');
-                      }}
-                      className="h-4 w-4 accent-primary"
-                    />
-                    <span className="text-sm font-semibold text-foreground">Referral assignment</span>
-                  </label>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Share this lead with a second user and keep a record of who referred it.
-                  </p>
-                  {referralEnabled && (
-                    <div className="relative mt-3 animate-rise-in">
-                      <select
-                        id="add-referral-to"
-                        disabled={!referralEnabled}
-                        className="input-base appearance-none pr-8"
-                        {...register('referralTo', { required: referralEnabled ? 'Choose a referral recipient' : false })}
-                      >
-                        <option value="">— Select second user —</option>
-                        {userList
-                          .filter((u) => u.id !== assignedTo)
-                          .map((u) => (
-                            <option key={`add-referral-${u.id}`} value={u.id}>{u.name}</option>
-                          ))}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                      {errors.referralTo && <p className="mt-1 text-xs text-red-500">{errors.referralTo.message}</p>}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="add-followup" className="label-base">
-                    First follow-up date{' '}
-                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </label>
+
+              {/* Referral Assignment */}
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
-                    id="add-followup"
-                    type="date"
-                    className={`input-base ${errors.followUpDue ? 'border-red-400' : ''}`}
-                    {...register('followUpDue')}
+                    type="checkbox"
+                    checked={referralEnabled}
+                    onChange={(e) => {
+                      setReferralEnabled(e.target.checked);
+                      if (!e.target.checked) setValue('referralTo', '');
+                    }}
+                    className="h-4 w-4 accent-primary"
                   />
-                  {errors.followUpDue && (
-                    <p className="mt-1 text-xs text-red-500">{errors.followUpDue.message}</p>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
-                  <label htmlFor="add-notes" className="label-base">
-                    Notes
-                  </label>
-                  <textarea
-                    id="add-notes"
-                    rows={3}
-                    className="input-base resize-none"
-                    placeholder="e.g. Interested in Palm Hills New Cairo, wants 3BR unit, flexible on payment plan"
-                    {...register('notes')}
-                  />
-                </div>
-              </AccordionSection>
+                  <span className="text-xs font-semibold text-foreground">
+                    {t('leadForm.referral')}
+                  </span>
+                </label>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t('leadForm.referralHint')}</p>
+                {referralEnabled && (
+                  <div className="relative mt-2.5 animate-rise-in">
+                    <select
+                      id="add-referral-to"
+                      disabled={!referralEnabled}
+                      autoComplete="off"
+                      className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                      {...register('referralTo', {
+                        required: referralEnabled ? t('leadForm.referralRequired') : false,
+                      })}
+                    >
+                      <option value="">{t('leadForm.selectSecond')}</option>
+                      {userList
+                        .filter((u) => u.id !== assignedTo)
+                        .map((u) => (
+                          <option key={`add-referral-${u.id}`} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                    </select>
+                    <SelectChevron />
+                    {errors.referralTo && (
+                      <p className="mt-1 text-xs text-red-500 font-medium">{errors.referralTo.message}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* First Follow-Up Date */}
+              <div>
+                <label htmlFor="add-followup" className="text-xs font-semibold text-foreground block mb-1">
+                  {t('leadForm.followUp')}{' '}
+                  <span className="text-muted-foreground font-normal text-[10px]">
+                    {t('leadForm.optional')}
+                  </span>
+                </label>
+                <input
+                  id="add-followup"
+                  type="date"
+                  className="input-base min-h-[44px] text-xs"
+                  {...register('followUpDue')}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label htmlFor="add-notes" className="text-xs font-semibold text-foreground block mb-1">
+                  {t('leadForm.notes')}
+                </label>
+                <textarea
+                  id="add-notes"
+                  rows={2}
+                  className="input-base resize-none text-xs"
+                  placeholder="e.g. Interested in Palm Hills New Cairo, 3BR unit"
+                  {...register('notes')}
+                />
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Toggle link */}
-        <button
-          type="button"
-          onClick={() => {
-            setShowDetails((v) => !v);
-            if (!showDetails) setOpenSection('dev');
-          }}
-          className="btn-press inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline active:scale-[0.97] transition-transform bg-primary/8 px-3 py-1.5 rounded-lg"
-        >
-          <ChevronDown
-            size={15}
-            className={`transition-transform duration-300 ${showDetails ? 'rotate-180' : ''}`}
-          />
-          {showDetails ? 'Hide extra details' : '+ Add more details (name, source, agent…)'}
-        </button>
       </div>
 
-      {/* Sticky footer — stays pinned to bottom of scroll viewport, safe-area aware */}
+      {/* ── Sticky Bottom Actions ── */}
       <div
-        className="sticky bottom-0 z-10 bg-card border-t border-border px-6 pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-2xl"
-        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+        className="sticky bottom-0 z-10 bg-card/95 backdrop-blur-md border-t border-border px-4 sm:px-6 py-3 flex items-center justify-between gap-2"
+        style={{
+          bottom: keyboardInset > 0 ? `${keyboardInset}px` : undefined,
+          paddingBottom: keyboardInset > 0 ? '12px' : 'max(14px, env(safe-area-inset-bottom))',
+        }}
       >
-        <p className="text-xs text-muted-foreground hidden sm:block">
-          ✅ Phone and source are required
-        </p>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="btn-secondary btn-press flex-1 sm:flex-none"
-          >
-            Cancel
-          </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-secondary min-h-[44px] px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0"
+        >
+          {t('leadForm.cancel')}
+        </button>
+
+        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
           <button
             type="submit"
+            onClick={() => {
+              submitModeRef.current = 'another';
+            }}
             disabled={isSubmitting}
-            className="relative btn-press flex items-center gap-2 min-w-[140px] justify-center flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-[0_6px_20px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_10px_28px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-secondary min-h-[44px] px-3 py-2 text-xs sm:text-sm font-medium rounded-xl inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
           >
-            {isSubmitting ? (
+            {isSubmitting && submitModeRef.current === 'another' ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Plus size={13} />
+            )}
+            <span className="truncate">{t('leadForm.saveAnother')}</span>
+          </button>
+
+          <button
+            type="submit"
+            onClick={() => {
+              submitModeRef.current = 'single';
+            }}
+            disabled={isSubmitting}
+            className="btn-press min-h-[44px] px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs sm:text-sm shadow-md hover:brightness-105 active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+          >
+            {isSubmitting && submitModeRef.current === 'single' ? (
               <>
-                <Loader2 size={15} className="animate-spin" />
-                <span>Adding…</span>
+                <Loader2 size={14} className="animate-spin" />
+                <span>{t('leadForm.adding')}</span>
               </>
             ) : (
               <>
-                <Plus size={15} strokeWidth={2.5} />
-                <span>Add lead</span>
+                <Check size={14} strokeWidth={2.5} />
+                <span>{t('leadForm.addLead')}</span>
               </>
             )}
           </button>

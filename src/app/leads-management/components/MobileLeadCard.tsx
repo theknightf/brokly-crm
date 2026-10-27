@@ -1,6 +1,7 @@
 'use client';
 import React, { useRef, useState } from 'react';
 import {
+  UserCheck,
   Pencil,
   Trash2,
   PhoneCall,
@@ -38,6 +39,14 @@ interface MobileLeadCardProps {
   onOpenLogCall?: (lead: Lead) => void;
   onAddNote?: (lead: Lead) => void;
   onPostCall?: (lead: Lead) => void;
+}
+
+function formatEgyBudget(min?: number, max?: number) {
+  if (min == null && max == null) return '—';
+  const parts: string[] = [];
+  if (min != null) parts.push(min.toLocaleString('en-EG'));
+  if (max != null) parts.push(max.toLocaleString('en-EG'));
+  return `${parts.join('–')} ج.م`;
 }
 
 function formatFollowUpShort(d?: string | null) {
@@ -98,6 +107,7 @@ function MobileLeadCardInner({
   const stageAnchorRef = useRef<HTMLButtonElement>(null);
   const initials = getInitials(lead.name || '', lead.id?.toString().slice(0, 2));
   const overdue = isOverdue(lead.followUpDue);
+  const budgetText = formatEgyBudget(lead.budgetMin, lead.budgetMax);
 
   // quick note
   const [noteOpen, setNoteOpen] = useState(false);
@@ -108,34 +118,20 @@ function MobileLeadCardInner({
     if (!text) return;
     setNoteSaving(true);
     try {
-      const res = await fetch('/api/lead-comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id, body: text, user_id: user?.id || '' }),
-      });
-      if (!res.ok) {
-        const { leadCommentsService } = await import('@/lib/services/crmService');
-        await leadCommentsService.create(lead.id, text, user?.id || '');
-      }
+      const { leadsService, leadCommentsService } = await import('@/lib/services/crmService');
+      await Promise.all([
+        leadsService.updateNotes(lead.id, text),
+        leadCommentsService.create(lead.id, text, user?.id || '').catch(() => {}),
+      ]);
       toast.success('Note added');
       setNoteText('');
       setNoteOpen(false);
+      lead.notes = text;
       lead.actionTakenToday = true;
       lead.contactedToday = true;
       onAddNote?.(lead);
-    } catch {
-      try {
-        const { leadCommentsService } = await import('@/lib/services/crmService');
-        await leadCommentsService.create(lead.id, text, user?.id || '');
-        toast.success('Note added');
-        setNoteText('');
-        setNoteOpen(false);
-        lead.actionTakenToday = true;
-        lead.contactedToday = true;
-        onAddNote?.(lead);
-      } catch {
-        toast.error('Could not save note');
-      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not save note');
     } finally {
       setNoteSaving(false);
     }
@@ -305,14 +301,27 @@ function MobileLeadCardInner({
           </ViewportPopover>
         )}
 
-        {/* Status badge — darker green pill with lightning */}
-        <span
-          className="inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-xs font-bold text-white dark:text-white"
-          style={{ backgroundColor: '#2f855a' }}
-        >
-          <Zap size={13} className="fill-white" />
-          <span className="truncate max-w-[110px]">{lead.status || 'Pending Leads'}</span>
-        </span>
+        {((lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName) && (
+          <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+            <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
+            <span className="truncate max-w-[140px]">
+              {lead.assignedToNames && lead.assignedToNames.length > 0
+                ? lead.assignedToNames.join(' & ')
+                : lead.assignedToName}
+            </span>
+          </span>
+        )}
+        {lead.source && (
+          <span className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+            <span className="truncate max-w-[110px]">{lead.source}</span>
+          </span>
+        )}
+        {lead.priority && lead.priority !== 'Normal' && (
+          <span className="inline-flex items-center gap-1 h-9 px-3 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <Zap size={12} className="fill-current" />
+            <span className="truncate max-w-[110px]">{lead.priority}</span>
+          </span>
+        )}
       </div>
 
       {/* 3. Primary Communication Actions — Call dials directly */}

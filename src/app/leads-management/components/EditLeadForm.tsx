@@ -1,9 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, RefreshCw, ChevronDown, Plus } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { isAdminRole } from '@/lib/roles';
+import { Loader2, Building2, RefreshCw, ChevronDown, UserCheck, Check, X } from 'lucide-react';
 import {
   Lead,
   LeadStatus,
@@ -13,8 +11,10 @@ import {
   ALL_SOURCES,
   ALL_PROPERTY_TYPES,
 } from './mockLeads';
-import { projectsService, teamsService, teamService, leadSourcesService } from '@/lib/services/crmService';
-import { unitsService } from '@/lib/services/crmService';
+import { projectsService, teamsService, teamService } from '@/lib/services/crmService';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
+import { unitsService, leadSourcesService } from '@/lib/services/crmService';
 
 interface EditLeadFormData {
   name: string;
@@ -86,14 +86,12 @@ const parseBudgetRange = (value: string) => {
 };
 
 export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormProps) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const canEditSource =
-    isAdminRole(profile?.role) ||
+    isAdminRole(profile?.role || user?.role) ||
     profile?.role === 'manager' ||
-    profile?.role === 'branch_manager' ||
-    profile?.role === 'team_leader' ||
-    profile?.role === 'Team Lead';
-
+    user?.role === 'manager';
+  const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string | null; developerName: string }[]
   >([]);
@@ -101,11 +99,52 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   const [agents, setAgents] = useState<string[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
-  const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
-  const [newSourceName, setNewSourceName] = useState('');
-  const [creatingSource, setCreatingSource] = useState(false);
   const [loadingUnits, setLoadingUnits] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(() => {
+    if (lead.assignedToIds && lead.assignedToIds.length > 0) {
+      return lead.assignedToIds.slice(0, 2);
+    }
+    return lead.assignedTo ? [lead.assignedTo] : [];
+  });
+
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      if (prev.includes(userId)) {
+        const next = prev.filter((id) => id !== userId);
+        setValue('assignedTo', next[0] || '');
+        return next;
+      }
+      if (prev.length >= 2) return prev; // max 2 assignees
+      const next = [...prev, userId];
+      setValue('assignedTo', next[0] || '');
+      return next;
+    });
+  };
+
+  const availableSources = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { id?: string; name: string }[] = [];
+    if (lead.source) {
+      seen.add(lead.source.trim().toLowerCase());
+      list.push({ name: lead.source });
+    }
+    sourceList.forEach((s) => {
+      const lower = s.name.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(s);
+      }
+    });
+    ALL_SOURCES.forEach((s) => {
+      const lower = s.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push({ id: '', name: s });
+      }
+    });
+    return list;
+  }, [sourceList, lead.source]);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -128,7 +167,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       location: lead.location || '',
       propertyType: (lead.propertyType as PropertyType) || '2BHK Apartment',
       budgetRange: budgetRangeValue(lead.budgetMin, lead.budgetMax),
-      source: (lead.source as LeadSource) || 'Facebook',
+      source: (lead.source as LeadSource) || 'Facebook Ads',
       agent: lead.agent || '',
       assignedTo: lead.assignedTo || '',
       status: (lead.status as LeadStatus) || 'Fresh Leads',
@@ -163,7 +202,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       teamsService.getAssignableUsers().catch(() => []),
       teamsService.getAll().catch(() => []),
       leadSourcesService.getActive().catch(() => []),
-    ]).then(([projectData, teamData, assignableUsers, teamsData, sources]) => {
+    ]).then(([projectData, teamData, assignableUsers, teamsData, sourcesData]) => {
       setProjects(
         (projectData as any[]).map((p) => ({
           id: p.id,
@@ -178,18 +217,9 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       setAgents(combined);
       setUsers((assignableUsers as any[]).map((u) => ({ id: u.id, name: u.name })));
       setTeams((teamsData as any[]).map((t) => ({ id: t.id, name: t.name })));
-      const activeSources = (sources as any[]).map((s: any) => ({ id: s.id, name: s.name }));
-      setSourceList(activeSources);
-      if (lead.source) {
-        const match = activeSources.find(
-          (s) => s.name.toLowerCase() === lead.source?.toLowerCase()
-        );
-        if (match && match.name !== lead.source) {
-          setValue('source', match.name);
-        }
-      }
+      setSourceList((sourcesData as any[]).map((s: any) => ({ id: s.id, name: s.name })));
     });
-  }, [lead.source, setValue]);
+  }, []);
 
   const totalPrice = watch('totalPrice');
   const downPayment = watch('downPayment');
@@ -255,18 +285,15 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
 
   const onFormSubmit = async (data: EditLeadFormData) => {
     const unit = projectUnits.find((u) => u.id === data.unitId);
-    const assignedUser = users.find((u) => u.id === data.assignedTo);
     const { budgetMin, budgetMax } = parseBudgetRange(data.budgetRange);
-    const chosenSource = canEditSource
-      ? (data.source || watch('source') || lead.source || (sourceList[0]?.name ?? 'Facebook'))
-      : lead.source;
-    const matchedSource =
-      sourceList.find((s) => s.name === chosenSource) ||
-      sourceList.find((s) => s.name.toLowerCase() === chosenSource?.toLowerCase()) ||
-      (ALL_SOURCES.includes(chosenSource as any) ? ({ id: '', name: chosenSource } as any) : null);
-    const leadSourceId = matchedSource?.id || (lead as any).leadSourceId || null;
-    const finalSource = matchedSource?.name || chosenSource;
-
+    const primaryId = selectedUserIds[0] || data.assignedTo || '';
+    const assignedNames = selectedUserIds
+      .map((id) => users.find((u) => u.id === id)?.name)
+      .filter(Boolean) as string[];
+    const primaryAgentName = assignedNames[0] || data.agent || '';
+    const matchedSource = sourceList.find(
+      (s) => s.name.trim().toLowerCase() === String(data.source || '').trim().toLowerCase()
+    );
     const updated: Lead & { leadSourceId?: string | null } = {
       ...lead,
       name: data.name,
@@ -276,11 +303,13 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       propertyType: data.propertyType,
       budgetMin,
       budgetMax,
-      source: finalSource,
-      leadSourceId,
-      agent: data.agent,
-      agentInitials: data.agent
-        ? data.agent
+      source: canEditSource ? (data.source || lead.source) : lead.source,
+      leadSourceId: canEditSource
+        ? (matchedSource?.id || lead.leadSourceId || null)
+        : lead.leadSourceId,
+      agent: primaryAgentName || data.agent,
+      agentInitials: (primaryAgentName || data.agent)
+        ? (primaryAgentName || data.agent)
             .split(' ')
             .map((p) => p[0])
             .join('')
@@ -288,8 +317,16 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
             .toUpperCase()
         : lead.agentInitials || '',
       status: data.status,
-      assignedTo: data.assignedTo || undefined,
-      assignedToName: assignedUser?.name || (data.assignedTo ? lead.assignedToName : undefined),
+      assignedTo: primaryId || undefined,
+      assignedToName: assignedNames.length > 0
+        ? assignedNames.join(' & ')
+        : (primaryId ? lead.assignedToName : undefined),
+      assignedToIds: selectedUserIds,
+      assignedToNames: assignedNames,
+      assignees: selectedUserIds.map((id) => ({
+        userId: id,
+        userName: users.find((u) => u.id === id)?.name || null,
+      })),
       followUpDue: data.followUpDue || undefined,
       notes: data.notes || '',
       developer: data.developer || undefined,
@@ -390,25 +427,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                 ))}
               </datalist>
             </div>
-            <div>
-              <label className="label-base">Property type</label>
-              <select className={selectClass} {...register('propertyType')}>
-                {ALL_PROPERTY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-base">Budget range (EGP)</label>
-              <input
-                type="text"
-                className="input-base"
-                placeholder="500000 - 1200000"
-                {...register('budgetRange')}
-              />
-            </div>
+
           </div>
         </details>
 
@@ -436,74 +455,29 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               </select>
             </div>
             <div>
-              <label className="label-base">Source</label>
+              <label className="label-base flex items-center justify-between">
+                <span>Source</span>
+                {!canEditSource && (
+                  <span className="text-[10px] text-muted-foreground font-normal">Read-only</span>
+                )}
+              </label>
               {canEditSource ? (
-                <div className="relative flex gap-2">
-                  <div className="relative flex-1">
-                    <select
-                      className={selectClass}
-                      {...register('source')}
-                      value={watch('source') || lead.source || ''}
-                      onChange={(e) => setValue('source', e.target.value as any, { shouldDirty: true })}
-                    >
-                      {lead.source && !sourceList.some((s) => s.name.toLowerCase() === lead.source?.toLowerCase()) && (
-                        <option value={lead.source}>{lead.source}</option>
-                      )}
-                      {sourceList.length ? (
-                        sourceList.map((s) => (
-                          <option key={`edit-source-${s.id}`} value={s.name}>
-                            {s.name}
-                          </option>
-                        ))
-                      ) : (
-                        ALL_SOURCES.map((s) => (
-                          <option key={`edit-source-${s}`} value={s}>
-                            {s}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                  </div>
-                  <div className="flex gap-1">
-                    <input
-                      value={newSourceName}
-                      onChange={(e) => setNewSourceName(e.target.value)}
-                      placeholder="New source"
-                      className="input-base h-9 text-xs w-28"
-                    />
-                    <button
-                      type="button"
-                      disabled={creatingSource || !newSourceName.trim()}
-                      onClick={async () => {
-                        if (!newSourceName.trim()) return;
-                        setCreatingSource(true);
-                        try {
-                          const created = await leadSourcesService.create(newSourceName.trim());
-                          setSourceList((prev) =>
-                            [...prev, { id: created.id, name: created.name }].sort((a, b) =>
-                              a.name.localeCompare(b.name)
-                            )
-                          );
-                          setValue('source', created.name, { shouldDirty: true });
-                          setNewSourceName('');
-                        } catch (e: any) {
-                          alert(e.message);
-                        } finally {
-                          setCreatingSource(false);
-                        }
-                      }}
-                      className="h-9 px-2 rounded-lg bg-zinc-900 text-white text-xs font-bold disabled:opacity-50 flex items-center gap-1"
-                    >
-                      <Plus size={12} />
-                      {creatingSource ? '…' : '+'}
-                    </button>
-                  </div>
+                <div className="relative">
+                  <select className={selectClass} {...register('source')}>
+                    {availableSources.map((s) => (
+                      <option key={`edit-source-${s.id || s.name}`} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={13}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
                 </div>
               ) : (
-                <div className="input-base bg-muted/40 cursor-not-allowed opacity-80 flex items-center justify-between">
-                  <span className="text-foreground text-sm font-medium">{lead.source || '—'}</span>
-                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Read-only</span>
+                <div className="input-base bg-muted/50 text-muted-foreground flex items-center select-none cursor-not-allowed">
+                  {lead.source || '—'}
                 </div>
               )}
             </div>
@@ -531,16 +505,69 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               <label className="label-base">Follow-up due</label>
               <input type="date" className="input-base" {...register('followUpDue')} />
             </div>
-            <div>
-              <label className="label-base">Assign to user</label>
-              <select className={selectClass} {...register('assignedTo')}>
-                <option value="">Unassigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="label-base !mb-0">
+                  Assign to users <span className="text-muted-foreground font-normal text-xs">(max 2 for co-assignment)</span>
+                </label>
+                <span className="text-xs text-muted-foreground font-medium">
+                  {selectedUserIds.length}/2 chosen
+                </span>
+              </div>
+
+              {selectedUserIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {selectedUserIds.map((id) => {
+                    const u = users.find((user) => user.id === id);
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                      >
+                        <UserCheck size={12} className="text-emerald-500" />
+                        {u?.name || 'Agent'}
+                        <button
+                          type="button"
+                          onClick={() => toggleUser(id)}
+                          className="hover:text-red-500 ml-0.5 text-muted-foreground"
+                          aria-label={`Remove ${u?.name || 'agent'}`}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="max-h-36 overflow-y-auto border border-input rounded-xl p-1.5 space-y-1 bg-background">
+                {users.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2 text-center">No agents found</p>
+                ) : (
+                  users.map((u) => {
+                    const isSelected = selectedUserIds.includes(u.id);
+                    const isDisabled = !isSelected && selectedUserIds.length >= 2;
+                    return (
+                      <button
+                        type="button"
+                        key={u.id}
+                        disabled={isDisabled}
+                        onClick={() => toggleUser(u.id)}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
+                          isSelected
+                            ? 'bg-primary/15 text-primary font-semibold'
+                            : isDisabled
+                            ? 'opacity-40 cursor-not-allowed text-muted-foreground'
+                            : 'hover:bg-muted text-foreground'
+                        }`}
+                      >
+                        <span className="truncate">{u.name}</span>
+                        {isSelected && <Check size={13} className="text-primary flex-shrink-0" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
             <div>
               <label className="label-base">Agent</label>

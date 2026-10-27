@@ -164,6 +164,14 @@ function StageSelector({
 
 const StatusDropdown = StageSelector;
 
+const formatBudget = (min?: number, max?: number) => {
+  if (min == null && max == null) return '—';
+  const parts: string[] = [];
+  if (min != null) parts.push(min.toLocaleString());
+  if (max != null) parts.push(max.toLocaleString());
+  return `${parts.join('–')} ج.م`;
+};
+
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '—';
   const [y, m, d] = dateStr.split('-');
@@ -251,6 +259,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
           </div>
         </div>
       </td>
+
       <td className="table-td">
         <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
           {lead.source || '—'}
@@ -267,19 +276,24 @@ const LeadTableRow = React.memo(function LeadTableRow({
         </div>
       </td>
       <td className="table-td">
-        {lead.assignedToName || lead.adminName ? (
+        {(lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName || lead.adminName ? (
           <div className="flex flex-col gap-0.5">
-            {lead.assignedToName && (
-              <div className="flex items-center gap-1.5">
+            {((lead.assignedToNames && lead.assignedToNames.length > 0)
+              ? lead.assignedToNames
+              : lead.assignedToName
+              ? lead.assignedToName.split(' & ')
+              : []
+            ).map((name, idx) => (
+              <div key={idx} className="flex items-center gap-1.5" title={name}>
                 <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
-                <span className="text-xs text-foreground truncate max-w-[100px]">
-                  {lead.assignedToName}
+                <span className="text-xs text-foreground truncate max-w-[120px]">
+                  {name}
                 </span>
               </div>
-            )}
+            ))}
             {lead.adminName && (
-              <span className="text-xs text-muted-foreground truncate max-w-[100px]">
-                {lead.assignedToName ? 'admin: ' : ''}
+              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                {(lead.assignedToNames?.length || lead.assignedToName) ? 'admin: ' : ''}
                 {lead.adminName}
               </span>
             )}
@@ -533,7 +547,7 @@ export default function LeadsTable({
 
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full min-w-[1050px] table-mobile">
+        <table className="w-full min-w-[1300px] table-mobile">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
               <th className="table-th w-10">
@@ -584,7 +598,7 @@ export default function LeadsTable({
             )}
             {visibleLeads.length < leads.length && (
               <tr>
-                <td colSpan={10} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
+                <td colSpan={12} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
                   <div className="inline-flex items-center gap-3">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
