@@ -48,14 +48,15 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
             <Link
               key={item.labelKey}
               href={item.href}
-              className={`mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium transition-all ${
-                active ? 'text-primary' : 'text-muted-foreground'
+              className={`mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[11px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg ${
+                active ? 'text-lime-700 dark:text-lime-300' : 'text-muted-foreground'
               }`}
               aria-label={t(item.labelKey)}
+              aria-current={active ? 'page' : undefined}
             >
               <span
                 className={`w-10 h-6 flex items-center justify-center rounded-full transition-colors ${
-                  active ? 'bg-secondary' : ''
+                  active ? 'bg-lime-500/20' : ''
                 }`}
               >
                 <item.icon size={20} strokeWidth={active ? 2.4 : 2} />
@@ -72,14 +73,15 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
             <Link
               key={item.labelKey}
               href={item.href}
-              className={`mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium transition-all ${
-                active ? 'text-primary' : 'text-muted-foreground'
+              className={`mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[11px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg ${
+                active ? 'text-lime-700 dark:text-lime-300' : 'text-muted-foreground'
               }`}
               aria-label={t(item.labelKey)}
+              aria-current={active ? 'page' : undefined}
             >
               <span
                 className={`w-10 h-6 flex items-center justify-center rounded-full transition-colors ${
-                  active ? 'bg-secondary' : ''
+                  active ? 'bg-lime-500/20' : ''
                 }`}
               >
                 <item.icon size={20} strokeWidth={active ? 2.4 : 2} />

@@ -44,8 +44,15 @@ export default function Topbar({
     const onClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
     document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
   }, []);
 
   const submitSearch = (e: React.FormEvent) => {
@@ -69,44 +76,46 @@ export default function Topbar({
       {/* Desktop toggle */}
       <button
         onClick={onToggleSidebar}
-        className="hidden lg:flex btn-ghost p-2 rounded-lg"
+        className="hidden lg:flex items-center btn-ghost p-2 rounded-lg [@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px] justify-center"
         aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        {sidebarCollapsed ? <PanelLeftOpen size={18} className="rtl:-scale-x-100" /> : <PanelLeftClose size={18} className="rtl:-scale-x-100" />}
       </button>
 
       {/* Mobile menu */}
       <button
         onClick={onMobileMenuOpen}
-        className="lg:hidden btn-ghost p-2 rounded-lg"
+        className="lg:hidden flex items-center btn-ghost p-2 rounded-lg [@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px] justify-center"
         aria-label="Open navigation"
       >
         <Menu size={18} />
       </button>
 
       {/* Search */}
-      <div className="flex-1 max-w-sm">
-        <form onSubmit={submitSearch} className="relative">
+      <div className="flex-1 max-w-md">
+        <form onSubmit={submitSearch} className="relative" role="search">
           <Search
             size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+            className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
           />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('common.search')}
-            className="input-base pl-9 py-1.5 text-sm h-9"
+            aria-label={t('common.search')}
+            className="input-base ps-9 py-1.5 text-sm h-9 [@media(pointer:coarse)]:h-11"
             suppressHydrationWarning
           />
         </form>
       </div>
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-2 ms-auto">
         {/* Quick action: new lead — visible on all sizes */}
         <Link
           href="/leads-management?new=1"
-          className="inline-flex btn-primary !h-9 !px-3 items-center gap-1.5 text-xs"
+          className="inline-flex btn-primary !h-9 [@media(pointer:coarse)]:!h-11 !px-3 items-center gap-1.5 text-xs"
           title="Add lead"
         >
           <Plus size={14} />
@@ -116,7 +125,7 @@ export default function Topbar({
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
-          className="btn-ghost flex items-center p-2 rounded-lg"
+          className="btn-ghost flex items-center p-2 rounded-lg [@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px] justify-center"
           aria-label={resolvedDark ? 'Switch to light mode' : 'Switch to dark mode'}
           title={resolvedDark ? 'Light mode' : 'Dark mode'}
         >
@@ -126,7 +135,7 @@ export default function Topbar({
         {/* Language toggle */}
         <button
           onClick={toggleLang}
-          className="btn-ghost flex items-center gap-1.5 p-2 rounded-lg text-xs font-semibold"
+          className="btn-ghost flex items-center gap-1.5 p-2 rounded-lg text-xs font-semibold [@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:min-h-[44px] justify-center"
           aria-label="Switch language"
           title="Language"
         >
@@ -141,7 +150,9 @@ export default function Topbar({
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((o) => !o)}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="flex items-center gap-2 px-2 py-1.5 [@media(pointer:coarse)]:min-h-[44px] rounded-lg hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
               {initials}
@@ -149,14 +160,14 @@ export default function Topbar({
             <span className="hidden sm:block text-sm font-medium text-foreground truncate max-w-[120px]">
               {displayName}
             </span>
-            <span className="hidden sm:block text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <span className="hidden sm:block text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
               {displayRole.replace('_', ' ')}
             </span>
             <ChevronDown size={14} className="text-muted-foreground hidden sm:block" />
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-border bg-card shadow-modal p-1.5 fade-in z-50">
+            <div role="menu" className="absolute end-0 top-full mt-1.5 w-56 rounded-xl border border-border bg-card shadow-modal p-1.5 fade-in z-50">
               <div className="px-3 py-2.5 border-b border-border mb-1.5">
                 <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
                 <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
@@ -164,7 +175,8 @@ export default function Topbar({
               <Link
                 href="/settings"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-muted"
+                role="menuitem"
+                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-foreground hover:bg-muted focus:outline-none focus-visible:bg-muted"
               >
                 <Settings size={15} /> Settings
               </Link>
@@ -173,7 +185,8 @@ export default function Topbar({
                   setMenuOpen(false);
                   await signOut();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50"
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-500/10 focus:outline-none focus-visible:bg-red-500/10"
               >
                 <LogOut size={15} /> Sign out
               </button>

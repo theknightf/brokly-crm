@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AppLogo from './ui/AppLogo';
@@ -12,7 +12,7 @@ import {
   UsersRound,
   BarChart3,
   Settings,
-  ChevronRight,
+  ChevronLeft,
   Building,
   FolderOpen,
   ShieldCheck,
@@ -297,11 +297,20 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
 
   const nav = reorderNavForRole(profile?.role);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onMobileClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [mobileOpen, onMobileClose]);
+
   return (
     <>
       {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col bg-card border-r border-border sidebar-transition flex-shrink-0 ${
+        className={`hidden lg:flex flex-col bg-card border-e border-border sidebar-transition flex-shrink-0 ${
           collapsed ? 'w-16' : 'w-60'
         }`}
       >
@@ -311,8 +320,10 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
       {/* Mobile sidebar — single brand header lives inside SidebarContent
           (a second header here used to render the Brokly logo twice) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex flex-col w-60 bg-card border-r border-border lg:hidden sidebar-transition ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        aria-hidden={!mobileOpen}
+        inert={!mobileOpen}
+        className={`fixed inset-y-0 start-0 z-40 flex flex-col w-60 bg-card border-e border-border shadow-2xl lg:hidden sidebar-transition ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
         }`}
       >
         <SidebarContent
@@ -321,8 +332,8 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }: Sideba
           nav={nav}
           onNavigate={onMobileClose}
           headerAction={
-            <button onClick={onMobileClose} className="btn-ghost p-1.5" aria-label="Close menu">
-              <ChevronRight size={16} />
+            <button onClick={onMobileClose} className="btn-ghost p-2 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close menu">
+              <ChevronLeft size={16} className="rtl:rotate-180" />
             </button>
           }
         />
@@ -383,7 +394,7 @@ function SidebarContent({
       </div>
 
       {/* Nav groups */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-3" aria-label="Main">
         {nav
           .map((group) => ({
             ...group,
@@ -395,15 +406,15 @@ function SidebarContent({
             ),
           }))
           .filter((group) => group.items.length > 0)
-          .map((group) => (
-               <div key={`group-${group.titleKey}`}>
+          .map((group, gi) => (
+               <div key={`group-${group.titleKey}`} className={gi > 0 ? 'pt-3 border-t border-border' : ''}>
                {!collapsed && (
                  <>
-                   <p className="px-3 mb-0.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                   <p className="px-3 mb-0.5 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                      {t(group.titleKey)}
                    </p>
                    {group.descriptionKey && (
-                     <p className="px-3 mb-1.5 text-[11px] leading-tight text-muted-foreground/70">
+                     <p className="px-3 mb-2 text-xs leading-snug text-muted-foreground opacity-80">
                        {t(group.descriptionKey)}
                      </p>
                    )}
@@ -418,26 +429,22 @@ function SidebarContent({
                         isActive(item.href) ? 'nav-item-active' : ''
                       } ${collapsed ? 'justify-center px-2' : ''}`}
                       title={collapsed ? t(item.labelKey) : undefined}
+                      aria-current={isActive(item.href) ? 'page' : undefined}
+                      aria-label={collapsed ? t(item.labelKey) : undefined}
                     >
                       <span className="flex-shrink-0">{item.icon}</span>
                       {!collapsed && (
                         <>
                           <span className="flex-1 truncate">{t(item.labelKey)}</span>
                           {item.badge !== undefined && (
-                            <span className="bg-primary text-primary-foreground text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                            <span className="bg-primary text-primary-foreground text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center tabular-nums">
                               {item.badge}
                             </span>
                           )}
                         </>
                       )}
                       {collapsed && item.badge !== undefined && (
-                        <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-                      )}
-                      {collapsed && (
-                        <span className="absolute left-full ml-2 px-2 py-1 bg-foreground text-background text-xs rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-                          {t(item.labelKey)}
-                          {item.badge !== undefined && ` (${item.badge})`}
-                        </span>
+                        <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-primary rounded-full" />
                       )}
                     </Link>
                   </li>
@@ -448,27 +455,26 @@ function SidebarContent({
       </nav>
 
       {/* Bottom user card */}
-      <div
-        className={`border-t border-border p-3 flex-shrink-0 ${collapsed ? 'flex justify-center' : ''}`}
-      >
+      <div className={`border-t border-border p-3 flex-shrink-0 ${collapsed ? 'flex justify-center' : ''}`}>
         {collapsed ? (
           <button
             onClick={handleSignOut}
-            className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold hover:bg-primary/80 transition-colors"
+            className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold hover:brightness-110 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             title="Sign out"
+            aria-label="Sign out"
           >
             {initials}
           </button>
         ) : (
-          <div className="flex flex-col gap-2 px-1">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 rounded-xl bg-zinc-500/10 p-2.5">
+              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
                 <div className="flex items-center gap-1">
-                  <Building size={10} className="text-muted-foreground flex-shrink-0" />
+                  <Building size={11} className="text-muted-foreground flex-shrink-0" aria-hidden />
                   <p className="text-xs text-muted-foreground truncate capitalize">
                     {displayRole.replace('_', ' ')}
                   </p>
@@ -476,15 +482,14 @@ function SidebarContent({
               </div>
               <button
                 onClick={handleSignOut}
-                className="btn-ghost p-1.5 rounded-lg flex-shrink-0"
+                className="w-9 h-9 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11 rounded-lg flex items-center justify-center flex-shrink-0 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 title="Sign out"
+                aria-label="Sign out"
               >
-                <LogOut size={14} className="text-muted-foreground" />
+                <LogOut size={15} />
               </button>
             </div>
-            <p className="text-[10px] text-muted-foreground/60 text-center">
-              Made by Faris Mustafa
-            </p>
+            <p className="text-[11px] text-muted-foreground opacity-70 text-center">Made by Faris Mustafa</p>
           </div>
         )}
       </div>
