@@ -58,7 +58,7 @@ export default function AppLayout({ children, fill = false }: AppLayoutProps) {
         />
         <main className={`flex-1 overscroll-contain ${fill ? 'overflow-y-auto sm:flex sm:flex-col' : 'overflow-y-auto'}`}>
           <div
-            className={`pwa-content max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-32 lg:pb-6 ${fill ? 'sm:w-full sm:flex-1 sm:min-h-0 sm:flex sm:flex-col sm:!pb-16' : ''}`}
+            className={`pwa-content max-w-screen-2xl mx-auto px-6 lg:px-8 xl:px-10 py-6 pb-32 lg:pb-6 ${fill ? 'sm:w-full sm:!max-w-none sm:flex-1 sm:min-h-0 sm:flex sm:flex-col sm:!pb-16' : ''}`}
             style={{ paddingBottom: 'max(8rem, calc(7rem + env(safe-area-inset-bottom)))' }}
           >
             {!isDashboard && (

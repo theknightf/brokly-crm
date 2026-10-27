@@ -218,7 +218,7 @@ const ICON_BTN =
   'w-8 h-8 rounded-lg text-zinc-500 dark:text-zinc-400 transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 disabled:opacity-30 disabled:cursor-not-allowed [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11';
 
 /** Shared dense cell: tight padding, hairline divider (white/5 on the obsidian theme). */
-const TD = 'px-3 py-2 text-[13px] text-foreground whitespace-nowrap border-b border-black/5 dark:border-white/5';
+const TD = 'px-3 py-2 text-[13px] text-foreground whitespace-nowrap overflow-hidden border-b border-black/5 dark:border-white/5';
 
 function formatBudgetRange(min?: number, max?: number): string {
   const a = Number(min) || 0;
@@ -340,7 +340,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
       </td>
 
       {/* Lead identity & source */}
-      <td className={`${TD} sticky start-9 z-[1] min-w-[250px] border-e border-black/5 dark:border-white/5 ${rowBg}`} title={tooltip}>
+      <td className={`${TD} sticky start-9 z-[1] border-e border-black/5 dark:border-white/5 ${rowBg}`} title={tooltip}>
         <div className="flex items-center gap-2.5 min-w-0">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${
@@ -352,11 +352,11 @@ const LeadTableRow = React.memo(function LeadTableRow({
           >
             {hasName ? initials : <User size={15} />}
           </div>
-          <div className="min-w-0 leading-tight">
-            <div className="flex items-center gap-1.5">
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="flex items-center gap-1.5 min-w-0">
               <a
                 href={`/leads/${lead.id}`}
-                className="font-semibold text-[13px] text-zinc-900 dark:text-zinc-50 truncate max-w-[170px] hover:text-lime-600 dark:hover:text-lime-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 rounded"
+                className="font-semibold text-[13px] text-zinc-900 dark:text-zinc-50 truncate min-w-0 hover:text-lime-600 dark:hover:text-lime-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 rounded"
               >
                 {title}
               </a>
@@ -366,7 +366,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
                   onClick={() => copyText(lead.id, t('leads.idCopied'))}
                   title={`${t('leads.copyId')} (${lead.id})`}
                   aria-label={t('leads.copyId')}
-                  className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 hover:text-lime-600 dark:hover:text-lime-400 rounded px-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
+                  className="shrink-0 font-mono text-[10px] text-zinc-400 dark:text-zinc-500 hover:text-lime-600 dark:hover:text-lime-400 rounded px-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
                 >
                   #{shortId}
                 </button>
@@ -379,7 +379,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[250px]">
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
               {lead.source || (hasName ? '' : t('leads.noName'))}
             </p>
           </div>
@@ -389,7 +389,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
       {/* Contact number */}
       <td className={TD}>
         {hasPhone && (
-          <span className="inline-flex items-center gap-1.5 font-mono text-[12px] text-zinc-600 dark:text-zinc-300">
+          <span className="inline-flex max-w-full items-center gap-1.5 font-mono text-[12px] text-zinc-600 dark:text-zinc-300">
             <Phone size={12} className="text-lime-600 dark:text-lime-400 flex-shrink-0" />
             <span dir="ltr">{lead.phone}</span>
             <button
@@ -416,14 +416,14 @@ const LeadTableRow = React.memo(function LeadTableRow({
       </td>
 
       {/* Project & budget */}
-      <td className={`${TD} min-w-[170px]`}>
+      <td className={`${TD} hidden xl:table-cell`}>
         {lead.project || budget ? (
           <div className="leading-tight">
-            <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate max-w-[190px]">
+            <p className="text-[13px] font-medium text-zinc-900 dark:text-zinc-100 truncate">
               {lead.project || lead.propertyType || ''}
             </p>
             {(lead.unit || (lead.project && lead.propertyType)) && (
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[190px]">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
                 {lead.unit || lead.propertyType}
               </p>
             )}
@@ -439,11 +439,11 @@ const LeadTableRow = React.memo(function LeadTableRow({
       {/* Assigned agent */}
       <td className={TD}>
         {agentFirst ? (
-          <div className="flex items-center gap-2" title={agentNames.join(', ')}>
+          <div className="flex items-center gap-2 min-w-0" title={agentNames.join(', ')}>
             <span className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-zinc-200 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
               {agentInitials}
             </span>
-            <span className="text-[13px] truncate max-w-[110px]">{agentFirst}</span>
+            <span className="text-[13px] truncate min-w-0">{agentFirst}</span>
             {agentNames.length > 1 && (
               <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-white/5 rounded-full px-1.5">
                 +{agentNames.length - 1}
@@ -456,7 +456,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
       </td>
 
       {/* Last contact */}
-      <td className={TD}>
+      <td className={`${TD} hidden 2xl:table-cell`}>
         <div className="leading-tight" title={lead.lastActionAt ? new Date(lead.lastActionAt).toLocaleString(localeOf(lang)) : undefined}>
           <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">
             {lead.lastActionAt ? timeAgo(lead.lastActionAt, lang) : <span className="font-normal text-zinc-500 dark:text-zinc-400">{t('leads.noAction')}</span>}
@@ -468,7 +468,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
       </td>
 
       {/* Quick actions */}
-      <td className={`${TD} w-[170px]`}>
+      <td className={TD}>
         <div className="flex items-center justify-center gap-0.5">
           <button
             type="button"
@@ -604,11 +604,11 @@ function SkeletonRows({ count = 14 }: { count?: number }) {
               </div>
             </div>
           </td>
-          {[112, 88, 120, 96, 72].map((w, c) => (
-            <td key={c} className={TD}>
-              <div className="h-4 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" style={{ width: `${w}px` }} />
-            </td>
-          ))}
+          <td className={TD}><div className="h-4 w-24 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
+          <td className={TD}><div className="h-4 w-20 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
+          <td className={`${TD} hidden xl:table-cell`}><div className="h-4 w-24 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
+          <td className={TD}><div className="h-4 w-16 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
+          <td className={`${TD} hidden 2xl:table-cell`}><div className="h-4 w-14 rounded-full bg-zinc-200 dark:bg-white/10 animate-pulse" /></td>
           <td className={TD}>
             <div className="h-7 w-32 rounded-lg bg-zinc-200 dark:bg-white/10 animate-pulse mx-auto" />
           </td>
@@ -657,7 +657,7 @@ export default function LeadsTable({
   };
 
   const TH =
-    'sticky top-0 z-[2] px-3 py-2 text-start text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-[#12121a] border-b border-black/5 dark:border-white/10 whitespace-nowrap';
+    'sticky top-0 z-[2] px-3 py-2 text-start text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-[#12121a] border-b border-black/5 dark:border-white/10 whitespace-nowrap overflow-hidden text-ellipsis';
   const sortableCol = (label: string, key: keyof Lead, extra = '') => (
     <th
       className={`${TH} ${extra}`}
@@ -870,7 +870,19 @@ export default function LeadsTable({
           tabIndex={0}
           aria-label={t('leads.title')}
         >
-          <table className="w-full min-w-[1180px] border-separate border-spacing-0">
+          <table className="table-fixed w-full min-w-[880px] xl:min-w-[980px] 2xl:min-w-[1100px] border-separate border-spacing-0">
+            {/* Checkbox + actions are fixed; the rest share the width proportionally.
+                Project & budget appears from xl, Last contact from 2xl. */}
+            <colgroup>
+              <col style={{ width: 36 }} />
+              <col className="w-[30%] xl:w-[24%] 2xl:w-[21%]" />
+              <col className="w-[18%] xl:w-[14%] 2xl:w-[13%]" />
+              <col className="w-[18%] xl:w-[15%] 2xl:w-[13%]" />
+              <col className="hidden xl:table-column xl:w-[15%] 2xl:w-[14%]" />
+              <col className="w-[12%] xl:w-[10%] 2xl:w-[9%]" />
+              <col className="hidden 2xl:table-column 2xl:w-[8%]" />
+              <col style={{ width: 140 }} />
+            </colgroup>
             <thead>
               <tr>
                 <th className={`${TH} w-9 start-0 z-[3]`}>
@@ -882,12 +894,12 @@ export default function LeadsTable({
                     aria-label={t('leads.selectAll')}
                   />
                 </th>
-                {sortableCol(t('leads.colIdentity'), 'name', 'start-9 z-[3] min-w-[250px] border-e border-black/5 dark:border-white/5')}
+                {sortableCol(t('leads.colIdentity'), 'name', 'start-9 z-[3] border-e border-black/5 dark:border-white/5')}
                 {plainCol(t('leads.colContactNumber'))}
                 {sortableCol(t('leads.colStage'), 'status')}
-                {sortableCol(t('leads.colProject'), 'budgetMin')}
+                {sortableCol(t('leads.colProject'), 'budgetMin', 'hidden xl:table-cell')}
                 {sortableCol(t('leads.colAssigned'), 'agent')}
-                {plainCol(t('leads.colLastContact'))}
+                {plainCol(t('leads.colLastContact'), 'hidden 2xl:table-cell')}
                 {plainCol(t('leads.colQuick'), 'text-center')}
               </tr>
             </thead>
