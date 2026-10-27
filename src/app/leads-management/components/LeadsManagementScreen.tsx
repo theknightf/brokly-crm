@@ -30,6 +30,7 @@ import {
   ClipboardList,
   Activity,
   MessageSquare,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -46,6 +47,7 @@ import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction } from './mockLeads';
 import {
   PIPELINE_STAGES,
@@ -1903,16 +1905,16 @@ export default function LeadsManagementScreen({
       {viewLead && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end">
           <div
-            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm animate-in fade-in"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in"
             onClick={() => setViewLead(null)}
           />
           <div
-            className="relative flex flex-col bg-card border-border shadow-modal w-full sm:max-w-md sm:w-full sm:h-full sm:border-l sm:rounded-none rounded-t-2xl max-h-[85dvh] sm:max-h-full overflow-hidden animate-in fade-in slide-in-from-right-4"
+            className="relative flex flex-col bg-card border-border shadow-modal w-full sm:max-w-lg sm:w-full sm:h-full sm:border-s sm:rounded-none rounded-t-2xl max-h-[85dvh] sm:max-h-full overflow-hidden animate-in fade-in slide-in-from-right-4"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border flex-shrink-0 bg-card z-10">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+                <div className="w-10 h-10 rounded-full bg-lime-500/15 text-lime-700 dark:text-lime-300 flex items-center justify-center text-sm font-bold">
                   {viewLead.name
                     ?.split(' ')
                     .map((n) => n[0])
@@ -1924,6 +1926,7 @@ export default function LeadsManagementScreen({
                     <h2 className="text-base font-semibold text-foreground">
                       {viewLead.name || `Lead ${viewLead.id}`}
                     </h2>
+                    <StatusPill status={viewLead.status || 'Fresh Leads'} />
                   </div>
                   <div className="flex items-center gap-2 flex-wrap mt-1">
                     {viewLead.source && (
@@ -1949,17 +1952,18 @@ export default function LeadsManagementScreen({
               </div>
               <button
                 onClick={() => setViewLead(null)}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0"
+                aria-label="Close"
+                className="w-9 h-9 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                ✕
+                <X size={18} aria-hidden />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-5 sm:px-8 py-6 space-y-5">
               {/* Stage (pipeline status) — first thing a Sales user changes */}
-              <div className="bg-muted/40 rounded-2xl px-4 py-3">
+              <div className="bg-zinc-500/10 border border-border rounded-2xl px-4 py-3">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-foreground">Stage</p>
-                  <StatusBadge status={viewLead.status || 'Fresh Leads'} showDot />
+                  <StatusPill status={viewLead.status || 'Fresh Leads'} />
                 </div>
                 <div className="space-y-3">
                   {/* Forward pipeline stepper — progress bar with tappable stages */}
@@ -1987,7 +1991,7 @@ export default function LeadsManagementScreen({
                               isActive
                                 ? 'bg-primary text-primary-foreground border-primary font-semibold'
                                 : isDone
-                                ? 'text-primary bg-primary/5 border-primary/40 hover:bg-primary/10 font-medium'
+                                ? 'text-lime-700 dark:text-lime-300 bg-lime-500/10 border-lime-500/40 hover:bg-lime-500/20 font-medium'
                                 : 'text-foreground bg-card border-border hover:bg-muted font-medium'
                             }`}
                           >
@@ -2037,7 +2041,7 @@ export default function LeadsManagementScreen({
                     <button
                       type="button"
                       onClick={() => handlePostCallTrigger(viewLead)}
-                      className="h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                      className="h-11 rounded-xl bg-lime-500/15 text-lime-700 dark:text-lime-300 hover:bg-lime-500/25 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
                     >
                       <PhoneCall size={15} />
                       Call
@@ -2046,7 +2050,7 @@ export default function LeadsManagementScreen({
                       href={getWhatsAppLinkForLead(viewLead.phone, viewLead.name)}
                       target="_blank"
                       rel="noreferrer"
-                      className="h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                      className="h-11 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
                     >
                       <MessageCircle size={16} />
                       WhatsApp
@@ -2055,7 +2059,7 @@ export default function LeadsManagementScreen({
                 )}
                 <button
                   onClick={() => setLogCallLead(viewLead)}
-                  className="h-11 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
+                  className="h-11 rounded-xl bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25 flex items-center justify-center gap-1.5 text-sm font-semibold transition-all active:scale-[0.98]"
                 >
                   <PhoneCall size={15} />
                   Log Call
@@ -2072,6 +2076,7 @@ export default function LeadsManagementScreen({
                 </button>
               </div>
 
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground -mb-2">Contact & details</h3>
               {/* Key info — most important fields, visible without scrolling */}
               <div className="grid grid-cols-2 gap-2">
                 {[
@@ -2094,7 +2099,7 @@ export default function LeadsManagementScreen({
                     ? [{ label: 'Referred By', value: viewLead.referredByName || 'Recorded user' }]
                     : []),
                 ].map(({ label, value, href }) => (
-                  <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
+                  <div key={label} className="bg-zinc-500/10 border border-border rounded-xl px-3 py-2.5">
                     <p className="text-[11px] text-muted-foreground mb-0.5">{label}</p>
                     {href ? (
                       <a href={href} className="text-sm font-semibold text-primary truncate block">
@@ -2107,8 +2112,33 @@ export default function LeadsManagementScreen({
                 ))}
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Follow-up Due', value: viewLead.followUpDue || '—' },
+                  { label: 'Priority', value: viewLead.priority || '—' },
+                  { label: 'Rating', value: viewLead.leadRating || '—' },
+                  { label: 'Team', value: viewLead.team || '—' },
+                  { label: 'CS Agent', value: viewLead.csAgent || '—' },
+                  ...(viewLead.developer
+                    ? [{ label: 'Developer', value: viewLead.developer }]
+                    : []),
+                  ...(viewLead.project ? [{ label: 'Project', value: viewLead.project }] : []),
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-zinc-500/10 border border-border rounded-xl px-3 py-2.5">
+                    <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+                    <p className="text-sm font-medium text-foreground">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {viewLead.notes && (
+                <div className="bg-zinc-500/10 border border-border rounded-xl px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
+                  <p className="text-sm text-foreground">{viewLead.notes}</p>
+                </div>
+              )}
+
               {/* Schedule follow-up — synced to dashboard + follow-up partition */}
-              <div className="bg-muted/40 rounded-xl px-4 py-3 space-y-2">
+              <div className="bg-zinc-500/10 border border-border rounded-xl px-4 py-3 space-y-2">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <CalendarClock size={12} /> Schedule follow-up
                 </p>
@@ -2149,12 +2179,13 @@ export default function LeadsManagementScreen({
                 )}
               </div>
 
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground -mb-2">Deal & payment</h3>
               {/* Reservation / Done Deal quick actions */}
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setDealModal({ lead: viewLead, status: 'Reservation' })}
                   disabled={viewLead.status === 'Reservation'}
-                  className="h-10 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                  className="h-10 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                 >
                   <BadgeCheck size={14} />
                   Reservation
@@ -2162,55 +2193,46 @@ export default function LeadsManagementScreen({
                 <button
                   onClick={() => setDealModal({ lead: viewLead, status: 'Done Deal' })}
                   disabled={viewLead.status === 'Done Deal'}
-                  className="h-10 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                  className="h-10 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                 >
                   <Handshake size={14} />
                   Done Deal
                 </button>
               </div>
 
-              {/* Log call quick action */}
-              <button
-                onClick={() => setLogCallLead(viewLead)}
-                className="w-full h-10 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <PhoneCall size={14} />
-                Log Call
-              </button>
-
               {/* Payment plan summary */}
               {Number(viewLead.totalPrice) > 0 ? (
-                <div className="bg-muted/40 rounded-xl px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                <div className="bg-zinc-500/10 border border-border rounded-xl px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-1.5">
                   <p className="text-xs text-muted-foreground">Total price</p>
-                  <p className="text-sm font-semibold text-foreground text-right tabular-nums">
+                  <p className="text-sm font-semibold text-foreground text-end tabular-nums">
                     EGP {Number(viewLead.totalPrice).toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">Down payment</p>
-                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                  <p className="text-sm font-medium text-foreground text-end tabular-nums">
                     EGP {Number(viewLead.downPayment || 0).toLocaleString()}
                     {Number(viewLead.downPaymentPct) > 0 && (
-                      <span className="text-xs text-muted-foreground ml-1">
+                      <span className="text-xs text-muted-foreground ms-1">
                         ({Number(viewLead.downPaymentPct)}%)
                       </span>
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">Reservation</p>
-                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                  <p className="text-sm font-medium text-foreground text-end tabular-nums">
                     EGP {Number(viewLead.reservationAmount || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">Remaining</p>
-                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                  <p className="text-sm font-medium text-foreground text-end tabular-nums">
                     EGP {Number(viewLead.remainingAmount || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">Installment</p>
-                  <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                  <p className="text-sm font-medium text-foreground text-end tabular-nums">
                     EGP {Number(viewLead.installmentAmount || 0).toLocaleString()}
                     {Number(viewLead.installmentCount) > 0 && ` × ${viewLead.installmentCount}`}
                   </p>
                   {viewLead.reservationDate && (
                     <>
                       <p className="text-xs text-muted-foreground">Reservation date</p>
-                      <p className="text-sm font-medium text-foreground text-right">
+                      <p className="text-sm font-medium text-foreground text-end">
                         {viewLead.reservationDate}
                       </p>
                     </>
@@ -2218,7 +2240,7 @@ export default function LeadsManagementScreen({
                   {viewLead.closingDate && (
                     <>
                       <p className="text-xs text-muted-foreground">Closing date</p>
-                      <p className="text-sm font-medium text-foreground text-right">
+                      <p className="text-sm font-medium text-foreground text-end">
                         {viewLead.closingDate}
                       </p>
                     </>
@@ -2226,7 +2248,7 @@ export default function LeadsManagementScreen({
                   {Number(viewLead.commission) > 0 && (
                     <>
                       <p className="text-xs text-muted-foreground">Commission</p>
-                      <p className="text-sm font-medium text-foreground text-right tabular-nums">
+                      <p className="text-sm font-medium text-foreground text-end tabular-nums">
                         EGP {Number(viewLead.commission).toLocaleString()}
                       </p>
                     </>
@@ -2234,7 +2256,7 @@ export default function LeadsManagementScreen({
                   {viewLead.paymentStatus && (
                     <>
                       <p className="text-xs text-muted-foreground">Payment status</p>
-                      <p className="text-sm font-medium text-foreground text-right">
+                      <p className="text-sm font-medium text-foreground text-end">
                         {viewLead.paymentStatus}
                       </p>
                     </>
@@ -2249,7 +2271,7 @@ export default function LeadsManagementScreen({
                   </div>
                 </div>
               ) : (
-                <div className="bg-muted/40 rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
+                <div className="bg-zinc-500/10 border border-border rounded-xl px-3 py-2.5 flex items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">No payment plan added</p>
                   <button
                     onClick={() => setPayPlanLead(viewLead)}
@@ -2260,33 +2282,8 @@ export default function LeadsManagementScreen({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Follow-up Due', value: viewLead.followUpDue || '—' },
-                  { label: 'Priority', value: viewLead.priority || '—' },
-                  { label: 'Rating', value: viewLead.leadRating || '—' },
-                  { label: 'Team', value: viewLead.team || '—' },
-                  { label: 'CS Agent', value: viewLead.csAgent || '—' },
-                  ...(viewLead.developer
-                    ? [{ label: 'Developer', value: viewLead.developer }]
-                    : []),
-                  ...(viewLead.project ? [{ label: 'Project', value: viewLead.project }] : []),
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-muted/40 rounded-xl px-3 py-2.5">
-                    <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
-                    <p className="text-sm font-medium text-foreground">{value}</p>
-                  </div>
-                ))}
-              </div>
-              {viewLead.notes && (
-                <div className="bg-muted/40 rounded-xl px-3 py-2.5">
-                  <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
-                  <p className="text-sm text-foreground">{viewLead.notes}</p>
-                </div>
-              )}
-
               {viewLead.phone && (
-                <details className="bg-muted/40 rounded-xl px-3 py-2.5 group" open>
+                <details className="bg-zinc-500/10 border border-border rounded-xl px-3 py-2.5 group" open>
                   <summary className="cursor-pointer list-none text-xs text-muted-foreground flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5">
                       <MessageCircle size={11} />
@@ -2304,32 +2301,32 @@ export default function LeadsManagementScreen({
                       {
                         label: 'WA Sent',
                         icon: <CheckCircle2 size={13} />,
-                        cls: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+                        cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25',
                         outcome: 'WhatsApp Sent',
                       },
                       {
                         label: 'Customer Replied',
                         icon: <ThumbsUp size={13} />,
-                        cls: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
+                        cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25',
                         outcome: 'Customer Replied',
                       },
                       {
                         label: 'No Reply',
                         icon: <UserX size={13} />,
-                        cls: 'bg-muted text-muted-foreground hover:bg-muted/80',
+                        cls: 'bg-zinc-500/10 text-muted-foreground hover:bg-zinc-500/20',
                         outcome: 'No Reply',
                       },
                       {
                         label: 'WA Follow-up',
                         icon: <CalendarClock size={13} />,
-                        cls: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+                        cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25',
                         outcome: 'WhatsApp Follow-up',
                       },
                     ].map((a) => (
                       <button
                         key={a.outcome}
                         onClick={() => handleWhatsAppAction(viewLead, a.outcome)}
-                        className={`w-full h-10 rounded-lg px-3 text-left text-sm font-medium flex items-center gap-2 active:scale-[0.98] transition-all ${
+                        className={`w-full h-10 rounded-lg px-3 text-start text-sm font-medium flex items-center gap-2 active:scale-[0.98] transition-all ${
                           a.cls
                         }`}
                       >
@@ -2342,7 +2339,7 @@ export default function LeadsManagementScreen({
               )}
 
               {/* Section tabs */}
-              <div className="sticky top-0 z-10 -mx-5 sm:-mx-6 px-5 sm:px-6 py-2 bg-card/95 backdrop-blur border-b border-border flex gap-1 animate-in fade-in">
+              <div className="sticky top-0 z-10 -mx-5 sm:-mx-6 px-5 sm:px-6 py-2 bg-card border-b border-border flex gap-1 animate-in fade-in">
                 {(
                   [
                     ['overview', 'Overview', ClipboardList],
@@ -2354,7 +2351,8 @@ export default function LeadsManagementScreen({
                   <button
                     key={key}
                     onClick={() => setViewTab(key)}
-                    className={`flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold transition-colors ${
+                    aria-pressed={viewTab === key}
+                    className={`flex items-center gap-1.5 px-3 h-9 [@media(pointer:coarse)]:h-11 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       viewTab === key
                         ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-muted-foreground hover:bg-muted'
