@@ -3,6 +3,24 @@
 import { createClient } from '@/lib/supabase/client';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 import { isAdminRole } from '@/lib/roles';
+import { describePostgrestError, logPostgrestError, toPostgrestError } from '@/lib/supabase/postgrestError';
+
+export function isAllOrEmpty(val?: string | null): boolean {
+  if (val === undefined || val === null) return true;
+  if (typeof val !== 'string') return false;
+  const trimmed = val.trim().toLowerCase();
+  return (
+    trimmed === '' ||
+    trimmed === 'all' ||
+    trimmed === 'undefined' ||
+    trimmed === 'null' ||
+    trimmed.startsWith('all ')
+  );
+}
+
+const isUuid = (val: unknown): val is string =>
+  typeof val === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
 
 export function getLocalTodayDateString(): string {
   const d = new Date();
@@ -305,8 +323,11 @@ export const leadsService = {
         const scope = await getCachedActorScope(supabase);
         if (scope.userId && !isAdminRole(scope.role)) {
           if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
-            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
-          } else {
+            const validMembers = (scope.memberIds || []).filter(isUuid);
+            if (validMembers.length > 0) {
+              query = query.or(`assigned_to.in.(${validMembers.join(',')}),created_by.in.(${validMembers.join(',')})`);
+            }
+          } else if (isUuid(scope.userId)) {
             query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
           }
         }
@@ -316,12 +337,14 @@ export const leadsService = {
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) {
-        if (isSchemaError(error)) throw error;
+        logPostgrestError('leadsService.getAll', error);
+        if (isSchemaError(error)) throw toPostgrestError(error, 'Failed to load leads');
         return [];
       }
       return (data || []).map(rowToLead);
     } catch (err: any) {
-      if (isSchemaError(err)) throw err;
+      logPostgrestError('leadsService.getAll.catch', err);
+      if (isSchemaError(err)) throw toPostgrestError(err, 'Failed to load leads');
       return [];
     }
   },
@@ -1002,8 +1025,11 @@ export const leadsService = {
         const scope = await getCachedActorScope(supabase);
         if (scope.userId && !isAdminRole(scope.role)) {
           if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
-            query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
-          } else {
+            const validMembers = (scope.memberIds || []).filter(isUuid);
+            if (validMembers.length > 0) {
+              query = query.or(`assigned_to.in.(${validMembers.join(',')}),created_by.in.(${validMembers.join(',')})`);
+            }
+          } else if (isUuid(scope.userId)) {
             query = query.or(`assigned_to.eq.${scope.userId},created_by.eq.${scope.userId}`);
           }
         }
@@ -1014,7 +1040,7 @@ export const leadsService = {
       // Action filter: restrict to leads touched by a specific activity-log
       // action (e.g. "Lead Assigned"). Respects activity_log RLS which keeps
       // agents on their own actions and admins on everything.
-      if (action) {
+      if (!isAllOrEmpty(action)) {
         let leadIds: string[] = [];
         try {
           const { data: logRows, error: logErr } = await supabase
@@ -1029,7 +1055,7 @@ export const leadsService = {
           } else {
             leadIds = (logRows || [])
               .map((r: any) => r.entity_id)
-              .filter((v: string | null | undefined): v is string => !!v);
+              .filter((v: string | null | undefined): v is string => isUuid(v));
           }
         } catch (err: any) {
           if (isSchemaError(err)) throw err;
@@ -1038,7 +1064,8 @@ export const leadsService = {
         if (!leadIds.length) {
           return { data: [], total: 0, page, pageSize };
         }
-        query = query.in('id', leadIds);
+        // Chunk or limit to prevent URL query string limit overflow
+        query = query.in('id', leadIds.slice(0, 150));
       }
 
       const q = search.trim();
@@ -1047,23 +1074,36 @@ export const leadsService = {
           `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
         );
       }
-      if (status) query = query.eq('crm_status', status);
-      if (source) query = query.eq('source', source);
-      if (agent) query = query.eq('agent', agent);
-      if (project) query = query.eq('project', project);
-      if (propertyType) query = query.eq('property_type', propertyType);
+
+      // Sentinel checks: skip filters if value is 'all', empty, or undefined.
+      // Also verify column types (UUID vs text).
+      if (!isAllOrEmpty(status)) query = query.eq('crm_status', status);
+      if (!isAllOrEmpty(source)) query = query.eq('source', source);
+      if (!isAllOrEmpty(agent)) {
+        if (isUuid(agent)) {
+          query = query.eq('assigned_to', agent);
+        } else {
+          query = query.eq('agent', agent);
+        }
+      }
+      if (!isAllOrEmpty(project)) query = query.eq('project', project);
+      if (!isAllOrEmpty(propertyType)) query = query.eq('property_type', propertyType);
+
       // Exclude leads the agent just called so the queue updates instantly.
       // The "not.in" filter is safe — empty arrays must NOT be passed or
       // PostgREST will return zero rows.
       if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
-        query = query.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
+        const validRecent = recentlyCalledIds.filter(isUuid).slice(0, 50);
+        if (validRecent.length > 0) {
+          query = query.not('id', 'in', `(${validRecent.map((id) => `"${id}"`).join(',')})`);
+        }
       }
 
       const from = Math.max(0, (page - 1) * pageSize);
       const to = from + pageSize - 1;
 
       // ── Action Taken filter (replaces Contacted) ──────────────────────────
-      const hasActionFilter = !!actionTaken || !!actionFrom || !!actionTo;
+      const hasActionFilter = (!isAllOrEmpty(actionTaken) && actionTaken !== '') || !isAllOrEmpty(actionFrom) || !isAllOrEmpty(actionTo);
       let useFallbackContacted = false;
       if (hasActionFilter) {
         try {
@@ -1105,13 +1145,14 @@ export const leadsService = {
           const ids = [
             ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
             ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
-          ].filter((v): v is string => !!v);
+          ].filter((v): v is string => isUuid(v));
           fallbackSet = new Set(ids);
           if (actionTaken === 'today' || contacted === 'today') {
             if (!fallbackSet.size) return { data: [], total: 0, page, pageSize };
-            query = query.in('id', [...fallbackSet]);
+            query = query.in('id', [...fallbackSet].slice(0, 150));
           } else if ((actionTaken === 'no-action' || contacted === 'not-today') && fallbackSet.size) {
-            query = query.not('id', 'in', `(${[...fallbackSet].map((id) => `"${id}"`).join(',')})`);
+            const idsToExclude = [...fallbackSet].slice(0, 150);
+            query = query.not('id', 'in', `(${idsToExclude.map((id) => `"${id}"`).join(',')})`);
           }
         } catch {
           fallbackSet = new Set<string>();
@@ -1119,35 +1160,104 @@ export const leadsService = {
       }
 
       // ── Called filter: has sales logged a call? (ever or in range) ──────────
-      const hasCalledFilter = !!called || !!calledFrom || !!calledTo;
+      const hasCalledFilter = (!isAllOrEmpty(called) && called !== '') || !isAllOrEmpty(calledFrom) || !isAllOrEmpty(calledTo);
       let calledSet: Set<string> | null = null;
+      let usedComputedHasCall = false;
+
       if (hasCalledFilter) {
-        try {
-          let qLogs: any = supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead');
-          if (calledFrom) qLogs = qLogs.gte('created_at', `${calledFrom}T00:00:00.000Z`);
-          if (calledTo) qLogs = qLogs.lte('created_at', `${calledTo}T23:59:59.999Z`);
-          const { data: callRows } = await qLogs;
-          const ids = ((callRows || []).map((r: any) => r.entity_id) as (string | null | undefined)[]).filter((v): v is string => !!v);
-          calledSet = new Set(ids);
+        if (!calledFrom && !calledTo) {
+          // Fast-path: use computed column `has_call` (zero URL query length explosion)
           if (called === 'called') {
-            if (!calledSet.size) return { data: [], total: 0, page, pageSize };
-            query = query.in('id', [...calledSet]);
+            query = query.eq('has_call', true);
+            usedComputedHasCall = true;
           } else if (called === 'not-called') {
-            if (calledSet.size) query = query.not('id', 'in', `(${[...calledSet].map((id) => `"${id}"`).join(',')})`);
-          } else if (calledFrom || calledTo) {
-            if (!calledSet.size) return { data: [], total: 0, page, pageSize };
-            query = query.in('id', [...calledSet]);
+            query = query.eq('has_call', false);
+            usedComputedHasCall = true;
           }
-        } catch {
-          calledSet = new Set<string>();
+        } else {
+          // Date range filter on call_logs
+          try {
+            let qLogs: any = supabase.from('call_logs').select('entity_id').eq('entity_type', 'lead');
+            if (calledFrom) qLogs = qLogs.gte('created_at', `${calledFrom}T00:00:00.000Z`);
+            if (calledTo) qLogs = qLogs.lte('created_at', `${calledTo}T23:59:59.999Z`);
+            const { data: callRows } = await qLogs;
+            const ids = ((callRows || []).map((r: any) => r.entity_id) as (string | null | undefined)[]).filter((v): v is string => isUuid(v));
+            calledSet = new Set(ids);
+            if (called === 'called') {
+              if (!calledSet.size) return { data: [], total: 0, page, pageSize };
+              query = query.in('id', [...calledSet].slice(0, 150));
+            } else if (called === 'not-called') {
+              if (calledSet.size && calledSet.size <= 150) {
+                query = query.not('id', 'in', `(${[...calledSet].map((id) => `"${id}"`).join(',')})`);
+              } else {
+                query = query.eq('has_call', false);
+              }
+            } else if (calledFrom || calledTo) {
+              if (!calledSet.size) return { data: [], total: 0, page, pageSize };
+              query = query.in('id', [...calledSet].slice(0, 150));
+            }
+          } catch {
+            calledSet = new Set<string>();
+          }
         }
       }
+
+      // Log the final request: exact PostgREST URL and applied filters
+      const finalUrl = (query as any)?.url?.toString() || '';
+      console.info('[leadsService.getPage] Final PostgREST request:', {
+        url: finalUrl,
+        sentinelFiltered: {
+          status: isAllOrEmpty(status) ? '(skipped sentinel)' : status,
+          source: isAllOrEmpty(source) ? '(skipped sentinel)' : source,
+          agent: isAllOrEmpty(agent) ? '(skipped sentinel)' : agent,
+          project: isAllOrEmpty(project) ? '(skipped sentinel)' : project,
+          propertyType: isAllOrEmpty(propertyType) ? '(skipped sentinel)' : propertyType,
+          action: isAllOrEmpty(action) ? '(skipped sentinel)' : action,
+          called: isAllOrEmpty(called) ? '(skipped sentinel)' : called,
+          actionTaken: isAllOrEmpty(actionTaken) ? '(skipped sentinel)' : actionTaken,
+        },
+        page,
+        pageSize,
+        sortKey,
+        sortDir,
+      });
 
       const { data, error, count } = await query
         .order(column, { ascending: sortDir !== 'desc' })
         .range(from, to);
 
       if (error) {
+        logPostgrestError('leadsService.getPage', error, {
+          url: finalUrl,
+          params: { status, source, agent, project, propertyType, action, called, actionTaken, search },
+        });
+
+        // If computed column has_call failed because migration wasn't loaded, retry without it
+        if (usedComputedHasCall && String(error.message || '').includes('has_call')) {
+          let fallbackQ = supabase
+            .from('leads')
+            .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', { count: 'exact' });
+          if (q) fallbackQ = fallbackQ.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`);
+          if (!isAllOrEmpty(status)) fallbackQ = fallbackQ.eq('crm_status', status);
+          if (!isAllOrEmpty(source)) fallbackQ = fallbackQ.eq('source', source);
+          if (!isAllOrEmpty(agent)) {
+            if (isUuid(agent)) fallbackQ = fallbackQ.eq('assigned_to', agent);
+            else fallbackQ = fallbackQ.eq('agent', agent);
+          }
+          if (!isAllOrEmpty(project)) fallbackQ = fallbackQ.eq('project', project);
+          if (!isAllOrEmpty(propertyType)) fallbackQ = fallbackQ.eq('property_type', propertyType);
+
+          const rFallback = await fallbackQ.order(column, { ascending: sortDir !== 'desc' }).range(from, to);
+          if (!rFallback.error) {
+            return {
+              data: (rFallback.data || []).map(rowToLead),
+              total: rFallback.count ?? (rFallback.data || []).length,
+              page,
+              pageSize,
+            };
+          }
+        }
+
         if (isSchemaError(error) && hasActionFilter && !useFallbackContacted) {
           try {
             const start = new Date();
@@ -1163,28 +1273,35 @@ export const leadsService = {
             const ids = [
               ...((todayLogs || []).map((r: any) => r.entity_id) as (string | null | undefined)[]),
               ...((todayFUs || []).map((r: any) => r.lead_id) as (string | null | undefined)[]),
-            ].filter((v): v is string => !!v);
+            ].filter((v): v is string => isUuid(v));
             const s = new Set(ids);
             let retryQuery: any = supabase
               .from('leads')
               .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', { count: 'exact' });
             if (q) retryQuery = retryQuery.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`);
-            if (status) retryQuery = retryQuery.eq('crm_status', status);
-            if (source) retryQuery = retryQuery.eq('source', source);
-            if (agent) retryQuery = retryQuery.eq('agent', agent);
-            if (project) retryQuery = retryQuery.eq('project', project);
-            if (propertyType) retryQuery = retryQuery.eq('property_type', propertyType);
+            if (!isAllOrEmpty(status)) retryQuery = retryQuery.eq('crm_status', status);
+            if (!isAllOrEmpty(source)) retryQuery = retryQuery.eq('source', source);
+            if (!isAllOrEmpty(agent)) {
+              if (isUuid(agent)) retryQuery = retryQuery.eq('assigned_to', agent);
+              else retryQuery = retryQuery.eq('agent', agent);
+            }
+            if (!isAllOrEmpty(project)) retryQuery = retryQuery.eq('project', project);
+            if (!isAllOrEmpty(propertyType)) retryQuery = retryQuery.eq('property_type', propertyType);
             if (Array.isArray(recentlyCalledIds) && recentlyCalledIds.length > 0) {
-              retryQuery = retryQuery.not('id', 'in', `(${recentlyCalledIds.map((id) => `"${id}"`).join(',')})`);
+              const validRecent = recentlyCalledIds.filter(isUuid).slice(0, 50);
+              if (validRecent.length > 0) {
+                retryQuery = retryQuery.not('id', 'in', `(${validRecent.map((id) => `"${id}"`).join(',')})`);
+              }
             }
             if (actionTaken === 'today' || contacted === 'today') {
               if (!s.size) return { data: [], total: 0, page, pageSize };
-              retryQuery = retryQuery.in('id', [...s]);
+              retryQuery = retryQuery.in('id', [...s].slice(0, 150));
             } else if ((actionTaken === 'no-action' || contacted === 'not-today') && s.size) {
-              retryQuery = retryQuery.not('id', 'in', `(${[...s].map((id) => `"${id}"`).join(',')})`);
+              const idsToExclude = [...s].slice(0, 150);
+              retryQuery = retryQuery.not('id', 'in', `(${idsToExclude.map((id) => `"${id}"`).join(',')})`);
             }
             const r2: any = await retryQuery.order(column, { ascending: sortDir !== 'desc' }).range(from, to);
-            if (r2.error) throw new Error(r2.error.message || 'Failed to load leads');
+            if (r2.error) throw toPostgrestError(r2.error, 'Failed to load leads');
             return {
               data: (r2.data || []).map((row: any) => {
                 const mapped = rowToLead(row);
@@ -1195,11 +1312,12 @@ export const leadsService = {
               pageSize,
             };
           } catch (e: any) {
-            throw new Error(error.message || 'Failed to load leads');
+            throw toPostgrestError(e || error, 'Failed to load leads');
           }
         }
-        throw new Error(error.message || 'Failed to load leads');
+        throw toPostgrestError(error, 'Failed to load leads');
       }
+
       // Derive hasBeenCalled without an extra blocking DB query when calledSet is not active
       const pageCalledSet: Set<string> | null = calledSet;
       return {
@@ -1207,9 +1325,9 @@ export const leadsService = {
           const mapped = rowToLead(row);
           if (fallbackSet) {
             const v = fallbackSet.has(row.id);
-            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at) };
+            return { ...mapped, contactedToday: v, actionTakenToday: v, hasBeenCalled: pageCalledSet ? pageCalledSet.has(row.id) : (row.has_call ?? Boolean(row.last_contact || row.last_action_at)) };
           }
-          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : Boolean(row.last_contact || row.last_action_at);
+          const hasBeenCalled = pageCalledSet ? pageCalledSet.has(row.id) : (row.has_call ?? Boolean(row.last_contact || row.last_action_at));
           return { ...mapped, hasBeenCalled };
         }),
         total: count ?? (data || []).length,
@@ -1217,8 +1335,9 @@ export const leadsService = {
         pageSize,
       };
     } catch (err: any) {
-      if (isSchemaError(err)) throw err;
-      throw err;
+      logPostgrestError('leadsService.getPage.catch', err);
+      if (err?.code || err?.details) throw err;
+      throw toPostgrestError(err, 'Failed to load leads');
     }
   },
 

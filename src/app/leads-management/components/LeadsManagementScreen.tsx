@@ -260,7 +260,12 @@ export default function LeadsManagementScreen({
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<{
+    message: string;
+    code?: string | null;
+    details?: string | null;
+    hint?: string | null;
+  } | null>(null);
   const [filters, setFilters] = useState<FilterState>(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
@@ -527,7 +532,16 @@ export default function LeadsManagementScreen({
       setLoadError(null);
     } catch (err: any) {
       if (requestId !== fetchRef.current) return;
-      setLoadError(err?.message || 'Failed to load leads');
+      const code = err?.code || null;
+      const details = err?.details || null;
+      const hint = err?.hint || null;
+      const rawMessage = err?.message || 'Failed to load leads';
+      setLoadError({
+        message: rawMessage,
+        code,
+        details,
+        hint,
+      });
       setLeads([]);
     } finally {
       if (requestId === fetchRef.current) {
@@ -1527,21 +1541,59 @@ export default function LeadsManagementScreen({
       )}
 
       {/* Table / Board */}
-      {loadError && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <TriangleAlert size={18} className="flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold">Failed to load leads</p>
-              <p className="text-xs opacity-80">{loadError}</p>
+      {loadError && (() => {
+        const isDev = process.env.NODE_ENV !== 'production';
+        const isAdmin = user?.role === 'admin' || user?.role === 'owner' || user?.role === 'manager';
+        const hasExtra = Boolean(loadError.code || loadError.details || loadError.hint);
+        const displaySubtitle = isDev
+          ? loadError.message
+          : loadError.message === 'Failed to load leads'
+          ? 'Could not retrieve lead records from the database.'
+          : loadError.message;
+
+        return (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-4 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <TriangleAlert size={18} className="flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Failed to load leads</p>
+                <p className="text-xs opacity-90 break-words mt-0.5">{displaySubtitle}</p>
+                {(isDev || isAdmin) && (hasExtra || loadError.message) && (
+                  <details className="mt-2 text-[11px] font-mono text-destructive/90 cursor-pointer">
+                    <summary className="hover:underline select-none font-semibold">
+                      Technical error details {loadError.code ? `(${loadError.code})` : ''}
+                    </summary>
+                    <div className="mt-1.5 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs space-y-1">
+                      {loadError.code && (
+                        <div>
+                          <span className="font-semibold">Code:</span> {loadError.code}
+                        </div>
+                      )}
+                      {loadError.details && (
+                        <div>
+                          <span className="font-semibold">Details:</span> {loadError.details}
+                        </div>
+                      )}
+                      {loadError.hint && (
+                        <div>
+                          <span className="font-semibold">Hint:</span> {loadError.hint}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-semibold">Full error:</span> {loadError.message}
+                      </div>
+                    </div>
+                  </details>
+                )}
+              </div>
             </div>
+            <button onClick={() => fetchLeads()} className="btn-secondary shrink-0">
+              <RefreshCw size={14} />
+              Retry
+            </button>
           </div>
-          <button onClick={() => fetchLeads()} className="btn-secondary shrink-0">
-            <RefreshCw size={14} />
-            Retry
-          </button>
-        </div>
-      )}
+        );
+      })()}
       <div className="card-base !p-0 overflow-hidden animate-in fade-in">
         {viewMode === 'board' ? (
           <LeadBoard
