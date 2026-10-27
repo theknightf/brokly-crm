@@ -118,34 +118,20 @@ function MobileLeadCardInner({
     if (!text) return;
     setNoteSaving(true);
     try {
-      const res = await fetch('/api/lead-comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id, body: text, user_id: user?.id || '' }),
-      });
-      if (!res.ok) {
-        const { leadCommentsService } = await import('@/lib/services/crmService');
-        await leadCommentsService.create(lead.id, text, user?.id || '');
-      }
+      const { leadsService, leadCommentsService } = await import('@/lib/services/crmService');
+      await Promise.all([
+        leadsService.updateNotes(lead.id, text),
+        leadCommentsService.create(lead.id, text, user?.id || '').catch(() => {}),
+      ]);
       toast.success('Note added');
       setNoteText('');
       setNoteOpen(false);
+      lead.notes = text;
       lead.actionTakenToday = true;
       lead.contactedToday = true;
       onAddNote?.(lead);
-    } catch {
-      try {
-        const { leadCommentsService } = await import('@/lib/services/crmService');
-        await leadCommentsService.create(lead.id, text, user?.id || '');
-        toast.success('Note added');
-        setNoteText('');
-        setNoteOpen(false);
-        lead.actionTakenToday = true;
-        lead.contactedToday = true;
-        onAddNote?.(lead);
-      } catch {
-        toast.error('Could not save note');
-      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not save note');
     } finally {
       setNoteSaving(false);
     }
@@ -241,9 +227,6 @@ function MobileLeadCardInner({
               </button>
             )}
           </div>
-          <p className="text-sm font-bold text-foreground tabular-nums" dir="ltr">
-            {budgetText}
-          </p>
         </div>
       </div>
 
@@ -318,14 +301,6 @@ function MobileLeadCardInner({
           </ViewportPopover>
         )}
 
-        {/* Status badge — darker green pill with lightning */}
-        <span
-          className="inline-flex items-center gap-1 h-9 px-3.5 rounded-full text-xs font-bold text-white dark:text-white"
-          style={{ backgroundColor: '#2f855a' }}
-        >
-          <Zap size={13} className="fill-white" />
-          <span className="truncate max-w-[110px]">{lead.status || 'Pending Leads'}</span>
-        </span>
         {((lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName) && (
           <span className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
             <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />

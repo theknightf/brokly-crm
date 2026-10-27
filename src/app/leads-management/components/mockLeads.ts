@@ -10,6 +10,7 @@ export type LeadStatus =
   | 'Pending Leads'
   | 'Following Up'
   | 'Meeting'
+  | 'Follow Up After Meeting'
   | 'Cancellation'
   | 'Done Deal'
   | 'Not Interested'
@@ -81,6 +82,7 @@ export interface Lead {
   budgetMin?: number;
   budgetMax?: number;
   source?: LeadSource;
+  leadSourceId?: string | null;
   agent?: string;
   agentInitials?: string;
   status?: LeadStatus;
@@ -107,6 +109,7 @@ export interface Lead {
   /** Called vs Not Called — derived from call_logs, display-only. */
   hasBeenCalled?: boolean;
   lastCallAt?: string | null;
+  lastCallOutcome?: string;
   createdAt?: string;
   notes?: string;
   location?: string;

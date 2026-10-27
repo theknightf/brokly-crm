@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { sanitizeEgyptPhone } from '@/lib/whatsapp';
 import {
   BadgeCheck,
-  Building2,
+  Building,
   Check,
   CheckCircle2,
   Eye,
@@ -235,7 +235,7 @@ export default function RecommendedUnitDetailsModal({
             <img src={img} alt={unit.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary via-background to-muted">
-              <Building2 size={40} className="text-primary/40" />
+              <Building size={40} className="text-primary/40" />
             </div>
           )}
           <div className="absolute top-3 right-3 flex items-center gap-2">

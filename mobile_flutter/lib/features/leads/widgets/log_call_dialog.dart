@@ -237,6 +237,15 @@ class _LogCallDialogState extends State<LogCallDialog> {
       suggestsSchedule: true,
     ),
     _CallOutcomeOption(
+      key: 'No Answer At All',
+      label: 'No Answer At All',
+      labelAr: 'لا يوجد رد نهائياً',
+      nextStage: 'No Answer At All',
+      icon: LucideIcons.phoneOff,
+      color: Color(0xFFF59E0B),
+      suggestsSchedule: true,
+    ),
+    _CallOutcomeOption(
       key: 'Interested',
       label: 'Interested',
       labelAr: 'مهتم',
@@ -252,6 +261,24 @@ class _LogCallDialogState extends State<LogCallDialog> {
       nextStage: 'Following Up',
       icon: LucideIcons.calendarClock,
       color: Color(0xFF3B82F6),
+      suggestsSchedule: true,
+    ),
+    _CallOutcomeOption(
+      key: 'Meeting',
+      label: 'Meeting',
+      labelAr: 'اجتماع',
+      nextStage: 'Meeting',
+      icon: LucideIcons.calendarCheck,
+      color: Color(0xFF8B5CF6),
+      suggestsSchedule: true,
+    ),
+    _CallOutcomeOption(
+      key: 'Follow Up After Meeting',
+      label: 'Follow Up After Meeting',
+      labelAr: 'متابعة بعد الاجتماع',
+      nextStage: 'Follow Up After Meeting',
+      icon: LucideIcons.calendarClock,
+      color: Color(0xFF06B6D4),
       suggestsSchedule: true,
     ),
     _CallOutcomeOption(
@@ -343,10 +370,13 @@ class _LogCallDialogState extends State<LogCallDialog> {
 
   bool get _needsSchedule =>
       _outcome == 'Follow-up' ||
+      _outcome == 'Follow Up After Meeting' ||
+      _outcome == 'Meeting' ||
       _outcome == 'Schedule Meeting' ||
       _outcome == 'Site Visit' ||
       _outcome == 'Interested' ||
-      _outcome == 'No Answer';
+      _outcome == 'No Answer' ||
+      _outcome == 'No Answer At All';
 
   Future<void> _pickScheduleDate() async {
     final now = DateTime.now();
@@ -381,6 +411,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
 
     String? followUpDateStr;
@@ -392,6 +423,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
           '${_scheduledTime.hour.toString().padLeft(2, '0')}:${_scheduledTime.minute.toString().padLeft(2, '0')}';
     }
 
+    final selectedOpt = _selectedOption;
     final callLog = CallLogModel(
       id: widget.capturedMetadata?.syncedCallLogId ?? '',
       entityType: 'lead',
@@ -407,32 +439,34 @@ class _LogCallDialogState extends State<LogCallDialog> {
       projectName: widget.lead.project,
     );
 
-    try {
-      await context.read<CallLogsProvider>().logCall(
-            callLog,
-            followUpDate: followUpDateStr,
-            followUpTime: followUpTimeStr,
-          );
-
-      if (mounted) {
-        final leadsProvider = context.read<LeadsProvider>();
-        await leadsProvider.updateStatus(widget.lead.id, _selectedOption.nextStage);
-        await leadsProvider.fetchLeads(silent: true);
-      }
-    } catch (_) {}
+    final callLogsProvider = context.read<CallLogsProvider>();
+    final leadsProvider = context.read<LeadsProvider>();
 
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Saved: $_outcome (${_selectedOption.labelAr}) → ${_selectedOption.nextStage}',
+            'Saved: $_outcome (${selectedOpt.labelAr}) → ${selectedOpt.nextStage}',
           ),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
+
+    unawaited(() async {
+      try {
+        await Future.wait([
+          callLogsProvider.logCall(
+            callLog,
+            followUpDate: followUpDateStr,
+            followUpTime: followUpTimeStr,
+          ),
+          leadsProvider.updateStatus(widget.lead.id, selectedOpt.nextStage),
+        ]);
+      } catch (_) {}
+    }());
   }
 
   @override

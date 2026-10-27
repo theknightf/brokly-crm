@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+
+<html class="dark" dir="ltr" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Brokly CRM | Duplicate Leads Management &amp; Resolution Center</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-background": "#e1e2eb",
+            "tertiary-fixed-dim": "#e7b6f3",
+            "on-primary": "#213600",
+            "on-error": "#690005",
+            "primary": "#ccff80",
+            "inverse-primary": "#446900",
+            "surface-container-high": "#272a31",
+            "on-primary-fixed-variant": "#334f00",
+            "secondary-fixed": "#acf847",
+            "secondary-container": "#7ac100",
+            "on-tertiary-container": "#734b80",
+            "on-primary-container": "#416400",
+            "background": "#10131a",
+            "on-secondary-fixed": "#102000",
+            "on-error-container": "#ffdad6",
+            "on-tertiary-fixed-variant": "#5e376b",
+            "surface-variant": "#32353c",
+            "primary-fixed-dim": "#98da27",
+            "inverse-surface": "#e1e2eb",
+            "on-tertiary": "#462153",
+            "primary-fixed": "#b2f746",
+            "primary-container": "#a3e635",
+            "on-tertiary-fixed": "#2f093d",
+            "on-primary-fixed": "#121f00",
+            "surface-bright": "#363940",
+            "surface-container": "#1d2026",
+            "surface-dim": "#10131a",
+            "on-secondary-container": "#2c4900",
+            "surface-container-highest": "#32353c",
+            "surface-container-low": "#191c22",
+            "error-container": "#93000a",
+            "on-secondary-fixed-variant": "#304f00",
+            "outline": "#8c947c",
+            "tertiary-container": "#f3c1ff",
+            "tertiary": "#fee7ff",
+            "outline-variant": "#424936",
+            "on-surface": "#e1e2eb",
+            "on-secondary": "#1f3700",
+            "surface-tint": "#98da27",
+            "surface-container-lowest": "#0b0e14",
+            "inverse-on-surface": "#2e3037",
+            "error": "#ffb4ab",
+            "surface": "#10131a",
+            "tertiary-fixed": "#fad7ff",
+            "secondary-fixed-dim": "#91db2a",
+            "secondary": "#94de2d",
+            "on-surface-variant": "#c2cab0"
+          },
+          "borderRadius": {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "gutter": "1.5rem",
+            "gutter-mobile": "0.75rem",
+            "space-xl": "2.5rem",
+            "space-lg": "1.5rem",
+            "margin": "2rem",
+            "space-md": "1rem",
+            "space-sm": "0.5rem",
+            "margin-mobile": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "body-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "display-hero-mobile": ["Libre Caslon Text"],
+            "headline-lg": ["Libre Caslon Text"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-md": ["Libre Caslon Text"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "display-hero": ["Libre Caslon Text"],
+            "headline-lg-mobile": ["Libre Caslon Text"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "mono": ["JetBrains Mono", "monospace"]
+          },
+          "fontSize": {
+            "body-sm": ["0.75rem", { "lineHeight": "1rem", "fontWeight": "400" }],
+            "body-lg": ["1rem", { "lineHeight": "1.5rem", "fontWeight": "400" }],
+            "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }],
+            "label-md": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "display-hero-mobile": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "headline-lg": ["2.25rem", { "lineHeight": "2.75rem", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "headline-md": ["1.5rem", { "lineHeight": "2rem", "fontWeight": "400" }],
+            "headline-sm": ["1.125rem", { "lineHeight": "1.5rem", "fontWeight": "600" }],
+            "display-hero": ["3.5rem", { "lineHeight": "4rem", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+            "headline-lg-mobile": ["1.75rem", { "lineHeight": "2.25rem", "letterSpacing": "0em", "fontWeight": "400" }],
+            "label-lg": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.01em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0b0e14;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #272a31;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #424936;
+    }
+    .beacon-glow {
+      box-shadow: 0 0 16px -2px rgba(163, 230, 53, 0.28);
+    }
+    .beacon-glow-sm {
+      box-shadow: 0 0 10px rgba(204, 255, 128, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body-md antialiased min-h-screen flex flex-col selection:bg-primary-container selection:text-surface-container-lowest">
+<!-- ================= TOP APP BAR (From Shared Components JSON) ================= -->
+<header class="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-space-md py-space-sm bg-surface-container-lowest border-b border-outline-variant h-14">
+<!-- Brand & Breadcrumbs -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs">
+<button class="p-1.5 rounded text-on-surface-variant hover:bg-surface-container-high hover:text-primary active:scale-95 transition-all duration-150">
+<span class="material-symbols-outlined text-[20px]" data-icon="menu">menu</span>
+</button>
+<span class="text-headline-sm font-headline-sm font-bold text-primary tracking-tight ml-1">Brokly</span>
+</div>
+<div class="h-4 w-[1px] bg-outline-variant hidden md:block"></div>
+<!-- Breadcrumbs Hierarchy -->
+<nav aria-label="Breadcrumb" class="hidden md:flex items-center gap-2 font-label-md text-label-md">
+<a class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1" href="#">
+<span>Leads</span>
+</a>
+<span class="text-outline-variant">/</span>
+<span class="text-primary font-semibold flex items-center gap-1">
+<span>Duplicate Leads Resolution Hub</span>
+<span class="text-primary text-[10px] font-mono bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">AI-DEDUP v4.2</span>
+</span>
+</nav>
+</div>
+<!-- Center Search & Live Monitor Indicator -->
+<div class="hidden lg:flex items-center gap-4 flex-1 max-w-xl mx-8">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant" data-icon="search">search</span>
+<input class="w-full h-9 pl-9 pr-24 bg-surface-container-lowest border border-outline-variant rounded-DEFAULT font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all" placeholder="Search phone (+20...), lead #, National ID, client email..." type="text"/>
+<div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 bg-surface-container-high text-[10px] font-mono text-on-surface-variant border border-outline-variant rounded">⌘K</kbd>
+</div>
+</div>
+<!-- Live Deduping Daemon Status Pill -->
+<div class="flex items-center gap-2 shrink-0 px-2.5 py-1 rounded-full bg-surface-container border border-outline-variant">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant tracking-wider uppercase">Auto-deduping active</span>
+</div>
+</div>
+<!-- Right Actions & User Profile -->
+<div class="flex items-center gap-space-sm">
+<button class="relative p-2 rounded text-on-surface-variant hover:bg-surface-container-high hover:text-primary active:scale-95 transition-all duration-150" title="System Alerts">
+<span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary"></span>
+</button>
+<button class="p-2 rounded text-on-surface-variant hover:bg-surface-container-high hover:text-primary active:scale-95 transition-all duration-150" title="Rule Config">
+<span class="material-symbols-outlined text-[20px]" data-icon="tune">tune</span>
+</button>
+<div class="h-4 w-[1px] bg-outline-variant mx-1"></div>
+<!-- Profile Avatar -->
+<div class="flex items-center gap-2 pl-1 cursor-pointer group">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold font-label-md text-label-md flex items-center justify-center border border-primary/40 shadow-sm">
+          FM
+        </div>
+<div class="hidden xl:flex flex-col text-left">
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors leading-tight">Faris Mansoor</span>
+<span class="text-[10px] text-on-surface-variant font-body-sm leading-tight">Senior Director (DXB-98421)</span>
+</div>
+</div>
+</div>
+</header>
+<!-- ================= WORKSPACE CONTAINER ================= -->
+<div class="flex pt-14 min-h-screen bg-surface-container-lowest">
+<!-- SUB-NAVIGATION RAIL / DRAWER INTEGRATION -->
+<aside class="w-64 shrink-0 bg-surface-container-low border-r border-outline-variant flex flex-col justify-between hidden md:flex">
+<div class="p-space-md space-y-4">
+<!-- Section Header -->
+<div class="px-space-md pt-2">
+<p class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Lead Intelligence</p>
+</div>
+<nav class="space-y-1">
+<!-- Item 1 -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm rounded-DEFAULT text-on-surface-variant font-normal hover:bg-surface-container hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<!-- Item 2 -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm rounded-DEFAULT text-on-surface-variant font-normal hover:bg-surface-container hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="group">group</span>
+<span class="font-label-md text-label-md">Leads Management</span>
+</a>
+<!-- Item 3: Active Duplicate Leads Navigation -->
+<a class="flex items-center justify-between px-space-md py-space-sm rounded-DEFAULT bg-primary-container/10 text-primary font-semibold border-l-2 border-primary" href="#">
+<div class="flex items-center gap-space-md">
+<span class="material-symbols-outlined text-[20px]" data-icon="content_copy">content_copy</span>
+<span class="font-label-md text-label-md">Duplicate Leads</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-primary text-on-primary font-bold text-[11px] font-mono beacon-glow-sm">14</span>
+</a>
+<!-- Item 4 -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm rounded-DEFAULT text-on-surface-variant font-normal hover:bg-surface-container hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="schedule">schedule</span>
+<span class="font-label-md text-label-md">Follow-up Queue</span>
+</a>
+<!-- Item 5 -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm rounded-DEFAULT text-on-surface-variant font-normal hover:bg-surface-container hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="fact_check">fact_check</span>
+<span class="font-label-md text-label-md">Attendance Records</span>
+</a>
+<!-- Item 6 -->
+<a class="flex items-center gap-space-md px-space-md py-space-sm rounded-DEFAULT text-on-surface-variant font-normal hover:bg-surface-container hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="handshake">handshake</span>
+<span class="font-label-md text-label-md">Deals Pipeline</span>
+</a>
+</nav>
+<div class="pt-4 border-t border-outline-variant">
+<p class="px-space-md font-label-sm text-label-sm uppercase tracking-wider text-outline mb-2">Ingestion Feeds</p>
+<div class="space-y-1.5 px-space-md text-body-sm font-mono text-[11px]">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>SODIC Webhooks</span>
+<span class="text-primary font-semibold">Active</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>Meta Ads API</span>
+<span class="text-primary font-semibold">Syncing</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>CSV Gateway</span>
+<span class="text-on-surface-variant">Idle</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Drawer Footer -->
+<div class="p-space-md border-t border-outline-variant space-y-2">
+<a class="flex items-center gap-space-md px-space-md py-space-sm rounded-DEFAULT text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings &amp; Rules</span>
+</a>
+<div class="px-space-md py-2 rounded-DEFAULT bg-surface-container border border-outline-variant text-[11px]">
+<p class="text-on-surface-variant font-body-sm">License Active</p>
+<p class="text-primary font-mono font-semibold">DXB-FINTECH-ENTERPRISE</p>
+</div>
+</div>
+</aside>
+<!-- MAIN BODY CONTENT CANVAS -->
+<main class="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-space-lg space-y-space-lg">
+<!-- ================= 2. EXECUTIVE KPI METRICS BAR ================= -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- KPI 1 -->
+<div class="p-space-lg rounded-DEFAULT bg-[#161B22] border border-[#21262D] hover:border-outline-variant transition-all flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Total Detected Duplicates</span>
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="filter_none">filter_none</span>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<div class="font-headline-lg text-headline-lg font-bold text-on-surface font-mono tracking-tight">32</div>
+<span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-primary/10 border border-primary/20 text-primary">
+              14 Groups
+            </span>
+</div>
+<div class="mt-2 text-body-sm text-on-surface-variant flex items-center gap-1 font-body-sm">
+<span class="material-symbols-outlined text-[14px] text-primary" data-icon="radar">radar</span>
+<span>+6 flagged from overnight batch ingest</span>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="p-space-lg rounded-DEFAULT bg-[#161B22] border border-[#21262D] hover:border-outline-variant transition-all flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Auto-Merged (Zero-Conflict)</span>
+<span class="material-symbols-outlined text-secondary text-[20px]" data-icon="auto_mode">auto_mode</span>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<div class="font-headline-lg text-headline-lg font-bold text-on-surface font-mono tracking-tight">18 <span class="text-body-md text-on-surface-variant font-normal">leads</span></div>
+<span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-secondary/10 border border-secondary/20 text-secondary">
+              9 Groups Clean
+            </span>
+</div>
+<div class="mt-2 text-body-sm text-on-surface-variant flex items-center gap-1 font-body-sm">
+<span class="material-symbols-outlined text-[14px] text-secondary" data-icon="verified">verified</span>
+<span>Identical phone &amp; email matching</span>
+</div>
+</div>
+<!-- KPI 3: High Priority Alert KPI -->
+<div class="p-space-lg rounded-DEFAULT bg-[#161B22] border border-red-500/30 hover:border-red-500/50 transition-all flex flex-col justify-between relative overflow-hidden">
+<div class="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-red-400">Cross-Agent Disputes</span>
+<span class="material-symbols-outlined text-red-400 text-[20px]" data-icon="warning">warning</span>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<div class="font-headline-lg text-headline-lg font-bold text-red-400 font-mono tracking-tight">5 <span class="text-body-md text-red-400/80 font-normal">Disputes</span></div>
+<span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-red-500/10 border border-red-500/30 text-red-400 animate-pulse">
+              نزاع وكلاء مبيعات
+            </span>
+</div>
+<div class="mt-2 text-body-sm text-on-surface-variant flex items-center gap-1 font-body-sm">
+<span class="text-red-400 text-[12px] font-semibold">High risk:</span>
+<span>Concurrent calls booked this week</span>
+</div>
+</div>
+<!-- KPI 4 -->
+<div class="p-space-lg rounded-DEFAULT bg-[#161B22] border border-[#21262D] hover:border-outline-variant transition-all flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Deduping Accuracy Rate</span>
+<button class="text-primary hover:text-white transition-colors text-[11px] font-label-sm flex items-center gap-1 underline underline-offset-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="refresh">refresh</span>
+              Audit Run
+            </button>
+</div>
+<div class="mt-3 flex items-baseline justify-between">
+<div class="font-headline-lg text-headline-lg font-bold text-primary font-mono tracking-tight">98.4%</div>
+<span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-primary/10 border border-primary/20 text-primary">
+              Strict (Fuzzy 0.95)
+            </span>
+</div>
+<div class="mt-2 text-body-sm text-on-surface-variant flex items-center gap-1 font-body-sm">
+<span class="material-symbols-outlined text-[14px] text-primary" data-icon="rule">rule</span>
+<span>Threshold: Phone E.164 + National ID</span>
+</div>
+</div>
+</section>
+<!-- ================= 3. FILTER & BATCH TOOLBAR ================= -->
+<section class="p-space-md rounded-DEFAULT bg-[#161B22] border border-[#21262D] flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-space-md">
+<!-- Search & Filter Badges -->
+<div class="flex flex-wrap items-center gap-2 flex-1">
+<div class="relative min-w-[260px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant" data-icon="filter_list">filter_list</span>
+<input class="w-full h-9 pl-9 pr-3 bg-surface-container-lowest border border-[#21262D] rounded-DEFAULT font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none" placeholder="Filter current queue..." type="text"/>
+</div>
+<!-- Filter Pills -->
+<button class="px-3 py-1.5 rounded-full text-label-sm font-label-sm bg-primary/10 border border-primary text-primary transition-all flex items-center gap-1.5">
+<span>All Matches</span>
+<span class="px-1.5 py-0.2 rounded-full bg-primary text-surface-container-lowest font-mono font-bold text-[10px]">14</span>
+</button>
+<button class="px-3 py-1.5 rounded-full text-label-sm font-label-sm bg-surface-container-lowest border border-[#21262D] text-on-surface-variant hover:text-primary hover:border-outline-variant transition-all flex items-center gap-1.5">
+<span>Phone Overlap</span>
+<span class="text-on-surface font-mono text-[10px]">9</span>
+</button>
+<button class="px-3 py-1.5 rounded-full text-label-sm font-label-sm bg-surface-container-lowest border border-[#21262D] text-on-surface-variant hover:text-primary hover:border-outline-variant transition-all flex items-center gap-1.5">
+<span>Email Overlap</span>
+<span class="text-on-surface font-mono text-[10px]">3</span>
+</button>
+<button class="px-3 py-1.5 rounded-full text-label-sm font-label-sm bg-red-950/40 border border-red-500/50 text-red-400 hover:bg-red-900/40 transition-all flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+<span>Cross-Agent Disputes</span>
+<span class="px-1.5 py-0.2 rounded-full bg-red-500 text-surface-container-lowest font-mono font-bold text-[10px]">5</span>
+</button>
+<button class="px-3 py-1.5 rounded-full text-label-sm font-label-sm bg-surface-container-lowest border border-[#21262D] text-on-surface-variant hover:text-primary hover:border-outline-variant transition-all flex items-center gap-1.5">
+<span>Marketing Ingest Conflicts</span>
+<span class="text-on-surface font-mono text-[10px]">2</span>
+</button>
+</div>
+<!-- Multi-select Batch Actions -->
+<div class="flex items-center gap-2 shrink-0 border-t xl:border-t-0 pt-2 xl:pt-0 border-outline-variant">
+<button class="px-3 py-2 rounded-DEFAULT bg-surface-container border border-[#21262D] text-on-surface hover:text-primary hover:border-outline transition-all text-label-md font-label-md flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]" data-icon="select_all">select_all</span>
+<span>Select All (14)</span>
+</button>
+<button class="px-3.5 py-2 rounded-DEFAULT bg-primary text-surface-container-lowest font-label-md font-bold hover:bg-[#84CC16] active:scale-95 transition-all beacon-glow flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]" data-icon="bolt">bolt</span>
+<span>Auto-Merge Clean (9 groups)</span>
+</button>
+<button class="p-2 rounded-DEFAULT bg-surface-container border border-[#21262D] text-on-surface-variant hover:text-primary hover:border-outline transition-all" title="Export CSV / PDF Dossier">
+<span class="material-symbols-outlined text-[20px]" data-icon="file_download">file_download</span>
+</button>
+</div>
+</section>
+<!-- ================= 4. MAIN WORKSPACE: SIDE-BY-SIDE RESOLUTION WORKBENCH ================= -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<!-- WORKSPACE COMPARISON MODULE (Cols 1-9) -->
+<div class="xl:col-span-9 space-y-space-md">
+<!-- ACTIVE RECORD IDENTITY HEADER -->
+<div class="p-space-lg rounded-DEFAULT bg-[#161B22] border border-[#21262D] relative">
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#21262D]">
+<div class="space-y-1">
+<div class="flex items-center gap-3 flex-wrap">
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface">Mohamed Galal Abdelhalim</h2>
+<span class="text-headline-md font-bold text-primary font-headline-md" dir="rtl">محمد جلال عبدالحليم</span>
+<span class="px-2.5 py-1 rounded-full text-label-sm font-label-sm bg-primary/10 border border-primary/30 text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="fingerprint">fingerprint</span>
+                    Exact Phone Match (+20 112 531 5790)
+                  </span>
+</div>
+<div class="flex items-center gap-4 text-body-sm font-body-sm text-on-surface-variant flex-wrap">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="call">call</span>
+<strong class="font-mono text-on-surface">+20 112 531 5790</strong>
+</span>
+<span>•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant" data-icon="mail">mail</span>
+                    m.galal@outlook.com
+                  </span>
+<span>•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant" data-icon="location_on">location_on</span>
+                    Cairo / New Zayed Territory
+                  </span>
+<span>•</span>
+<span class="font-mono text-[11px] text-outline">Group ID #DUP-8821</span>
+</div>
+</div>
+<!-- Quick Switcher for Group Hierarchy -->
+<div class="flex items-center gap-2 self-start lg:self-center">
+<span class="text-body-sm font-mono text-on-surface-variant">Record 1 of 14</span>
+<div class="flex border border-[#21262D] rounded-DEFAULT overflow-hidden">
+<button class="px-2 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="px-2 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors border-l border-[#21262D]">
+<span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- HIGH-PRIORITY CONFLICT ALERT BANNER -->
+<div class="mt-4 p-space-md rounded-DEFAULT bg-red-950/30 border border-red-500/40 flex items-start gap-3">
+<span class="material-symbols-outlined text-red-400 text-[24px] shrink-0 mt-0.5" data-icon="warning">warning</span>
+<div class="flex-1 space-y-1">
+<div class="flex items-center justify-between flex-wrap gap-2">
+<p class="font-label-md text-label-md font-bold text-red-300">
+                    Active Cross-Agent Conflict (نزاع وكلاء مبيعات مرتفع الخطورة)
+                  </p>
+<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-red-500/20 text-red-300 border border-red-500/30">Immediate Action Required</span>
+</div>
+<p class="text-body-sm text-on-surface-variant font-body-sm">
+                  Client is currently assigned to both <strong class="text-white">Ahmed Ezzat (Sales Rep)</strong> and <strong class="text-white">Faris Mansoor (Senior Director)</strong> simultaneously. Two distinct meetings are logged in calendar over the next 48 hours. Merging will preserve history and establish sole ownership.
+                </p>
+</div>
+</div>
+</div>
+<!-- COMPARISON MATRIX: 4-COLUMN DESKTOP INSTRUMENT -->
+<div class="rounded-DEFAULT bg-[#161B22] border border-[#21262D] overflow-hidden">
+<!-- Table Sub-Header Controls -->
+<div class="px-space-lg py-space-sm bg-[#0B0E14] border-b border-[#21262D] flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Lead Attribute Differential Analysis</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-[11px] text-on-surface-variant font-mono">3 Divergences</span>
+</div>
+<div class="flex items-center gap-4 text-[11px] font-label-sm">
+<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Identical</span>
+<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-400"></span> Disparity</span>
+<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-red-400"></span> Conflict</span>
+</div>
+</div>
+<!-- Comparison Grid Container -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-[#21262D] bg-[#161B22]/80">
+<th class="p-space-md w-[22%] text-outline font-label-sm text-label-sm uppercase">Attribute Field</th>
+<!-- MASTER COLUMN HEADER -->
+<th class="p-space-md w-[26%] bg-primary/5 border-l-2 border-primary">
+<div class="flex items-center justify-between">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-primary font-mono">Lead #1042</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-primary text-surface-container-lowest">Primary</span>
+</div>
+<span class="text-[11px] text-on-surface-variant font-mono">Ingested: 14 Aug 2026</span>
+</div>
+<label class="flex items-center gap-1.5 cursor-pointer">
+<input checked="" class="text-primary focus:ring-primary border-[#21262D] bg-surface-container-lowest" name="master_selection" type="radio"/>
+<span class="text-[11px] font-label-sm text-primary">Master</span>
+</label>
+</div>
+</th>
+<!-- DUPLICATE COLUMN HEADER -->
+<th class="p-space-md w-[26%] bg-amber-500/5 border-l border-amber-500/40">
+<div class="flex items-center justify-between">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-amber-300 font-mono">Lead #2981</span>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-400 text-surface-container-lowest">Duplicate</span>
+</div>
+<span class="text-[11px] text-on-surface-variant font-mono">Ingested: Today, 11:20 AM</span>
+</div>
+<label class="flex items-center gap-1.5 cursor-pointer">
+<input class="text-primary focus:ring-primary border-[#21262D] bg-surface-container-lowest" name="master_selection" type="radio"/>
+<span class="text-[11px] font-label-sm text-on-surface-variant hover:text-on-surface">Make Master</span>
+</label>
+</div>
+</th>
+<!-- RESULT PREVIEW COLUMN HEADER -->
+<th class="p-space-md w-[26%] bg-surface-container-low border-l border-[#21262D]">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Merged Preview</span>
+</div>
+<span class="text-[11px] text-on-surface-variant">Synthesis Output on Confirmation</span>
+</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#21262D] font-body-sm text-body-sm">
+<!-- ROW 1: Client Full Name -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span>Client Full Name</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Identical</span>
+</div>
+<span class="text-[10px] text-outline" dir="rtl">اسم العميل بالكامل</span>
+</td>
+<td class="p-space-md bg-primary/5 border-l-2 border-primary font-medium text-white">
+                      Mohamed Galal Abdelhalim
+                      <div class="text-[11px] text-on-surface-variant font-arabic" dir="rtl">محمد جلال عبدالحليم</div>
+</td>
+<td class="p-space-md bg-amber-500/5 border-l border-amber-500/20 font-medium text-white">
+                      Mohamed Galal
+                      <div class="text-[11px] text-on-surface-variant font-arabic" dir="rtl">محمد جلال</div>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D] font-medium text-primary">
+                      Mohamed Galal Abdelhalim
+                      <div class="text-[10px] text-on-surface-variant">Retains most comprehensive legal spelling</div>
+</td>
+</tr>
+<!-- ROW 2: Primary Phone & Contact -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span>Phone (E.164)</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Identical</span>
+</div>
+<span class="text-[10px] text-outline">رقم الهاتف الأساسي</span>
+</td>
+<td class="p-space-md bg-primary/5 border-l-2 border-primary font-mono text-primary font-semibold">
+                      +20 112 531 5790
+                      <span class="text-[10px] block text-on-surface-variant font-normal">WhatsApp Verified ✓</span>
+</td>
+<td class="p-space-md bg-amber-500/5 border-l border-amber-500/20 font-mono text-primary font-semibold">
+                      01125315790
+                      <span class="text-[10px] block text-on-surface-variant font-normal">Normalized to E.164</span>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D] font-mono text-primary font-bold">
+                      +20 112 531 5790
+                      <span class="text-[10px] block text-on-surface-variant font-sans">Locked in master directory</span>
+</td>
+</tr>
+<!-- ROW 3: CURRENT ASSIGNEE (HIGH RISK CONFLICT) -->
+<tr class="bg-red-500/5 hover:bg-red-500/10 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span class="text-red-400 font-semibold">Current Assignee</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-red-500/20 text-red-300 border border-red-500/40">Conflict</span>
+</div>
+<span class="text-[10px] text-red-400/80">كانت عند مين (وكيل البيع)</span>
+</td>
+<td class="p-space-md bg-primary/10 border-l-2 border-primary">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-surface-container-high text-on-surface text-[11px] font-bold flex items-center justify-center">AE</div>
+<div>
+<div class="font-bold text-white">Ahmed Ezzat</div>
+<span class="text-[11px] text-on-surface-variant">Sales Rep (Assigned 14 Aug)</span>
+</div>
+</div>
+</td>
+<td class="p-space-md bg-amber-500/10 border-l border-amber-500/30">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-primary/20 text-primary text-[11px] font-bold flex items-center justify-center">FM</div>
+<div>
+<div class="font-bold text-white">Faris Mansoor</div>
+<span class="text-[11px] text-on-surface-variant">Senior Broker Director</span>
+</div>
+</div>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D]">
+<div class="space-y-1.5">
+<select class="w-full h-8 bg-surface-container-lowest border border-primary text-primary rounded text-body-sm font-label-md px-2 focus:ring-primary focus:outline-none">
+<option selected="">Assign Sole: Ahmed Ezzat (Primary Rep)</option>
+<option>Assign Sole: Faris Mansoor (Director Escalate)</option>
+<option>Co-Brokerage / Split Commission (50/50)</option>
+</select>
+<span class="text-[10px] text-on-surface-variant block">Auto-notifies displaced agent on resolution</span>
+</div>
+</td>
+</tr>
+<!-- ROW 4: Ingestion Source & Campaign -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span>Lead Source</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20">Disparity</span>
+</div>
+<span class="text-[10px] text-outline">مصدر العميل والحملة</span>
+</td>
+<td class="p-space-md bg-primary/5 border-l-2 border-primary">
+<span class="inline-flex items-center gap-1 text-white font-medium">
+<span class="material-symbols-outlined text-[14px] text-blue-400" data-icon="campaign">campaign</span>
+                        Meta Ads (Sky Villa SODIC)
+                      </span>
+<span class="text-[10px] block text-on-surface-variant font-mono">utm_camp: skyvilla_aug26</span>
+</td>
+<td class="p-space-md bg-amber-500/5 border-l border-amber-500/20">
+<span class="inline-flex items-center gap-1 text-white font-medium">
+<span class="material-symbols-outlined text-[14px] text-amber-400" data-icon="upload_file">upload_file</span>
+                        CSV Bulk Import (Admin Upload)
+                      </span>
+<span class="text-[10px] block text-on-surface-variant font-mono">file: NewZayed_Catalog_Aug18.csv</span>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D]">
+<div class="text-white font-medium">Multi-Touch Attributed</div>
+<span class="text-[10px] text-on-surface-variant block">First touch: Meta Ads | Secondary: Catalog Ingest</span>
+</td>
+</tr>
+<!-- ROW 5: Pipeline Stage -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span>Pipeline Stage</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20">Disparity</span>
+</div>
+<span class="text-[10px] text-outline">المرحلة البيعية</span>
+</td>
+<td class="p-space-md bg-primary/5 border-l-2 border-primary">
+<span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-blue-500/10 border border-blue-500/30 text-blue-300">
+                        Meeting Scheduled (مقابلة محددة)
+                      </span>
+<span class="text-[10px] block text-on-surface-variant mt-1">Scheduled for tomorrow, 3:00 PM</span>
+</td>
+<td class="p-space-md bg-amber-500/5 border-l border-amber-500/20">
+<span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-surface-container border border-outline-variant text-on-surface-variant">
+                        Fresh Lead (جديد لم يتم التواصل)
+                      </span>
+<span class="text-[10px] block text-on-surface-variant mt-1">Zero interaction yet</span>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D]">
+<span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-blue-500/20 border border-blue-500/40 text-blue-300 font-bold">
+                        Keep Advanced: Meeting Scheduled
+                      </span>
+<span class="text-[10px] block text-on-surface-variant mt-1">Rule: Always preserves highest pipeline progress</span>
+</td>
+</tr>
+<!-- ROW 6: Property of Interest & Budget -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span>Property &amp; Budget</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20">Disparity</span>
+</div>
+<span class="text-[10px] text-outline">العقار المستهدف والميزانية</span>
+</td>
+<td class="p-space-md bg-primary/5 border-l-2 border-primary">
+<div class="text-white font-medium">New Zayed Sky Villa (3BR)</div>
+<div class="font-mono text-primary text-[11px]">Budget: 2,500,000 EGP</div>
+<div class="text-[10px] text-on-surface-variant">Vye SODIC Project</div>
+</td>
+<td class="p-space-md bg-amber-500/5 border-l border-amber-500/20">
+<div class="text-white font-medium">New Zayed Generic Catalog</div>
+<div class="font-mono text-on-surface-variant text-[11px]">Budget: Not specified</div>
+<div class="text-[10px] text-on-surface-variant">General Landing Page Form</div>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D]">
+<div class="text-white font-semibold">New Zayed Sky Villa (3BR)</div>
+<div class="font-mono text-primary text-[11px] font-bold">Budget: 2,500,000 EGP</div>
+<span class="text-[10px] text-on-surface-variant block">Tag: +Catalog Download attached to assets</span>
+</td>
+</tr>
+<!-- ROW 7: Telephony & Call Logs -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span>Telephony Logs</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Combined</span>
+</div>
+<span class="text-[10px] text-outline">سجلات المكالمات الهاتفية</span>
+</td>
+<td class="p-space-md bg-primary/5 border-l-2 border-primary">
+<div class="flex items-center gap-1 font-mono font-bold text-white">
+<span class="material-symbols-outlined text-[14px] text-primary" data-icon="phone_in_talk">phone_in_talk</span>
+                        3 Calls Logged
+                      </div>
+<div class="text-[10px] text-on-surface-variant mt-0.5">2 answered (Total duration: 11m 40s)</div>
+</td>
+<td class="p-space-md bg-amber-500/5 border-l border-amber-500/20">
+<div class="flex items-center gap-1 font-mono text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="phone_missed">phone_missed</span>
+                        0 Calls Logged
+                      </div>
+<div class="text-[10px] text-on-surface-variant mt-0.5">Uncontacted in duplicate record</div>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D]">
+<div class="font-mono font-bold text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="merge">merge</span>
+                        Unified VoIP Timeline: 3 Calls
+                      </div>
+<span class="text-[10px] text-on-surface-variant block">All audio recordings &amp; transcripts preserved</span>
+</td>
+</tr>
+<!-- ROW 8: Agent Notes & Historical Timeline -->
+<tr class="hover:bg-surface-container/30 transition-colors">
+<td class="p-space-md text-on-surface-variant font-medium">
+<div class="flex items-center gap-2">
+<span>Activity &amp; Agent Notes</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20">Concatenate</span>
+</div>
+<span class="text-[10px] text-outline">ملاحظات الوكلاء والأنشطة</span>
+</td>
+<td class="p-space-md bg-primary/5 border-l-2 border-primary">
+<p class="text-body-sm text-on-surface bg-surface-container-lowest/80 p-2 rounded border border-[#21262D] text-[11px] leading-relaxed">
+                        "Client requested 3BR payment terms over 7 years in Vye SODIC. Has downpayment ready in EGP. Wife prefers ground floor with private garden."
+                      </p>
+<span class="text-[10px] text-outline block mt-1">Logged by Ahmed Ezzat • 14 Aug</span>
+</td>
+<td class="p-space-md bg-amber-500/5 border-l border-amber-500/20">
+<p class="text-body-sm text-on-surface bg-surface-container-lowest/80 p-2 rounded border border-[#21262D] text-[11px] leading-relaxed">
+                        "Ingested via website landing page form for New Zayed projects catalog download. Auto-lead created."
+                      </p>
+<span class="text-[10px] text-outline block mt-1">System Import • Today, 11:20 AM</span>
+</td>
+<td class="p-space-md bg-surface-container-low border-l border-[#21262D]">
+<div class="bg-surface-container-lowest/90 p-2 rounded border border-primary/30 text-[11px] space-y-1">
+<span class="text-primary font-bold block text-[10px] uppercase font-mono">Unified Chronological Ledger:</span>
+<p class="text-on-surface text-[10px]">1. Ingested via website form (Catalog download)</p>
+<p class="text-on-surface text-[10px]">2. Meeting confirmed for 3BR Vye SODIC (7yr plan)</p>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- RESOLUTION ACTION SUITE DOCK -->
+<div class="p-space-lg bg-[#0B0E14] border-t border-[#21262D] flex flex-col md:flex-row items-center justify-between gap-4">
+<div class="flex items-center gap-2 text-body-sm text-on-surface-variant font-body-sm">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="verified_user">verified_user</span>
+<span>Audit trail logged: Reversible for 72 hours under Director Authorization.</span>
+</div>
+<!-- ACTION BUTTONS CLUSTER -->
+<div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+<!-- Destructive -->
+<button class="px-3.5 py-2.5 rounded-DEFAULT bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-500/30 hover:border-red-500 text-label-md font-label-md transition-all active:scale-95 flex items-center gap-1.5" title="Discard duplicate #2981">
+<span class="material-symbols-outlined text-[18px]" data-icon="delete">delete</span>
+<span>Discard Duplicate #2981</span>
+</button>
+<!-- Keep Separate -->
+<button class="px-3.5 py-2.5 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-on-surface border border-[#21262D] text-label-md font-label-md transition-all active:scale-95 flex items-center gap-1.5" title="Client is inquiring about separate units">
+<span class="material-symbols-outlined text-[18px]" data-icon="call_split">call_split</span>
+<span>Keep Separate (Multiple Units)</span>
+</button>
+<!-- Reassign Sole Ownership Modal Trigger -->
+<button class="px-3.5 py-2.5 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high text-primary border border-primary/40 hover:border-primary text-label-md font-label-md transition-all active:scale-95 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]" data-icon="person_pin">person_pin</span>
+<span>Reassign Sole Ownership</span>
+</button>
+<!-- Primary CTA Beacon -->
+<button class="px-6 py-2.5 rounded-full bg-primary hover:bg-[#84CC16] text-[#0B0E14] font-label-md font-extrabold text-label-md transition-all active:scale-95 beacon-glow flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]" data-icon="merge">merge</span>
+<span>Merge into Primary Record (دمج وتوحيد السجلات)</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- ================= 5. SECONDARY GROUPS QUEUE (Cols 10-12) ================= -->
+<aside class="xl:col-span-3 space-y-space-md">
+<div class="p-space-md rounded-DEFAULT bg-[#161B22] border border-[#21262D] space-y-3">
+<div class="flex items-center justify-between pb-2 border-b border-[#21262D]">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Queue</span>
+<span class="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-[11px] font-bold">13 Pending</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="sort">sort</span>
+                Severity
+              </button>
+</div>
+<!-- QUEUE ITEMS -->
+<div class="space-y-2.5">
+<!-- Active Item (Current in workspace) -->
+<div class="p-3 rounded-DEFAULT bg-[#1A1F29] border-2 border-primary relative cursor-pointer beacon-glow">
+<div class="flex items-start justify-between">
+<div class="space-y-0.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-red-400"></span>
+<h4 class="font-label-md text-label-md font-bold text-white">Mohamed Galal Abdelhalim</h4>
+</div>
+<p class="font-mono text-[11px] text-primary">+20 112 531 5790</p>
+</div>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/20 text-red-300 border border-red-500/40">Conflict</span>
+</div>
+<div class="mt-2 pt-2 border-t border-[#21262D] flex items-center justify-between text-[11px] text-on-surface-variant">
+<span>Ahmed Ezzat vs Faris M.</span>
+<span class="text-primary font-bold">In Review ➔</span>
+</div>
+</div>
+<!-- Queue Card 2 -->
+<div class="p-3 rounded-DEFAULT bg-surface-container-low border border-[#21262D] hover:border-outline-variant transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="space-y-0.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+<h4 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors">Nourhan El-Shamy</h4>
+</div>
+<p class="font-mono text-[11px] text-on-surface-variant">+20 109 876 5432</p>
+</div>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Clean Match</span>
+</div>
+<div class="mt-2 text-[11px] text-on-surface-variant flex items-center justify-between">
+<span>2x Duplicates (Karim Hassan)</span>
+<span class="text-primary font-semibold hover:underline">1-Click Merge</span>
+</div>
+</div>
+<!-- Queue Card 3 -->
+<div class="p-3 rounded-DEFAULT bg-surface-container-low border border-[#21262D] hover:border-outline-variant transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="space-y-0.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-amber-400"></span>
+<h4 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors">Tarek Mostafa</h4>
+</div>
+<p class="font-mono text-[11px] text-on-surface-variant">+20 120 445 9911</p>
+</div>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-300 border border-amber-500/20">Source Diff</span>
+</div>
+<div class="mt-2 text-[11px] text-on-surface-variant flex items-center justify-between">
+<span>TikTok Ads vs Cold Dial</span>
+<span class="text-on-surface">Dina Radwan</span>
+</div>
+</div>
+<!-- Queue Card 4 -->
+<div class="p-3 rounded-DEFAULT bg-surface-container-low border border-[#21262D] hover:border-outline-variant transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="space-y-0.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-red-400"></span>
+<h4 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors">Khaled El-Gohary</h4>
+</div>
+<p class="font-mono text-[11px] text-on-surface-variant">+20 100 219 8834</p>
+</div>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/20 text-red-300 border border-red-500/40">3x Duplicates</span>
+</div>
+<div class="mt-2 text-[11px] text-on-surface-variant flex items-center justify-between">
+<span class="text-red-400 font-semibold">Omar vs Sarah vs Tamer</span>
+<span class="text-on-surface-variant">3 Agents</span>
+</div>
+</div>
+<!-- Queue Card 5 -->
+<div class="p-3 rounded-DEFAULT bg-surface-container-low border border-[#21262D] hover:border-outline-variant transition-all cursor-pointer group">
+<div class="flex items-start justify-between">
+<div class="space-y-0.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+<h4 class="font-label-md text-label-md font-bold text-on-surface group-hover:text-primary transition-colors">Sherif Al-Wakeel</h4>
+</div>
+<p class="font-mono text-[11px] text-on-surface-variant">+20 111 902 3341</p>
+</div>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Clean Match</span>
+</div>
+<div class="mt-2 text-[11px] text-on-surface-variant flex items-center justify-between">
+<span>Palm Hills Ingestion</span>
+<span class="text-primary font-semibold hover:underline">1-Click Merge</span>
+</div>
+</div>
+</div>
+<!-- Queue Pagination / Controls -->
+<button class="w-full py-2 rounded-DEFAULT bg-surface-container hover:bg-surface-container-high border border-[#21262D] text-on-surface-variant hover:text-on-surface text-label-sm font-label-sm transition-all flex items-center justify-center gap-1">
+<span>View Remaining (9 Groups)</span>
+<span class="material-symbols-outlined text-[16px]" data-icon="expand_more">expand_more</span>
+</button>
+</div>
+<!-- SYSTEM DEDUPING LOGIC RULES WIDGET -->
+<div class="p-space-md rounded-DEFAULT bg-[#161B22] border border-[#21262D] space-y-3">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Resolution Rules</span>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]" data-icon="policy">policy</span>
+</div>
+<ul class="space-y-2 text-body-sm font-body-sm text-on-surface-variant text-[11px]">
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-[14px] shrink-0 mt-0.5" data-icon="check_circle">check_circle</span>
+<span>Phone normalized to E.164 (+20) takes precedence over all free-text fields.</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-[14px] shrink-0 mt-0.5" data-icon="check_circle">check_circle</span>
+<span>Active deals with meeting notes override uncontacted imported leads.</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary text-[14px] shrink-0 mt-0.5" data-icon="check_circle">check_circle</span>
+<span>Displaced brokers receive commission tag protection if lead converts within 30 days.</span>
+</li>
+</ul>
+<a class="inline-block text-primary hover:text-white text-[11px] font-label-md pt-1 underline underline-offset-2" href="#">
+              Edit Deduplication Matrix Rules &amp; Commission Splits ➔
+            </a>
+</div>
+</aside>
+</div>
+</main>
+</div>
+<!-- Micro-interaction Vanilla JS script -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Radio row master record switcher highlight
+      const radios = document.querySelectorAll('input[name="master_selection"]');
+      radios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+          console.log('Master selection toggled:', e.target);
+        });
+      });
+    });
+  </script>
+</body></html>

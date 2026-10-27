@@ -545,12 +545,16 @@ class CallLogsService {
       case 'Meeting':
       case 'Schedule Meeting':
         return 'Meeting';
+      case 'Follow Up After Meeting':
+        return 'Follow Up After Meeting';
       case 'Won Deal':
         return 'Done Deal';
       case 'Not Interested':
         return 'Not Interested';
       case 'No Answer':
         return 'No Answer';
+      case 'No Answer At All':
+        return 'No Answer At All';
       case 'Wrong Number':
       case 'Wrong Phone':
         return 'Wrong Number';
@@ -580,6 +584,7 @@ class CallLogsService {
       case 'No Answer At All':
         return 'Contacted';
       case 'Following Up':
+      case 'Follow Up After Meeting':
       case 'Interested':
         return 'Qualified';
       case 'Meeting':

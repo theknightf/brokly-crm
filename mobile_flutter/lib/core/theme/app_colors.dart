@@ -110,6 +110,7 @@ class AppColors {
           bg: isDark ? const Color(0xFF1E293B) : statusPendingLeadsBg,
         );
       case 'Following Up':
+      case 'Follow Up After Meeting':
         return (
           text: isDark ? const Color(0xFF38BDF8) : statusFollowingUp,
           bg: isDark ? const Color(0xFF0C4A6E) : statusFollowingUpBg,
@@ -168,6 +169,7 @@ class AppColors {
     switch (outcome) {
       case 'Reached':
       case 'Connected':
+      case 'Follow Up After Meeting':
         return outcomeReached;
       case 'Interested':
         return outcomeInterested;
@@ -181,6 +183,7 @@ class AppColors {
       case 'WhatsApp Follow-up':
         return outcomeWhatsApp;
       case 'No Answer':
+      case 'No Answer At All':
       case 'No Reply':
         return outcomeNoAnswer;
       case 'Busy':

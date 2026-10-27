@@ -118,7 +118,7 @@ export async function GET(request: Request) {
       supabase.from('leads').select('crm_status, lead_status'),
     ]);
 
-  const STATUSES_CANON_OWNER = ['Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number','No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'] as const;
+  const STATUSES_CANON_OWNER = ['Duplicate Leads','Fresh Leads','Cold Calls','Pending Leads','Following Up','Meeting','Follow Up After Meeting','Cancellation','Done Deal','Not Interested','Interested','Wrong Number','Data Rotation','Closed Number','No Answer','No Answer At All','Low Budget','Reschedule Meeting','Reservation'] as const;
   const canonMapOwner = new Map<string,string>(STATUSES_CANON_OWNER.map(s=>[s.toLowerCase(), s]));
   const toCanonicalOwner = (raw: any): string => {
     const t = String(raw||'').trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');

@@ -127,6 +127,49 @@ export function resolveStatusParam(raw: string | null): LeadStatus | '' {
   return v as LeadStatus;
 }
 
+export function leadMatchesFilters(lead: Partial<Lead>, f: FilterState): boolean {
+  if (f.status) {
+    const s = lead.status || 'Fresh Leads';
+    if (s !== f.status) return false;
+  }
+  if (f.search && f.search.trim()) {
+    const q = f.search.trim().toLowerCase();
+    const nameMatch = lead.name?.toLowerCase().includes(q);
+    const emailMatch = lead.email?.toLowerCase().includes(q);
+    const phoneMatch = lead.phone?.toLowerCase().includes(q);
+    const locMatch = (lead as any)?.location?.toLowerCase().includes(q);
+    if (!nameMatch && !emailMatch && !phoneMatch && !locMatch) return false;
+  }
+  if (f.source) {
+    if (!lead.source || lead.source !== f.source) return false;
+  }
+  if (f.agent) {
+    const qAgent = f.agent.toLowerCase();
+    const agentMatch = lead.agent?.toLowerCase().includes(qAgent);
+    const assignedToMatch = lead.assignedToName?.toLowerCase().includes(qAgent);
+    const assignedNamesMatch = lead.assignedToNames?.some((n) => n.toLowerCase().includes(qAgent));
+    const assigneesMatch = lead.assignees?.some((a) => a.userName?.toLowerCase().includes(qAgent));
+    if (!agentMatch && !assignedToMatch && !assignedNamesMatch && !assigneesMatch) return false;
+  }
+  if (f.project) {
+    if ((lead as any)?.project !== f.project) return false;
+  }
+  if (f.propertyType) {
+    if (lead.propertyType !== f.propertyType) return false;
+  }
+  if (f.called === 'called') {
+    if (!lead.hasBeenCalled && !lead.lastContact && !lead.lastCallAt) return false;
+  } else if (f.called === 'not-called') {
+    if (lead.hasBeenCalled || lead.lastCallAt) return false;
+  }
+  if (f.actionTaken === 'today') {
+    if (!lead.actionTakenToday && !lead.contactedToday) return false;
+  } else if (f.actionTaken === 'no-action') {
+    if (lead.actionTakenToday || lead.contactedToday) return false;
+  }
+  return true;
+}
+
 interface CallHistoryRow {
   id: string;
   contact_name?: string;
@@ -258,23 +301,49 @@ export default function LeadsManagementScreen({
   const { t } = useLanguage();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    status: initialStatus || '',
-    source: '',
-    agent: '',
-    project: '',
-    propertyType: '',
-    action: '',
-    contacted: '',
-    actionTaken: '',
-    actionFrom: '',
-    actionTo: '',
-    called: '',
-    calledFrom: '',
-    calledTo: '',
+
+  const [filters, setFilters] = useState<FilterState>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const urlCalled = (p.get('called') || '') as FilterState['called'];
+      const urlAction = (p.get('actionTaken') || '') as FilterState['actionTaken'];
+      const urlStatus = resolveStatusParam(p.get('stage')) || resolveStatusParam(p.get('status')) || initialStatus || '';
+      return {
+        search: p.get('search') || '',
+        status: urlStatus,
+        source: (p.get('source') as LeadSource) || '',
+        agent: p.get('agent') || '',
+        project: p.get('project') || '',
+        propertyType: (p.get('propertyType') as PropertyType) || '',
+        action: (p.get('action') as LeadAction) || '',
+        contacted: '',
+        actionTaken: urlAction,
+        actionFrom: p.get('actionFrom') || '',
+        actionTo: p.get('actionTo') || '',
+        called: urlCalled,
+        calledFrom: p.get('calledFrom') || '',
+        calledTo: p.get('calledTo') || '',
+      };
+    }
+    return {
+      search: '',
+      status: initialStatus || '',
+      source: '',
+      agent: '',
+      project: '',
+      propertyType: '',
+      action: '',
+      contacted: '',
+      actionTaken: '',
+      actionFrom: '',
+      actionTo: '',
+      called: '',
+      calledFrom: '',
+      calledTo: '',
+    };
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -309,7 +378,7 @@ export default function LeadsManagementScreen({
     setScheduleNotes('');
   }, [viewLead?.id]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(500);
+  const [pageSize, setPageSize] = useState(100);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [showFilters, setShowFilters] = useState(true);
   const [viewTab, setViewTab] = useState<'overview' | 'activity' | 'units' | 'comments'>('overview');
@@ -346,6 +415,10 @@ export default function LeadsManagementScreen({
   leadsRef.current = leads;
   const viewLeadRef = useRef(viewLead);
   viewLeadRef.current = viewLead;
+  const totalRef = useRef(total);
+  totalRef.current = total;
+  const statusCountsRef = useRef(statusCounts);
+  statusCountsRef.current = statusCounts;
 
   // Lock body scroll when View Lead drawer is open (Add Lead modal handled by Modal portal)
   useEffect(() => {
@@ -380,6 +453,65 @@ export default function LeadsManagementScreen({
   const fetchRef = useRef(0);
   const firstLoadRef = useRef(true);
 
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+  const pageSizeRef = useRef(pageSize);
+  pageSizeRef.current = pageSize;
+  const sortKeyRef = useRef(sortKey);
+  sortKeyRef.current = sortKey;
+  const sortDirRef = useRef(sortDir);
+  sortDirRef.current = sortDir;
+
+  const loadStatusCounts = useCallback(async (overrideFilters?: FilterState) => {
+    try {
+      const activeFilters = overrideFilters || filtersRef.current;
+      const counts = await leadsService.getStatusCounts({
+        search: activeFilters.search || undefined,
+        agent: activeFilters.agent || undefined,
+        source: activeFilters.source || undefined,
+        project: activeFilters.project || undefined,
+        propertyType: activeFilters.propertyType || undefined,
+        action: activeFilters.action || undefined,
+        actionTaken: activeFilters.actionTaken || undefined,
+        actionFrom: activeFilters.actionFrom || undefined,
+        actionTo: activeFilters.actionTo || undefined,
+        called: activeFilters.called || undefined,
+        calledFrom: activeFilters.calledFrom || undefined,
+        calledTo: activeFilters.calledTo || undefined,
+        recentlyCalledIds: Array.from(recentlyCalledRef.current),
+      });
+      if (counts && typeof counts === 'object') {
+        setStatusCounts(counts);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    void loadStatusCounts();
+  }, [loadStatusCounts]);
+
+  // Keep URL search params in sync with active filters so opening a lead,
+  // logging a call, drawer closes, or router navigation never wipes active filters
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (filters.called) url.searchParams.set('called', filters.called);
+    else url.searchParams.delete('called');
+
+    if (filters.actionTaken) url.searchParams.set('actionTaken', filters.actionTaken);
+    else url.searchParams.delete('actionTaken');
+
+    if (filters.status) url.searchParams.set('status', filters.status);
+    else url.searchParams.delete('status');
+
+    if (filters.search) url.searchParams.set('search', filters.search);
+    else url.searchParams.delete('search');
+
+    window.history.replaceState({}, '', url.toString());
+  }, [filters]);
+
   // Deep-link intake via useSearchParams (dashboard cards, follow-ups, topbar):
   // /leads-management?lead=<id> · ?new=1 · ?search= · ?status=<exact|alias> ·
   // ?stage=fresh|cold|pending|deal. Applied on mount AND on in-place query
@@ -396,23 +528,33 @@ export default function LeadsManagementScreen({
     const leadId = params.get('lead');
     const openNew = params.get('new') === '1';
     const searchParam = params.get('search');
-    if (searchParam) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('search');
-      window.history.replaceState({}, '', url.toString());
-      setFilters((f) => ({ ...f, search: searchParam }));
-    }
-    // Exact statuses (?status=Fresh%20Leads) + short aliases (?status=no_answer)
-    // + dashboard stage keys (?stage=fresh). Stage wins when both are present.
+    const calledParam = params.get('called') as FilterState['called'];
+    const actionTakenParam = params.get('actionTaken') as FilterState['actionTaken'];
+
     const resolved = resolveStatusParam(params.get('stage')) || resolveStatusParam(params.get('status'));
-    if (resolved) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('status');
-      url.searchParams.delete('stage');
-      window.history.replaceState({}, '', url.toString());
-      setFilters((f) => ({ ...f, status: resolved }));
-      setCurrentPage(1);
-    }
+
+    setFilters((prev) => {
+      const updated = { ...prev };
+      let changed = false;
+      if (searchParam && searchParam !== prev.search) {
+        updated.search = searchParam;
+        changed = true;
+      }
+      if (resolved && resolved !== prev.status) {
+        updated.status = resolved;
+        changed = true;
+      }
+      if (calledParam && calledParam !== prev.called) {
+        updated.called = calledParam;
+        changed = true;
+      }
+      if (actionTakenParam && actionTakenParam !== prev.actionTaken) {
+        updated.actionTaken = actionTakenParam;
+        changed = true;
+      }
+      return changed ? updated : prev;
+    });
+
     if (openNew) {
       const url = new URL(window.location.href);
       url.searchParams.delete('new');
@@ -420,9 +562,6 @@ export default function LeadsManagementScreen({
       setAddModalOpen(true);
     }
     if (!leadId) return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete('lead');
-    window.history.replaceState({}, '', url.toString());
     leadsService
       .getById(leadId)
       .then((lead) => {
@@ -431,29 +570,30 @@ export default function LeadsManagementScreen({
       .catch(() => {});
   }, [qpLead, qpNew, qpSearch, qpStatus, qpStage]);
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async (overrideFilters?: FilterState) => {
+    const activeFilters = overrideFilters || filtersRef.current;
     const requestId = ++fetchRef.current;
     if (firstLoadRef.current) setLoading(true);
     try {
       const res = await leadsService.getPage({
-        page: currentPage,
-        pageSize,
-        search: filters.search,
-        status: filters.status || undefined,
-        source: filters.source || undefined,
-        agent: filters.agent || undefined,
-        project: filters.project || undefined,
-        propertyType: filters.propertyType || undefined,
-        action: filters.action || undefined,
-        contacted: filters.contacted || undefined,
-        actionTaken: filters.actionTaken || undefined,
-        actionFrom: filters.actionFrom || undefined,
-        actionTo: filters.actionTo || undefined,
-        called: filters.called || undefined,
-        calledFrom: filters.calledFrom || undefined,
-        calledTo: filters.calledTo || undefined,
-        sortKey,
-        sortDir,
+        page: currentPageRef.current,
+        pageSize: pageSizeRef.current,
+        search: activeFilters.search,
+        status: activeFilters.status || undefined,
+        source: activeFilters.source || undefined,
+        agent: activeFilters.agent || undefined,
+        project: activeFilters.project || undefined,
+        propertyType: activeFilters.propertyType || undefined,
+        action: activeFilters.action || undefined,
+        contacted: activeFilters.contacted || undefined,
+        actionTaken: activeFilters.actionTaken || undefined,
+        actionFrom: activeFilters.actionFrom || undefined,
+        actionTo: activeFilters.actionTo || undefined,
+        called: activeFilters.called || undefined,
+        calledFrom: activeFilters.calledFrom || undefined,
+        calledTo: activeFilters.calledTo || undefined,
+        sortKey: sortKeyRef.current,
+        sortDir: sortDirRef.current,
         // Exclude leads that were optimistically removed after call logging
         recentlyCalledIds: Array.from(recentlyCalledRef.current),
       });
@@ -461,30 +601,114 @@ export default function LeadsManagementScreen({
       setLeads((res.data || []) as Lead[]);
       setTotal(res.total);
       setLoadError(null);
+      void loadStatusCounts(activeFilters);
     } catch (err: any) {
       if (requestId !== fetchRef.current) return;
       setLoadError(err?.message || 'Failed to load leads');
       setLeads([]);
+      setTotal(0);
     } finally {
       if (requestId === fetchRef.current) {
         setLoading(false);
         firstLoadRef.current = false;
       }
     }
-  };
+  }, [loadStatusCounts]);
 
-  // Debounced server-side fetch: pagination, filters, and sorting all happen in
-  // the database so we never download the full leads table to the browser.
+  const prevSearchRef = useRef(filters.search);
+
+  // Server-side fetch: pagination, filters, and sorting all happen in the DB.
+  // Only debounce text search input (150ms); stage/filter/page/sort changes fire in 0ms!
   useEffect(() => {
-    const timer = setTimeout(
-      () => {
-        fetchLeads();
-      },
-      firstLoadRef.current ? 0 : 250
-    );
+    const isSearchTyping = !firstLoadRef.current && prevSearchRef.current !== filters.search;
+    prevSearchRef.current = filters.search;
+
+    if (!isSearchTyping) {
+      fetchLeads();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchLeads();
+    }, 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, currentPage, pageSize, sortKey, sortDir]);
+  }, [filters, currentPage, pageSize, sortKey, sortDir, fetchLeads]);
+
+  // Real-time two-way stage synchronization with Mobile App & other active sessions
+  useEffect(() => {
+    const supabase = createClient();
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel('web-leads-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leads' },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const row = payload.new as Record<string, any>;
+            const rawStatus = String(row.crm_status || row.lead_status || '').trim();
+            const normalizedStatus: LeadStatus | '' =
+              rawStatus.toLowerCase() === 'follow up after meeting'
+                ? 'Follow Up After Meeting'
+                : rawStatus.toLowerCase() === 'no answer at all'
+                  ? 'No Answer At All'
+                  : (rawStatus as LeadStatus);
+
+            if (row.id) {
+              const existing = leadsRef.current.find((l) => l.id === row.id);
+              if (existing) {
+                const updated: Lead = {
+                  ...existing,
+                  name: row.name ?? existing.name,
+                  phone: row.phone ?? existing.phone,
+                  email: row.email ?? existing.email,
+                  status: normalizedStatus || existing.status,
+                  notes: row.notes ?? existing.notes,
+                  followUpDue: row.follow_up_due
+                    ? String(row.follow_up_due).slice(0, 10)
+                    : existing.followUpDue,
+                };
+                if (!leadMatchesFilters(updated, filtersRef.current)) {
+                  setLeads((prev) => prev.filter((l) => l.id !== row.id));
+                  setTotal((t) => Math.max(0, t - 1));
+                } else {
+                  setLeads((prev) => prev.map((l) => (l.id === row.id ? updated : l)));
+                }
+              }
+              setViewLead((prev) =>
+                prev && prev.id === row.id
+                  ? {
+                      ...prev,
+                      name: row.name ?? prev.name,
+                      phone: row.phone ?? prev.phone,
+                      email: row.email ?? prev.email,
+                      status: normalizedStatus || prev.status,
+                      notes: row.notes ?? prev.notes,
+                      followUpDue: row.follow_up_due
+                        ? String(row.follow_up_due).slice(0, 10)
+                        : prev.followUpDue,
+                    }
+                  : prev
+              );
+              void loadStatusCounts();
+            }
+          } else {
+            if (refreshTimer) clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(() => {
+              fetchLeads();
+            }, 300);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -503,23 +727,54 @@ export default function LeadsManagementScreen({
   const handleStatusChange = useCallback(async (id: string, newStatus: LeadStatus) => {
     if (statusPendingRef.current.has(id)) return;
     statusPendingRef.current.add(id);
-    // Snapshot the previous status so we can roll the UI back if the server
-    // rejects the change (prevents the preview from lying about the stage).
+    // Snapshot the previous state so we can roll the UI back if the server rejects the change
     const prevLeads = leadsRef.current;
+    const prevTotal = totalRef.current;
     const prevView = viewLeadRef.current;
+    const prevStatusCounts = statusCountsRef.current;
+
+    const existingLead = prevLeads.find((x) => x.id === id) || (prevView?.id === id ? prevView : null);
+    const oldStatus = (existingLead?.status || 'Fresh Leads') as LeadStatus;
+
+    if (existingLead && oldStatus === newStatus) {
+      statusPendingRef.current.delete(id);
+      return;
+    }
+
+    const updatedLead: Lead = existingLead
+      ? { ...existingLead, status: newStatus, actionTakenToday: true, contactedToday: true }
+      : ({ id, status: newStatus, actionTakenToday: true, contactedToday: true } as any);
+
+    const stillMatches = leadMatchesFilters(updatedLead, filtersRef.current);
+
     try {
-      setLeads((prev) =>
-        prev.map((l) =>
-          l.id === id
-            ? { ...l, status: newStatus, actionTakenToday: true, contactedToday: true }
-            : l
-        )
-      );
+      setLeads((prev) => {
+        if (!stillMatches) {
+          return prev.filter((l) => l.id !== id);
+        }
+        return prev.map((l) => (l.id === id ? updatedLead : l));
+      });
+
+      if (!stillMatches) {
+        setTotal((t) => Math.max(0, t - 1));
+      }
+
       setViewLead((prev) =>
         prev?.id === id
           ? { ...prev, status: newStatus, actionTakenToday: true, contactedToday: true }
           : prev
       );
+
+      setStatusCounts((prev) => {
+        const next = { ...prev };
+        if (oldStatus && next[oldStatus] !== undefined) {
+          next[oldStatus] = Math.max(0, next[oldStatus] - 1);
+        }
+        next[newStatus] = (next[newStatus] || 0) + 1;
+        return next;
+      });
+
+      toast.success(`Lead status updated to ${newStatus}`);
       await leadsService.updateStatus(id, newStatus);
       // An active status filter (e.g. Cold Calls) must stop showing the lead the
       // moment it no longer matches, without waiting for a refetch.
@@ -534,12 +789,11 @@ export default function LeadsManagementScreen({
         });
         setViewLead((prev) => (prev?.id === id ? null : prev));
       }
-      // Unified fix: status "Following Up" must also guarantee a follow_ups row.
-      // If the lead has no due date, default to tomorrow (08/09/26 example) so the
-      // Follow-ups screen (which reads from follow_ups, not leads) is not empty.
-      const needsFollowUp = new Set(['Following Up', 'Pending Leads', 'Interested', 'Meeting', 'Reservation']).has(newStatus);
+      void loadStatusCounts();
+      // Unified fix: status "Following Up" / "Follow Up After Meeting" must also guarantee a follow_ups row.
+      const needsFollowUp = new Set(['Following Up', 'Follow Up After Meeting', 'Pending Leads', 'Interested', 'Meeting', 'Reservation']).has(newStatus);
       if (needsFollowUp) {
-        const src = prevLeads.find((x) => x.id === id) || prevView;
+        const src = existingLead || prevView;
         if (!src?.followUpDue) {
           const tomorrow = new Date();
           tomorrow.setDate(tomorrow.getDate() + 1);
@@ -574,24 +828,16 @@ export default function LeadsManagementScreen({
             .catch(() => {});
         }
       }
-      toast.success(`Lead status updated to ${newStatus}`);
     } catch (err: any) {
-      setLeads((prev) =>
-        prev.map((l) => {
-          const orig = prevLeads.find((x) => x.id === id);
-          return l.id === id && orig ? { ...l, status: orig.status } : l;
-        })
-      );
-      setViewLead((prev) => {
-        if (prev?.id !== id) return prev;
-        const orig = prevView && prevView.id === id ? prevView : prevLeads.find((x) => x.id === id);
-        return orig ? { ...prev, status: orig.status } : prev;
-      });
+      setLeads(prevLeads);
+      setTotal(prevTotal);
+      setViewLead(prevView);
+      setStatusCounts(prevStatusCounts);
       toast.error(err?.message || 'Failed to update status');
     } finally {
       statusPendingRef.current.delete(id);
     }
-  }, [user?.id, filters.status]);
+  }, [user?.id, filters.status, loadStatusCounts]);
 
   const handleScheduleFollowUp = async () => {
     if (!viewLead) return;
@@ -619,52 +865,46 @@ export default function LeadsManagementScreen({
         return;
       }
     } catch {}
-    const prev = viewLead;
     setScheduleSaving(true);
-    // Optimistic: reflect date immediately on card/list + drawer, and mark action taken
-    setViewLead((v) =>
-      v?.id === id ? { ...v, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : v
-    );
-    setLeads((prevLeads) =>
-      prevLeads.map((l) =>
-        l.id === id ? { ...l, followUpDue: dueDate, actionTakenToday: true, contactedToday: true } : l
-      )
-    );
     try {
-      // 1) Keep legacy lead column in sync and mark last_action_at / last_action_by
-      await leadsService.scheduleFollowUp(id, dueDate, user?.id).catch(() => {});
-      // 2) Canonical create: validates, upserts on lead_id, preserves time+notes,
-      //    and drives the dashboard widget + follow-up partition via emit.
-      await followUpsService.create(
-        {
-          title: `Follow up: ${viewLead.name || 'Lead'}`,
-          contactName: viewLead.name || 'Lead',
-          contactPhone: viewLead.phone || '',
-          contactEmail: viewLead.email || '',
-          type: 'Call',
-          status: 'Pending',
-          priority: 'Medium',
-          dueDate,
-          dueTime,
-          agent: viewLead.agent || '',
-          agentInitials: viewLead.agentInitials || '',
-          notes: notes || viewLead.notes || '',
-          propertyInterest: viewLead.propertyType || viewLead.project || '',
-          relationshipStatus: 'New',
-          leadId: id,
-        },
-        user?.id || ''
+      await Promise.all([
+        leadsService.scheduleFollowUp(id, dueDate, user?.id, notes || undefined),
+        followUpsService.create(
+          {
+            title: `Follow up: ${viewLead.name || 'Lead'}`,
+            contactName: viewLead.name || 'Lead',
+            contactPhone: viewLead.phone || '',
+            contactEmail: viewLead.email || '',
+            type: 'Call',
+            status: 'Pending',
+            priority: 'Medium',
+            dueDate,
+            dueTime,
+            agent: viewLead.agent || '',
+            agentInitials: viewLead.agentInitials || '',
+            notes: notes || viewLead.notes || '',
+            propertyInterest: viewLead.propertyType || viewLead.project || '',
+            relationshipStatus: 'New',
+            leadId: id,
+          },
+          user?.id || ''
+        ),
+      ]);
+      // Update local state ONLY after success
+      setViewLead((v) =>
+        v?.id === id
+          ? { ...v, followUpDue: dueDate, notes: notes || v.notes, actionTakenToday: true, contactedToday: true }
+          : v
       );
-      toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
-    } catch (err: any) {
-      setViewLead(prev ?? null);
       setLeads((prevLeads) =>
         prevLeads.map((l) =>
           l.id === id
-            ? { ...l, followUpDue: prev?.followUpDue || '', actionTakenToday: prev?.actionTakenToday }
+            ? { ...l, followUpDue: dueDate, notes: notes || l.notes, actionTakenToday: true, contactedToday: true }
             : l
         )
       );
+      toast.success(`Follow-up scheduled for ${dueDate} ${dueTime}${notes ? ' — notes saved' : ''}`);
+    } catch (err: any) {
       toast.error(err?.message || 'Failed to schedule follow-up');
     } finally {
       setScheduleSaving(false);
@@ -692,6 +932,7 @@ export default function LeadsManagementScreen({
       toast.error('Only owner and admin can delete leads.');
       return;
     }
+    const targetLead = leadsRef.current.find((l) => l.id === id);
     try {
       await leadsService.delete(id);
       setLeads((prev) => prev.filter((l) => l.id !== id));
@@ -701,11 +942,19 @@ export default function LeadsManagementScreen({
         n.delete(id);
         return n;
       });
+      if (targetLead?.status) {
+        const s = targetLead.status;
+        setStatusCounts((prev) => ({
+          ...prev,
+          [s]: Math.max(0, (prev[s] || 0) - 1),
+        }));
+      }
+      void loadStatusCounts();
       toast.success('Lead deleted');
     } catch (err: any) {
       toast.error(err?.message || 'Failed to delete lead');
     }
-  }, [user?.role]);
+  }, [user?.role, loadStatusCounts]);
 
   const handleViewLead = useCallback((lead: Lead) => {
     setViewLead(lead);
@@ -723,11 +972,11 @@ export default function LeadsManagementScreen({
   const handleAddNote = useCallback((lead: Lead) => {
     setLeads((prev) =>
       prev.map((l) =>
-        l.id === lead.id ? { ...l, actionTakenToday: true, contactedToday: true } : l
+        l.id === lead.id ? { ...l, notes: lead.notes, actionTakenToday: true, contactedToday: true } : l
       )
     );
     setViewLead((prev) =>
-      prev?.id === lead.id ? { ...prev, actionTakenToday: true, contactedToday: true } : prev
+      prev?.id === lead.id ? { ...prev, notes: lead.notes, actionTakenToday: true, contactedToday: true } : prev
     );
   }, []);
 
@@ -744,36 +993,51 @@ export default function LeadsManagementScreen({
    */
   const handleCallLogged = useCallback((loggedLead: Lead, outcome: string) => {
     const leadId = loggedLead.id;
+    const existing = leadsRef.current.find((l) => l.id === leadId);
+    const updatedLead: Lead = {
+      ...(existing || loggedLead),
+      ...loggedLead,
+      hasBeenCalled: true,
+      lastCallOutcome: outcome,
+      lastCallAt: new Date().toISOString(),
+      actionTakenToday: true,
+      contactedToday: true,
+    };
 
-    // 1. Optimistic local removal: instantly drop from list/board
+    const stillMatches = leadMatchesFilters(updatedLead, filtersRef.current);
+
     setLeads((prev) => {
-      if (!prev.find((l) => l.id === leadId)) return prev; // already gone
-      return prev.filter((l) => l.id !== leadId);
+      if (!stillMatches) {
+        return prev.filter((l) => l.id !== leadId);
+      }
+      return prev.map((l) => (l.id === leadId ? updatedLead : l));
     });
 
-    // 2. Decrement total so pagination stays accurate
-    setTotal((t) => Math.max(0, t - 1));
+    if (!stillMatches) {
+      setTotal((t) => Math.max(0, t - 1));
+    }
 
-    // 3. Remove from selected set (if somehow selected)
+    // 2. Remove from selected set (if selected)
     setSelectedIds((prev) => {
+      if (!prev.has(leadId)) return prev;
       const n = new Set(prev);
       n.delete(leadId);
       return n;
     });
 
-    // 4. Close the lead preview if this lead was open
-    if (viewLead?.id === leadId) setViewLead(null);
+    // 3. Close the lead preview drawer if this lead no longer matches
+    setViewLead((curr) => (curr?.id === leadId ? (stillMatches ? updatedLead : null) : curr));
 
-    // 5. Track ID so the next fetchLeads() can exclude it from the server result
-    //    (the API already handles last_call_at / action='called_today' natively)
-    recentlyCalledRef.current.add(leadId);
-    // Auto-clear after 5 minutes so re-fetching naturally re-includes it
-    setTimeout(() => recentlyCalledRef.current.delete(leadId), 5 * 60 * 1000);
+    // 4. Track ID so server query excludes it when filtering not-called
+    if (filtersRef.current.called === 'not-called') {
+      recentlyCalledRef.current.add(leadId);
+      setTimeout(() => recentlyCalledRef.current.delete(leadId), 5 * 60 * 1000);
+    }
 
-    // 6. Trigger a silent background refresh so the next page/fetch reflects
-    //    the server-side state. Do NOT block the UI.
+    // 5. Update counts and trigger background refresh
+    void loadStatusCounts();
     void fetchLeads();
-  }, [viewLead?.id]);
+  }, [fetchLeads, loadStatusCounts]);
 
   // Post-Call Outcome: triggered by Call button — shows modal immediately + dials tel:
   const handlePostCallTrigger = useCallback((lead: Lead) => {
@@ -810,6 +1074,7 @@ export default function LeadsManagementScreen({
       await leadsService.bulkDelete(ids);
       setLeads((prev) => prev.filter((l) => !selectedIds.has(l.id)));
       setTotal((t) => Math.max(0, t - ids.length));
+      void loadStatusCounts();
       toast.success(`${ids.length} leads deleted`);
       setSelectedIds(new Set());
     } catch (err: any) {
@@ -924,10 +1189,11 @@ export default function LeadsManagementScreen({
     }
   };
 
-  // Duplicates are never blocked or warned about: the DB marks them and only the
-  // original owner is notified (server-side).
-  const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> =>
-    createLead(lead, options);
+  const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
+    setDupChecking(false);
+    setDupWarning(null);
+    return createLead(lead, options);
+  };
 
   const createLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     try {
@@ -935,8 +1201,13 @@ export default function LeadsManagementScreen({
       // next number straight away.
       if (!options?.keepOpen) setAddModalOpen(false);
       const created = await leadsService.create(lead, user?.id || '');
-      setLeads((prev) => [created as Lead, ...prev]);
-      setTotal((t) => t + 1);
+      const createdLead = created as Lead;
+      const matches = leadMatchesFilters(createdLead, filtersRef.current);
+      if (matches) {
+        setLeads((prev) => [createdLead, ...prev]);
+        setTotal((t) => t + 1);
+      }
+      void loadStatusCounts();
       void fetchLeads();
       toast.success(`Lead "${lead.name}" added successfully`);
       return true;
@@ -946,23 +1217,12 @@ export default function LeadsManagementScreen({
     }
   };
 
-  /** "Create anyway" after a duplicate warning — records the attempt for admins. */
+  /** "Create anyway" fallback if dupWarning is ever triggered. */
   const createDuplicateAnyway = async () => {
     if (!dupWarning) return;
-    const { existing, pendingLead } = dupWarning;
+    const { pendingLead } = dupWarning;
     setDupWarning(null);
-    try {
-      await createLead(pendingLead);
-      if (existing?.id) {
-        await duplicateLeadsService.logAttempt({
-          matchedLeadId: existing.id,
-          attemptedLeadId: pendingLead.id,
-          attemptedPhone: pendingLead.phone || '',
-        });
-      }
-    } catch {
-      /* toast already shown by createLead */
-    }
+    await createLead(pendingLead);
   };
 
   const handleEditSave = async (updated: Lead) => {
@@ -1000,9 +1260,17 @@ export default function LeadsManagementScreen({
               assignedToName: updated.assignedToName || (row.assigned_to ? updated.assignedToName : null),
             }))
         : await leadsService.update(updated.id, updated);
-      setLeads((prev) => prev.map((l) => (l.id === updated.id ? (saved as Lead) : l)));
-      setViewLead((current) => (current?.id === updated.id ? (saved as Lead) : current));
+      const savedLead = saved as Lead;
+      const stillMatches = leadMatchesFilters(savedLead, filtersRef.current);
+      if (!stillMatches) {
+        setLeads((prev) => prev.filter((l) => l.id !== updated.id));
+        setTotal((t) => Math.max(0, t - 1));
+      } else {
+        setLeads((prev) => prev.map((l) => (l.id === updated.id ? savedLead : l)));
+      }
+      setViewLead((current) => (current?.id === updated.id ? savedLead : current));
       setEditLead(null);
+      void loadStatusCounts();
       toast.success(assignmentOnly ? 'Lead reassigned successfully' : `Lead "${updated.name}" updated`);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update lead');
@@ -1035,8 +1303,23 @@ export default function LeadsManagementScreen({
     };
     try {
       const saved = await leadsService.update(next.id, next);
-      setLeads((prev) => prev.map((l) => (l.id === next.id ? (saved as Lead) : l)));
-      setViewLead(saved as Lead);
+      const savedLead = saved as Lead;
+      const stillMatches = leadMatchesFilters(savedLead, filtersRef.current);
+      if (!stillMatches) {
+        setLeads((prev) => prev.filter((l) => l.id !== next.id));
+        setTotal((t) => Math.max(0, t - 1));
+      } else {
+        setLeads((prev) => prev.map((l) => (l.id === next.id ? savedLead : l)));
+      }
+      setViewLead(savedLead);
+      setStatusCounts((prev) => {
+        const nextC = { ...prev };
+        const oldS = lead.status || 'Fresh Leads';
+        if (nextC[oldS] !== undefined) nextC[oldS] = Math.max(0, nextC[oldS] - 1);
+        nextC[status] = (nextC[status] || 0) + 1;
+        return nextC;
+      });
+      void loadStatusCounts();
       toast.success(`Lead marked as ${status}`);
       try {
         const supabase = createClient();
@@ -1064,9 +1347,6 @@ export default function LeadsManagementScreen({
       'Phone',
       'Email',
       'Location',
-      'Property Type',
-      'Budget Min',
-      'Budget Max',
       'Source',
       'Agent',
       'Status',
@@ -1090,7 +1370,6 @@ export default function LeadsManagementScreen({
         status: filters.status || undefined,
         source: filters.source || undefined,
         agent: filters.agent || undefined,
-        propertyType: filters.propertyType || undefined,
         action: filters.action || undefined,
         contacted: filters.contacted || undefined,
         actionTaken: filters.actionTaken || undefined,
@@ -1105,9 +1384,6 @@ export default function LeadsManagementScreen({
         l.phone,
         l.email,
         l.location,
-        l.propertyType,
-        l.budgetMin,
-        l.budgetMax,
         l.source,
         l.agent,
         l.status,
@@ -1266,7 +1542,6 @@ export default function LeadsManagementScreen({
     filters.status,
     filters.source,
     filters.agent,
-    filters.propertyType,
     filters.action,
   ].filter(Boolean).length;
 
@@ -1304,7 +1579,7 @@ export default function LeadsManagementScreen({
           <p className="text-sm text-muted-foreground mt-0.5">
             {subtitle ||
               `${total} lead${total !== 1 ? 's' : ''} in your list${
-                initialStatus ? ` · status: ${initialStatus}` : ''
+                filters.status ? ` · status: ${filters.status}` : initialStatus ? ` · status: ${initialStatus}` : ''
               }`}
           </p>
         </div>
@@ -1325,6 +1600,14 @@ export default function LeadsManagementScreen({
             <Upload size={15} />
             <span className="hidden sm:inline">{t('leads.import')}</span>
           </button>
+          <a
+            href="/import-history"
+            className="btn-secondary flex items-center gap-1.5 text-sm"
+            title="View Excel Import History & Download Uploaded Sheets"
+          >
+            <ClipboardList size={15} />
+            <span className="hidden sm:inline">Import History</span>
+          </a>
           {/* ── Prominent Add Lead CTA ── */}
           <div className="relative">
             {/* Animated glow ring */}
@@ -1392,7 +1675,13 @@ export default function LeadsManagementScreen({
               <span className="hidden md:inline">{t('leads.list')}</span>
             </button>
             <button
-              onClick={() => setViewMode('board')}
+              onClick={() => {
+                setViewMode('board');
+                if (pageSize < 500) {
+                  setPageSize(500);
+                  setCurrentPage(1);
+                }
+              }}
               className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
                 viewMode === 'board'
                   ? 'bg-card text-primary shadow-sm'
@@ -1447,7 +1736,7 @@ export default function LeadsManagementScreen({
               <p className="text-xs opacity-80">{loadError}</p>
             </div>
           </div>
-          <button onClick={fetchLeads} className="btn-secondary shrink-0">
+          <button onClick={() => fetchLeads()} className="btn-secondary shrink-0">
             <RefreshCw size={14} />
             Retry
           </button>
@@ -1457,6 +1746,7 @@ export default function LeadsManagementScreen({
         {viewMode === 'board' ? (
           <LeadBoard
             leads={leads}
+            statusCounts={statusCounts}
             onView={(lead) => {
               setViewLead(lead);
               setViewTab('overview');
@@ -1784,8 +2074,6 @@ export default function LeadsManagementScreen({
                   { label: 'Email', value: viewLead.email || '—' },
                   { label: 'Source', value: viewLead.source || '—' },
                   { label: 'Project', value: viewLead.project || viewLead.developer || '—' },
-                  { label: 'Property', value: viewLead.propertyType || '—' },
-                  { label: 'Budget', value: formatDisplayBudget(viewLead) },
                   { label: 'Agent', value: viewLead.agent || 'Unassigned' },
                   { label: 'Assigned To', value: (viewLead.assignedToNames && viewLead.assignedToNames.length > 0) ? viewLead.assignedToNames.join(' & ') : (viewLead.assignedToName || 'Unassigned') },
                   ...(viewLead.referredTo

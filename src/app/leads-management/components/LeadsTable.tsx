@@ -1,20 +1,32 @@
 'use client';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
+  ChevronDown,
   Eye,
   Pencil,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Phone,
+  Mail,
+  MapPin,
   Users,
+  UserCheck,
+  Zap,
 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
-import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
+import {
+  PIPELINE_STAGES,
+  OUTCOME_STAGES,
+  nextPipelineStage,
+} from './leadStages';
 import EmptyState from '@/components/ui/EmptyState';
+import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
+import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
+import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
@@ -45,22 +57,10 @@ interface LeadsTableProps {
   onPostCall?: (lead: Lead) => void;
 }
 
-type ColumnAlign = 'start' | 'center' | 'end';
-
-interface LeadTableColumn {
-  key: string;
-  label: string;
-  width: string;
-  align?: ColumnAlign;
-  sortKey?: keyof Lead;
-  header?: React.ReactNode;
-  render: (lead: Lead) => React.ReactNode;
-}
-
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   return (
     <span
-      className={`ms-1 inline-flex flex-col ${active ? 'text-primary' : 'text-muted-foreground/40'}`}
+      className={`ml-1 inline-flex flex-col ${active ? 'text-primary' : 'text-muted-foreground/40'}`}
     >
       <ChevronUp size={10} className={active && dir === 'asc' ? 'text-primary' : ''} />
       <ChevronDown
@@ -93,7 +93,7 @@ function StageSelector({
           e.stopPropagation();
           setOpen((o) => !o);
         }}
-        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted/70 transition-colors text-start max-w-full"
+        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted/70 transition-colors text-left max-w-full"
         aria-label={`Change status from ${currentStatus}`}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -115,47 +115,47 @@ function StageSelector({
           aria-label="Select stage"
           className="stage-dropdown-panel"
         >
-          <div className="py-1">
-            <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Pipeline
-            </p>
-            {PIPELINE_STAGES.map((s) => (
-              <button
-                key={`status-opt-${leadId}-${s}`}
-                role="option"
-                aria-selected={s === currentStatus}
-                onClick={() => {
-                  onStatusChange(leadId, s as LeadStatus);
-                  setOpen(false);
-                }}
-                className={`w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
-                  s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
-                }`}
-              >
-                <StatusBadge status={s} showDot />
-              </button>
-            ))}
-            <div className="my-1 border-t border-border/60" />
-            <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Outcomes
-            </p>
-            {OUTCOME_STAGES.map((s) => (
-              <button
-                key={`status-opt-${leadId}-${s}`}
-                role="option"
-                aria-selected={s === currentStatus}
-                onClick={() => {
-                  onStatusChange(leadId, s as LeadStatus);
-                  setOpen(false);
-                }}
-                className={`w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
-                  s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
-                }`}
-              >
-                <StatusBadge status={s} showDot />
-              </button>
-            ))}
-          </div>
+        <div className="py-1">
+          <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Pipeline
+          </p>
+          {PIPELINE_STAGES.map((s) => (
+            <button
+              key={`status-opt-${leadId}-${s}`}
+              role="option"
+              aria-selected={s === currentStatus}
+              onClick={() => {
+                onStatusChange(leadId, s as LeadStatus);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
+                s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
+              }`}
+            >
+              <StatusBadge status={s} showDot />
+            </button>
+          ))}
+          <div className="my-1 border-t border-border/60" />
+          <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Outcomes
+          </p>
+          {OUTCOME_STAGES.map((s) => (
+            <button
+              key={`status-opt-${leadId}-${s}`}
+              role="option"
+              aria-selected={s === currentStatus}
+              onClick={() => {
+                onStatusChange(leadId, s as LeadStatus);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
+                s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
+              }`}
+            >
+              <StatusBadge status={s} showDot />
+            </button>
+          ))}
+        </div>
         </ViewportPopover>
       )}
     </>
@@ -164,8 +164,216 @@ function StageSelector({
 
 const StatusDropdown = StageSelector;
 
-const alignClassOf = (align: ColumnAlign = 'start') =>
-  align === 'center' ? 'text-center' : align === 'end' ? 'text-end' : 'text-start';
+const formatBudget = (min?: number, max?: number) => {
+  if (min == null && max == null) return '—';
+  const parts: string[] = [];
+  if (min != null) parts.push(min.toLocaleString());
+  if (max != null) parts.push(max.toLocaleString());
+  return `${parts.join('–')} ج.م`;
+};
+
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-');
+  return `${m}/${d}/${y?.slice(2)}`;
+};
+
+const isOverdue = (dueDate?: string) => {
+  if (!dueDate) return false;
+  const due = new Date(dueDate);
+  const today = new Date();
+  return due < today;
+};
+
+interface LeadTableRowProps {
+  lead: Lead;
+  isSelected: boolean;
+  canDelete: boolean;
+  onSelectRow: (id: string, checked: boolean) => void;
+  onStatusChange: (id: string, status: LeadStatus) => void;
+  onView?: (lead: Lead) => void;
+  onEdit?: (lead: Lead) => void;
+  onDeletePrompt: (id: string) => void;
+}
+
+const LeadTableRow = React.memo(function LeadTableRow({
+  lead,
+  isSelected,
+  canDelete,
+  onSelectRow,
+  onStatusChange,
+  onView,
+  onEdit,
+  onDeletePrompt,
+}: LeadTableRowProps) {
+  return (
+    <tr
+      className={`hover:bg-muted/30 transition-colors group ${isSelected ? 'bg-secondary/20' : ''}`}
+    >
+      <td className="table-td">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => onSelectRow(lead.id, e.target.checked)}
+          className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
+          aria-label={`Select ${lead.name || lead.id}`}
+        />
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {(lead.name || lead.id)
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .slice(0, 2)}
+          </div>
+          <div className="min-w-0">
+            <a
+              href={`/leads/${lead.id}`}
+              className="font-semibold text-foreground text-sm truncate max-w-[130px] hover:text-primary hover:underline cursor-pointer transition-colors block"
+            >
+              {lead.name || `Lead ${lead.id}`}
+            </a>
+            <ActionTakenBadge
+              actionTakenToday={lead.actionTakenToday ?? lead.contactedToday}
+              compact
+            />
+            <CalledBadge hasBeenCalled={lead.hasBeenCalled} compact />
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+              <MapPin size={10} />
+              {lead.location || '—'}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td className="table-td">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Phone size={10} className="flex-shrink-0" />
+            <span className="font-mono-data">{lead.phone}</span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Mail size={10} className="flex-shrink-0" />
+            <span className="truncate max-w-[150px]">{lead.email || '—'}</span>
+          </div>
+        </div>
+      </td>
+
+      <td className="table-td">
+        <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-lg font-medium whitespace-nowrap">
+          {lead.source || '—'}
+        </span>
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-6 rounded-full bg-secondary text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {lead.agentInitials || '—'}
+          </div>
+          <span className="text-sm text-foreground truncate max-w-[100px]">
+            {lead.agent?.split(' ')[0] || '—'}
+          </span>
+        </div>
+      </td>
+      <td className="table-td">
+        {(lead.assignedToNames && lead.assignedToNames.length > 0) || lead.assignedToName || lead.adminName ? (
+          <div className="flex flex-col gap-0.5">
+            {((lead.assignedToNames && lead.assignedToNames.length > 0)
+              ? lead.assignedToNames
+              : lead.assignedToName
+              ? lead.assignedToName.split(' & ')
+              : []
+            ).map((name, idx) => (
+              <div key={idx} className="flex items-center gap-1.5" title={name}>
+                <UserCheck size={12} className="text-emerald-500 flex-shrink-0" />
+                <span className="text-xs text-foreground truncate max-w-[120px]">
+                  {name}
+                </span>
+              </div>
+            ))}
+            {lead.adminName && (
+              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                {(lead.assignedToNames?.length || lead.assignedToName) ? 'admin: ' : ''}
+                {lead.adminName}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        )}
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-1.5">
+          <StatusDropdown
+            currentStatus={lead.status || 'Fresh Leads'}
+            leadId={lead.id}
+            onStatusChange={onStatusChange}
+          />
+          <button
+            onClick={() => {
+              const next = nextPipelineStage(lead.status);
+              if (next && next !== lead.status) onStatusChange(lead.id, next);
+            }}
+            disabled={!nextPipelineStage(lead.status)}
+            className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap"
+            title={
+              nextPipelineStage(lead.status)
+                ? `One-click: move to ${nextPipelineStage(lead.status)}`
+                : 'At final pipeline stage'
+            }
+            aria-label="Advance lead status one step"
+          >
+            <Zap size={13} />
+            {nextPipelineStage(lead.status) || 'Done'}
+          </button>
+        </div>
+      </td>
+      <td className="table-td">
+        <span
+          className={`font-mono-data text-sm tabular-nums ${isOverdue(lead.followUpDue) ? 'text-red-500 font-semibold' : 'text-muted-foreground'}`}
+        >
+          {formatDate(lead.followUpDue)}
+          {isOverdue(lead.followUpDue) && (
+            <span className="ml-1 text-xs text-red-400">overdue</span>
+          )}
+        </span>
+      </td>
+      <td className="table-td">
+        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
+          <button
+            onClick={() => onView?.(lead)}
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+            title="View lead details"
+          >
+            <Eye size={14} />
+          </button>
+          <button
+            onClick={() => onEdit?.(lead)}
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
+            title="Edit lead"
+          >
+            <Pencil size={14} />
+          </button>
+          {canDelete && (
+            <button
+              onClick={() => onDeletePrompt(lead.id)}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
+              title="Delete lead"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}, (prev, next) => {
+  return (
+    prev.lead === next.lead &&
+    prev.isSelected === next.isSelected &&
+    prev.canDelete === next.canDelete
+  );
+});
 
 export default function LeadsTable({
   leads,
@@ -201,150 +409,17 @@ export default function LeadsTable({
     }
   };
 
-  // Single source of truth for both the header row and every body row.
-  // Keep the utility select/actions columns here too so all six cells stay aligned.
-  const columns: LeadTableColumn[] = [
-    {
-      key: 'select',
-      label: '',
-      width: '44px',
-      align: 'center',
-      header: (
-        <input
-          type="checkbox"
-          checked={allSelected}
-          onChange={(e) => onSelectAll(e.target.checked)}
-          className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
-          aria-label="Select all leads on this page"
-        />
-      ),
-      render: (lead) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.has(lead.id)}
-          onChange={(e) => onSelectRow(lead.id, e.target.checked)}
-          className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
-          aria-label={`Select ${lead.name || lead.id}`}
-        />
-      ),
-    },
-    {
-      key: 'name',
-      label: 'Lead Name',
-      width: '25%',
-      sortKey: 'name',
-      render: (lead) => {
-        const name = lead.name?.trim();
-        const phone = lead.phone?.trim();
-        const displayName = name || phone || '—';
-        const initials =
-          (name || phone || '?')
-            .split(/\s+/)
-            .map((part) => part[0])
-            .join('')
-            .slice(0, 2) || '—';
-
-        return (
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-              {initials}
-            </div>
-            <a
-              href={`/leads/${lead.id}`}
-              className="block min-w-0 truncate font-semibold text-foreground text-sm hover:text-primary hover:underline cursor-pointer transition-colors"
-              dir="auto"
-              title={displayName}
-            >
-              {displayName}
-            </a>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'phone',
-      label: 'Phone Number',
-      width: '16%',
-      render: (lead) => {
-        const phone = lead.phone?.trim();
-        return phone ? (
-          <span dir="ltr" className="font-mono-data inline-block text-sm text-foreground">
-            {phone}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        );
-      },
-    },
-    {
-      key: 'source',
-      label: 'Source',
-      width: '15%',
-      sortKey: 'source',
-      render: (lead) => {
-        const source = lead.source?.trim();
-        return source ? (
-          <span
-            className="inline-block max-w-full truncate align-middle rounded-lg bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
-            dir="auto"
-          >
-            {source}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        );
-      },
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      width: '18%',
-      sortKey: 'status',
-      render: (lead) =>
-        lead.status ? (
-          <StatusDropdown
-            currentStatus={lead.status}
-            leadId={lead.id}
-            onStatusChange={onStatusChange}
-          />
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      width: '148px',
-      align: 'end',
-      render: (lead) => (
-        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity mobile-force-visible">
-          <button
-            onClick={() => onView?.(lead)}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            title="View lead details"
-          >
-            <Eye size={14} />
-          </button>
-          <button
-            onClick={() => onEdit?.(lead)}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-secondary text-muted-foreground hover:text-primary transition-colors flex items-center justify-center"
-            title="Edit lead"
-          >
-            <Pencil size={14} />
-          </button>
-          {canDelete && (
-            <button
-              onClick={() => setDeletingId(lead.id)}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center"
-              title="Delete lead"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
-      ),
-    },
-  ];
+  const sortableCol = (label: string, key: keyof Lead) => (
+    <th
+      className="table-th cursor-pointer select-none hover:text-foreground transition-colors"
+      onClick={() => onSort(key)}
+    >
+      <span className="flex items-center gap-0.5">
+        {label}
+        <SortIcon active={sortKey === key} dir={sortDir} />
+      </span>
+    </th>
+  );
 
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalCount);
@@ -389,6 +464,11 @@ export default function LeadsTable({
   }, [renderLimit, leads.length]);
 
   const visibleLeads = leads.slice(0, renderLimit);
+
+  // Stable callbacks to avoid breaking React.memo on 500 rows
+  const handleDeletePrompt = useCallback((id: string) => {
+    setDeletingId(id);
+  }, []);
 
   const emptyFn = useCallback(() => {}, []);
   const safeOnView = onView ?? emptyFn;
@@ -440,7 +520,7 @@ export default function LeadsTable({
               onSelect={onSelectRow}
               onView={safeOnView}
               onEdit={safeOnEdit}
-              onDelete={(id) => setDeletingId(id)}
+              onDelete={handleDeletePrompt}
               onStatusChange={onStatusChange}
               onOpenLogCall={onOpenLogCall}
               onAddNote={onAddNote}
@@ -467,57 +547,33 @@ export default function LeadsTable({
 
       {/* Desktop table */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full min-w-[800px] table-fixed">
+        <table className="w-full min-w-[1300px] table-mobile">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
-              {columns.map((col) => {
-                const alignClass = alignClassOf(col.align);
-                const sortable = Boolean(col.sortKey);
-                const activeSort = sortable && sortKey === col.sortKey;
-                return (
-                  <th
-                    key={col.key}
-                    scope="col"
-                    style={{ width: col.width }}
-                    className={`table-th ${alignClass} align-middle ${
-                      sortable
-                        ? 'cursor-pointer select-none hover:text-foreground transition-colors'
-                        : ''
-                    }`}
-                    onClick={sortable ? () => onSort(col.sortKey!) : undefined}
-                    aria-sort={
-                      sortable
-                        ? activeSort
-                          ? sortDir === 'asc'
-                            ? 'ascending'
-                            : 'descending'
-                          : 'none'
-                        : undefined
-                    }
-                  >
-                    {col.header ?? (
-                      <span
-                        className={`flex items-center gap-0.5 ${
-                          col.align === 'center'
-                            ? 'justify-center'
-                            : col.align === 'end'
-                              ? 'justify-end'
-                              : ''
-                        }`}
-                      >
-                        {col.label}
-                        {sortable && <SortIcon active={activeSort} dir={sortDir} />}
-                      </span>
-                    )}
-                  </th>
-                );
-              })}
+              <th className="table-th w-10">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(e) => onSelectAll(e.target.checked)}
+                  className="w-4 h-4 rounded border-input accent-primary cursor-pointer"
+                  aria-label="Select all leads on this page"
+                />
+              </th>
+              {sortableCol('Lead Name', 'name')}
+              <th className="table-th">Lead ID</th>
+              <th className="table-th">Contact</th>
+              {sortableCol('Source', 'source')}
+              {sortableCol('Agent', 'agent')}
+              <th className="table-th">Assigned To</th>
+              {sortableCol('Status', 'status')}
+              {sortableCol('Follow-up Due', 'followUpDue')}
+              <th className="table-th text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {leads.length === 0 ? (
               <tr>
-                <td colSpan={columns.length}>
+                <td colSpan={10}>
                   <EmptyState
                     icon={<Users size={24} className="text-muted-foreground" />}
                     title="No leads found"
@@ -527,35 +583,26 @@ export default function LeadsTable({
               </tr>
             ) : (
               visibleLeads.map((lead) => (
-                <tr
+                <LeadTableRow
                   key={lead.id}
-                  className={`hover:bg-muted/30 transition-colors group ${
-                    selectedIds.has(lead.id) ? 'bg-secondary/20' : ''
-                  }`}
-                >
-                  {columns.map((col) => (
-                    <td
-                      key={col.key}
-                      style={{ width: col.width }}
-                      className={`table-td ${alignClassOf(col.align)} align-middle`}
-                    >
-                      {col.render(lead)}
-                    </td>
-                  ))}
-                </tr>
+                  lead={lead}
+                  isSelected={selectedIds.has(lead.id)}
+                  canDelete={canDelete}
+                  onSelectRow={onSelectRow}
+                  onStatusChange={onStatusChange}
+                  onView={safeOnView}
+                  onEdit={safeOnEdit}
+                  onDeletePrompt={handleDeletePrompt}
+                />
               ))
             )}
             {visibleLeads.length < leads.length && (
               <tr>
-                <td
-                  colSpan={columns.length}
-                  className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10"
-                >
+                <td colSpan={12} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
                   <div className="inline-flex items-center gap-3">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                      Showing {visibleLeads.length} of {leads.length} leads — scroll or click to
-                      load more
+                      Showing {visibleLeads.length} of {leads.length} leads — scroll or click to load more
                     </span>
                     <button
                       type="button"
@@ -614,11 +661,7 @@ export default function LeadsTable({
                 <button
                   key={`page-${p}`}
                   onClick={() => onPageChange(p as number)}
-                  className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
-                    currentPage === p
-                      ? 'bg-primary text-primary-foreground'
-                      : 'border border-border text-muted-foreground hover:bg-muted'
-                  }`}
+                  className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-sm font-medium transition-colors ${currentPage === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
                 >
                   {p}
                 </button>

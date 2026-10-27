@@ -63,7 +63,7 @@ interface BulkActionBarProps {
   selectedCount: number;
   selectedLeads: BulkLead[];
   onDelete: () => void;
-  onAssignMany: (users: AssignableUser[], mode?: 'co_assign' | 'round_robin') => Promise<void>;
+  onAssignMany: (users: AssignableUser[]) => Promise<void>;
   onAssignTeam: (teamName: string) => void;
   onRefer?: (userId: string, userName: string) => Promise<void>;
   onClear: () => void;
@@ -107,7 +107,6 @@ export default function BulkActionBar({
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<{ sent: number; failed: number } | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
-  const [assignMode, setAssignMode] = useState<'co_assign' | 'round_robin'>('co_assign');
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [referModalOpen, setReferModalOpen] = useState(false);
   const [selectedReferralUserId, setSelectedReferralUserId] = useState<string>('');
@@ -581,48 +580,9 @@ export default function BulkActionBar({
           size="sm"
         >
           <div className="p-6 space-y-4">
-            <div className="flex items-center gap-2 p-1 bg-muted/60 rounded-xl text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignMode('co_assign');
-                  if (selectedUserIds.size > 2) {
-                    setSelectedUserIds(new Set(Array.from(selectedUserIds).slice(0, 2)));
-                  }
-                }}
-                className={`flex-1 py-1.5 px-3 rounded-lg transition-all ${
-                  assignMode === 'co_assign'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Co-assignment (max 2)
-              </button>
-              <button
-                type="button"
-                onClick={() => setAssignMode('round_robin')}
-                className={`flex-1 py-1.5 px-3 rounded-lg transition-all ${
-                  assignMode === 'round_robin'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Round-robin
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                {assignMode === 'co_assign'
-                  ? 'Assign both agents to all selected leads:'
-                  : 'Distribute leads evenly between agents:'}
-              </span>
-              {assignMode === 'co_assign' && (
-                <span className="font-semibold text-foreground">
-                  {selectedUserIds.size}/2 chosen
-                </span>
-              )}
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Pick agents — leads are shared evenly between them. Current split:
+            </p>
 
             {loadingUsers ? (
               <div className="flex items-center justify-center py-4">
@@ -634,28 +594,19 @@ export default function BulkActionBar({
               <div className="max-h-56 overflow-y-auto space-y-1 border border-border rounded-xl p-1.5">
                 {users.map((u) => {
                   const checked = selectedUserIds.has(u.id);
-                  const isDisabled = assignMode === 'co_assign' && !checked && selectedUserIds.size >= 2;
                   return (
                     <button
                       key={`bulk-user-${u.id}`}
-                      disabled={isDisabled}
                       onClick={() =>
                         setSelectedUserIds((prev) => {
                           const next = new Set(prev);
                           if (next.has(u.id)) next.delete(u.id);
-                          else {
-                            if (assignMode === 'co_assign' && next.size >= 2) return next;
-                            next.add(u.id);
-                          }
+                          else next.add(u.id);
                           return next;
                         })
                       }
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors rounded-lg ${
-                        checked
-                          ? 'bg-muted/60 text-foreground'
-                          : isDisabled
-                          ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                          : 'text-foreground hover:bg-muted'
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors rounded-lg ${
+                        checked ? 'bg-muted/60' : ''
                       }`}
                     >
                       <span
@@ -725,7 +676,7 @@ export default function BulkActionBar({
                   setAssigning(true);
                   setAssignError(null);
                   try {
-                    await onAssignMany(selectedUsers, assignMode);
+                    await onAssignMany(selectedUsers);
                     setAssignModalOpen(false);
                     setSelectedUserIds(new Set());
                   } catch (err: any) {

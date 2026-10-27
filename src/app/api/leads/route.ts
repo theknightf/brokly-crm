@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
-import { LEADS_LIST_SELECT } from '@/lib/supabase/leadsSelect';
-import { describePostgrestError, logPostgrestError } from '@/lib/supabase/postgrestError';
 import { notifyDuplicateOwnersServer } from '@/lib/duplicateNotify';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/leads — create a lead. Duplicates are NEVER blocked: the DB trigger
- * marks is_duplicate / duplicate_of_lead_id and only the original owner is notified.
+ * POST /api/leads — create a lead. Duplicates are NEVER blocked or re-routed: the DB
+ * trigger marks is_duplicate / duplicate_of_lead_id and only the original owner is notified.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -27,7 +25,9 @@ export async function POST(request: Request) {
 
   const db: any = supabase as any;
 
-  // --- Insert ---
+  const requestedStatus = body.stage || body.status || body.crm_status || 'Fresh Leads';
+  const rawNotes = String(body.notes || '').trim();
+
   const row: any = {
     name,
     phone,
@@ -38,9 +38,9 @@ export async function POST(request: Request) {
     source: body.source || '',
     agent: body.agent || '',
     agent_initials: body.agentInitials || body.agent_initials || '',
-    crm_status: body.stage || body.status || body.crm_status || 'Fresh Leads',
+    crm_status: requestedStatus,
     lead_status: body.lead_status || 'New',
-    notes: body.notes || '',
+    notes: rawNotes,
     location: body.location || '',
     developer: body.developer || '',
     project: body.project || '',
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get('page') || 1));
   const pageSize = Math.min(100, Math.max(5, Number(url.searchParams.get('pageSize') || 25)));
 
-  let query: any = supabase.from('leads').select(LEADS_LIST_SELECT, { count: 'exact' });
+  let query: any = supabase.from('leads').select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(full_name)', { count: 'exact' });
 
   // Privacy isolation: only team leaders and admins can see other members' leads
   try {
@@ -109,13 +109,7 @@ export async function GET(request: Request) {
 
   const from = (page - 1) * pageSize;
   const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, from + pageSize - 1);
-  if (error) {
-    logPostgrestError('GET /api/leads', error, { search, stage, assignedTo, page, pageSize, select: LEADS_LIST_SELECT });
-    return NextResponse.json(
-      { error: describePostgrestError(error, 'Failed to load leads') },
-      { status: 400 }
-    );
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ leads: data || [], total: count ?? (data || []).length, page, pageSize });
 }
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { UserPlus, CalendarClock, Building2, X } from 'lucide-react';
+import { UserPlus, CalendarClock, Building, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const DISMISS_KEY = 'brokly_got_started';
@@ -10,7 +10,7 @@ const DISMISS_KEY = 'brokly_got_started';
 const STEPS = [
   { key: 'dashboard.step1', href: '/leads-management?new=1', icon: <UserPlus size={18} /> },
   { key: 'dashboard.step2', href: '/follow-ups', icon: <CalendarClock size={18} /> },
-  { key: 'dashboard.step3', href: '/projects', icon: <Building2 size={18} /> },
+  { key: 'dashboard.step3', href: '/projects', icon: <Building size={18} /> },
 ] as const;
 
 export default function GettingStarted() {

@@ -6,7 +6,7 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
-  Building2,
+  Building,
   FolderOpen,
   Loader2,
   X,
@@ -167,7 +167,7 @@ function ProjectCover({
     <div
       className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-400 ${className || ''}`}
     >
-      <Building2 size={iconSize} className="text-white/90" />
+      <Building size={iconSize} className="text-white/90" />
     </div>
   );
 }
@@ -589,7 +589,7 @@ function ProjectDetailsModal({
             <h2 className="text-xl font-bold text-foreground">{project.name}</h2>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <Building2 size={14} className="text-primary" /> {project.developerName}
+                <Building size={14} className="text-primary" /> {project.developerName}
               </span>
               {project.location && (
                 <span className="flex items-center gap-1.5">
@@ -1015,7 +1015,7 @@ export default function ProjectsScreen() {
                     </h3>
                     <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap mt-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
-                        <Building2 size={12} className="text-primary" />
+                        <Building size={12} className="text-primary" />
                         {project.developerName}
                       </span>
                       {project.location && (

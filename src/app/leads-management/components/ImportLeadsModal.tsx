@@ -61,6 +61,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fileName, setFileName] = useState('');
+  const [fileSize, setFileSize] = useState(0);
+  const [mimeType, setMimeType] = useState('');
+  const [fileBase64, setFileBase64] = useState('');
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -126,6 +129,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
 
   const reset = useCallback(() => {
     setFileName('');
+    setFileSize(0);
+    setMimeType('');
+    setFileBase64('');
     setRows([]);
     setParsing(false);
     setImporting(false);
@@ -249,12 +255,33 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     if (!file) return;
     setParsing(true);
     try {
-      const res = await parseLeadFile(file, undefined, agents.length ? agents : undefined);
+      const [res, b64] = await Promise.all([
+        parseLeadFile(file, undefined, agents.length ? agents : undefined),
+        new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = typeof reader.result === 'string' ? reader.result : '';
+            resolve(result.includes(',') ? result.split(',').pop() || '' : result);
+          };
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(file);
+        }),
+      ]);
       if (!res.rows.length) {
         toast.error('No rows found in file');
         return;
       }
       setFileName(file.name);
+      setFileSize(file.size || 0);
+      setMimeType(
+        file.type ||
+          (file.name.toLowerCase().endsWith('.csv')
+            ? 'text/csv'
+            : file.name.toLowerCase().endsWith('.xls')
+              ? 'application/vnd.ms-excel'
+              : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      );
+      setFileBase64(b64);
       setRows(res.rows);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to read file');
@@ -358,22 +385,26 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rows,
+          fileName,
+          fileSize,
+          mimeType,
+          fileBase64,
           globalSource: source.trim(),
           sourceId: matched?.id || null,
           globalStage: stage.trim(),
           // 'unassigned' = Pool, 'round-robin' = even split, else the user's unique id
           globalAssignedTo: assignee,
-
+          duplicateAction: 'route',
         }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error || 'Import failed');
       const imported = Number(j.imported || 0);
-      const skipped = Number(j.skipped || 0);
+      const routedDuplicates = Number(j.routedDuplicates || 0);
       toast.success(
-        skipped > 0
-          ? `Successfully imported ${imported} leads, ${skipped} failed.`
-          : `Successfully imported ${imported} leads.`,
+        routedDuplicates > 0
+          ? `Successfully imported ${imported} leads (${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} routed to Duplicate Center). File saved to Import History.`
+          : `Successfully imported ${imported} leads. File saved to Import History.`,
         { duration: 5000 }
       );
       handleClose();
@@ -392,6 +423,17 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   return (
     <Modal open={open} onClose={handleClose} title="Import Leads" subtitle="Upload / Import Sheet — استيراد الليدات" size="xl">
       <div className="p-6 sm:p-8 space-y-6">
+        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 border border-border px-3.5 py-2.5 text-xs">
+          <span className="text-muted-foreground">
+            Every uploaded Excel / CSV file is archived in Import History for re-download & audit.
+          </span>
+          <a
+            href="/import-history"
+            className="font-semibold text-primary hover:underline whitespace-nowrap"
+          >
+            View Import History →
+          </a>
+        </div>
         {/* File picker */}
         <input
           ref={fileInputRef}

@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import {
-  Building2,
+  Building,
   MapPin,
   Ruler,
   Layers,
@@ -70,7 +70,7 @@ export default function UnitCard({
           <img src={imageUrl} alt={unit.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary via-background to-muted">
-            <Building2 size={28} className="text-primary/50" />
+            <Building size={28} className="text-primary/50" />
           </div>
         )}
         <div className="absolute top-2 right-2">
@@ -129,7 +129,7 @@ export default function UnitCard({
           )}
           {unit.building && (
             <span className="inline-flex items-center gap-1">
-              <Building2 size={11} />
+              <Building size={11} />
               {unit.building}
             </span>
           )}

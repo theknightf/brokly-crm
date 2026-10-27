@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import {
   Loader2,
@@ -215,9 +215,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     defaultValues: makeDefaults(),
   });
 
-  const budgetMin = watch('budgetMin');
   const assignedTo = watch('assignedTo');
-  const watchedSource = watch('source');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(() => {
     if (initialData?.assignedToIds && initialData.assignedToIds.length > 0) {
       return initialData.assignedToIds.slice(0, 2);
@@ -293,18 +291,6 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     if (!initialData?.agent && agentList.includes(me.name)) setValue('agent', me.name);
   }, [userList, agentList, currentUserId, initialData, setValue]);
 
-  // Sync default/remembered source
-  useEffect(() => {
-    if (!sourceList.length) return;
-    const current = getValues('source');
-    if (sourceList.some((s) => s.name === current)) return;
-    const preferred =
-      sourceList.find((s) => s.name === lastUsedSource)?.name ||
-      sourceList.find((s) => s.name === DEFAULT_SOURCE)?.name ||
-      sourceList[0].name;
-    setValue('source', preferred as LeadSource);
-  }, [sourceList, getValues, setValue]);
-
   const toggleUser = (userId: string) => {
     setSelectedUserIds((prev) => {
       if (prev.includes(userId)) {
@@ -351,8 +337,11 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       .filter(Boolean) as string[];
     const primaryAgentName = assignedNames[0] || data.agent || '';
     const matchedSource =
-      sourceList.find((s) => s.name === data.source) ||
-      (ALL_SOURCES.includes(data.source as any) ? ({ id: '', name: data.source } as any) : null);
+      sourceList.find(
+        (s) => s.name.trim().toLowerCase() === String(data.source || '').trim().toLowerCase()
+      ) ||
+      sourceList.find((s) => s.id === (data.source as any)) ||
+      null;
     const leadSourceId = matchedSource?.id || null;
     const cleanPhone = phoneToStore(data.phone);
     // Name is optional — falls back to phone number as requested
@@ -470,10 +459,26 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     }
   };
 
-  // Build the list of source options (from database or canonical list)
-  const sourcesToDisplay = sourceList.length > 0
-    ? sourceList
-    : ALL_SOURCES.map((s) => ({ id: s, name: s }));
+  // Merge database sources with standard canonical sources, preserving IDs when available
+  const sourcesToDisplay = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { id?: string; name: string }[] = [];
+    sourceList.forEach((s) => {
+      const lower = s.name.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(s);
+      }
+    });
+    ALL_SOURCES.forEach((s) => {
+      const lower = s.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push({ id: '', name: s });
+      }
+    });
+    return list;
+  }, [sourceList]);
 
   return (
     <form
@@ -636,37 +641,39 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
             )}
           </div>
 
-          <div
-            className="flex flex-wrap gap-1.5"
-            role="radiogroup"
-            aria-label={t('leadForm.source')}
-          >
-            {sourcesToDisplay.map((s) => {
-              const isSelected = watchedSource === s.name;
-              return (
-                <button
-                  key={`chip-source-${s.id || s.name}`}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() =>
-                    setValue('source', s.name as LeadSource, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 select-none ${
-                    isSelected
-                      ? 'bg-primary text-primary-foreground font-semibold shadow-sm ring-2 ring-primary/30'
-                      : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60'
-                  }`}
-                >
-                  {isSelected && <Check size={12} className="stroke-[2.5]" />}
-                  <span>{s.name}</span>
-                </button>
-              );
-            })}
-          </div>
+          <Controller
+            name="source"
+            control={control}
+            rules={{ required: t('leadForm.sourceRequired') || 'Source is required' }}
+            render={({ field }) => (
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="radiogroup"
+                aria-label={t('leadForm.source')}
+              >
+                {sourcesToDisplay.map((s) => {
+                  const isSelected = field.value === s.name;
+                  return (
+                    <button
+                      key={`chip-source-${s.id || s.name}`}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => field.onChange(s.name)}
+                      className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 select-none ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground font-semibold shadow-sm ring-2 ring-primary/30'
+                          : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60'
+                      }`}
+                    >
+                      {isSelected && <Check size={12} className="stroke-[2.5]" />}
+                      <span>{s.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          />
 
           {/* Optional inline input for new custom source */}
           {showAddSourceInput && (
@@ -935,88 +942,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 </div>
               </div>
 
-              {/* Property Type */}
-              <div>
-                <label htmlFor="add-proptype" className="text-xs font-semibold text-foreground block mb-1">
-                  {t('leadForm.propertyType')}{' '}
-                  <span className="text-muted-foreground font-normal text-[10px]">
-                    {t('leadForm.optional')}
-                  </span>
-                </label>
-                <div className="relative">
-                  <select
-                    id="add-proptype"
-                    autoComplete="off"
-                    className="input-base appearance-none pe-8 min-h-[44px] text-xs"
-                    {...register('propertyType')}
-                  >
-                    {ALL_PROPERTY_TYPES.map((p) => (
-                      <option key={`add-prop-${p}`} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                  <SelectChevron />
-                </div>
-              </div>
 
-              {/* Budget Range (Min / Max) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="add-budgetmin" className="text-xs font-semibold text-foreground block mb-1">
-                    {t('leadForm.budgetMin')}{' '}
-                    <span className="text-muted-foreground font-normal">(ج.م)</span>
-                  </label>
-                  <input
-                    id="add-budgetmin"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    dir="ltr"
-                    className={`input-base font-mono-data min-h-[44px] text-xs ${
-                      errors.budgetMin ? 'border-red-400' : ''
-                    }`}
-                    placeholder="500000"
-                    {...register('budgetMin', {
-                      min: { value: 1, message: t('leadForm.budgetMinInvalid') },
-                      valueAsNumber: true,
-                    })}
-                  />
-                  {errors.budgetMin && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">{errors.budgetMin.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="add-budgetmax" className="text-xs font-semibold text-foreground block mb-1">
-                    {t('leadForm.budgetMax')}{' '}
-                    <span className="text-muted-foreground font-normal">(ج.م)</span>
-                  </label>
-                  <input
-                    id="add-budgetmax"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    dir="ltr"
-                    className={`input-base font-mono-data min-h-[44px] text-xs ${
-                      errors.budgetMax ? 'border-red-400' : ''
-                    }`}
-                    placeholder="800000"
-                    {...register('budgetMax', {
-                      min: { value: 1, message: t('leadForm.budgetMinInvalid') },
-                      valueAsNumber: true,
-                      validate: (val) =>
-                        !budgetMin ||
-                        !val ||
-                        val >= Number(budgetMin) ||
-                        t('leadForm.budgetMaxInvalid'),
-                    })}
-                  />
-                  {errors.budgetMax && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">{errors.budgetMax.message}</p>
-                  )}
-                </div>
-              </div>
 
               {/* Referral Assignment */}
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">

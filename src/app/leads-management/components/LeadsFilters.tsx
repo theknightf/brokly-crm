@@ -237,25 +237,7 @@ export default function LeadsFilters({ filters, onChange }: LeadsFiltersProps) {
         />
       </div>
 
-      {/* Property type */}
-      <div className="relative w-full sm:w-auto">
-        <select
-          value={filters.propertyType}
-          onChange={(e) => update('propertyType', e.target.value as PropertyType | '')}
-          className="input-base h-9 text-sm appearance-none pr-8 min-w-[150px] w-full sm:w-auto"
-        >
-          <option value="">All Property Types</option>
-          {ALL_PROPERTY_TYPES.map((p) => (
-            <option key={`filter-prop-${p}`} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={13}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-        />
-      </div>
+
 
       {/* Action taken on lead */}
       <div className="relative">

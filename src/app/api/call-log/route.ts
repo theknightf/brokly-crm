@@ -140,6 +140,7 @@ export async function POST(request: Request) {
     'Won Deal': 'Done Deal',
     'Not Interested': 'Not Interested',
     'No Answer': 'No Answer',
+    'No Answer At All': 'No Answer At All',
     'Wrong Number': 'Wrong Number',
     'Wrong Phone': 'Wrong Number',
     Cancellation: 'Cancellation',
@@ -149,6 +150,7 @@ export async function POST(request: Request) {
     'Follow Up': 'Following Up',
     'Schedule Meeting': 'Meeting',
     Meeting: 'Meeting',
+    'Follow Up After Meeting': 'Follow Up After Meeting',
     'Following Up': 'Following Up',
   };
   const STATUS_TO_LEGACY: Record<string, string> = {
@@ -157,6 +159,7 @@ export async function POST(request: Request) {
     'Pending Leads': 'Contacted',
     'Following Up': 'Qualified',
     Meeting: 'Site Visit Scheduled',
+    'Follow Up After Meeting': 'Qualified',
     Interested: 'Qualified',
     'Not Interested': 'Lost',
     Cancellation: 'Lost',

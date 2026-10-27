@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       supabase
         .from('leads')
         .select(
-          'crm_status, lead_status, source, property_type, budget_max, created_at, agent, assigned_to, created_by, lead_assignees(user_id)'
+          'crm_status, lead_status, source, property_type, budget_max, created_at, agent, assigned_to, created_by'
         ),
       supabase
         .from('follow_ups')
@@ -233,13 +233,8 @@ export async function GET(request: Request) {
       memberIdsByTeam.get(m.team_id)!.push(m.user_id);
     });
 
-  const leadAssigneeIds = (l: any) => [
-    l.assigned_to,
-    ...(l.lead_assignees || []).map((la: any) => la.user_id),
-  ].filter(Boolean);
-
   const leadByUserId = (id: string) =>
-    leads.filter((l: any) => leadAssigneeIds(l).includes(id) || l.created_by === id);
+    leads.filter((l: any) => l.assigned_to === id || l.created_by === id);
   const wonByUserId = (id: string) => leadByUserId(id).filter((l: any) => l.lead_status === 'Won');
 
   const teamPerformance = visibleTeams.map((t: any) => {
@@ -307,7 +302,7 @@ export async function GET(request: Request) {
   const teamAgentPerformance = profiles
     .filter((p: any) => p.is_active !== false && visibleProfileIds.has(p.id))
     .map((p: any) => {
-      const mine = leads.filter((l: any) => leadAssigneeIds(l).includes(p.id) || l.created_by === p.id);
+      const mine = leads.filter((l: any) => l.assigned_to === p.id || l.created_by === p.id);
       const stageOf = (l: any) => l.crm_status || l.lead_status || 'Fresh Leads';
       const newCount = mine.filter((l: any) => stageOf(l) === 'Fresh Leads' || stageOf(l) === 'New').length;
       const pendingCount = mine.filter((l: any) => !terminalStages.has(stageOf(l)) && !['Fresh Leads', 'New'].includes(stageOf(l))).length;

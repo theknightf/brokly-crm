@@ -9,7 +9,7 @@ import {
   GitBranch,
   MapPin,
   Flag,
-  Building2,
+  Building,
   ClipboardList,
   X,
   Check,
@@ -104,7 +104,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
   {
     key: 'developers',
     label: 'Developers',
-    icon: <Building2 size={16} />,
+    icon: <Building size={16} />,
     description: 'Real estate developers linked to projects and leads',
   },
   {

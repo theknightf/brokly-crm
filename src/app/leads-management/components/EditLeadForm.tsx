@@ -12,7 +12,9 @@ import {
   ALL_PROPERTY_TYPES,
 } from './mockLeads';
 import { projectsService, teamsService, teamService } from '@/lib/services/crmService';
-import { unitsService } from '@/lib/services/crmService';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
+import { unitsService, leadSourcesService } from '@/lib/services/crmService';
 
 interface EditLeadFormData {
   name: string;
@@ -84,6 +86,12 @@ const parseBudgetRange = (value: string) => {
 };
 
 export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormProps) {
+  const { profile, user } = useAuth();
+  const canEditSource =
+    isAdminRole(profile?.role || user?.role) ||
+    profile?.role === 'manager' ||
+    user?.role === 'manager';
+  const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string | null; developerName: string }[]
   >([]);
@@ -113,6 +121,30 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       return next;
     });
   };
+
+  const availableSources = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { id?: string; name: string }[] = [];
+    if (lead.source) {
+      seen.add(lead.source.trim().toLowerCase());
+      list.push({ name: lead.source });
+    }
+    sourceList.forEach((s) => {
+      const lower = s.name.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(s);
+      }
+    });
+    ALL_SOURCES.forEach((s) => {
+      const lower = s.trim().toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push({ id: '', name: s });
+      }
+    });
+    return list;
+  }, [sourceList, lead.source]);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -169,7 +201,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       teamService.getAll().catch(() => []),
       teamsService.getAssignableUsers().catch(() => []),
       teamsService.getAll().catch(() => []),
-    ]).then(([projectData, teamData, assignableUsers, teamsData]) => {
+      leadSourcesService.getActive().catch(() => []),
+    ]).then(([projectData, teamData, assignableUsers, teamsData, sourcesData]) => {
       setProjects(
         (projectData as any[]).map((p) => ({
           id: p.id,
@@ -184,6 +217,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       setAgents(combined);
       setUsers((assignableUsers as any[]).map((u) => ({ id: u.id, name: u.name })));
       setTeams((teamsData as any[]).map((t) => ({ id: t.id, name: t.name })));
+      setSourceList((sourcesData as any[]).map((s: any) => ({ id: s.id, name: s.name })));
     });
   }, []);
 
@@ -257,7 +291,10 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       .map((id) => users.find((u) => u.id === id)?.name)
       .filter(Boolean) as string[];
     const primaryAgentName = assignedNames[0] || data.agent || '';
-    const updated: Lead = {
+    const matchedSource = sourceList.find(
+      (s) => s.name.trim().toLowerCase() === String(data.source || '').trim().toLowerCase()
+    );
+    const updated: Lead & { leadSourceId?: string | null } = {
       ...lead,
       name: data.name,
       phone: data.phone,
@@ -266,7 +303,10 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       propertyType: data.propertyType,
       budgetMin,
       budgetMax,
-      source: data.source,
+      source: canEditSource ? (data.source || lead.source) : lead.source,
+      leadSourceId: canEditSource
+        ? (matchedSource?.id || lead.leadSourceId || null)
+        : lead.leadSourceId,
       agent: primaryAgentName || data.agent,
       agentInitials: (primaryAgentName || data.agent)
         ? (primaryAgentName || data.agent)
@@ -387,25 +427,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                 ))}
               </datalist>
             </div>
-            <div>
-              <label className="label-base">Property type</label>
-              <select className={selectClass} {...register('propertyType')}>
-                {ALL_PROPERTY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-base">Budget range (EGP)</label>
-              <input
-                type="text"
-                className="input-base"
-                placeholder="500000 - 1200000"
-                {...register('budgetRange')}
-              />
-            </div>
+
           </div>
         </details>
 
@@ -433,14 +455,31 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               </select>
             </div>
             <div>
-              <label className="label-base">Source</label>
-              <select className={selectClass} {...register('source')}>
-                {ALL_SOURCES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <label className="label-base flex items-center justify-between">
+                <span>Source</span>
+                {!canEditSource && (
+                  <span className="text-[10px] text-muted-foreground font-normal">Read-only</span>
+                )}
+              </label>
+              {canEditSource ? (
+                <div className="relative">
+                  <select className={selectClass} {...register('source')}>
+                    {availableSources.map((s) => (
+                      <option key={`edit-source-${s.id || s.name}`} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={13}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                </div>
+              ) : (
+                <div className="input-base bg-muted/50 text-muted-foreground flex items-center select-none cursor-not-allowed">
+                  {lead.source || '—'}
+                </div>
+              )}
             </div>
             <div>
               <label className="label-base">Priority</label>

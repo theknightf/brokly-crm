@@ -33,6 +33,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       setState(() => _error = 'Please enter a valid email address');

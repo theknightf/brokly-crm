@@ -4,12 +4,10 @@
  *  - icons/fonts/images: cache-first
  *  - page navigations: network-first (8s timeout) with offline fallback
  *  - API requests + Supabase + _next/data (RSC payloads): network-only, NEVER cached
- *  2026-10-26: v1.4.0 — purge stale cached chunks (fixes old leads bundle
- *  requesting an ambiguous `user_profiles` embed and getting HTTP 300/400).
  *  2026-09-05: v1.2.0 — bypass _next/data to kill stale-chunk infinite loads,
  *  navigation timeout so flaky networks fall back instead of hanging.
  */
-const VERSION = 'brokly-v1.4.0';
+const VERSION = 'brokly-v1.3.2';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;

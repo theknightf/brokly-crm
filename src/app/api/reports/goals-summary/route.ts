@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   // Fetch needed data
   const [profilesRes, leadsRes, callsRes, kpiRes] = await Promise.all([
     supabase.from('user_profiles').select('id, full_name, email, role, avatar_url, team_id, is_active').eq('is_active', true).order('full_name'),
-    supabase.from('leads').select('id, crm_status, lead_status, assigned_to, created_by, created_at, lead_assignees(user_id)'),
+    supabase.from('leads').select('id, crm_status, lead_status, assigned_to, created_by, created_at'),
     supabase.from('call_logs').select('id, user_id, outcome, duration_seconds, is_valid, is_flagged, created_at, channel, direction'),
     supabase.from('kpi_targets').select('metric, target_value, target_role').eq('is_active', true),
   ]);
@@ -93,24 +93,28 @@ export async function GET(request: Request) {
     });
   }
 
-  // Leads -> stages (5 lead-based buckets) - attributes to all co-assignees
+  // Leads -> stages (5 lead-based buckets)
   for (const lead of leads) {
-    const assignees = Array.from(new Set([
-      lead.assigned_to,
-      ...(lead.lead_assignees || []).map((la: any) => la.user_id),
-      lead.created_by,
-    ].filter(Boolean))) as string[];
+    const assignee = (lead.assigned_to || lead.created_by) as string | null;
+    if (!assignee || !byAgent.has(assignee)) continue;
     const bucket = mapStageToBucket(String(lead.crm_status || lead.lead_status || ''));
-    if (!bucket || bucket === 'callsAnswer' || bucket === 'noAnswer') continue;
-    for (const assignee of assignees) {
-      if (!byAgent.has(assignee)) continue;
-      const rec = byAgent.get(assignee)!;
-      if (bucket === 'newFresh') rec.stages.newFresh++;
-      else if (bucket === 'newCold') rec.stages.newCold++;
-      else if (bucket === 'pending') rec.stages.pending++;
-      else if (bucket === 'cancel') rec.stages.cancel++;
-      else if (bucket === 'doneDeal') rec.stages.doneDeal++;
+    if (!bucket) continue;
+    // callsAnswer/noAnswer buckets will be overridden by call_logs counts below, so only count lead-based ones here
+    if (bucket === 'callsAnswer' || bucket === 'noAnswer') {
+      // still count if lead stage is explicitly Calls Answer/No Answer (rare) - keep as pending fallback
+      // To avoid double counting with calls, we will count these only if no call stats override? Simpler: count them as lead stage
+      // For hybrid, we treat callsAnswer/noAnswer from leads as well, but will add call_logs on top? Instead, we separate:
+      // We'll count lead-based buckets only: newFresh, newCold, pending, cancel, doneDeal
+      // So skip callsAnswer/noAnswer from leads here
+      continue;
     }
+    const rec = byAgent.get(assignee)!;
+    // map to agent's stages
+    if (bucket === 'newFresh') rec.stages.newFresh++;
+    else if (bucket === 'newCold') rec.stages.newCold++;
+    else if (bucket === 'pending') rec.stages.pending++;
+    else if (bucket === 'cancel') rec.stages.cancel++;
+    else if (bucket === 'doneDeal') rec.stages.doneDeal++;
   }
 
   // Calls -> callsAnswer, noAnswer, totalCalls (verified)
@@ -144,17 +148,11 @@ export async function GET(request: Request) {
   // For lead-based Calls Answer/No Answer, we already skipped, but we should add them from leads too for completeness
   // Count those now (separately) - to avoid double counting, we already counted calls, but lead stage Calls Answer should also contribute? For hybrid report we sum both? Instead, we will add lead stage callsAnswer/noAnswer on top of call counts
   for (const lead of leads) {
-    const assignees = Array.from(new Set([
-      lead.assigned_to,
-      ...(lead.lead_assignees || []).map((la: any) => la.user_id),
-      lead.created_by,
-    ].filter(Boolean))) as string[];
+    const assignee = (lead.assigned_to || lead.created_by) as string | null;
+    if (!assignee || !byAgent.has(assignee)) continue;
     const bucket = mapStageToBucket(String(lead.crm_status || lead.lead_status || ''));
-    for (const assignee of assignees) {
-      if (!byAgent.has(assignee)) continue;
-      if (bucket === 'callsAnswer') byAgent.get(assignee)!.stages.callsAnswer++;
-      if (bucket === 'noAnswer') byAgent.get(assignee)!.stages.noAnswer++;
-    }
+    if (bucket === 'callsAnswer') byAgent.get(assignee)!.stages.callsAnswer++;
+    if (bucket === 'noAnswer') byAgent.get(assignee)!.stages.noAnswer++;
   }
 
   const agentGoals = Array.from(byAgent.values())

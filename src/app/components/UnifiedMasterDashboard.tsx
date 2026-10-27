@@ -39,7 +39,10 @@ export default function UnifiedMasterDashboard() {
 
   const leaderboardRef = useRef<HTMLDivElement | null>(null);
 
-  const load = useCallback(async () => {
+  const dataRef = useRef<UnifiedData | null>(null);
+  dataRef.current = data;
+
+  const load = useCallback(async (silent = false) => {
     // Guard: wait for auth hydration and ensure Owner/Admin role
     if (authLoading) return;
     if (!user || !profile || !isAdminRole(profile.role)) {
@@ -47,13 +50,18 @@ export default function UnifiedMasterDashboard() {
       if (!user) setError('');
       return;
     }
-    setLoading(true); setError('');
+    if (!silent && !dataRef.current) setLoading(true);
+    setError('');
     try {
       const res = await fetch(`/api/dashboard/unified-master?range=${range}`, { cache: 'no-store', credentials: 'same-origin' });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Failed');
       setData(j);
-    } catch (e: any) { setError(e.message); } finally { setLoading(false); }
+    } catch (e: any) {
+      if (!dataRef.current) setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   }, [range, authLoading, user?.id, profile?.role]);
 
   const loadPipelineLeads = useCallback(async () => {
@@ -69,11 +77,11 @@ export default function UnifiedMasterDashboard() {
     } catch {} finally { setPipelineLoading(false); }
   }, [mode, pipelineSearch]);
 
-  // Re-fetch immediately when session/profile hydrates or range changes; also on focus/visibility
-  useEffect(() => { if (!authLoading) load(); }, [load, authLoading]);
+  // Re-fetch immediately when session/profile hydrates or range changes; silently revalidate on focus/visibility
+  useEffect(() => { if (!authLoading) load(false); }, [load, authLoading]);
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible' && !authLoading && isAdminRole(profile?.role)) load(); };
-    const onFocus = () => { if (!authLoading && isAdminRole(profile?.role)) load(); };
+    const onVisible = () => { if (document.visibilityState === 'visible' && !authLoading && isAdminRole(profile?.role)) load(true); };
+    const onFocus = () => { if (!authLoading && isAdminRole(profile?.role)) load(true); };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
     return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onVisible); };
@@ -101,7 +109,7 @@ export default function UnifiedMasterDashboard() {
   };
 
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-lime-500"/></div>;
-  if (error) return <div className="text-center py-10"><p className="text-sm text-destructive mb-3">{error}</p><button onClick={load} className="btn-secondary text-sm flex items-center gap-1 mx-auto"><RefreshCw size={14}/> Retry</button></div>;
+  if (error) return <div className="text-center py-10"><p className="text-sm text-destructive mb-3">{error}</p><button onClick={() => load(false)} className="btn-secondary text-sm flex items-center gap-1 mx-auto"><RefreshCw size={14}/> Retry</button></div>;
   if (!data) return null;
 
   const filteredLeads = pipelineLeads;
@@ -125,7 +133,7 @@ export default function UnifiedMasterDashboard() {
         <div className="flex items-center gap-2 self-end sm:self-auto">
           <button onClick={() => setRange('week')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
           <button onClick={() => setRange('month')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
-          <button onClick={load} className="w-8 h-8 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors"><RefreshCw size={14}/></button>
+          <button onClick={() => load(false)} className="w-8 h-8 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors"><RefreshCw size={14}/></button>
         </div>
       </div>
 

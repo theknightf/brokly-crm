@@ -6,12 +6,12 @@ import {
   Trash2,
   Pencil,
   Upload,
-  Building2,
   Search,
   Image as ImageIcon,
   LayoutGrid,
   Table2,
   BadgeCheck,
+  Building,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
@@ -250,7 +250,7 @@ export default function UnitsScreen() {
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon={<Building2 size={22} className="text-muted-foreground" />}
+            icon={<Building size={22} className="text-muted-foreground" />}
             title="No units"
             description="Add units to your inventory to recommend them in the calculator."
           />
@@ -330,7 +330,7 @@ export default function UnitsScreen() {
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon={<Building2 size={22} className="text-muted-foreground" />}
+            icon={<Building size={22} className="text-muted-foreground" />}
             title="No units"
             description="Add units to your inventory to recommend them in the calculator."
           />
@@ -383,7 +383,7 @@ export default function UnitsScreen() {
               <tr>
                 <td colSpan={8} className="table-td">
                   <EmptyState
-                    icon={<Building2 size={22} className="text-muted-foreground" />}
+                    icon={<Building size={22} className="text-muted-foreground" />}
                     title="No units"
                     description="Add units to your CRM to recommend them in the calculator."
                   />
@@ -496,7 +496,7 @@ export default function UnitsScreen() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary via-background to-muted">
-                  <Building2 size={32} className="text-primary/50" />
+                  <Building size={32} className="text-primary/50" />
                 </div>
               )}
               <div className="absolute top-3 right-3">

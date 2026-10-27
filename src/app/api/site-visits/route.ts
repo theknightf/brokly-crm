@@ -417,7 +417,7 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('site_visits')
-    .select('*, agent:user_profiles!site_visits_user_id_fkey(id, full_name)')
+    .select('*, agent:user_profiles(id, full_name)')
     .order('check_in_at', { ascending: false })
     .limit(200);
 

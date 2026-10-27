@@ -13,7 +13,7 @@ import {
   BarChart3,
   Settings,
   ChevronRight,
-  Building2,
+  Building,
   FolderOpen,
   ShieldCheck,
   LogOut,
@@ -24,7 +24,9 @@ import {
   KeyRound,
   Handshake,
   Phone,
+  CopyCheck,
   CalendarCheck2,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -136,7 +138,7 @@ const navGroups: NavGroup[] = [
       {
         id: 'nav-units',
         labelKey: 'common.units',
-        icon: <Building2 size={18} />,
+        icon: <Building size={18} />,
         href: '/units',
       },
       {
@@ -168,6 +170,18 @@ const navGroups: NavGroup[] = [
         labelKey: 'common.expenses',
         icon: <Receipt size={18} />,
         href: '/expenses',
+      },
+      {
+        id: 'nav-duplicate-leads',
+        labelKey: 'common.duplicateLeads',
+        icon: <CopyCheck size={18} />,
+        href: '/duplicate-leads',
+      },
+      {
+        id: 'nav-import-history',
+        labelKey: 'common.importHistory',
+        icon: <FileSpreadsheet size={18} />,
+        href: '/import-history',
       },
       {
         id: 'nav-admin',
@@ -375,7 +389,8 @@ function SidebarContent({
             ...group,
             items: group.items.filter(
               (item) =>
-                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses')) &&
+                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses' && item.id !== 'nav-duplicate-leads')) &&
+                (isAdminOrOwner || canWatchTeams || item.id !== 'nav-import-history') &&
                 (canWatchTeams || item.id !== 'nav-teams')
             ),
           }))
@@ -453,7 +468,7 @@ function SidebarContent({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
                 <div className="flex items-center gap-1">
-                  <Building2 size={10} className="text-muted-foreground flex-shrink-0" />
+                  <Building size={10} className="text-muted-foreground flex-shrink-0" />
                   <p className="text-xs text-muted-foreground truncate capitalize">
                     {displayRole.replace('_', ' ')}
                   </p>

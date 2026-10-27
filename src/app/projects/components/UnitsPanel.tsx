@@ -10,7 +10,7 @@ import {
   FileText,
   Film,
   Upload,
-  Building2,
+  Building,
   Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -544,7 +544,7 @@ export default function UnitsPanel({ projectId, projectName, open, onClose }: Un
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Building2 size={15} className="text-primary" />
+            <Building size={15} className="text-primary" />
             <span>
               <strong className="text-foreground">{units.length}</strong> unit
               {units.length !== 1 ? 's' : ''}

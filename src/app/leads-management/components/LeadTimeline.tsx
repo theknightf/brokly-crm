@@ -7,7 +7,6 @@ interface TimelineEvent {
   actionType: string;
   detail: string;
   createdAt: string;
-  userName?: string | null;
 }
 
 interface LeadTimelineProps {
@@ -90,7 +89,7 @@ export default function LeadTimeline({ leadId }: LeadTimelineProps) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-foreground truncate">{e.detail || '—'}</p>
-                <p className="text-[10px] text-muted-foreground">{formatTime(e.createdAt)}{e.userName ? ` · by ${e.userName}` : ''}</p>
+                <p className="text-[10px] text-muted-foreground">{formatTime(e.createdAt)}</p>
               </div>
             </li>
           ))}
