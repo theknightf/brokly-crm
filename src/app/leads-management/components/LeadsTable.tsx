@@ -68,7 +68,7 @@ interface LeadsTableProps {
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   return (
     <span
-      className={`ms-1 inline-flex flex-col ${active ? 'text-primary' : 'text-muted-foreground/40'}`}
+      className={`ms-1 inline-flex flex-col ${active ? 'text-primary' : 'text-muted-foreground'}`}
     >
       <ChevronUp size={10} className={active && dir === 'asc' ? 'text-primary' : ''} />
       <ChevronDown
@@ -101,7 +101,7 @@ function StageSelector({
           e.stopPropagation();
           setOpen((o) => !o);
         }}
-        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted/70 transition-colors text-start max-w-full"
+        className="inline-flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg hover:bg-muted transition-colors text-start max-w-full"
         aria-label={`Change status from ${currentStatus}`}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -298,7 +298,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
   };
 
   return (
-    <tr className={`group transition-colors ${isSelected ? 'bg-secondary/20' : 'hover:bg-muted/30'}`}>
+    <tr className={`group transition-colors ${isSelected ? 'bg-secondary' : 'hover:bg-muted'}`}>
       <td className={`table-td sticky start-0 z-[1] w-10 ${stickyBg}`}>
         <input
           type="checkbox"
@@ -310,11 +310,11 @@ const LeadTableRow = React.memo(function LeadTableRow({
       </td>
 
       {/* Lead: avatar/icon + name (or phone) + phone + at most two badges */}
-      <td className={`table-td sticky start-10 z-[1] min-w-[250px] border-e border-border/40 ${stickyBg}`}>
+      <td className={`table-td sticky start-10 z-[1] min-w-[250px] border-e border-border ${stickyBg}`}>
         <div className="flex items-center gap-3">
           <div
             className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-              hasName ? 'bg-primary/10 text-primary text-xs font-bold' : 'bg-muted text-muted-foreground'
+              hasName ? 'bg-lime-500/10 text-primary text-xs font-bold' : 'bg-muted text-muted-foreground'
             }`}
             aria-hidden
           >
@@ -353,7 +353,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
                 onClick={copyId}
                 title={`${t('leads.copyId')} (${lead.id})`}
                 aria-label={t('leads.copyId')}
-                className="ms-1 w-6 h-6 rounded flex items-center justify-center text-muted-foreground/70 hover:text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="ms-1 w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Copy size={11} />
               </button>
@@ -412,7 +412,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
               if (next && next !== lead.status) onStatusChange(lead.id, next);
             }}
             disabled={!nextPipelineStage(lead.status)}
-            className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-h-[44px] h-9 px-3 rounded-full bg-primary text-primary-foreground hover:bg-lime-500/90 disabled:opacity-40 flex items-center gap-1 text-[11px] font-semibold transition-colors shadow-sm whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             title={
               nextPipelineStage(lead.status)
                 ? `${nextPipelineStage(lead.status)}`
@@ -575,7 +575,7 @@ function SkeletonRows({ count = 8 }: { count?: number }) {
           <td className="table-td sticky start-0 bg-card">
             <div className="w-5 h-5 rounded bg-muted animate-pulse" />
           </td>
-          <td className="table-td sticky start-10 bg-card border-e border-border/40">
+          <td className="table-td sticky start-10 bg-card border-e border-border">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
               <div className="space-y-1.5">
@@ -798,7 +798,7 @@ export default function LeadsTable({
             <button
               type="button"
               onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
-              className="min-h-[44px] text-sm text-primary font-medium hover:underline py-1 px-4 rounded-lg border border-primary/20 bg-primary/5 active:scale-95 transition-all"
+              className="min-h-[44px] text-sm text-primary font-medium hover:underline py-1 px-4 rounded-lg border border-lime-500/20 bg-lime-500/5 active:scale-95 transition-all"
             >
               +50
             </button>
@@ -826,7 +826,7 @@ export default function LeadsTable({
                 />
               </th>
               <th
-                className="table-th text-start sticky top-0 start-10 z-[3] bg-muted min-w-[250px] border-e border-border/40"
+                className="table-th text-start sticky top-0 start-10 z-[3] bg-muted min-w-[250px] border-e border-border"
                 aria-sort={sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
               >
                 <button
@@ -873,7 +873,7 @@ export default function LeadsTable({
             )}
             {visibleLeads.length < leads.length && (
               <tr>
-                <td colSpan={9} className="py-2.5 text-center text-xs text-muted-foreground bg-muted/10">
+                <td colSpan={9} className="py-2.5 text-center text-xs text-muted-foreground bg-muted">
                   <div className="inline-flex items-center gap-3">
                     <span>
                       {t('leads.showing', {
@@ -885,7 +885,7 @@ export default function LeadsTable({
                     <button
                       type="button"
                       onClick={() => setRenderLimit((prev) => Math.min(prev + 50, leads.length))}
-                      className="min-h-[36px] text-xs text-primary font-medium hover:underline px-3 rounded-md border border-primary/20 bg-primary/5 active:scale-95 transition-all"
+                      className="min-h-[36px] text-xs text-primary font-medium hover:underline px-3 rounded-md border border-lime-500/20 bg-lime-500/5 active:scale-95 transition-all"
                     >
                       +50
                     </button>

@@ -51,7 +51,7 @@ export default function WeightedLeaderboard() {
 
   return (
     <div className="dash-card overflow-hidden">
-      <div className="p-4 border-b border-border/70 flex flex-wrap items-center justify-between gap-3">
+      <div className="p-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="dash-icon-chip bg-amber-500/10 text-amber-500"><Trophy size={16} /></div>
           <div>
@@ -74,9 +74,9 @@ export default function WeightedLeaderboard() {
       : users.length===0 ? <p className="text-sm text-muted-foreground text-center py-12">No data for this period.</p>
       : <div className="divide-y divide-border">
           {users.map(u => (
-            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3.5 flex items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer focus:outline-none focus-visible:bg-muted/60 ${u.rank<=3 ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent' : ''}`}>
+            <a key={u.user_id} href={`/admin/employees/${u.user_id}/360`} className={`p-3.5 flex items-center gap-3 hover:bg-muted transition-colors cursor-pointer focus:outline-none focus-visible:bg-muted ${u.rank<=3 ? 'bg-gradient-to-r from-lime-500/10 via-lime-500/5 to-transparent' : ''}`}>
               <RankIcon rank={u.rank}/>
-              <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-primary">{(u.full_name||u.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</span></div>
+              <div className="w-9 h-9 rounded-full bg-lime-500/10 border border-lime-500/20 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-primary">{(u.full_name||u.email).split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</span></div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-foreground truncate flex items-center gap-1.5">{u.full_name || u.email} <span className="bg-muted text-muted-foreground text-[10px] px-2 py-0.5 rounded-md">{u.role}</span> <span className="text-[11px] text-primary hidden sm:inline">360 →</span></p>
                 <div className="flex gap-4 mt-2">

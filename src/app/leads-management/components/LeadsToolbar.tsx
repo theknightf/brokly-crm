@@ -35,7 +35,7 @@ function ToolbarSelect({
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="input-base h-11 appearance-none ps-3 pe-9 truncate bg-card/90 shadow-sm"
+        className="input-base h-11 appearance-none ps-3 pe-9 truncate bg-card shadow-sm"
       >
         {children}
       </select>
@@ -116,7 +116,7 @@ export default function LeadsToolbar({
 
   return (
     <div
-      className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2.5 bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm animate-rise-in"
+      className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2.5 bg-background backdrop-blur-md border-b border-border shadow-sm animate-rise-in"
       style={{ animationDelay: '140ms' }}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -132,7 +132,7 @@ export default function LeadsToolbar({
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
             placeholder={t('leads.searchPlaceholder')}
             aria-label={t('leads.searchPlaceholder')}
-            className="input-base h-11 ps-9 pe-3 w-full bg-card/90 shadow-sm"
+            className="input-base h-11 ps-9 pe-3 w-full bg-card shadow-sm"
           />
         </div>
 
@@ -174,7 +174,7 @@ export default function LeadsToolbar({
           aria-haspopup="dialog"
           aria-expanded={filtersOpen}
           className={`btn-secondary h-11 min-w-[44px] flex items-center justify-center gap-1.5 text-sm ${
-            drawerCount > 0 ? 'ring-1 ring-primary/40 text-primary' : ''
+            drawerCount > 0 ? 'ring-1 ring-lime-500/40 text-primary' : ''
           }`}
         >
           <SlidersHorizontal size={15} />
@@ -222,14 +222,14 @@ export default function LeadsToolbar({
           {chips.map((c) => (
             <span
               key={c.key}
-              className="inline-flex items-center gap-1 max-w-full ps-2.5 pe-1 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20"
+              className="inline-flex items-center gap-1 max-w-full ps-2.5 pe-1 py-1 rounded-full bg-lime-500/10 text-primary text-xs font-medium border border-lime-500/20"
             >
               <span className="truncate">{c.label}</span>
               <button
                 type="button"
                 onClick={c.onRemove}
                 aria-label={`${t('leads.clearFilters')}: ${c.label}`}
-                className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-primary/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-lime-500/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X size={12} />
               </button>
@@ -281,7 +281,7 @@ export function LeadsFilterDrawer({ open, onClose, onClear, count, children }: L
 
   return (
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={t('leads.filtersTitle')}>
-      <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
       <aside className="absolute inset-y-0 end-0 w-full sm:w-[400px] bg-card border-s border-border shadow-2xl flex flex-col animate-in fade-in">
         <header className="flex items-center gap-2 px-5 py-4 border-b border-border">
           <SlidersHorizontal size={16} className="text-muted-foreground" />

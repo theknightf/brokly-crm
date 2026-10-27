@@ -60,7 +60,7 @@ const ACCENTS: { match: RegExp; bar: string; dot: string }[] = [
   { match: /no answer/i, bar: 'bg-zinc-500', dot: 'bg-zinc-500' },
 ];
 function accentFor(stage: string) {
-  return ACCENTS.find((a) => a.match.test(stage)) || { bar: 'bg-muted-foreground/50', dot: 'bg-muted-foreground/50' };
+  return ACCENTS.find((a) => a.match.test(stage)) || { bar: 'bg-muted-foreground', dot: 'bg-muted-foreground' };
 }
 
 export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; agentId?: string }) {
@@ -101,7 +101,7 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
           <div className="absolute inset-y-4 start-0 w-1 rounded-e-full bg-muted" />
           <div className="h-3 w-20 bg-muted rounded mb-4" />
           <div className="h-8 w-14 bg-muted rounded mb-3" />
-          <div className="h-4 w-12 bg-muted/60 rounded-full" />
+          <div className="h-4 w-12 bg-muted rounded-full" />
         </div>
       ))}
     </div>
@@ -119,7 +119,7 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
             href={hrefForStage(c.stage)}
             title={`Open ${c.stage} in Leads Management`}
             className={`group dash-card dash-card-hover overflow-hidden p-4 ps-5 cursor-pointer active:scale-[0.98] ${
-              featured ? 'bg-gradient-to-br from-primary/15 via-card to-card border-primary/40' : ''
+              featured ? 'bg-gradient-to-br from-lime-500/15 via-card to-card border-lime-500/40' : ''
             }`}
           >
             <span className={`absolute inset-y-4 start-0 w-1 rounded-e-full ${accent.bar}`} aria-hidden />
@@ -128,7 +128,7 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${accent.dot}`} aria-hidden />
                 <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase truncate">{c.stage}</p>
               </span>
-              <ArrowUpRight size={14} className="text-muted-foreground/40 group-hover:text-primary rtl:-scale-x-100 transition-colors shrink-0" />
+              <ArrowUpRight size={14} className="text-muted-foreground group-hover:text-primary rtl:-scale-x-100 transition-colors shrink-0" />
             </span>
             <p className="text-3xl font-extrabold text-foreground mt-2 tabular-nums tracking-tight">{c.count.toLocaleString()}</p>
             <span

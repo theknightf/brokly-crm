@@ -121,7 +121,7 @@ export default function UnifiedMasterDashboard() {
         <div>
           <h1 className="text-foreground font-extrabold text-2xl tracking-tight flex flex-wrap items-center gap-2.5">
             Executive Master Dashboard
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-[11px] font-semibold text-primary">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-lime-500/10 border border-lime-500/30 text-[11px] font-semibold text-primary">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               Live
             </span>
@@ -186,7 +186,7 @@ export default function UnifiedMasterDashboard() {
                   <div className={`dash-icon-chip ${card.color}`}><card.icon size={15}/></div>
                 </div>
                 <p className="text-3xl font-extrabold text-foreground mt-2 tabular-nums tracking-tight">{card.value}</p>
-                {card.sub && <p className="text-muted-foreground/80 text-xs mt-1.5 truncate">{card.sub}</p>}
+                {card.sub && <p className="text-muted-foreground text-xs mt-1.5 truncate">{card.sub}</p>}
               </div>
             ))}
           </div>
@@ -196,13 +196,13 @@ export default function UnifiedMasterDashboard() {
             <div className="dash-card p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2"><ShoppingBag size={16} className="text-emerald-600"/><h3 className="text-sm font-bold">Sales Performance KPIs ↔ Lead Analytics</h3></div>
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border/70 text-foreground/80">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
                   Conversion: <strong className="text-lime-600 dark:text-lime-400">{data.conversionMetrics.conversionRate}%</strong>
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border/70 text-foreground/80">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
                   Revenue: <strong className="text-zinc-900 dark:text-white">{Number(data.conversionMetrics.revenue||0).toLocaleString()} EGP</strong>
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border/70 text-foreground/80">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
                   Avg Score: <strong className="text-lime-600 dark:text-lime-400">{data.teamPerformance?.avgScore ?? '-'}/100</strong>
                 </span>
               </div>
@@ -217,18 +217,18 @@ export default function UnifiedMasterDashboard() {
 
           {/* Live Leaderboard table for 360 drill-down */}
           <div id="leaderboard-table" className="dash-card overflow-hidden">
-            <div className="p-4 border-b border-border/70 flex items-center justify-between gap-2">
+            <div className="p-4 border-b border-border flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Live Leaderboard (Unified) — 40% Valid Calls · 30% Attendance · 30% Dress</h3>
               <span className="text-xs text-muted-foreground">{data.leaderboard.length} ranked</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <thead className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr><th className="text-left px-4 py-2">#</th><th className="text-left px-2 py-2">Employee</th><th className="text-center px-2 py-2"><Phone size={12} className="inline"/> Calls</th><th className="text-center px-2 py-2"><Clock size={12} className="inline"/> Attend</th><th className="text-center px-2 py-2"><Shirt size={12} className="inline"/> Dress</th><th className="text-center px-2 py-2 font-bold">Total</th><th className="text-right px-4 py-2"></th></tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {data.leaderboard.slice(0,10).map((r: any) => (
-                    <tr key={r.id} className="hover:bg-muted/40 transition-colors">
+                    <tr key={r.id} className="hover:bg-muted transition-colors">
                       <td className="px-4 py-2.5"><span className={`inline-flex w-7 h-7 items-center justify-center rounded-full text-xs font-bold ${r.rank===1?'bg-gradient-to-br from-amber-300 to-amber-500 text-white':r.rank===2?'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800':r.rank===3?'bg-gradient-to-br from-orange-300 to-orange-500 text-white':'bg-muted text-muted-foreground'}`}>{r.rank}</span></td>
                       <td className="px-2 py-2"><span className="font-medium">{r.name}</span> <span className="text-xs text-muted-foreground">· {r.role}</span></td>
                       <td className="text-center">{r.scores.callScore}</td>
@@ -263,7 +263,7 @@ export default function UnifiedMasterDashboard() {
               {data.notifications.recent.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No alerts.</p>
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.notifications.recent.map((n:any)=>(
-                    <div key={n.id} className={`p-2.5 rounded-xl border text-xs ${n.is_read ? 'bg-muted/30 border-border' : 'bg-primary/10 border-primary/30'}`}>
+                    <div key={n.id} className={`p-2.5 rounded-xl border text-xs ${n.is_read ? 'bg-muted border-border' : 'bg-lime-500/10 border-lime-500/30'}`}>
                       <p className="font-semibold">{n.title}</p><p className="text-muted-foreground line-clamp-2">{n.message}</p><p className="text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString()} {n.is_read ? '· Read' : '· Unread'}</p>
                     </div>
                   ))}
@@ -280,7 +280,7 @@ export default function UnifiedMasterDashboard() {
             <div className="dash-card p-4 flex items-center justify-between gap-3">
               <div><p className="text-xs text-muted-foreground">Sources</p><p className="text-sm font-bold">{data.leadSummary?.bySource?.length ?? 0} channels</p></div>
               <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
-                {(data.leadSummary?.bySource||[]).slice(0,4).map((s:any)=>(<span key={s.source} className="text-xs bg-muted text-foreground/80 px-2.5 py-1 rounded-full">{s.source} {s.count}</span>))}
+                {(data.leadSummary?.bySource||[]).slice(0,4).map((s:any)=>(<span key={s.source} className="text-xs bg-muted text-foreground px-2.5 py-1 rounded-full">{s.source} {s.count}</span>))}
               </div>
             </div>
             <div className="dash-card p-4 flex items-center justify-between gap-3">

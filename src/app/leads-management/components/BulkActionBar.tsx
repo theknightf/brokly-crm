@@ -343,7 +343,7 @@ export default function BulkActionBar({
 
           {onChangeStatus && (
             <>
-              <div className="h-4 w-px bg-background/20 flex-shrink-0" />
+              <div className="h-4 w-px bg-background flex-shrink-0" />
               <div className="relative flex-shrink-0">
                 <button
                   ref={statusBtnRef}
@@ -352,7 +352,7 @@ export default function BulkActionBar({
                   disabled={statusBusy}
                   aria-haspopup="listbox"
                   aria-expanded={statusOpen}
-                  className="flex items-center gap-1.5 text-sm font-medium text-background/80 hover:text-background transition-colors min-h-[44px] px-2 disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-sm font-medium text-background hover:text-background transition-colors min-h-[44px] px-2 disabled:opacity-50"
                 >
                   {statusBusy ? <Loader2 size={15} className="animate-spin" /> : <Tag size={15} />}
                   {t('leads.bulkStatus')}
@@ -533,7 +533,7 @@ export default function BulkActionBar({
           {/* Clear */}
           <button
             onClick={onClear}
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] text-sm text-background/60 hover:text-background transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-background/60 rounded-lg"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] text-sm text-background hover:text-background transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-background rounded-lg"
             aria-label={t('leads.clearSelection')}
             title={t('leads.clearSelection')}
           >
