@@ -18,6 +18,7 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(date || new Date().toISOString().slice(0,10));
+  const topActions = Math.max(1, ...rows.map((r) => r.totalActions || 0));
 
   useEffect(() => {
     setLoading(true);
@@ -28,28 +29,34 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
   }, [selectedDate]);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
-      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-        <h3 className="font-bold flex items-center gap-2 text-zinc-900 dark:text-white"><Trophy size={16} className="text-amber-500"/> Daily Leaderboard</h3>
-        <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs" />
+    <div className="dash-card overflow-hidden h-full flex flex-col">
+      <div className="p-4 border-b border-border/70 flex items-center justify-between gap-2">
+        <h3 className="font-bold flex items-center gap-2 text-foreground">
+          <span className="dash-icon-chip bg-amber-500/10 text-amber-500"><Trophy size={16}/></span>
+          Daily Leaderboard
+        </h3>
+        <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} className="input-base !w-auto h-9 text-xs px-3" aria-label="Leaderboard date" />
       </div>
-      {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin"/></div> :
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary"/></div> :
+        <div className="divide-y divide-border/60 flex-1">
           {rows.slice(0,10).map(r=>(
-            <div key={r.user_id} className="flex items-center gap-3 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${r.rank===1?'bg-amber-400 text-white': r.rank===2?'bg-zinc-300 text-zinc-700': r.rank===3?'bg-orange-400 text-white':'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'}`}>{r.rank}</span>
+            <div key={r.user_id} className={`flex items-center gap-3 p-3 transition-colors hover:bg-muted/50 ${r.rank<=3 ? 'bg-gradient-to-r from-primary/5 to-transparent' : ''}`}>
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-sm ${r.rank===1?'bg-gradient-to-br from-amber-300 to-amber-500 text-white': r.rank===2?'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800': r.rank===3?'bg-gradient-to-br from-orange-300 to-orange-500 text-white':'bg-muted text-muted-foreground'}`}>{r.rank}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{r.full_name}</p>
-                <p className="text-xs text-zinc-500 truncate">
+                <p className="text-sm font-semibold text-foreground truncate">{r.full_name}</p>
+                <p className="text-xs text-muted-foreground truncate">
                   {r.role} · {r.calls ?? 0} calls · {r.statusUpdates ?? 0} updates · {r.meetings ?? 0} meetings · {r.deals ?? 0} deals
                 </p>
+                <div className="mt-1.5 h-1 rounded-full bg-muted overflow-hidden" aria-hidden>
+                  <div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.round(((r.totalActions || 0) / topActions) * 100)}%` }} />
+                </div>
               </div>
-              <span className="text-sm font-black text-lime-600 dark:text-lime-400 tabular-nums shrink-0">{r.totalActions} actions</span>
+              <span className="text-sm font-extrabold text-primary tabular-nums shrink-0">{r.totalActions} actions</span>
             </div>
           ))}
         </div>
       }
-      <p className="text-[11px] text-center text-zinc-500 py-2">Resets daily at 00:00</p>
+      <p className="text-[11px] text-center text-muted-foreground py-2.5 border-t border-border/60">Resets daily at 00:00</p>
     </div>
   );
 }

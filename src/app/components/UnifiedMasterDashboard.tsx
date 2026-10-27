@@ -119,9 +119,9 @@ export default function UnifiedMasterDashboard() {
       {/* Header — brand-aligned, uses design tokens */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-foreground font-bold text-xl flex items-center gap-2">
+          <h1 className="text-foreground font-extrabold text-2xl tracking-tight flex flex-wrap items-center gap-2.5">
             Executive Master Dashboard
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card border border-border text-[11px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-[11px] font-semibold text-primary">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               Live
             </span>
@@ -131,9 +131,9 @@ export default function UnifiedMasterDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          <button onClick={() => setRange('week')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
-          <button onClick={() => setRange('month')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
-          <button onClick={() => load(false)} className="w-8 h-8 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors"><RefreshCw size={14}/></button>
+          <button onClick={() => setRange('week')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
+          <button onClick={() => setRange('month')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
+          <button onClick={() => load(false)} aria-label="Refresh" className="w-9 h-9 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RefreshCw size={14}/></button>
         </div>
       </div>
 
@@ -180,27 +180,29 @@ export default function UnifiedMasterDashboard() {
               { label: 'Expenses', value: `${data.expenses.totalThis}`, sub: `${data.expenses.changePct>=0?'+':''}${data.expenses.changePct}%`, icon: Banknote, color: 'text-amber-400 bg-amber-500/10' },
               { label: 'Pending Deductions', value: data.deductions.pending, sub: `${data.notifications.unread} unread alerts`, icon: Bell, color: 'text-red-400 bg-red-500/10' },
             ].map(card => (
-              <div key={card.label} className="bg-card border border-border rounded-2xl p-4 shadow-sm hover:border-primary/20 transition-all">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-2 ${card.color}`}><card.icon size={14}/></div>
-                <p className="text-muted-foreground text-xs font-bold tracking-wider uppercase truncate">{card.label}</p>
-                <p className="text-2xl font-black text-foreground mt-1">{card.value}</p>
-                {card.sub && <p className="text-muted-foreground/80 text-xs mt-1 truncate">{card.sub}</p>}
+              <div key={card.label} className="dash-card dash-card-hover p-4 overflow-hidden">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase truncate pt-1">{card.label}</p>
+                  <div className={`dash-icon-chip ${card.color}`}><card.icon size={15}/></div>
+                </div>
+                <p className="text-3xl font-extrabold text-foreground mt-2 tabular-nums tracking-tight">{card.value}</p>
+                {card.sub && <p className="text-muted-foreground/80 text-xs mt-1.5 truncate">{card.sub}</p>}
               </div>
             ))}
           </div>
 
           {/* Sales KPIs + Conversion */}
           {data.conversionMetrics && (
-            <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="dash-card p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2"><ShoppingBag size={16} className="text-emerald-600"/><h3 className="text-sm font-bold">Sales Performance KPIs ↔ Lead Analytics</h3></div>
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border/70 text-foreground/80">
                   Conversion: <strong className="text-lime-600 dark:text-lime-400">{data.conversionMetrics.conversionRate}%</strong>
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border/70 text-foreground/80">
                   Revenue: <strong className="text-zinc-900 dark:text-white">{Number(data.conversionMetrics.revenue||0).toLocaleString()} EGP</strong>
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border/70 text-foreground/80">
                   Avg Score: <strong className="text-lime-600 dark:text-lime-400">{data.teamPerformance?.avgScore ?? '-'}/100</strong>
                 </span>
               </div>
@@ -214,25 +216,25 @@ export default function UnifiedMasterDashboard() {
           </div>
 
           {/* Live Leaderboard table for 360 drill-down */}
-          <div id="leaderboard-table" className="bg-card border border-border rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
+          <div id="leaderboard-table" className="dash-card overflow-hidden">
+            <div className="p-4 border-b border-border/70 flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold flex items-center gap-2"><Trophy size={14} className="text-amber-500"/> Live Leaderboard (Unified) — 40% Valid Calls · 30% Attendance · 30% Dress</h3>
               <span className="text-xs text-muted-foreground">{data.leaderboard.length} ranked</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-muted/30 text-xs text-muted-foreground">
+                <thead className="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr><th className="text-left px-4 py-2">#</th><th className="text-left px-2 py-2">Employee</th><th className="text-center px-2 py-2"><Phone size={12} className="inline"/> Calls</th><th className="text-center px-2 py-2"><Clock size={12} className="inline"/> Attend</th><th className="text-center px-2 py-2"><Shirt size={12} className="inline"/> Dress</th><th className="text-center px-2 py-2 font-bold">Total</th><th className="text-right px-4 py-2"></th></tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {data.leaderboard.slice(0,10).map((r: any) => (
-                    <tr key={r.id} className="hover:bg-muted/20">
-                      <td className="px-4 py-2 font-bold">{r.rank}</td>
+                    <tr key={r.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-4 py-2.5"><span className={`inline-flex w-7 h-7 items-center justify-center rounded-full text-xs font-bold ${r.rank===1?'bg-gradient-to-br from-amber-300 to-amber-500 text-white':r.rank===2?'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800':r.rank===3?'bg-gradient-to-br from-orange-300 to-orange-500 text-white':'bg-muted text-muted-foreground'}`}>{r.rank}</span></td>
                       <td className="px-2 py-2"><span className="font-medium">{r.name}</span> <span className="text-xs text-muted-foreground">· {r.role}</span></td>
                       <td className="text-center">{r.scores.callScore}</td>
                       <td className="text-center">{r.scores.attendanceScore}</td>
                       <td className="text-center">{r.scores.dressScore}</td>
-                      <td className="text-center font-extrabold text-lime-700 dark:text-lime-400">{r.totalScore}</td>
+                      <td className="text-center font-extrabold text-primary tabular-nums">{r.totalScore}</td>
                       <td className="text-right px-4"><a href={`/admin/employees/${r.id}/360`} className="text-lime-700 dark:text-lime-400 hover:underline inline-flex items-center gap-1 text-xs">360 <ExternalLink size={12}/></a></td>
                     </tr>
                   ))}
@@ -243,25 +245,25 @@ export default function UnifiedMasterDashboard() {
 
           {/* Payroll & Deductions Hub */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-card border border-border rounded-xl p-4">
+            <div className="dash-card p-4">
               <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Banknote size={14} className="text-amber-600"/> Payroll & Deductions Hub</h3>
               {data.deductions.recent.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No deductions this period.</p>
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.deductions.recent.map((d:any)=>(
-                    <div key={d.id} className="flex items-center justify-between p-2 rounded-lg bg-red-50 border border-red-200 text-xs">
-                      <div><p className="font-semibold text-red-800">{d.reason}</p><p className="text-muted-foreground">{d.source_ref} · {d.month_year}</p></div>
+                    <div key={d.id} className="flex items-center justify-between p-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-xs">
+                      <div><p className="font-semibold text-red-700 dark:text-red-300">{d.reason}</p><p className="text-muted-foreground">{d.source_ref} · {d.month_year}</p></div>
                       <div className="text-right"><p className="font-bold">-{d.amount}</p><p className={d.is_applied ? 'text-emerald-600' : 'text-amber-600'}>{d.is_applied ? 'Applied' : 'Pending'}</p></div>
                     </div>
                   ))}
                 </div>
               }
             </div>
-            <div className="bg-card border border-border rounded-xl p-4">
+            <div className="dash-card p-4">
               <h3 className="text-sm font-bold flex items-center gap-2 mb-3"><Bell size={14} className="text-lime-700 dark:text-lime-400"/> Instant Alerts (NotificationLog) — {data.notifications.unread} unread</h3>
               {data.notifications.recent.length===0 ? <p className="text-xs text-muted-foreground text-center py-6">No alerts.</p>
               : <div className="space-y-2 max-h-[260px] overflow-auto">
                   {data.notifications.recent.map((n:any)=>(
-                    <div key={n.id} className={`p-2 rounded-lg border text-xs ${n.is_read ? 'bg-muted/30 border-border' : 'bg-lime-50 dark:bg-lime-500/10 border-lime-200 dark:border-lime-500/30'}`}>
+                    <div key={n.id} className={`p-2.5 rounded-xl border text-xs ${n.is_read ? 'bg-muted/30 border-border' : 'bg-primary/10 border-primary/30'}`}>
                       <p className="font-semibold">{n.title}</p><p className="text-muted-foreground line-clamp-2">{n.message}</p><p className="text-[11px] text-muted-foreground">{new Date(n.created_at).toLocaleString()} {n.is_read ? '· Read' : '· Unread'}</p>
                     </div>
                   ))}
@@ -275,24 +277,24 @@ export default function UnifiedMasterDashboard() {
         <>
           {/* Leads Pipeline & Data Hub */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
+            <div className="dash-card p-4 flex items-center justify-between gap-3">
               <div><p className="text-xs text-muted-foreground">Sources</p><p className="text-sm font-bold">{data.leadSummary?.bySource?.length ?? 0} channels</p></div>
               <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
-                {(data.leadSummary?.bySource||[]).slice(0,4).map((s:any)=>(<span key={s.source} className="text-xs bg-muted px-2 py-1 rounded-full">{s.source} {s.count}</span>))}
+                {(data.leadSummary?.bySource||[]).slice(0,4).map((s:any)=>(<span key={s.source} className="text-xs bg-muted text-foreground/80 px-2.5 py-1 rounded-full">{s.source} {s.count}</span>))}
               </div>
             </div>
-            <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
+            <div className="dash-card p-4 flex items-center justify-between gap-3">
               <div><p className="text-xs text-muted-foreground">Conversion</p><p className="text-sm font-bold">{data.conversionMetrics?.conversionRate ?? 0}% · {data.conversionMetrics?.doneDeal ?? 0} won</p></div>
-              <span className="text-xs bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">{Number(data.conversionMetrics?.revenue||0).toLocaleString()} EGP</span>
+              <span className="text-xs bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded-full font-semibold">{Number(data.conversionMetrics?.revenue||0).toLocaleString()} EGP</span>
             </div>
-            <div className="bg-card border border-border rounded-xl p-3 flex items-center justify-between">
+            <div className="dash-card p-4 flex items-center justify-between gap-3">
               <div><p className="text-xs text-muted-foreground">Data Rotation</p><p className="text-sm font-bold">Round-robin</p></div>
               <button onClick={handleRotate} disabled={rotating} className="bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold rounded-xl transition-all shadow-sm hover:shadow-[0_0_16px_rgba(163,230,53,0.3)] text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50">{rotating ? <Loader2 size={12} className="animate-spin text-zinc-950"/> : <RotateCw size={12} className="text-zinc-950"/>} Rotate Data</button>
             </div>
           </div>
 
           {/* Pipeline toolbar */}
-          <div className="bg-card border border-border rounded-2xl p-3 flex flex-wrap gap-2 items-center justify-between">
+          <div className="dash-card p-3 flex flex-wrap gap-2 items-center justify-between">
             <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
               <div className="relative flex-1">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"/>
@@ -309,7 +311,7 @@ export default function UnifiedMasterDashboard() {
           </div>
 
           {/* Pipeline content */}
-          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="dash-card overflow-hidden">
             {pipelineLoading ? <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-lime-700 dark:text-lime-400"/></div>
             : filteredLeads.length===0 ? <div className="text-center py-12 text-sm text-muted-foreground">No leads {pipelineSearch ? `matching "${pipelineSearch}"` : ''}. <button onClick={()=>{setPipelineSearch('');}} className="text-lime-700 dark:text-lime-400 underline">Clear search</button></div>
             : pipelineView==='table' ? (
@@ -346,7 +348,7 @@ export default function UnifiedMasterDashboard() {
           </div>
 
           {/* Mini timeline for leads */}
-          <div className="bg-card border border-border rounded-xl p-4">
+          <div className="dash-card p-4">
             <h3 className="text-sm font-bold mb-3">Recent Activity</h3>
             <div className="space-y-1 max-h-[200px] overflow-auto">
               {data.timeline.slice(0,12).map((t:any,i:number)=>(
