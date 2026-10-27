@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Phone,
   Mail,
-  Building2,
+  Building,
   MapPin,
   Clock,
   UserCheck,
@@ -569,7 +569,7 @@ export default function LeadProfileSidePanel({
                         {lead.propertyType ? ` • ${lead.propertyType}` : ' • Type B Villa'}
                       </span>
                     </div>
-                    <Building2 size={18} className="text-[#c1cab0]" />
+                    <Building size={18} className="text-[#c1cab0]" />
                   </div>
 
                   {/* Target Budget */}

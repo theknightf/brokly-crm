@@ -5,7 +5,7 @@ import {
   Car,
   Info,
   Percent,
-  Building2,
+  Building,
   Wallet,
   Handshake,
   ListChecks,
@@ -786,7 +786,7 @@ export default function UnitPriceCalculator() {
           </div>
           {result.valid && result.count > 0 && (
             <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-xl px-3 py-2.5">
-              <Building2 size={13} />
+              <Building size={13} />
               {t('calculator.installmentFormula', { count: result.count })}
             </div>
           )}
@@ -797,7 +797,7 @@ export default function UnitPriceCalculator() {
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-            <Building2 size={15} className="text-primary" />
+            <Building size={15} className="text-primary" />
             Recommended units
           </span>
           <span className="flex items-center gap-2">
@@ -839,7 +839,7 @@ export default function UnitPriceCalculator() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary via-background to-muted">
-                        <Building2 size={28} className="text-primary/50" />
+                        <Building size={28} className="text-primary/50" />
                       </div>
                     )}
                     <div className="absolute top-2 right-2 flex items-center gap-1.5">

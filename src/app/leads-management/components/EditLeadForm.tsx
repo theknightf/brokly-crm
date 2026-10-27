@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Building2, RefreshCw, ChevronDown, Plus } from 'lucide-react';
+import { Loader2, RefreshCw, ChevronDown, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import {

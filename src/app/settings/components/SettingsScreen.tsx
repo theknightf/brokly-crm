@@ -6,7 +6,7 @@ import {
   Bell,
   Shield,
   Palette,
-  Building2,
+  Building,
   Save,
   Loader2,
   Check,
@@ -35,7 +35,7 @@ const TABS: { key: SettingsTab; label: string; icon: React.ReactNode; descriptio
   {
     key: 'brokerage',
     label: 'Brokerage',
-    icon: <Building2 size={16} />,
+    icon: <Building size={16} />,
     description: 'Brokerage name and company settings',
   },
   {

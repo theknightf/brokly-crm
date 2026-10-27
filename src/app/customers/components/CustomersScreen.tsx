@@ -6,7 +6,7 @@ import {
   Phone,
   Mail,
   MapPin,
-  Building2,
+  Building,
   Loader2,
   RefreshCw,
   Banknote,
@@ -279,7 +279,7 @@ function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () =
         )}
         {customer.project && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Building2 size={12} className="flex-shrink-0" />
+            <Building size={12} className="flex-shrink-0" />
             <span className="truncate">{customer.project}</span>
           </div>
         )}
@@ -324,7 +324,7 @@ function CustomerDetailPanel({ customer, onClose }: { customer: Customer; onClos
           <DetailRow icon={<Phone size={15} />} label="Phone" value={customer.phone} />
           <DetailRow icon={<Mail size={15} />} label="Email" value={customer.email} />
           <DetailRow icon={<MapPin size={15} />} label="Location" value={customer.location} />
-          <DetailRow icon={<Building2 size={15} />} label="Project" value={customer.project} />
+          <DetailRow icon={<Building size={15} />} label="Project" value={customer.project} />
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-muted/50 rounded-lg p-3">
               <p className="text-xs text-muted-foreground mb-1">Property Type</p>

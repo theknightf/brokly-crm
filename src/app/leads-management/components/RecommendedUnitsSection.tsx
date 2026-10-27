@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, X, Search, Loader2, CheckCircle2 } from 'lucide-react';
+import { Building, Plus, X, Search, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsService, recommendedUnitsService, unitsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +30,7 @@ function UnitThumb({ unit }: { unit: any }) {
   if (!url) {
     return (
       <span className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-        <Building2 size={16} />
+        <Building size={16} />
       </span>
     );
   }
@@ -130,7 +130,7 @@ export default function RecommendedUnitsSection({
     <div className="bg-muted/40 rounded-xl px-3 py-2.5">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-          <Building2 size={12} /> Recommended units
+          <Building size={12} /> Recommended units
         </p>
         <button
           onClick={openPicker}

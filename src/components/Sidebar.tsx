@@ -13,7 +13,7 @@ import {
   BarChart3,
   Settings,
   ChevronRight,
-  Building2,
+  Building,
   FolderOpen,
   ShieldCheck,
   LogOut,
@@ -138,7 +138,7 @@ const navGroups: NavGroup[] = [
       {
         id: 'nav-units',
         labelKey: 'common.units',
-        icon: <Building2 size={18} />,
+        icon: <Building size={18} />,
         href: '/units',
       },
       {
@@ -468,7 +468,7 @@ function SidebarContent({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
                 <div className="flex items-center gap-1">
-                  <Building2 size={10} className="text-muted-foreground flex-shrink-0" />
+                  <Building size={10} className="text-muted-foreground flex-shrink-0" />
                   <p className="text-xs text-muted-foreground truncate capitalize">
                     {displayRole.replace('_', ' ')}
                   </p>

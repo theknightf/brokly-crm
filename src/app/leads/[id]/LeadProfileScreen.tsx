@@ -1,6 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Phone, Mail, MapPin, Building2, Calendar, Clock, UserCheck, TrendingUp, AlertTriangle, ExternalLink, Loader2, ArrowLeft, Star, Banknote, MessageSquare } from 'lucide-react';
+import { Phone, Mail, MapPin, Building, Calendar, Clock, UserCheck, TrendingUp, AlertTriangle, ExternalLink, Loader2, ArrowLeft, Star, Banknote, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LeadProfile {
@@ -76,7 +76,7 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
                 <span className="flex items-center gap-1"><Phone size={12}/>{lead.phone||'—'}</span>
                 <span className="flex items-center gap-1"><Mail size={12}/>{lead.email||'—'}</span>
                 <span className="flex items-center gap-1"><MapPin size={12}/>{lead.location||'—'}</span>
-                <span className="flex items-center gap-1"><Building2 size={12}/>{lead.project||lead.developer||'—'}</span>
+                <span className="flex items-center gap-1"><Building size={12}/>{lead.project||lead.developer||'—'}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1 font-mono">ID: {lead.id} • {lead.createdAt?.slice(0,10)} → {lead.updatedAt?.slice(0,10)}</p>
             </div>

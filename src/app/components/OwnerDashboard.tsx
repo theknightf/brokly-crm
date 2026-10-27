@@ -12,7 +12,7 @@ import {
   Receipt,
   AlertCircle,
   Activity,
-  Building2,
+  Building,
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
@@ -501,7 +501,7 @@ export default function OwnerDashboard() {
         <div className="flex flex-col gap-6">
           <div className="bg-card border border-border rounded-2xl p-5">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
-              <Building2 size={16} className="text-primary" /> Monthly Summary
+              <Building size={16} className="text-primary" /> Monthly Summary
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[

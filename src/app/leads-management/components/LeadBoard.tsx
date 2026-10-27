@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Building2, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Phone, MessageCircle, Pencil, MapPin, Building, Trash2 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { Lead, LeadStatus } from './mockLeads';
 import { PIPELINE_STAGES, nextPipelineStage, prevPipelineStage, pipelineIndex } from './leadStages';
@@ -101,7 +101,7 @@ const BoardCard = React.memo(function BoardCard({
         )}
         {lead.project && (
           <span className="inline-flex items-center gap-0.5 truncate">
-            <Building2 size={10} className="flex-shrink-0" />
+            <Building size={10} className="flex-shrink-0" />
             {lead.project}
           </span>
         )}

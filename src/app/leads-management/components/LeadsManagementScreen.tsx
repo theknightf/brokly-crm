@@ -20,7 +20,7 @@ import {
   BadgeCheck,
   Handshake,
   Pencil,
-  Building2,
+  Building,
   Tag,
   TriangleAlert,
   RefreshCw,
