@@ -108,7 +108,19 @@ export default function UnifiedMasterDashboard() {
     } catch (e:any) { toast.error(e.message); } finally { setRotating(false); }
   };
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 size={28} className="animate-spin text-lime-500"/></div>;
+  if (loading) return (
+    <div className="space-y-6 p-4 md:p-6 -m-4 md:-m-6 animate-pulse" aria-busy="true" aria-label="Loading dashboard">
+      <div className="h-8 w-72 max-w-full rounded-lg bg-muted" />
+      <div className="h-12 w-full sm:w-96 rounded-full bg-muted" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        {Array.from({ length: 14 }).map((_, i) => <div key={i} className="dash-card h-[112px]" />)}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="dash-card h-64 lg:col-span-2" />
+        <div className="dash-card h-64" />
+      </div>
+    </div>
+  );
   if (error) return <div className="text-center py-10"><p className="text-sm text-destructive mb-3">{error}</p><button onClick={() => load(false)} className="btn-secondary text-sm flex items-center gap-1 mx-auto"><RefreshCw size={14}/> Retry</button></div>;
   if (!data) return null;
 
@@ -127,12 +139,12 @@ export default function UnifiedMasterDashboard() {
             </span>
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {data.period?.from} — {data.period?.to} <span className="mx-1 text-muted-foreground/60">•</span> {data.leadSummary?.total ?? 0} leads <span className="mx-1 text-muted-foreground/60">•</span> {data.summary.totalEmployees} team
+            {data.period?.from} — {data.period?.to} <span className="mx-1 text-muted-foreground">•</span> {data.leadSummary?.total ?? 0} leads <span className="mx-1 text-muted-foreground">•</span> {data.summary.totalEmployees} team
           </p>
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          <button onClick={() => setRange('week')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
-          <button onClick={() => setRange('month')} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
+          <button onClick={() => setRange('week')} aria-pressed={range==='week'} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='week' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Week</button>
+          <button onClick={() => setRange('month')} aria-pressed={range==='month'} className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${range==='month' ? 'bg-primary text-primary-foreground border-transparent shadow-sm' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>Month</button>
           <button onClick={() => load(false)} aria-label="Refresh" className="w-9 h-9 rounded-full bg-card border border-border text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RefreshCw size={14}/></button>
         </div>
       </div>
@@ -141,14 +153,16 @@ export default function UnifiedMasterDashboard() {
       <div className="bg-muted border border-border rounded-full p-1 flex gap-1 w-full sm:w-auto">
         <button
           onClick={() => setMode('sales')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='sales' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card/60 font-medium'}`}
+          aria-pressed={mode==='sales'}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode==='sales' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card font-medium'}`}
         >
           <Users size={16}/> Sales & Team Performance
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='sales' ? 'bg-card text-primary' : 'bg-muted text-muted-foreground'}`}>{data.leaderboard.length}</span>
         </button>
         <button
           onClick={() => setMode('leads')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all ${mode==='leads' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card/60 font-medium'}`}
+          aria-pressed={mode==='leads'}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${mode==='leads' ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_12px_rgba(163,230,53,0.3)] border border-primary' : 'text-muted-foreground hover:text-foreground hover:bg-card font-medium'}`}
         >
           <Target size={16}/> Leads Pipeline & Data Hub
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-card text-primary' : 'bg-muted text-muted-foreground'}`}>{data.summary?.totalLeads ?? 0}</span>
@@ -224,7 +238,7 @@ export default function UnifiedMasterDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <tr><th className="text-left px-4 py-2">#</th><th className="text-left px-2 py-2">Employee</th><th className="text-center px-2 py-2"><Phone size={12} className="inline"/> Calls</th><th className="text-center px-2 py-2"><Clock size={12} className="inline"/> Attend</th><th className="text-center px-2 py-2"><Shirt size={12} className="inline"/> Dress</th><th className="text-center px-2 py-2 font-bold">Total</th><th className="text-right px-4 py-2"></th></tr>
+                  <tr><th className="text-start px-4 py-2">#</th><th className="text-start px-2 py-2">Employee</th><th className="text-center px-2 py-2"><Phone size={12} className="inline"/> Calls</th><th className="text-center px-2 py-2"><Clock size={12} className="inline"/> Attend</th><th className="text-center px-2 py-2"><Shirt size={12} className="inline"/> Dress</th><th className="text-center px-2 py-2 font-bold">Total</th><th className="text-end px-4 py-2"></th></tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {data.leaderboard.slice(0,10).map((r: any) => (
@@ -235,7 +249,7 @@ export default function UnifiedMasterDashboard() {
                       <td className="text-center">{r.scores.attendanceScore}</td>
                       <td className="text-center">{r.scores.dressScore}</td>
                       <td className="text-center font-extrabold text-primary tabular-nums">{r.totalScore}</td>
-                      <td className="text-right px-4"><a href={`/admin/employees/${r.id}/360`} className="text-lime-700 dark:text-lime-400 hover:underline inline-flex items-center gap-1 text-xs">360 <ExternalLink size={12}/></a></td>
+                      <td className="text-end px-4"><a href={`/admin/employees/${r.id}/360`} className="text-lime-700 dark:text-lime-400 hover:underline inline-flex items-center gap-1 text-xs">360 <ExternalLink size={12}/></a></td>
                     </tr>
                   ))}
                 </tbody>
@@ -252,7 +266,7 @@ export default function UnifiedMasterDashboard() {
                   {data.deductions.recent.map((d:any)=>(
                     <div key={d.id} className="flex items-center justify-between p-2.5 rounded-xl bg-red-500/10 border border-red-500/25 text-xs">
                       <div><p className="font-semibold text-red-700 dark:text-red-300">{d.reason}</p><p className="text-muted-foreground">{d.source_ref} · {d.month_year}</p></div>
-                      <div className="text-right"><p className="font-bold">-{d.amount}</p><p className={d.is_applied ? 'text-emerald-600' : 'text-amber-600'}>{d.is_applied ? 'Applied' : 'Pending'}</p></div>
+                      <div className="text-end"><p className="font-bold">-{d.amount}</p><p className={d.is_applied ? 'text-emerald-600' : 'text-amber-600'}>{d.is_applied ? 'Applied' : 'Pending'}</p></div>
                     </div>
                   ))}
                 </div>
@@ -297,14 +311,14 @@ export default function UnifiedMasterDashboard() {
           <div className="dash-card p-3 flex flex-wrap gap-2 items-center justify-between">
             <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
               <div className="relative flex-1">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"/>
-                <input value={pipelineSearch} onChange={e=>setPipelineSearch(e.target.value)} placeholder="Search leads..." className="input-base pl-8 h-9 text-sm w-full"/>
+                <Search size={14} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"/>
+                <input value={pipelineSearch} onChange={e=>setPipelineSearch(e.target.value)} placeholder="Search leads..." className="input-base ps-8 h-9 text-sm w-full"/>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex bg-muted rounded-lg p-1">
-                <button onClick={()=>setPipelineView('kanban')} className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 ${pipelineView==='kanban'?'bg-card shadow':''}`}><LayoutGrid size={12}/> Kanban</button>
-                <button onClick={()=>setPipelineView('table')} className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 ${pipelineView==='table'?'bg-card shadow':''}`}><List size={12}/> Table</button>
+                <button onClick={()=>setPipelineView('kanban')} aria-pressed={pipelineView==='kanban'} className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pipelineView==='kanban'?'bg-card shadow text-foreground':'text-muted-foreground hover:text-foreground'}`}><LayoutGrid size={12}/> Kanban</button>
+                <button onClick={()=>setPipelineView('table')} aria-pressed={pipelineView==='table'} className={`px-3 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${pipelineView==='table'?'bg-card shadow text-foreground':'text-muted-foreground hover:text-foreground'}`}><List size={12}/> Table</button>
               </div>
               <a href="/leads-management" className="text-xs text-lime-700 hover:underline flex items-center gap-1">Full Leads <ExternalLink size={12}/></a>
             </div>
@@ -317,15 +331,15 @@ export default function UnifiedMasterDashboard() {
             : pipelineView==='table' ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-muted/30 text-xs text-muted-foreground"><tr><th className="text-left px-4 py-2">Lead</th><th className="text-left px-2 py-2">Phone</th><th className="text-center px-2 py-2">Stage</th><th className="text-center px-2 py-2">Assigned</th><th className="text-right px-4 py-2"></th></tr></thead>
+                  <thead className="bg-zinc-500/10 text-xs text-muted-foreground"><tr><th className="text-start px-4 py-2">Lead</th><th className="text-start px-2 py-2">Phone</th><th className="text-center px-2 py-2">Stage</th><th className="text-center px-2 py-2">Assigned</th><th className="text-end px-4 py-2"></th></tr></thead>
                   <tbody className="divide-y divide-border">
                     {filteredLeads.slice(0,50).map((l:any)=>(
-                      <tr key={l.id} className="hover:bg-muted/20">
-                        <td className="px-4 py-2"><a href={`/leads/${l.id}`} className="font-medium text-lime-700 dark:text-lime-400 hover:underline">{l.name || 'Lead'}</a><span className="ml-2 text-xs text-muted-foreground">{l.source||''}</span></td>
+                      <tr key={l.id} className="hover:bg-zinc-500/10">
+                        <td className="px-4 py-2"><a href={`/leads/${l.id}`} className="font-medium text-lime-700 dark:text-lime-400 hover:underline">{l.name || 'Lead'}</a><span className="ms-2 text-xs text-muted-foreground">{l.source||''}</span></td>
                         <td className="px-2 py-2 font-mono text-xs">{l.phone||'—'}</td>
                         <td className="text-center"><span className="text-xs bg-muted px-2 py-0.5 rounded-full">{l.crm_status || l.lead_status||'—'}</span></td>
                         <td className="text-center text-xs">{l.assigned_to_profile?.full_name || l.assigned_to || 'Unassigned'}</td>
-                        <td className="text-right px-4"><a href={`/leads/${l.id}`} className="text-xs text-lime-700 dark:text-lime-400 hover:underline">Profile →</a></td>
+                        <td className="text-end px-4"><a href={`/leads/${l.id}`} className="text-xs text-lime-700 dark:text-lime-400 hover:underline">Profile →</a></td>
                       </tr>
                     ))}
                   </tbody>
@@ -352,7 +366,7 @@ export default function UnifiedMasterDashboard() {
             <h3 className="text-sm font-bold mb-3">Recent Activity</h3>
             <div className="space-y-1 max-h-[200px] overflow-auto">
               {data.timeline.slice(0,12).map((t:any,i:number)=>(
-                <div key={i} className="flex gap-2 text-xs py-1 border-b border-border/40 last:border-0"><span className="text-muted-foreground font-mono whitespace-nowrap">{String(t.createdAt).slice(0,16).replace('T',' ')}</span><span className="font-medium truncate">{t.employee}: {t.action}</span></div>
+                <div key={i} className="flex gap-2 text-xs py-1 border-b border-zinc-500/20 last:border-0"><span className="text-muted-foreground font-mono whitespace-nowrap">{String(t.createdAt).slice(0,16).replace('T',' ')}</span><span className="font-medium truncate">{t.employee}: {t.action}</span></div>
               ))}
             </div>
           </div>

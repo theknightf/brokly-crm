@@ -56,13 +56,13 @@ export default function DressCodeEvaluationForm() {
   };
 
   if (isAdmin === false) {
-    return <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-2 text-sm text-amber-800"><AlertCircle size={16}/> Only Admin/Owner can submit dress code evaluations.</div>;
+    return <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200"><AlertCircle size={16}/> Only Admin/Owner can submit dress code evaluations.</div>;
   }
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5">
+    <div className="dash-card p-5">
       <div className="flex items-center gap-2 mb-4">
-        <div className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-lime-600 dark:text-lime-400 p-2 rounded-xl"><Shirt size={16} /></div>
+        <div className="dash-icon-chip bg-lime-500/15 text-lime-600 dark:text-lime-400"><Shirt size={16} /></div>
         <div>
           <h3 className="text-sm font-semibold text-foreground">Daily Dress Code Evaluation</h3>
           <p className="text-xs text-muted-foreground">Admin input → feeds Leaderboard (30%) & Owner 360 in real-time</p>
@@ -72,14 +72,14 @@ export default function DressCodeEvaluationForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5">Employee *</label>
-          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all">
+          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="input-base">
             <option value="">Select employee…</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.full_name || e.email} · {e.role}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1"><Calendar size={12}/> Date *</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all" />
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} max={new Date().toISOString().slice(0,10)} className="input-base" />
         </div>
       </div>
 
@@ -102,11 +102,11 @@ export default function DressCodeEvaluationForm() {
 
       <div className="mt-4">
         <label className="block text-xs font-medium text-foreground mb-1.5">Behavioral Flags (comma separated)</label>
-        <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm" />
+        <input type="text" value={flags} onChange={e => setFlags(e.target.value)} placeholder="e.g. no tie, sneakers, missing badge" className="input-base" />
       </div>
       <div className="mt-3">
         <label className="block text-xs font-medium text-foreground mb-1.5">Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition-all text-sm resize-none" />
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional observation…" rows={2} className="input-base" />
       </div>
 
       <button onClick={submit} disabled={submitting || !employeeId} className="bg-lime-500 hover:bg-lime-400 text-zinc-950 font-bold rounded-xl py-3 w-full mt-4 flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-sm hover:shadow-[0_0_16px_rgba(163,230,53,0.3)]">

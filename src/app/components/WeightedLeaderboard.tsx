@@ -85,7 +85,7 @@ export default function WeightedLeaderboard() {
                   <ScoreBar label="Dress 30%" value={u.scores.dressScore} icon={<Shirt size={10} className="text-lime-400"/>} color="bg-lime-400"/>
                 </div>
               </div>
-              <div className="text-right flex-shrink-0">
+              <div className="text-end flex-shrink-0">
                 <div className="flex items-center gap-1 justify-end"><TrendingUp size={12} className="text-primary"/><span className="text-xl font-extrabold text-primary tabular-nums">{u.totalScore}</span><span className="text-xs text-muted-foreground">/100</span></div>
                 <p className="text-[11px] text-muted-foreground">{u.metrics.totalCalls} calls · {u.metrics.presentDays}/{u.metrics.totalDays} days · {u.metrics.avgDressRating!=null ? `${u.metrics.avgDressRating}/5` : 'no rating'}</p>
               </div>
