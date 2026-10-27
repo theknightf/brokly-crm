@@ -245,13 +245,13 @@ export default function BulkActionBar({
         <div
           role="toolbar"
           aria-label={t('leads.selectedCount', { count: selectedCount })}
-          className="bg-[#12121a] text-zinc-100 border border-white/10 rounded-2xl shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] px-5 py-2.5 flex items-center gap-4 min-w-[min(380px,90vw)] max-w-full overflow-x-auto pointer-events-auto"
+          className="bg-[#12121a] text-zinc-100 border border-white/10 rounded-2xl shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] px-5 py-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 min-w-[min(380px,90vw)] max-w-[min(1180px,94vw)] pointer-events-auto"
         >
           <span className="text-sm font-semibold flex-shrink-0 rounded-full bg-lime-400/15 text-lime-300 border border-lime-400/30 px-3 py-1" aria-live="polite">
             {t('leads.selectedCount', { count: selectedCount })}
           </span>
 
-          <div className="h-4 w-px bg-white/15 flex-shrink-0" />
+          <div className="hidden xl:block h-4 w-px bg-white/15 flex-shrink-0" />
 
           {/* WhatsApp bulk */}
           <div className="relative flex-shrink-0">
@@ -328,7 +328,7 @@ export default function BulkActionBar({
             </ViewportPopover>
           </div>
 
-          <div className="h-4 w-px bg-white/15 flex-shrink-0" />
+          <div className="hidden xl:block h-4 w-px bg-white/15 flex-shrink-0" />
 
           {/* Assign user */}
           <div className="flex-shrink-0">
@@ -352,7 +352,7 @@ export default function BulkActionBar({
                   disabled={statusBusy}
                   aria-haspopup="listbox"
                   aria-expanded={statusOpen}
-                  className="flex items-center gap-1.5 text-sm font-medium text-background hover:text-white transition-colors min-h-[44px] px-2 disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-sm font-medium text-zinc-300 hover:text-white transition-colors min-h-[44px] px-2 disabled:opacity-50"
                 >
                   {statusBusy ? <Loader2 size={15} className="animate-spin" /> : <Tag size={15} />}
                   {t('leads.bulkStatus')}
@@ -395,7 +395,7 @@ export default function BulkActionBar({
             </>
           )}
 
-          <div className="h-4 w-px bg-white/15 flex-shrink-0" />
+          <div className="hidden xl:block h-4 w-px bg-white/15 flex-shrink-0" />
 
           {/* Referral lead */}
           <div className="flex-shrink-0">
@@ -409,7 +409,7 @@ export default function BulkActionBar({
             </button>
           </div>
 
-          <div className="h-4 w-px bg-white/15 flex-shrink-0" />
+          <div className="hidden xl:block h-4 w-px bg-white/15 flex-shrink-0" />
 
           {/* Assign team */}
           <div className="relative flex-shrink-0">
@@ -455,7 +455,7 @@ export default function BulkActionBar({
             </ViewportPopover>
           </div>
 
-          <div className="h-4 w-px bg-white/15 flex-shrink-0" />
+          <div className="hidden xl:block h-4 w-px bg-white/15 flex-shrink-0" />
 
           {/* Bulk email / SMS */}
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -493,7 +493,7 @@ export default function BulkActionBar({
             </button>
           </div>
 
-          <div className="h-4 w-px bg-white/15 flex-shrink-0" />
+          <div className="hidden xl:block h-4 w-px bg-white/15 flex-shrink-0" />
 
           {/* Delete (Owner and Admin only) */}
           {canDelete && (
@@ -526,14 +526,14 @@ export default function BulkActionBar({
                   </button>
                 </div>
               )}
-              <div className="h-4 w-px bg-white/15 flex-shrink-0" />
+              <div className="hidden xl:block h-4 w-px bg-white/15 flex-shrink-0" />
             </>
           )}
 
           {/* Clear */}
           <button
             onClick={onClear}
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] text-sm text-background hover:text-white transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-background rounded-lg"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] text-sm text-zinc-300 hover:text-white transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-background rounded-lg"
             aria-label={t('leads.clearSelection')}
             title={t('leads.clearSelection')}
           >

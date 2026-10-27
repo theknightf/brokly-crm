@@ -116,7 +116,7 @@ export default function LeadsToolbar({
 
   return (
     <div
-      className="sticky top-0 z-20 -mx-3 sm:-mx-5 px-3 sm:px-5 py-2 bg-background backdrop-blur-md border-b border-border shadow-sm animate-rise-in"
+      className="animate-rise-in"
       style={{ animationDelay: '140ms' }}
     >
       <div className="flex flex-wrap items-center gap-2">

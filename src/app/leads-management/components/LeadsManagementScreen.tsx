@@ -1623,7 +1623,7 @@ export default function LeadsManagementScreen({
   };
 
   return (
-    <div className="page-aurora min-h-[calc(100dvh-8rem)] sm:min-h-[34rem] sm:flex-1 space-y-5 sm:space-y-3 rounded-[2rem] p-3 sm:p-4 pb-24 sm:pb-4 flex flex-col">
+    <div className="page-aurora min-h-[calc(100dvh-8rem)] space-y-5 sm:space-y-3 rounded-[2rem] p-3 sm:p-4 pb-24 sm:pb-4 flex flex-col">
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 sm:px-4 sm:py-2.5 shadow-sm backdrop-blur-xl">
         <div className="animate-rise-in min-w-0 sm:flex sm:items-baseline sm:gap-3">
@@ -1741,7 +1741,7 @@ export default function LeadsManagementScreen({
           </button>
         </div>
       )}
-      <div className="card-base !p-0 overflow-hidden animate-in fade-in sm:flex-1 sm:min-h-0 sm:flex sm:flex-col">
+      <div className="card-base !p-0 overflow-clip animate-in fade-in hover:!transform-none hover:!shadow-none">
         {viewMode === 'board' && loading && leads.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3" aria-hidden>
             {Array.from({ length: 8 }).map((_, i) => (
@@ -1749,7 +1749,7 @@ export default function LeadsManagementScreen({
             ))}
           </div>
         ) : viewMode === 'board' ? (
-          <div className="sm:flex-1 sm:min-h-0 sm:overflow-auto">
+          <div>
           <LeadBoard
             leads={leads}
             statusCounts={statusCounts}

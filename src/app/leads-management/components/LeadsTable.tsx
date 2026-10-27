@@ -16,6 +16,7 @@ import {
   Copy,
   MessageCircle,
   MoreHorizontal,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -80,6 +81,55 @@ function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   );
 }
 
+/** Status pill colours that read on both the obsidian and the light theme. Order matters. */
+const STATUS_TONES: { match: RegExp; cls: string }[] = [
+  { match: /not interested|low budget/i, cls: 'bg-rose-500/15 text-rose-700 border-rose-500/30 dark:text-rose-300' },
+  { match: /cancel/i, cls: 'bg-red-500/15 text-red-700 border-red-500/30 dark:text-red-300' },
+  { match: /duplicate/i, cls: 'bg-fuchsia-500/15 text-fuchsia-700 border-fuchsia-500/30 dark:text-fuchsia-300' },
+  { match: /wrong|closed number/i, cls: 'bg-orange-500/15 text-orange-700 border-orange-500/30 dark:text-orange-300' },
+  { match: /rotation/i, cls: 'bg-teal-500/15 text-teal-700 border-teal-500/30 dark:text-teal-300' },
+  { match: /no answer/i, cls: 'bg-zinc-500/15 text-zinc-700 border-zinc-500/30 dark:text-zinc-300' },
+  { match: /reschedule/i, cls: 'bg-blue-500/15 text-blue-700 border-blue-500/30 dark:text-blue-300' },
+  { match: /meeting/i, cls: 'bg-indigo-500/15 text-indigo-700 border-indigo-500/30 dark:text-indigo-300' },
+  { match: /follow/i, cls: 'bg-violet-500/15 text-violet-700 border-violet-500/30 dark:text-violet-300' },
+  { match: /pending/i, cls: 'bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-300' },
+  { match: /cold/i, cls: 'bg-cyan-500/15 text-cyan-700 border-cyan-500/30 dark:text-cyan-300' },
+  { match: /fresh|new/i, cls: 'bg-sky-500/15 text-sky-700 border-sky-500/30 dark:text-sky-300' },
+  { match: /reservation/i, cls: 'bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-300' },
+  { match: /done deal|won/i, cls: 'bg-lime-500/15 text-lime-700 border-lime-500/30 dark:text-lime-300' },
+  { match: /interested/i, cls: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-300' },
+];
+
+function StatusPill({ status }: { status: string }) {
+  const tone =
+    STATUS_TONES.find((x) => x.match.test(status))?.cls ||
+    'bg-zinc-500/15 text-zinc-700 border-zinc-500/30 dark:text-zinc-300';
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 max-w-full rounded-full border px-2.5 py-0.5 text-[12px] font-semibold leading-5 ${tone}`}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden />
+      <span className="truncate">{status}</span>
+    </span>
+  );
+}
+
+/** Up to two initials from the first letter/digit of each word ("Lead (6881)" → "L", not "L("). */
+function initialsOf(text: string, max = 2): string {
+  const out: string[] = [];
+  for (const word of String(text || '').split(/\s+/)) {
+    for (let i = 0; i < word.length; i++) {
+      const c = word[i];
+      if (/[A-Za-z0-9\u00C0-\u024F\u0600-\u06FF]/.test(c)) {
+        out.push(c);
+        break;
+      }
+    }
+    if (out.length >= max) break;
+  }
+  return out.join('').toUpperCase();
+}
+
 function StageSelector({
   leadId,
   currentStatus,
@@ -112,9 +162,13 @@ function StageSelector({
         aria-expanded={open}
         aria-haspopup="listbox"
       >
-        <span className="min-w-0">
-          <StatusBadge status={currentStatus} />
-        </span>
+        {compact ? (
+          <StatusPill status={currentStatus} />
+        ) : (
+          <span className="min-w-0">
+            <StatusBadge status={currentStatus} />
+          </span>
+        )}
         <ChevronDown size={12} className="text-muted-foreground flex-shrink-0" />
       </button>
       {open && (
@@ -264,12 +318,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
   const name = (lead.name || '').trim();
   const hasName = !!name;
   const title = hasName ? name : lead.phone || t('leads.noName');
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2);
+  const initials = initialsOf(name);
 
   const agentNames: string[] =
     lead.assignedToNames && lead.assignedToNames.length > 0
@@ -280,13 +329,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
           ? [lead.agent]
           : [];
   const agentFirst = agentNames[0] || '';
-  const agentInitials =
-    agentFirst
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((n) => n[0])
-      .join('')
-      .slice(0, 2) || '';
+  const agentInitials = initialsOf(agentFirst);
 
   const overdue = isOverdue(lead.followUpDue);
   const called = !!lead.hasBeenCalled;
@@ -376,7 +419,11 @@ const LeadTableRow = React.memo(function LeadTableRow({
                 </button>
               )}
               {hot && <Zap size={11} className="text-amber-500 fill-amber-500 flex-shrink-0" aria-label={String(lead.priority)} />}
-              {overdue && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title={t('leads.overdue')} />}
+              {overdue && (
+                <span className="inline-flex flex-shrink-0 text-red-500" title={t('leads.overdue')}>
+                  <Clock size={12} aria-label={t('leads.overdue')} />
+                </span>
+              )}
               {canDelete && lead.isDuplicate && (
                 <span className="flex-shrink-0 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-semibold px-1.5">
                   {t('leads.duplicate')}
@@ -713,42 +760,43 @@ export default function LeadsTable({
     setTableW(el.clientWidth);
     return () => ro.disconnect();
   }, []);
-  const showProject = tableW === 0 || tableW >= 960;
-  const showLast = tableW === 0 || tableW >= 1070;
-  const colWidths = [36, 220, 150, 150, ...(showProject ? [150] : []), 110, ...(showLast ? [100] : []), 140];
+  const showProject = tableW === 0 || tableW >= 980;
+  const showLast = tableW === 0 || tableW >= 1080;
+  const colWidths = [36, 220, 150, 150, ...(showProject ? [150] : []), 130, ...(showLast ? [100] : []), 140];
   const colCount = colWidths.length;
   const tableMinWidth = colWidths.reduce((a, b) => a + b, 0);
+  // Only fall back to a horizontal scroller when the table truly cannot fit; otherwise the
+  // wrapper just clips, so there is no inner scrollbar and the header can stick to the page.
+  const needsScroll = tableW > 0 && tableW < tableMinWidth;
 
   // Reset render window whenever page or dataset changes
   useEffect(() => {
     setRenderLimit(50);
   }, [leads, currentPage]);
 
-  // Progressive expansion: the table body scrolls inside its own container (sticky
-  // header) AND the page may scroll, so listen to both.
+  // Progressive expansion: the page (<main>) is the scroller, so load the next rows as it
+  // nears the bottom (the "+50" button stays as a fallback).
   useEffect(() => {
     if (renderLimit >= leads.length) return;
+    const host = scrollerRef.current?.closest('main') as HTMLElement | null;
     let ticking = false;
     const check = () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
-        const el = scrollerRef.current;
-        const nearInner = el ? el.scrollHeight - (el.scrollTop + el.clientHeight) < 500 : false;
-        const nearPage =
-          document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) < 700;
-        if (nearInner || nearPage) {
+        const nearHost = host ? host.scrollHeight - (host.scrollTop + host.clientHeight) < 700 : false;
+        const nearPage = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) < 700;
+        if (nearHost || nearPage) {
           setRenderLimit((prev) => Math.min(prev + 50, leads.length));
         }
       });
     };
-    const el = scrollerRef.current;
     window.addEventListener('scroll', check, { passive: true });
-    el?.addEventListener('scroll', check, { passive: true });
+    host?.addEventListener('scroll', check, { passive: true });
     return () => {
       window.removeEventListener('scroll', check);
-      el?.removeEventListener('scroll', check);
+      host?.removeEventListener('scroll', check);
     };
   }, [renderLimit, leads.length]);
 
@@ -853,7 +901,7 @@ export default function LeadsTable({
       </div>
 
       {/* Desktop dense table — obsidian surface, hairline borders, neon-lime accents */}
-      <div className="hidden sm:flex sm:flex-col sm:flex-1 sm:min-h-0 bg-white dark:bg-[#0a0a0f]">
+      <div className="hidden sm:block bg-white dark:bg-[#0a0a0f]">
         <div className="flex items-center justify-between gap-3 px-4 py-1.5 shrink-0 border-b border-black/5 dark:border-white/10 bg-white dark:bg-[#12121a]">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{t('leads.title')}</h2>
@@ -892,7 +940,7 @@ export default function LeadsTable({
 
         <div
           ref={scrollerRef}
-          className="overflow-auto flex-1 min-h-[240px]"
+          className={needsScroll ? 'overflow-x-auto' : 'overflow-x-clip'}
           tabIndex={0}
           aria-label={t('leads.title')}
         >
@@ -977,7 +1025,7 @@ export default function LeadsTable({
       </div>
 
       {totalCount > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2 sm:pe-20 rtl:sm:pe-4 rtl:sm:ps-20 border-t border-border shrink-0 bg-white dark:bg-[#0a0a0f]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2 border-t border-border shrink-0 bg-white dark:bg-[#0a0a0f]">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span aria-live="polite">
               {t('leads.showing', {

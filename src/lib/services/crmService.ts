@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 import { isAdminRole } from '@/lib/roles';
 
@@ -1152,7 +1153,10 @@ export const leadsService = {
         return {};
       }
 
-      const { data, error } = await filteredQuery;
+      // A single select is capped at 1000 rows by PostgREST; page through everything so the
+      // per-status counts add up to the real total.
+      const pagedQuery: any = (filteredQuery as any).order('id', { ascending: true });
+      const { data, error } = await fetchAllRows<any>((from, to) => pagedQuery.range(from, to));
       if (error || !Array.isArray(data)) {
         // Fallback to rpc if available and no extra filters
         const hasExtraFilters = Boolean(
