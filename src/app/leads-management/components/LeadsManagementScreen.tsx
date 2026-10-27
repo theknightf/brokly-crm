@@ -521,6 +521,19 @@ export default function LeadsManagementScreen({
           : prev
       );
       await leadsService.updateStatus(id, newStatus);
+      // An active status filter (e.g. Cold Calls) must stop showing the lead the
+      // moment it no longer matches, without waiting for a refetch.
+      if (filters.status && filters.status !== newStatus) {
+        setLeads((prev) => prev.filter((l) => l.id !== id));
+        setTotal((t) => Math.max(0, t - 1));
+        setSelectedIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const n = new Set(prev);
+          n.delete(id);
+          return n;
+        });
+        setViewLead((prev) => (prev?.id === id ? null : prev));
+      }
       // Unified fix: status "Following Up" must also guarantee a follow_ups row.
       // If the lead has no due date, default to tomorrow (08/09/26 example) so the
       // Follow-ups screen (which reads from follow_ups, not leads) is not empty.
@@ -578,7 +591,7 @@ export default function LeadsManagementScreen({
     } finally {
       statusPendingRef.current.delete(id);
     }
-  }, [user?.id]);
+  }, [user?.id, filters.status]);
 
   const handleScheduleFollowUp = async () => {
     if (!viewLead) return;
@@ -911,30 +924,10 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
-    setDupChecking(true);
-    let existing = null;
-    try {
-      existing = await duplicateLeadsService.findByPhone(lead.phone || '');
-    } catch {
-      existing = null;
-    }
-    setDupChecking(false);
-
-    // Strong duplicate detection: alert owner/admin and warn user before creating
-    if (existing) {
-      if (existing.id) {
-        // Automatically log attempt so owner and admin get notified who added it and who first owned it
-        duplicateLeadsService.logAttempt({
-          matchedLeadId: existing.id,
-          attemptedPhone: lead.phone || '',
-        }).catch(() => {});
-      }
-      setDupWarning({ existing, pendingLead: lead });
-      return false;
-    }
-    return createLead(lead, options);
-  };
+  // Duplicates are never blocked or warned about: the DB marks them and only the
+  // original owner is notified (server-side).
+  const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> =>
+    createLead(lead, options);
 
   const createLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     try {
@@ -945,11 +938,7 @@ export default function LeadsManagementScreen({
       setLeads((prev) => [created as Lead, ...prev]);
       setTotal((t) => t + 1);
       void fetchLeads();
-      if ((created as any)?.isDuplicate || (created as any)?.routedToDuplicateCenter) {
-        toast.success(`Lead "${lead.name}" accepted and routed to Duplicate Center for review`);
-      } else {
-        toast.success(`Lead "${lead.name}" added successfully`);
-      }
+      toast.success(`Lead "${lead.name}" added successfully`);
       return true;
     } catch (err: any) {
       toast.error(err?.message || 'Failed to add lead');

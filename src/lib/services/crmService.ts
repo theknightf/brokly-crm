@@ -303,6 +303,24 @@ async function pushAssignmentNotifications(
   }
 }
 
+/**
+ * Asks the server to notify the OWNER of each original lead that someone
+ * re-added their number (one grouped notification per owner). Silent and
+ * best-effort: the user who added the lead never sees anything about it.
+ */
+async function notifyDuplicateOwners(leadIds: string[]) {
+  if (!leadIds.length) return;
+  try {
+    await fetch('/api/leads/duplicate-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leadIds }),
+    });
+  } catch {
+    // ignore — notifications are best-effort
+  }
+}
+
 export const leadsService = {
   async getAll() {
     const supabase = createClient();
@@ -411,27 +429,7 @@ export const leadsService = {
 
   async create(lead: any, userId: string) {
     const supabase = createClient();
-    // Global dedup pre-check (phone/email) — spec 2.C: provide clickable redirect link to existing lead
-    try {
-      const phoneNorm = String(lead.phone || '').replace(/\D/g, '');
-      if (phoneNorm && phoneNorm.length >= 8) {
-        const { data: dup } = await supabase.from('leads').select('id, name, phone').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
-        if (dup && String(dup.phone||'').replace(/\D/g,'').slice(-10) === phoneNorm.slice(-10)) {
-          const err: any = new Error(`Duplicate phone — existing lead: ${dup.name} (${dup.id}). Open /leads/${dup.id}`);
-          err.code = '23505'; err.existingLeadId = dup.id; err.redirectLink = `/leads/${dup.id}`; err.apiLink = `/api/leads/${dup.id}/profile`;
-          throw err;
-        }
-      }
-      const emailNorm = String(lead.email||'').toLowerCase().trim();
-      if (emailNorm) {
-        const { data: dup } = await supabase.from('leads').select('id, name, email').ilike('email', emailNorm).limit(1).maybeSingle();
-        if (dup && String(dup.email||'').toLowerCase().trim()===emailNorm) {
-          const err: any = new Error(`Duplicate email — existing lead: ${dup.name} (${dup.id}). Open /leads/${dup.id}`);
-          err.code = '23505'; err.existingLeadId = dup.id; err.redirectLink = `/leads/${dup.id}`;
-          throw err;
-        }
-      }
-    } catch (e:any) { if (e?.code==='23505') throw e; }
+    // Duplicates are never blocked: the DB trigger marks is_duplicate / duplicate_of_lead_id.
     // Auto-assignment when the admin rotation toggle is on.
     const rotation = await computeRotationAssignments([lead]);
     const rot = rotation.get(0);
@@ -447,27 +445,10 @@ export const leadsService = {
       .select(LEADS_LIST_SELECT)
       .single();
     if (error) {
-      // Handle race-condition unique violation with redirect link
-      if ((error as any).code === '23505') {
-        const phoneNorm = String(lead.phone||'').replace(/\D/g,'');
-        let dupId: string | null = null;
-        try {
-          if (phoneNorm) {
-            const { data: dup } = await supabase.from('leads').select('id').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
-            if (dup) dupId = dup.id;
-          }
-          if (!dupId && lead.email) {
-            const { data: dup } = await supabase.from('leads').select('id').ilike('email', String(lead.email).toLowerCase().trim()).limit(1).maybeSingle();
-            if (dup) dupId = dup.id;
-          }
-        } catch {}
-        (error as any).existingLeadId = dupId;
-        (error as any).redirectLink = dupId ? `/leads/${dupId}` : null;
-        (error as any).message = dupId ? `${error.message} — existing: /leads/${dupId}` : error.message;
-      }
       throw error;
     }
     invalidateCache();
+    if (data?.is_duplicate) void notifyDuplicateOwners([data.id]);
     // Run side-effects in the background so UI responds immediately.
     const assigneeIds = Array.isArray(lead.assignedToIds) && lead.assignedToIds.length > 0
       ? lead.assignedToIds
@@ -544,23 +525,13 @@ export const leadsService = {
       .insert(finalRows.map((r) => leadToRow(r, userId)))
       .select(LEADS_LIST_SELECT);
     if (error) {
-      if ((error as any).code === '23505') {
-        // Global dedup uniqueness violated — fetch one existing duplicate for redirect link
-        const phone = String(finalRows[0]?.phone || '').replace(/\D/g,'');
-        let dupId: string | null = null;
-        try {
-          if (phone) {
-            const { data: dup } = await supabase.from('leads').select('id').ilike('phone', `%${phone.slice(-10)}%`).limit(1).maybeSingle();
-            if (dup) dupId = (dup as any).id;
-          }
-        } catch {}
-        (error as any).existingLeadId = dupId;
-        (error as any).redirectLink = dupId ? `/leads/${dupId}` : null;
-        (error as any).message = dupId ? `${error.message} — existing lead: /leads/${dupId} (click to view)` : error.message;
-      }
       throw error;
     }
     invalidateCache();
+    {
+      const dupIds = (data || []).filter((l: any) => l.is_duplicate).map((l: any) => l.id);
+      if (dupIds.length) void notifyDuplicateOwners(dupIds);
+    }
     // Notify assignees when imported leads were assigned to them (best-effort).
     const assignees = new Map<string, string[]>();
     (data || []).forEach((l: any) => {
@@ -3511,10 +3482,7 @@ export const leadCommentsService = {
         )
         .eq('lead_id', leadId)
         .order('created_at', { ascending: true });
-      if (error) {
-        if (isSchemaError(error)) throw error;
-        return [];
-      }
+      if (error) throw error;
       return (data || []).map((row: any) => ({
         id: row.id,
         body: row.body,
@@ -3523,8 +3491,7 @@ export const leadCommentsService = {
         createdAt: row.created_at,
       }));
     } catch (err: any) {
-      if (isSchemaError(err)) throw err;
-      return [];
+      throw err;
     }
   },
 

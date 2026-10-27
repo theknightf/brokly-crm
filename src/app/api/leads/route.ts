@@ -3,13 +3,13 @@ import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
 import { LEADS_LIST_SELECT } from '@/lib/supabase/leadsSelect';
 import { describePostgrestError, logPostgrestError } from '@/lib/supabase/postgrestError';
+import { notifyDuplicateOwnersServer } from '@/lib/duplicateNotify';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/leads — create lead with global deduplication (phone & email)
- * Spec 2.C: Automatic validation on phone/email before insertion,
- * prevent duplicates globally and provide clickable redirect link to existing lead.
+ * POST /api/leads — create a lead. Duplicates are NEVER blocked: the DB trigger
+ * marks is_duplicate / duplicate_of_lead_id and only the original owner is notified.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -27,40 +27,7 @@ export async function POST(request: Request) {
 
   const db: any = supabase as any;
 
-  // --- Pre-check dedup via normalized lookup (best-effort fast path) ---
-  try {
-    const phoneNorm = phone.replace(/\D/g, '');
-    if (phoneNorm && phoneNorm.length >= 8) {
-      const { data: existing } = await db.from('leads').select('id, name, phone, email, crm_status').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
-      // Verify exact normalized match
-      if (existing && String(existing.phone || '').replace(/\D/g, '').slice(-10) === phoneNorm.slice(-10)) {
-        return NextResponse.json({
-          error: 'Duplicate lead: phone already exists',
-          duplicate: true,
-          existingLeadId: existing.id,
-          existingLeadName: existing.name,
-          redirectLink: `/api/leads/${existing.id}/profile`,
-          profileLink: `/leads-management?leadId=${existing.id}`,
-        }, { status: 409 });
-      }
-    }
-    if (email) {
-      const emailNorm = email.toLowerCase().trim();
-      const { data: existing } = await db.from('leads').select('id, name, phone, email').ilike('email', emailNorm).limit(1).maybeSingle();
-      if (existing && String(existing.email || '').toLowerCase().trim() === emailNorm) {
-        return NextResponse.json({
-          error: 'Duplicate lead: email already exists',
-          duplicate: true,
-          existingLeadId: existing.id,
-          existingLeadName: existing.name,
-          redirectLink: `/api/leads/${existing.id}/profile`,
-          profileLink: `/leads-management?leadId=${existing.id}`,
-        }, { status: 409 });
-      }
-    }
-  } catch {}
-
-  // --- Insert with DB uniqueness fallback (handles race) ---
+  // --- Insert ---
   const row: any = {
     name,
     phone,
@@ -83,33 +50,10 @@ export async function POST(request: Request) {
 
   const { data, error } = await db.from('leads').insert(row).select().single();
   if (error) {
-    const msg = String(error.message || '').toLowerCase();
-    const isDup = error.code === '23505' || msg.includes('duplicate') || msg.includes('unique') || msg.includes('idx_leads_phone') || msg.includes('idx_leads_email');
-    if (isDup) {
-      // Fetch existing for redirect link
-      let existing: any = null;
-      try {
-        const phoneNorm = phone.replace(/\D/g, '');
-        if (phoneNorm) {
-          const { data: byPhone } = await db.from('leads').select('id, name').ilike('phone', `%${phoneNorm.slice(-10)}%`).limit(1).maybeSingle();
-          if (byPhone) existing = byPhone;
-        }
-        if (!existing && email) {
-          const { data: byEmail } = await db.from('leads').select('id, name').ilike('email', email.toLowerCase().trim()).limit(1).maybeSingle();
-          if (byEmail) existing = byEmail;
-        }
-      } catch {}
-      return NextResponse.json({
-        error: 'Duplicate lead detected (global uniqueness)',
-        duplicate: true,
-        existingLeadId: existing?.id || null,
-        redirectLink: existing ? `/api/leads/${existing.id}/profile` : null,
-        profileLink: existing ? `/leads-management?leadId=${existing.id}` : null,
-        detail: error.message,
-      }, { status: 409 });
-    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  if (data?.is_duplicate) await notifyDuplicateOwnersServer(supabase as any, [data.id]);
 
   return NextResponse.json({ lead: data, message: 'Lead created' }, { status: 201 });
 }

@@ -330,27 +330,9 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     setValue('project', '');
   };
 
-  /** Inline duplicate check — never blocks saving, warns agent */
-  const checkDuplicate = async (value: string) => {
-    const digits = phoneDigits(value);
-    if (digits.length < 8) {
-      setDupState({ checking: false, existing: null });
-      return;
-    }
-    const key = phoneCanonicalKey(value);
-    const seq = ++dupSeqRef.current;
-    setDupState({ checking: true, existing: null });
-    try {
-      const found = await duplicateLeadsService.findByPhone(key);
-      if (seq !== dupSeqRef.current) return;
-      if (!found || phoneCanonicalKey(found.phone || '') !== key) {
-        setDupState({ checking: false, existing: null });
-        return;
-      }
-      setDupState({ checking: false, existing: found as DuplicateMatch });
-    } catch {
-      if (seq === dupSeqRef.current) setDupState({ checking: false, existing: null });
-    }
+  /** Duplicates are never surfaced to the person adding the lead. */
+  const checkDuplicate = async (_value: string) => {
+    setDupState({ checking: false, existing: null });
   };
 
   const handlePhoneChange = (raw: string, caret: number) => {

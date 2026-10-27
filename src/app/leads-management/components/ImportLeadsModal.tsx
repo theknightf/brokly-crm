@@ -363,7 +363,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           globalStage: stage.trim(),
           // 'unassigned' = Pool, 'round-robin' = even split, else the user's unique id
           globalAssignedTo: assignee,
-          duplicateAction: 'skip',
+
         }),
       });
       const j = await res.json().catch(() => ({}));
@@ -372,7 +372,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       const skipped = Number(j.skipped || 0);
       toast.success(
         skipped > 0
-          ? `Successfully imported ${imported} leads, ${skipped} duplicates skipped.`
+          ? `Successfully imported ${imported} leads, ${skipped} failed.`
           : `Successfully imported ${imported} leads.`,
         { duration: 5000 }
       );

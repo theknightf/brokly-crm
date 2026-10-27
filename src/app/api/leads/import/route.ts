@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { normalizePhone } from '@/lib/phone';
+import { notifyDuplicateOwnersServer } from '@/lib/duplicateNotify';
 
 export const dynamic = 'force-dynamic';
 
-function normalizePhone(phone: string): string {
+function digitsOnly(phone: string): string {
   return String(phone || '').replace(/\D/g, '');
 }
 
 // Egyptian phone validation consistent with leadsImport
 function isValidEgyptian(phone: string): boolean {
-  let digits = normalizePhone(phone);
+  let digits = digitsOnly(phone);
   if (!digits) return false;
   if (digits.startsWith('0020')) digits = digits.slice(4);
   else if (digits.startsWith('20')) digits = digits.slice(2);
@@ -34,7 +36,6 @@ export async function POST(request: Request) {
   // (legacy '__ROUND_ROBIN__' / 'round_robin' / '__UNASSIGNED__' still accepted)
   const rawAssignedTo: string = body.globalAssignedTo !== undefined ? String(body.globalAssignedTo) : '';
   const globalAssignedTo: string = rawAssignedTo === 'unassigned' ? '' : rawAssignedTo;
-  const duplicateAction: 'skip' | 'update' = body.duplicateAction === 'update' ? 'update' : 'skip';
   const sourceId: string | null = body.sourceId || null;
 
   // Validate global settings are provided (mandatory per spec Step 2)
@@ -83,37 +84,9 @@ export async function POST(request: Request) {
     }
   } catch {}
 
-  // Pre-fetch existing phones for duplicate check (batch)
-  const phonesToCheck = rows.map(r => normalizePhone(r.phone || '')).filter(Boolean);
-  const existingPhoneMap = new Map<string, { id: string; phone: string }>();
-  const existingIdByPhone = new Map<string, string>();
-  if (phonesToCheck.length) {
-    // chunk to avoid URL length limits
-    for (let i = 0; i < phonesToCheck.length; i += 50) {
-      const chunk = phonesToCheck.slice(i, i + 50);
-      try {
-        const { data, error } = await supabase.from('leads').select('id, phone').or(chunk.map(p => `phone.ilike.%${p.slice(-10)}%`).join(','));
-        if (!error && data) {
-          for (const lead of data as any[]) {
-            const norm = normalizePhone(lead.phone || '').slice(-10);
-            if (norm) {
-              // find matching chunk phone that equals this
-              for (const cp of chunk) {
-                if (cp.slice(-10) === norm) {
-                  existingPhoneMap.set(cp, { id: lead.id, phone: lead.phone });
-                  existingIdByPhone.set(cp, lead.id);
-                }
-              }
-            }
-          }
-        }
-      } catch {}
-    }
-  }
-
   let imported = 0;
+  const duplicateIds: string[] = [];
   let skipped = 0;
-  let updated = 0;
   let invalid = 0;
   const errors: string[] = [];
   const skippedDetails: string[] = [];
@@ -121,7 +94,6 @@ export async function POST(request: Request) {
   // Process rows sequentially to handle per-row logic and round-robin index
   let rrIndex = 0;
   const toInsert: any[] = [];
-  const toUpdate: { id: string; payload: any; originalPhone: string }[] = [];
 
   for (let idx = 0; idx < rows.length; idx++) {
     const row = rows[idx];
@@ -147,72 +119,8 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const isDuplicate = phoneNorm ? existingPhoneMap.has(phoneNorm) || existingIdByPhone.has(phoneNorm) : false;
-
-    if (isDuplicate) {
-      if (duplicateAction === 'skip') {
-        skipped += 1;
-        skippedDetails.push(`Row ${rowNum}: duplicate phone ${phoneRaw} — skipped`);
-        continue;
-      } else {
-        // Update existing
-        const existingId = existingIdByPhone.get(phoneNorm) || existingPhoneMap.get(phoneNorm)?.id;
-        if (!existingId) {
-          skipped += 1;
-          skippedDetails.push(`Row ${rowNum}: duplicate phone ${phoneRaw} but no ID found — skipped`);
-          continue;
-        }
-        // Determine assignee for update: respect globalAssignedTo if set, otherwise keep existing
-        let assignedTo: string | null = null;
-        let agentName = '';
-        if (isRoundRobin) {
-          const rr = roundRobinUsers[rrIndex % roundRobinUsers.length];
-          rrIndex++;
-          assignedTo = rr.id;
-          agentName = rr.name;
-        } else if (globalAssignedTo && globalAssignedTo !== '' && globalAssignedTo !== '__UNASSIGNED__') {
-          assignedTo = globalAssignedTo;
-          // fetch name for agent
-          try {
-            const { data: prof } = await supabase.from('user_profiles').select('full_name').eq('id', assignedTo).maybeSingle();
-            agentName = prof?.full_name || '';
-          } catch {}
-        } else if (row.assignedTo) {
-          assignedTo = row.assignedTo;
-          agentName = row.assignedName || '';
-        }
-
-        const payload: any = {
-          name,
-          phone: phoneRaw,
-          email: row.email || null,
-          source: resolvedSource,
-          lead_source_id: resolvedSourceId,
-          crm_status: globalStage,
-          lead_status: globalStage, // will be mapped on update handler as needed; keep simple
-          notes: row.notes || '',
-          location: row.location || '',
-          developer: row.developer || '',
-          project: row.project || '',
-          unit: row.unit || '',
-          interest_level: row.interestLevel || '',
-          budget_min: row.budgetMin ?? row.budget_min ?? 0,
-          budget_max: row.budgetMax ?? row.budget_max ?? 0,
-          updated_at: new Date().toISOString(),
-        };
-        if (assignedTo !== null) {
-          payload.assigned_to = assignedTo;
-          if (agentName) {
-            payload.agent = agentName;
-            payload.agent_initials = agentName.split(' ').map((p:string)=> p[0]).join('').slice(0,2).toUpperCase();
-          }
-        }
-        toUpdate.push({ id: existingId, payload, originalPhone: phoneRaw });
-        continue;
-      }
-    }
-
-    // Not duplicate — prepare insert
+    // Duplicates are NEVER skipped: the DB trigger flags is_duplicate / duplicate_of_lead_id.
+    // Prepare insert
     let assignedTo: string | null = null;
     let agentName = '';
     let agentInitials = '';
@@ -269,54 +177,43 @@ export async function POST(request: Request) {
     toInsert.push(insertPayload);
   }
 
-  // Perform updates for duplicateAction=update
-  for (const upd of toUpdate) {
-    try {
-      const { error } = await supabase.from('leads').update(upd.payload).eq('id', upd.id);
-      if (error) {
-        skipped += 1;
-        errors.push(`Update failed for ${upd.originalPhone}: ${error.message}`);
-      } else {
-        updated += 1;
-      }
-    } catch (e:any) {
-      skipped += 1;
-      errors.push(`Update failed for ${upd.originalPhone}: ${e?.message || 'unknown'}`);
-    }
-  }
-
   // Perform bulk insert for remaining
   if (toInsert.length > 0) {
     // Chunk inserts to avoid payload limits (50 per chunk)
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const chunk = toInsert.slice(i, i + chunkSize);
-      const { error, data } = await supabase.from('leads').insert(chunk).select('id');
+      const { error, data } = await supabase.from('leads').insert(chunk).select('id, is_duplicate');
       if (error) {
         // Fallback to row-by-row to isolate bad rows
         for (const single of chunk) {
-          const { error: singleErr } = await supabase.from('leads').insert(single).select('id').single();
+          const { data: one, error: singleErr } = await supabase.from('leads').insert(single).select('id, is_duplicate').single();
           if (singleErr) {
             skipped += 1;
             errors.push(`Insert failed for ${single.phone}: ${singleErr.message}`);
           } else {
             imported += 1;
+            if ((one as any)?.is_duplicate) duplicateIds.push((one as any).id);
           }
         }
       } else {
         imported += chunk.length;
+        for (const r of (data || []) as any[]) if (r.is_duplicate) duplicateIds.push(r.id);
       }
     }
   }
 
+  // One grouped notification per original owner (never a warning for the importer).
+  if (duplicateIds.length) await notifyDuplicateOwnersServer(supabase as any, duplicateIds);
+
   const totalProcessed = rows.length;
-  const summary = `Successfully imported ${imported} leads${updated>0 ? `, ${updated} updated` : ''}${skipped>0 ? `, ${skipped} duplicates skipped` : ''}${invalid>0 ? `, ${invalid} invalid` : ''}.`;
+  const summary = `Successfully imported ${imported} leads${skipped>0 ? `, ${skipped} failed` : ''}${invalid>0 ? `, ${invalid} invalid` : ''}.`;
 
   return NextResponse.json({
     ok: true,
     summary,
     imported,
-    updated,
+    updated: 0,
     skipped,
     invalid,
     total: totalProcessed,

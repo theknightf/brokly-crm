@@ -64,9 +64,10 @@ export async function GET(request: Request) {
     const effectiveTeamId = teamId || actor.team_id;
     if (effectiveTeamId) {
       const { data: m } = await (supabase as any).from('team_memberships').select('user_id').eq('team_id', effectiveTeamId);
-      teamMemberIds = (m||[]).map((x:any)=>x.user_id);
+      const ids: string[] = (m||[]).map((x:any)=>x.user_id);
       // include leader themselves if not in memberships (some setups store team_id directly)
-      if (actor.id && !teamMemberIds.includes(actor.id)) teamMemberIds.push(actor.id);
+      if (actor.id && !ids.includes(actor.id)) ids.push(actor.id);
+      teamMemberIds = ids;
     }
   } else if (['agent','senior_agent','telecaller','broker','sales'].includes(normalizedRole)) {
     assignedFilter = actor.id;
