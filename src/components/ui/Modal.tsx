@@ -16,6 +16,12 @@ interface ModalProps {
    * its current layout.
    */
   mobileFullScreen?: boolean;
+  /**
+   * 'drawer': from `sm` up render a full-height slide-over docked to the inline-end
+   * edge (keeps the page visible behind it); phones keep the bottom sheet.
+   * Default 'center' leaves every existing modal unchanged.
+   */
+  variant?: 'center' | 'drawer';
 }
 
 const sizeClasses = {
@@ -33,14 +39,19 @@ export default function Modal({
   children,
   size = 'md',
   mobileFullScreen = false,
+  variant = 'center',
 }: ModalProps) {
   const [mounted, setMounted] = useState(false);
+  const isDrawer = variant === 'drawer';
 
   // On small screens the panel is a bottom sheet; `mobileFullScreen` promotes it
-  // to a full-screen sheet. Both fall back to a centred dialog from `sm` up.
-  const panelClasses = mobileFullScreen
-    ? 'rounded-none h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[85vh]'
-    : 'rounded-t-3xl max-h-[85dvh] sm:max-h-[85vh]';
+  // to a full-screen sheet. Both fall back to a centred dialog from `sm` up,
+  // or to a slide-over drawer when `variant="drawer"`.
+  const panelClasses = isDrawer
+    ? 'rounded-t-3xl max-h-[92dvh] sm:rounded-none sm:h-[100dvh] sm:max-h-[100dvh]'
+    : mobileFullScreen
+      ? 'rounded-none h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[85vh]'
+      : 'rounded-t-3xl max-h-[85dvh] sm:max-h-[85vh]';
 
   useEffect(() => {
     setMounted(true);
@@ -77,7 +88,9 @@ export default function Modal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4"
+      className={`fixed inset-0 z-[100] flex items-end ${
+        isDrawer ? 'sm:items-stretch sm:justify-end' : 'sm:items-center justify-center sm:p-4'
+      } ${isDrawer ? 'justify-center' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -88,8 +101,10 @@ export default function Modal({
         aria-hidden
       />
       <div
-        className={`relative z-[101] w-full ${sizeClasses[size]} bg-card sm:rounded-2xl ${panelClasses} shadow-modal flex flex-col overflow-hidden slide-up-enter`}
-        style={mobileFullScreen ? undefined : { maxHeight: 'min(85vh, 85dvh)' }}
+        className={`relative z-[101] w-full ${sizeClasses[size]} bg-card ${
+          isDrawer ? 'sm:border-s sm:border-border drawer-enter' : 'sm:rounded-2xl slide-up-enter'
+        } ${panelClasses} shadow-modal flex flex-col overflow-hidden`}
+        style={mobileFullScreen || isDrawer ? undefined : { maxHeight: 'min(85vh, 85dvh)' }}
       >
         {/* Header — fixed, never scrolls */}
         <div className="flex items-start justify-between p-5 sm:p-6 border-b border-border flex-shrink-0 bg-card">

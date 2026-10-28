@@ -58,7 +58,7 @@ import {
 import { leadsService, followUpsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole } from '@/lib/roles';
@@ -303,6 +303,7 @@ export default function LeadsManagementScreen({
 }: LeadsManagementScreenProps = {}) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const router = useRouter();
   const filterOptions = useLeadFilterOptions();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
@@ -1269,7 +1270,14 @@ export default function LeadsManagementScreen({
       }
       void loadStatusCounts();
       void fetchLeads();
-      toast.success(`Lead "${lead.name}" added successfully`);
+      toast.success(`${t('leadForm.created')} — ${lead.name}`, {
+        action: createdLead?.id
+          ? {
+              label: t('leadForm.viewLead'),
+              onClick: () => router.push(`/leads/${createdLead.id}`),
+            }
+          : undefined,
+      });
       return true;
     } catch (err: any) {
       if (err?.code === 'DUPLICATE_LEAD') {
@@ -1817,10 +1825,10 @@ export default function LeadsManagementScreen({
       <Modal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
-        title="Add lead"
-        subtitle="Enter a phone number — everything else is optional"
+        title={t('leadForm.title')}
+        subtitle={t('leadForm.subtitle')}
         size="md"
-        mobileFullScreen={false}
+        variant="drawer"
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
       </Modal>

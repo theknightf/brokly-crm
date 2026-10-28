@@ -253,6 +253,34 @@
       opacity: 1;
     }
   }
+  /* Drawer: bottom sheet on phones, slides in from the inline-end edge from sm up. */
+  .drawer-enter {
+    --drawer-x: 40px;
+    animation: slideUp 200ms ease forwards;
+  }
+  [dir='rtl'] .drawer-enter {
+    --drawer-x: -40px;
+  }
+  @media (min-width: 640px) {
+    .drawer-enter {
+      animation: drawerIn 220ms ease forwards;
+    }
+  }
+  @keyframes drawerIn {
+    from {
+      transform: translateX(var(--drawer-x));
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .drawer-enter {
+      animation: none;
+    }
+  }
   .fade-in {
     animation: fadeIn 200ms ease forwards;
   }
