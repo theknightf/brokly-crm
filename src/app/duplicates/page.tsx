@@ -8,6 +8,7 @@ import {
   GitMerge,
   Loader2,
   RefreshCw,
+  Split,
   Repeat,
   UserCheck,
   UserPlus,
@@ -22,15 +23,17 @@ import {
   displayValue,
   fieldDiffers,
   fmtDateTime,
+  formatActionCounts,
   type DuplicateItem,
   type DuplicatePerson,
 } from './duplicateFields';
 
-type Tab = 'pending' | 'merged' | 'dismissed';
+type Tab = 'pending' | 'merged' | 'separated' | 'dismissed';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'pending', label: 'Pending' },
   { id: 'merged', label: 'Merged' },
+  { id: 'separated', label: 'Separated' },
   { id: 'dismissed', label: 'Dismissed' },
 ];
 
@@ -58,14 +61,16 @@ function DuplicateCard({
   item,
   busy,
   onMerge,
+  onSeparate,
   onDismiss,
 }: {
   item: DuplicateItem;
   busy: boolean;
   onMerge: () => void;
+  onSeparate: () => void;
   onDismiss: () => void;
 }) {
-  const [confirmDismiss, setConfirmDismiss] = useState(false);
+  const [confirm, setConfirm] = useState<null | 'dismiss' | 'separate'>(null);
   const diffs = DUPLICATE_FIELDS.filter((f) => fieldDiffers(f.key, item.existing, item.submitted));
   const rows = DUPLICATE_FIELDS.filter(
     (f) => displayValue(f.key, item.existing?.[f.key]) || displayValue(f.key, item.submitted?.[f.key])
@@ -73,6 +78,29 @@ function DuplicateCard({
   const newNotes = String(item.submitted?.notes || '').trim();
   const oldNotes = String(item.existing?.notes || '').trim();
   const pending = item.status === 'pending';
+  const dupLead = item.duplicateLead;
+  const repOriginal = item.currentOwner?.name || '—';
+  const repDuplicate = dupLead?.assignedTo?.name || item.attemptedBy?.name || '—';
+  const stageOriginal = String(item.existing?.stage || '—');
+  const stageDuplicate = String(dupLead?.stage || item.submitted?.stage || '—');
+  const metaRows = [
+    {
+      key: 'created',
+      label: 'Created',
+      existing: fmtDateTime(item.existing?.created_at),
+      incoming: fmtDateTime(dupLead?.createdAt || item.createdAt),
+      differs: false,
+    },
+    { key: 'rep', label: 'Assigned rep', existing: repOriginal, incoming: repDuplicate, differs: repOriginal !== repDuplicate },
+    { key: 'stage', label: 'Status', existing: stageOriginal, incoming: stageDuplicate, differs: stageOriginal !== stageDuplicate },
+    {
+      key: 'actions',
+      label: 'Actions',
+      existing: formatActionCounts(item.actions?.original),
+      incoming: item.source === 'existing' ? formatActionCounts(item.actions?.duplicate) : '—',
+      differs: false,
+    },
+  ];
 
   return (
     <article className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
@@ -93,12 +121,12 @@ function DuplicateCard({
             {!pending && (
               <span
                 className={`rounded-full border px-2 py-0.5 ${
-                  item.status === 'merged'
+                  item.status === 'merged' || item.status === 'separated'
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                     : 'border-border bg-muted text-muted-foreground'
                 }`}
               >
-                {item.status === 'merged' ? 'Merged' : 'Dismissed'}
+                {item.status === 'merged' ? 'Merged' : item.status === 'separated' ? 'Separated' : 'Dismissed'}
                 {item.resolvedBy ? ` by ${item.resolvedBy.name}` : ''} · {fmtDateTime(item.resolvedAt)}
               </span>
             )}
@@ -106,22 +134,24 @@ function DuplicateCard({
         </div>
         {pending && (
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-shrink-0">
-            {confirmDismiss ? (
+            {confirm ? (
               <>
                 <button
                   type="button"
                   onClick={() => {
-                    setConfirmDismiss(false);
-                    onDismiss();
+                    const which = confirm;
+                    setConfirm(null);
+                    if (which === 'dismiss') onDismiss();
+                    else onSeparate();
                   }}
                   disabled={busy}
                   className="btn-secondary min-h-[44px]"
                 >
-                  Confirm dismiss
+                  {confirm === 'dismiss' ? 'Confirm dismiss' : 'Confirm separate'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setConfirmDismiss(false)}
+                  onClick={() => setConfirm(null)}
                   className="btn-ghost min-h-[44px]"
                 >
                   Cancel
@@ -131,11 +161,20 @@ function DuplicateCard({
               <>
                 <button
                   type="button"
-                  onClick={() => setConfirmDismiss(true)}
+                  onClick={() => setConfirm('dismiss')}
                   disabled={busy}
                   className="btn-secondary inline-flex min-h-[44px] items-center justify-center gap-2"
                 >
                   <X size={16} /> Dismiss
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirm('separate')}
+                  disabled={busy}
+                  title="Keep both as independent leads"
+                  className="btn-secondary inline-flex min-h-[44px] items-center justify-center gap-2"
+                >
+                  <Split size={16} /> Separate
                 </button>
                 <button
                   type="button"
@@ -156,10 +195,14 @@ function DuplicateCard({
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Who icon={<UserPlus size={12} />} label="Original added by" person={item.originalAddedBy} />
         <Who icon={<UserCheck size={12} />} label="First owner" person={item.firstOwner} />
-        <Who icon={<UserPlus size={12} />} label="Duplicate attempted by" person={item.attemptedBy} />
+        <Who
+          icon={<UserPlus size={12} />}
+          label={item.source === 'existing' ? 'Duplicate added by' : 'Duplicate attempted by'}
+          person={item.attemptedBy}
+        />
         <div className="min-w-0 rounded-lg border border-border bg-muted/30 p-2.5">
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <Clock size={12} /> Attempted
+            <Clock size={12} /> {item.source === 'existing' ? 'Added' : 'Attempted'}
           </p>
           <p className="mt-0.5 text-sm font-medium text-foreground">{fmtDateTime(item.createdAt)}</p>
           {item.attemptCount > 1 && (
@@ -182,10 +225,32 @@ function DuplicateCard({
         <div className="mt-4">
           <div className="hidden grid-cols-[8rem_1fr_1fr] gap-2 px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
             <span />
-            <span>Existing lead</span>
-            <span>Newly submitted</span>
+            <span>Original lead</span>
+            <span>Duplicate</span>
           </div>
           <dl className="space-y-2">
+            {metaRows.map((m) => (
+              <div
+                key={m.key}
+                className={`grid grid-cols-1 gap-1.5 rounded-lg border p-2.5 sm:grid-cols-[8rem_1fr_1fr] sm:gap-2 ${
+                  m.differs ? 'border-amber-500/40 bg-amber-500/10' : 'border-border bg-card'
+                }`}
+              >
+                <dt className="text-xs font-semibold text-muted-foreground">{m.label}</dt>
+                <dd className="min-w-0 break-words text-sm text-foreground">
+                  <span className="mb-0.5 block text-[10px] font-semibold uppercase text-muted-foreground sm:hidden">
+                    Original
+                  </span>
+                  {m.existing}
+                </dd>
+                <dd className="min-w-0 break-words text-sm text-foreground">
+                  <span className="mb-0.5 block text-[10px] font-semibold uppercase text-muted-foreground sm:hidden">
+                    Duplicate
+                  </span>
+                  {m.incoming}
+                </dd>
+              </div>
+            ))}
             {rows.map((f) => {
               const differs = diffs.some((d) => d.key === f.key);
               const existing = displayValue(f.key, item.existing?.[f.key]);
@@ -381,6 +446,7 @@ export default function DuplicatesPage() {
                 item={item}
                 busy={busyId === item.id}
                 onMerge={() => setMergeItem(item)}
+                onSeparate={() => void act(item, { action: 'separate' }, 'Kept as a separate lead')}
                 onDismiss={() => void act(item, { action: 'dismiss' }, 'Duplicate dismissed')}
               />
             ))}

@@ -120,7 +120,7 @@ export async function GET(
           .limit(300),
         supabase.from('expenses').select('*').eq('created_by', employeeId).order('created_at', { ascending: false }).limit(500),
         supabase
-          .from('activity_log')
+          .from('user_actions')
           .select('user_id, action_type, created_at')
           .eq('user_id', employeeId)
           .gte('created_at', startISO)

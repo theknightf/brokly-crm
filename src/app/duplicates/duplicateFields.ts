@@ -35,7 +35,20 @@ export interface DuplicatePerson {
 
 export interface DuplicateItem {
   id: string;
-  status: 'pending' | 'merged' | 'dismissed';
+  status: 'pending' | 'merged' | 'dismissed' | 'separated';
+  source?: 'attempt' | 'existing';
+  duplicateLead?: {
+    id: string;
+    createdAt: string;
+    stage: string | null;
+    source: string | null;
+    assignedTo: DuplicatePerson | null;
+    addedBy: DuplicatePerson | null;
+  } | null;
+  actions?: {
+    original: ActionCounts;
+    duplicate: ActionCounts | null;
+  };
   createdAt: string;
   lastAttemptAt: string;
   attemptCount: number;
@@ -98,3 +111,15 @@ export function fmtDateTime(iso?: string | null): string {
 
 /** Tell the sidebar / bell badges to refetch the pending count. */
 export const DUPLICATES_CHANGED_EVENT = 'brokly:duplicates-changed';
+
+export interface ActionCounts {
+  calls: number;
+  meetings: number;
+  notes: number;
+  statusChanges: number;
+}
+
+export const formatActionCounts = (c?: ActionCounts | null): string =>
+  c
+    ? `${c.calls} calls · ${c.meetings} meetings · ${c.notes} notes · ${c.statusChanges} status changes`
+    : '—';

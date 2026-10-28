@@ -102,14 +102,14 @@ export async function GET(request: Request) {
     if (userIds.length === 0)
       return NextResponse.json({ users: [], rows: [], online: [], not_setup: false });
 
-    // ── 1. Actions (activity_log) per period ─────────────────────────────
+    // ── 1. Actions (user_actions) per period ─────────────────────────────
     const activityQueries = ['day', 'week', 'month', 'range', 'total'] as const;
     const activityByPeriod: Record<string, any[]> = {};
     await Promise.all(
       activityQueries.map(async (key) => {
         const r = ranges[key];
         const { data } = await db
-          .from('activity_log')
+          .from('user_actions')
           .select('user_id, action_type, created_at')
           .gte('created_at', `${r.start}T00:00:00`)
           .lte('created_at', `${r.end}T23:59:59.999`);

@@ -56,6 +56,34 @@ export async function GET(request: Request) {
     : { data: [] };
   const leadById = new Map<string, any>((leads || []).map((l: any) => [l.id, l]));
 
+  // Entries that point at a real duplicate lead (historical scan / mobile inserts).
+  const dupLeadIds = Array.from(new Set(list.map((r) => r.duplicate_lead_id).filter(Boolean)));
+  const { data: dupLeads } = dupLeadIds.length
+    ? await db.from('leads').select(LEAD_FIELDS).in('id', dupLeadIds)
+    : { data: [] };
+  const dupLeadById = new Map<string, any>((dupLeads || []).map((l: any) => [l.id, l]));
+
+  // Action counters per lead, from the single validated action log.
+  const countIds = Array.from(new Set([...leadIds, ...dupLeadIds]));
+  const { data: actionRows } = countIds.length
+    ? await db.from('user_actions').select('lead_id, action_type').in('lead_id', countIds).limit(50000)
+    : { data: [] };
+  const actionCounts = new Map<string, Record<string, number>>();
+  for (const a of (actionRows || []) as any[]) {
+    const c = actionCounts.get(a.lead_id) || {};
+    c[a.action_type] = (c[a.action_type] || 0) + 1;
+    actionCounts.set(a.lead_id, c);
+  }
+  const countsFor = (id?: string | null) => {
+    const c = (id && actionCounts.get(id)) || {};
+    return {
+      calls: c.CALL || 0,
+      meetings: c.MEETING || 0,
+      notes: c.NOTE || 0,
+      statusChanges: c.STATUS_CHANGE || 0,
+    };
+  };
+
   const personIds = new Set<string>();
   for (const r of list) {
     [r.attempted_by, r.original_owner_id, r.original_added_by, r.resolved_by].forEach(
@@ -63,6 +91,8 @@ export async function GET(request: Request) {
     );
     const l = leadById.get(r.original_lead_id);
     if (l) [l.created_by, l.assigned_to].forEach((x: string | null) => x && personIds.add(x));
+    const dl = dupLeadById.get(r.duplicate_lead_id);
+    if (dl) [dl.created_by, dl.assigned_to].forEach((x: string | null) => x && personIds.add(x));
   }
   const { data: profiles } = personIds.size
     ? await db.from('user_profiles').select('id, full_name, role').in('id', Array.from(personIds))
@@ -74,8 +104,24 @@ export async function GET(request: Request) {
 
   const items = list.map((r) => {
     const l = leadById.get(r.original_lead_id) || null;
+    const dl = r.duplicate_lead_id ? dupLeadById.get(r.duplicate_lead_id) || null : null;
     return {
       id: r.id,
+      source: r.source || 'attempt',
+      duplicateLead: dl
+        ? {
+            id: dl.id,
+            createdAt: dl.created_at,
+            stage: dl.crm_status,
+            source: dl.source,
+            assignedTo: person(dl.assigned_to || dl.created_by),
+            addedBy: person(dl.created_by),
+          }
+        : null,
+      actions: {
+        original: countsFor(r.original_lead_id),
+        duplicate: dl ? countsFor(dl.id) : null,
+      },
       status: r.status,
       createdAt: r.created_at,
       lastAttemptAt: r.last_attempt_at,
@@ -117,8 +163,9 @@ export async function GET(request: Request) {
 /**
  * POST /api/duplicates
  *   { action: 'merge', id, choices: { name: 'new' | 'existing', ... }, appendNotes?: boolean }
+ *   { action: 'separate', id }   keep both as independent leads
  *   { action: 'dismiss', id }
- * Both run in SECURITY DEFINER functions that re-check ownership / role.
+ * All run in resolve_duplicate_lead() (SECURITY DEFINER), which re-checks ownership / role.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -130,8 +177,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const id = String(body?.id || '');
   const action = String(body?.action || '');
-  if (!id || !['merge', 'dismiss'].includes(action)) {
-    return NextResponse.json({ error: 'action (merge|dismiss) and id required' }, { status: 400 });
+  if (!id || !['merge', 'separate', 'dismiss'].includes(action)) {
+    return NextResponse.json(
+      { error: 'action (merge|separate|dismiss) and id required' },
+      { status: 400 }
+    );
   }
 
   const choices: Record<string, string> = {};
@@ -141,14 +191,26 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data, error } =
-    action === 'merge'
-      ? await (supabase as any).rpc('merge_duplicate_lead', {
-          p_id: id,
-          p_choices: choices,
-          p_append_notes: body?.appendNotes !== false,
-        })
-      : await (supabase as any).rpc('dismiss_duplicate_lead', { p_id: id });
+  let { data, error } = await (supabase as any).rpc('resolve_duplicate_lead', {
+    p_id: id,
+    p_action: action,
+    p_choices: choices,
+    p_append_notes: body?.appendNotes !== false,
+  });
+
+  // Migration 20261028060000 not applied yet: merge / dismiss keep working through the
+  // original functions; "separate" needs the new one.
+  if (error && /resolve_duplicate_lead|PGRST202|42883/i.test(`${error.code} ${error.message}`)) {
+    if (action === 'merge') {
+      ({ data, error } = await (supabase as any).rpc('merge_duplicate_lead', {
+        p_id: id,
+        p_choices: choices,
+        p_append_notes: body?.appendNotes !== false,
+      }));
+    } else if (action === 'dismiss') {
+      ({ data, error } = await (supabase as any).rpc('dismiss_duplicate_lead', { p_id: id }));
+    }
+  }
 
   if (error) {
     const code = String(error.code || '');

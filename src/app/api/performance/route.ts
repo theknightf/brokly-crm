@@ -102,7 +102,7 @@ export async function GET(request: Request) {
       .gte('created_at', startISO)
       .lte('created_at', endISO),
     db
-      .from('activity_log')
+      .from('user_actions')
       .select('user_id, created_at')
       .gte('created_at', startISO)
       .lte('created_at', endISO),

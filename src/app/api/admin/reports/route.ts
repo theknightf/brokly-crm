@@ -79,7 +79,7 @@ export async function GET(request: Request) {
 
     // All activity for the range (needed for per-day breakdowns).
     const activityRes = await db
-      .from('activity_log')
+      .from('user_actions')
       .select('user_id, action_type, created_at')
       .gte('created_at', `${from}T00:00:00`)
       .lte('created_at', `${to}T23:59:59.999`);

@@ -75,7 +75,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       (supabase as any).from('leads').select('id, lead_status, follow_up_due, created_at').or(`created_by.eq.${employeeId},assigned_to.eq.${employeeId}`).limit(200),
       (supabase as any).from('follow_ups').select('*').eq('created_by', employeeId).limit(200),
       (supabase as any).from('user_daily_activity').select('activity_date, total_active_seconds').eq('user_id', employeeId).gte('activity_date', from).lte('activity_date', to),
-      (supabase as any).from('activity_log').select('user_id, action_type, created_at').eq('user_id', employeeId).gte('created_at', startISO).lte('created_at', endISO),
+      (supabase as any).from('user_actions').select('user_id, action_type, created_at').eq('user_id', employeeId).gte('created_at', startISO).lte('created_at', endISO),
     ]);
 
     if (!empRes.data) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
