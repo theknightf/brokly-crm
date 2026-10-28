@@ -27,6 +27,7 @@ export const dictionaries: Dict = {
   'common.callLogs': { en: 'Call Logs', ar: 'سجل المكالمات' },
   'common.duplicateLeads': { en: 'Duplicate Center', ar: 'مركز معالجة التكرار' },
   'common.duplicates': { en: 'Duplicates', ar: 'العملاء المكررين' },
+  'common.claimConflicts': { en: 'Claim conflicts', ar: 'محاولات الاستحواذ المرفوضة' },
   'common.importHistory': { en: 'Import History', ar: 'سجل ملفات الاستيراد' },
   'common.calendar': { en: 'Calendar', ar: 'التقويم' },
   'common.myLocation': { en: 'My Location', ar: 'موقعي' },

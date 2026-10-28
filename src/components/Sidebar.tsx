@@ -26,6 +26,7 @@ import {
   Phone,
   CopyCheck,
   Copy,
+  ShieldAlert,
   CalendarCheck2,
   FileSpreadsheet,
 } from 'lucide-react';
@@ -184,6 +185,12 @@ const navGroups: NavGroup[] = [
         labelKey: 'common.duplicateLeads',
         icon: <CopyCheck size={18} />,
         href: '/duplicate-leads',
+      },
+      {
+        id: 'nav-claim-conflicts',
+        labelKey: 'common.claimConflicts',
+        icon: <ShieldAlert size={18} />,
+        href: '/admin/claim-conflicts',
       },
       {
         id: 'nav-import-history',
@@ -411,7 +418,7 @@ function SidebarContent({
             ...group,
             items: group.items.filter(
               (item) =>
-                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses' && item.id !== 'nav-duplicate-leads')) &&
+                (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses' && item.id !== 'nav-duplicate-leads' && item.id !== 'nav-claim-conflicts')) &&
                 (isAdminOrOwner || canWatchTeams || item.id !== 'nav-import-history') &&
                 (canWatchTeams || item.id !== 'nav-teams')
             ),

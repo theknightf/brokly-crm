@@ -320,6 +320,35 @@ async function notifyDuplicateOwners(leadIds: string[]) {
   }
 }
 
+/**
+ * Thrown when a non-admin tries to take a lead another user already holds. The message is
+ * deliberately generic: it never names the holder. The attempt is logged by claim_leads().
+ */
+export class ClaimRejectedError extends Error {
+  code = 'CLAIM_REJECTED' as const;
+  constructor() {
+    super('You are not authorized to take this lead.');
+    this.name = 'ClaimRejectedError';
+  }
+}
+
+/**
+ * Runs before a non-admin assigns leads to THEMSELVES. claim_leads() (SECURITY DEFINER)
+ * rejects and audit-logs every lead held by someone else. Fails open when the DB function
+ * is not installed yet, so assignment never breaks because of a missing migration.
+ */
+async function guardClaim(supabase: any, leadIds: string[], targetUserIds: string[]) {
+  try {
+    const scope = await getCachedActorScope(supabase);
+    if (!scope.userId || isAdminRole(scope.role) || !targetUserIds.includes(scope.userId)) return;
+    const { data, error } = await supabase.rpc('claim_leads', { p_lead_ids: leadIds });
+    if (error) return;
+    if (data && data.ok === false) throw new ClaimRejectedError();
+  } catch (e) {
+    if (e instanceof ClaimRejectedError) throw e;
+  }
+}
+
 /** Thrown when the server reports that the lead already exists (see duplicate_leads). */
 export class DuplicateLeadError extends Error {
   code = 'DUPLICATE_LEAD' as const;
@@ -760,7 +789,9 @@ export const leadsService = {
       ? lead.assignedToIds
       : (data?.assigned_to ? [data.assigned_to] : []);
     if (assigneeIds.length > 0) {
-      void leadsService.setAssignees(data.id, assigneeIds, lead.agent ? [lead.agent] : undefined);
+      void leadsService
+        .setAssignees(data.id, assigneeIds, lead.agent ? [lead.agent] : undefined)
+        .catch(() => undefined);
     }
     void followUpsService.syncFromLead(data).then(() => emitFollowUpsChanged());
 
@@ -964,6 +995,7 @@ export const leadsService = {
   async setAssignees(id: string, userIds: string[], assigneeNames?: string[]) {
     const supabase = createClient();
     const cleanUserIds = Array.from(new Set(userIds.filter(Boolean))).slice(0, 2);
+    await guardClaim(supabase, [id], cleanUserIds);
     try {
       const { error } = await supabase.rpc('set_lead_assignees', {
         p_lead_id: id,
@@ -1080,6 +1112,7 @@ export const leadsService = {
   async bulkAssignUsers(ids: string[], userIds: string | string[] | null, assigneeNames?: string | string[]) {
     const supabase = createClient();
     const targetUserIds = (Array.isArray(userIds) ? userIds : (userIds ? [userIds] : [])).slice(0, 2);
+    await guardClaim(supabase, ids, targetUserIds);
     try {
       const { error } = await supabase.rpc('bulk_set_lead_assignees', {
         p_lead_ids: ids,
