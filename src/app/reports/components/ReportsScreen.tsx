@@ -34,6 +34,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { exportPDF, exportCSV } from '@/lib/exportReport';
 import CallLogsReport from './CallLogsReport';
+import EmployeeDrawer from '@/components/employee-drawer/EmployeeDrawer';
 import { ALL_REAL_STATUSES } from '../../leads-management/components/leadStages';
 import {
   BarChart,
@@ -2203,6 +2204,7 @@ function CallsTab({
   from: string;
   to: string;
 }) {
+  const [drawerEmp, setDrawerEmp] = useState<ReportData['callsByEmployee'][number] | null>(null);
   const [goalsData, setGoalsData] = useState<{agentGoals:any[];targetDeals:number}|null>(null);
   const [goalsLoading, setGoalsLoading] = useState(false);
   const refreshGoals = useCallback(() => {
@@ -2653,7 +2655,17 @@ function CallsTab({
                   .map((emp, i) => (
                     <tr
                       key={emp.userId || i}
-                      className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open details for ${emp.name}`}
+                      onClick={() => emp.userId && setDrawerEmp(emp)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && emp.userId) {
+                          e.preventDefault();
+                          setDrawerEmp(emp);
+                        }
+                      }}
+                      className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer focus:outline-none focus-visible:bg-muted/40"
                     >
                       <td className="py-2.5 px-3 font-medium text-foreground">{emp.name}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-foreground">
@@ -2678,6 +2690,19 @@ function CallsTab({
           </div>
         </div>
       )}
+
+      <EmployeeDrawer
+        open={!!drawerEmp}
+        onClose={() => setDrawerEmp(null)}
+        employee={drawerEmp ? { id: drawerEmp.userId, name: drawerEmp.name } : null}
+        from={from}
+        to={to}
+        summary={{
+          calls: drawerEmp?.calls ?? 0,
+          connected: drawerEmp?.connected ?? 0,
+          noAnswer: drawerEmp?.noAnswer ?? 0,
+        }}
+      />
 
       {/* Call logs */}
       <div className="mt-8 border-t border-border pt-8">
