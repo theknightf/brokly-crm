@@ -422,20 +422,9 @@ async function applyLeadFilters(
       if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
         query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
       } else {
-        try {
-          const { data: laRows } = await supabase
-            .from('lead_assignees')
-            .select('lead_id')
-            .eq('user_id', scope.userId);
-          const assignedLeadIds = (laRows || []).map((r: any) => r.lead_id);
-          if (assignedLeadIds.length > 0) {
-            query = query.or(`assigned_to.eq.${scope.userId},id.in.(${assignedLeadIds.join(',')})`);
-          } else {
-            query = query.eq('assigned_to', scope.userId);
-          }
-        } catch {
-          query = query.eq('assigned_to', scope.userId);
-        }
+        // is_mine = assigned to me OR one of my lead_assignees (DB computed column), so the
+        // URL stays tiny however many leads the user is assigned to.
+        query = query.or('is_mine.eq.true');
       }
     }
   } catch {
@@ -663,20 +652,7 @@ export const leadsService = {
           if (scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager') {
             query = query.or(`assigned_to.in.(${scope.memberIds.join(',')}),created_by.in.(${scope.memberIds.join(',')})`);
           } else {
-            try {
-              const { data: laRows } = await supabase
-                .from('lead_assignees')
-                .select('lead_id')
-                .eq('user_id', scope.userId);
-              const assignedLeadIds = (laRows || []).map((r: any) => r.lead_id);
-              if (assignedLeadIds.length > 0) {
-                query = query.or(`assigned_to.eq.${scope.userId},id.in.(${assignedLeadIds.join(',')})`);
-              } else {
-                query = query.eq('assigned_to', scope.userId);
-              }
-            } catch {
-              query = query.eq('assigned_to', scope.userId);
-            }
+            query = query.or('is_mine.eq.true');
           }
         }
       } catch {
