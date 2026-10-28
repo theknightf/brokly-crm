@@ -11,6 +11,11 @@ import {
   AlertTriangle,
   ExternalLink,
   SlidersHorizontal,
+  Phone,
+  User,
+  Mail,
+  MapPin,
+  CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -138,6 +143,67 @@ function SelectChevron() {
       size={14}
       className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
     />
+  );
+}
+
+/** Presentational: label row with an optional "required"/"optional" tag and trailing action. */
+function FieldLabel({
+  htmlFor,
+  children,
+  required,
+  requiredText,
+  optionalText,
+  action,
+}: {
+  htmlFor?: string;
+  children: React.ReactNode;
+  required?: boolean;
+  requiredText?: string;
+  optionalText?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 mb-2 min-h-[24px]">
+      <label htmlFor={htmlFor} className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+        <span>{children}</span>
+        {required && <span className="text-red-500" aria-hidden="true">*</span>}
+        {requiredText && (
+          <span className="text-[11px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">
+            {requiredText}
+          </span>
+        )}
+        {optionalText && (
+          <span className="text-xs font-normal text-muted-foreground">{optionalText}</span>
+        )}
+      </label>
+      {action}
+    </div>
+  );
+}
+
+/** Presentational: positions a leading icon inside an input wrapper. */
+function IconWrap({
+  icon,
+  children,
+  physicalLeft,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  /** Use for dir="ltr" inputs (e.g. phone) so the icon stays on the input's own left edge. */
+  physicalLeft?: boolean;
+}) {
+  return (
+    <div className="relative">
+      {children}
+      <span
+        className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none ${
+          physicalLeft ? 'left-3.5' : 'start-3.5'
+        }`}
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+    </div>
   );
 }
 
@@ -480,6 +546,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     return list;
   }, [sourceList]);
 
+  const inputBase = 'input-base h-12 min-h-[48px] text-base sm:text-sm border-border/80';
+
   return (
     <form
       onSubmit={handleSubmit(onFormSubmit)}
@@ -487,268 +555,264 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       noValidate
       className="w-full max-w-md mx-auto flex flex-col justify-between min-h-full"
     >
-      <div className="px-4 sm:px-6 py-4 space-y-4">
-        {/* ── 1. Phone (Required, autofocus, type="tel", inputMode="numeric") ── */}
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <label
-              htmlFor="add-phone"
-              className="text-xs font-semibold text-foreground flex items-center gap-1"
-            >
-              <span>{t('leadForm.phone')}</span>
-              <span className="text-red-500">*</span>
-            </label>
-            <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5 tracking-wide">
-              {t('leadForm.required')}
-            </span>
-          </div>
+      <div className="px-4 sm:px-6 py-5 space-y-5">
+        {/* ── Essentials: phone, name, source ── */}
+        <section className="rounded-2xl border border-border/70 bg-card p-4 space-y-5 shadow-sm">
+          {/* 1. Phone (Required, autofocus, type="tel", inputMode="numeric") */}
+          <div>
+            <FieldLabel htmlFor="add-phone" required requiredText={t('leadForm.required')}>
+              {t('leadForm.phone')}
+            </FieldLabel>
 
-          <Controller
-            name="phone"
-            control={control}
-            rules={{
-              required: t('leadForm.phoneRequired'),
-              minLength: { value: 7, message: t('leadForm.phoneInvalid') },
-            }}
-            render={({ field, fieldState }) => (
-              <>
-                <input
-                  id="add-phone"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  dir="ltr"
-                  placeholder="010 1234 5678"
-                  value={field.value || ''}
-                  onChange={(e) => {
-                    const el = e.target;
-                    const caret = el.selectionStart ?? el.value.length;
-                    const next = handlePhoneChange(el.value, caret);
-                    field.onChange(next.value);
-                    window.requestAnimationFrame(() => {
-                      const node = phoneRef.current;
-                      if (!node) return;
-                      try {
-                        node.setSelectionRange(next.caret, next.caret);
-                      } catch {
-                        /* ignore */
+            <Controller
+              name="phone"
+              control={control}
+              rules={{
+                required: t('leadForm.phoneRequired'),
+                minLength: { value: 7, message: t('leadForm.phoneInvalid') },
+              }}
+              render={({ field, fieldState }) => (
+                <>
+                  <IconWrap icon={<Phone size={18} />} physicalLeft>
+                    <input
+                      id="add-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      dir="ltr"
+                      placeholder="010 1234 5678"
+                      value={field.value || ''}
+                      onChange={(e) => {
+                        const el = e.target;
+                        const caret = el.selectionStart ?? el.value.length;
+                        const next = handlePhoneChange(el.value, caret);
+                        field.onChange(next.value);
+                        window.requestAnimationFrame(() => {
+                          const node = phoneRef.current;
+                          if (!node) return;
+                          try {
+                            node.setSelectionRange(next.caret, next.caret);
+                          } catch {
+                            /* ignore */
+                          }
+                        });
+                      }}
+                      onBlur={(e) => {
+                        field.onBlur();
+                        void checkDuplicate(e.target.value);
+                      }}
+                      ref={(el) => {
+                        field.ref(el);
+                        phoneRef.current = el;
+                      }}
+                      aria-invalid={fieldState.invalid || undefined}
+                      aria-describedby={
+                        fieldState.error
+                          ? 'add-phone-error'
+                          : dupState.existing
+                            ? 'add-phone-duplicate'
+                            : undefined
                       }
-                    });
-                  }}
-                  onBlur={(e) => {
-                    field.onBlur();
-                    void checkDuplicate(e.target.value);
-                  }}
-                  ref={(el) => {
-                    field.ref(el);
-                    phoneRef.current = el;
-                  }}
-                  aria-invalid={fieldState.invalid || undefined}
-                  aria-describedby={
-                    fieldState.error
-                      ? 'add-phone-error'
-                      : dupState.existing
-                        ? 'add-phone-duplicate'
-                        : undefined
-                  }
-                  className={`input-base text-base font-mono-data h-12 min-h-[44px] ${
-                    fieldState.error
-                      ? 'border-red-400 focus:border-red-500 ring-1 ring-red-400/20'
-                      : 'border-border/80 focus:border-primary'
-                  }`}
-                />
-                {fieldState.error && (
-                  <p id="add-phone-error" className="mt-1 text-xs text-red-500 font-medium">
-                    {fieldState.error.message}
-                  </p>
-                )}
-              </>
-            )}
-          />
-
-          {/* Inline duplicate warning */}
-          {dupState.existing ? (
-            <div
-              id="add-phone-duplicate"
-              role="status"
-              className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3"
-            >
-              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                <AlertTriangle size={13} className="flex-shrink-0" />
-                {t('leadForm.duplicateTitle')}
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                {t('leadForm.duplicateBody', {
-                  name: dupState.existing.name,
-                  status: dupState.existing.status,
-                  by: dupState.existing.createdBy,
-                })}
-              </p>
-              <a
-                href={`/leads/${dupState.existing.id}`}
-                className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-primary hover:underline"
-              >
-                {t('leadForm.openExisting')}
-                <ExternalLink size={12} />
-              </a>
-            </div>
-          ) : (
-            dupState.checking && (
-              <p className="mt-1.5 text-[11px] text-muted-foreground flex items-center gap-1.5">
-                <Loader2 size={11} className="animate-spin" />
-                {t('leadForm.phoneHint')}
-              </p>
-            )
-          )}
-        </div>
-
-        {/* ── 2. Name (Optional) ── */}
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <label htmlFor="add-name" className="text-xs font-semibold text-foreground">
-              {t('leadForm.name')}
-            </label>
-            <span className="text-[10px] font-normal text-muted-foreground">
-              {t('leadForm.optional')}
-            </span>
-          </div>
-          <input
-            id="add-name"
-            type="text"
-            autoComplete="name"
-            className="input-base text-sm h-11 min-h-[44px] border-border/80"
-            placeholder="Ahmed Hassan"
-            {...register('name')}
-          />
-        </div>
-
-        {/* ── 3. Source (Selectable chips instead of dropdown, single select) ── */}
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-              <span>{t('leadForm.source')}</span>
-              <span className="text-red-500">*</span>
-            </label>
-            {!showAddSourceInput && (
-              <button
-                type="button"
-                onClick={() => setShowAddSourceInput(true)}
-                className="text-[11px] font-semibold text-primary hover:underline inline-flex items-center gap-0.5"
-              >
-                <Plus size={11} />
-                <span>{t('leadForm.newSource')}</span>
-              </button>
-            )}
-          </div>
-
-          <Controller
-            name="source"
-            control={control}
-            rules={{ required: t('leadForm.sourceRequired') || 'Source is required' }}
-            render={({ field }) => (
-              <div
-                className="flex flex-wrap gap-1.5"
-                role="radiogroup"
-                aria-label={t('leadForm.source')}
-              >
-                {sourcesToDisplay.map((s) => {
-                  const isSelected = field.value === s.name;
-                  return (
-                    <button
-                      key={`chip-source-${s.id || s.name}`}
-                      type="button"
-                      role="radio"
-                      aria-checked={isSelected}
-                      onClick={() => field.onChange(s.name)}
-                      className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 select-none ${
-                        isSelected
-                          ? 'bg-primary text-primary-foreground font-semibold shadow-sm ring-2 ring-primary/30'
-                          : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60'
+                      className={`input-base h-14 min-h-[56px] ps-11 text-xl tracking-wide font-mono-data ${
+                        fieldState.error
+                          ? 'border-red-400 focus:border-red-500 ring-1 ring-red-400/20'
+                          : 'border-border/80 focus:border-primary'
                       }`}
-                    >
-                      {isSelected && <Check size={12} className="stroke-[2.5]" />}
-                      <span>{s.name}</span>
-                    </button>
-                  );
-                })}
+                    />
+                  </IconWrap>
+                  {fieldState.error && (
+                    <p id="add-phone-error" className="mt-1.5 text-sm text-red-500 font-medium">
+                      {fieldState.error.message}
+                    </p>
+                  )}
+                </>
+              )}
+            />
+
+            {/* Inline duplicate warning */}
+            {dupState.existing ? (
+              <div
+                id="add-phone-duplicate"
+                role="status"
+                className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3"
+              >
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <AlertTriangle size={14} className="flex-shrink-0" />
+                  {t('leadForm.duplicateTitle')}
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                  {t('leadForm.duplicateBody', {
+                    name: dupState.existing.name,
+                    status: dupState.existing.status,
+                    by: dupState.existing.createdBy,
+                  })}
+                </p>
+                <a
+                  href={`/leads/${dupState.existing.id}`}
+                  className="inline-flex items-center gap-1 mt-1.5 text-sm font-semibold text-primary hover:underline"
+                >
+                  {t('leadForm.openExisting')}
+                  <ExternalLink size={13} />
+                </a>
+              </div>
+            ) : (
+              dupState.checking && (
+                <p className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 size={12} className="animate-spin" />
+                  {t('leadForm.phoneHint')}
+                </p>
+              )
+            )}
+          </div>
+
+          {/* 2. Name (Optional) */}
+          <div>
+            <FieldLabel htmlFor="add-name" optionalText={t('leadForm.optional')}>
+              {t('leadForm.name')}
+            </FieldLabel>
+            <IconWrap icon={<User size={18} />}>
+              <input
+                id="add-name"
+                type="text"
+                autoComplete="name"
+                className={`${inputBase} ps-11`}
+                placeholder="Ahmed Hassan"
+                {...register('name')}
+              />
+            </IconWrap>
+          </div>
+
+          {/* 3. Source (Selectable chips instead of dropdown, single select) */}
+          <div>
+            <FieldLabel
+              required
+              action={
+                !showAddSourceInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSourceInput(true)}
+                    className="min-h-[36px] px-2 -me-2 text-sm font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    <span>{t('leadForm.newSource')}</span>
+                  </button>
+                ) : undefined
+              }
+            >
+              {t('leadForm.source')}
+            </FieldLabel>
+
+            <Controller
+              name="source"
+              control={control}
+              rules={{ required: t('leadForm.sourceRequired') || 'Source is required' }}
+              render={({ field }) => (
+                <div
+                  className="flex flex-wrap gap-2"
+                  role="radiogroup"
+                  aria-label={t('leadForm.source')}
+                >
+                  {sourcesToDisplay.map((s) => {
+                    const isSelected = field.value === s.name;
+                    return (
+                      <button
+                        key={`chip-source-${s.id || s.name}`}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => field.onChange(s.name)}
+                        className={`min-h-[44px] px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 select-none ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground font-semibold shadow-sm ring-2 ring-primary/30'
+                            : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60'
+                        }`}
+                      >
+                        {isSelected && <Check size={14} className="stroke-[2.5]" />}
+                        <span>{s.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            />
+
+            {/* Optional inline input for new custom source */}
+            {showAddSourceInput && (
+              <div className="flex items-center gap-2 mt-3 animate-rise-in">
+                <input
+                  value={newSourceName}
+                  onChange={(e) => setNewSourceName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    void createNewSource();
+                  }}
+                  placeholder={t('leadForm.newSource')}
+                  className="input-base h-11 min-h-[44px] text-base sm:text-sm flex-1"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  disabled={creatingSource || !newSourceName.trim()}
+                  onClick={() => void createNewSource()}
+                  className="min-h-[44px] px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {creatingSource ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  <span>{t('leadForm.addSource')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddSourceInput(false);
+                    setNewSourceName('');
+                  }}
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"
+                  aria-label={t('leadForm.cancel')}
+                >
+                  <X size={16} />
+                </button>
               </div>
             )}
-          />
 
-          {/* Optional inline input for new custom source */}
-          {showAddSourceInput && (
-            <div className="flex items-center gap-1.5 mt-2 animate-rise-in">
-              <input
-                value={newSourceName}
-                onChange={(e) => setNewSourceName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter') return;
-                  e.preventDefault();
-                  void createNewSource();
-                }}
-                placeholder={t('leadForm.newSource')}
-                className="input-base h-10 min-h-[44px] text-xs flex-1"
-                autoFocus
-              />
-              <button
-                type="button"
-                disabled={creatingSource || !newSourceName.trim()}
-                onClick={() => void createNewSource()}
-                className="min-h-[44px] px-3.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
-              >
-                {creatingSource ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                <span>{t('leadForm.addSource')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddSourceInput(false);
-                  setNewSourceName('');
-                }}
-                className="min-h-[44px] px-2.5 rounded-xl text-muted-foreground hover:bg-muted"
-                aria-label={t('leadForm.cancel')}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
-
-          {errors.source && (
-            <p className="mt-1 text-xs text-red-500 font-medium">{errors.source.message}</p>
-          )}
-        </div>
+            {errors.source && (
+              <p className="mt-1.5 text-sm text-red-500 font-medium">{errors.source.message}</p>
+            )}
+          </div>
+        </section>
 
         {/* ── 4. Assign To (Visible ONLY for admin/manager, otherwise hidden) ── */}
         {isPrivileged && (
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              <label htmlFor="add-assignee" className="text-xs font-semibold text-foreground">
-                {t('leadForm.assignTo')}
-              </label>
-              <span className="text-[10px] text-muted-foreground font-medium">
-                {t('leadForm.assignCount', { n: selectedUserIds.length })}
-              </span>
-            </div>
+          <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+            <FieldLabel
+              htmlFor="add-assignee"
+              action={
+                <span className="text-xs text-muted-foreground font-medium">
+                  {t('leadForm.assignCount', { n: selectedUserIds.length })}
+                </span>
+              }
+            >
+              {t('leadForm.assignTo')}
+            </FieldLabel>
 
             {/* Selected assignees badge list */}
             {selectedUserIds.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-2">
+              <div className="flex flex-wrap gap-2 mb-3">
                 {selectedUserIds.map((id) => {
                   const u = userList.find((user) => user.id === id);
                   return (
                     <span
                       key={id}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
+                      className="inline-flex items-center gap-1.5 ps-3 pe-1 py-1 rounded-full text-sm font-semibold bg-primary/10 text-primary border border-primary/20"
                     >
-                      <UserCheck size={12} className="text-emerald-500" />
+                      <UserCheck size={14} className="text-emerald-500" />
                       <span>{u?.name || 'Agent'}</span>
                       <button
                         type="button"
                         onClick={() => toggleUser(id)}
-                        className="hover:text-red-500 ms-0.5 text-muted-foreground p-0.5 rounded"
+                        className="hover:text-red-500 text-muted-foreground min-h-[32px] min-w-[32px] flex items-center justify-center rounded-full"
                         aria-label={t('leadForm.removeAgent', { name: u?.name || 'agent' })}
                       >
-                        <X size={12} />
+                        <X size={14} />
                       </button>
                     </span>
                   );
@@ -764,7 +828,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 onChange={(e) => {
                   if (e.target.value) toggleUser(e.target.value);
                 }}
-                className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                className={`${inputBase} appearance-none pe-9`}
               >
                 <option value="">
                   {selectedUserIds.length >= 2
@@ -782,7 +846,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
               </select>
               <SelectChevron />
             </div>
-          </div>
+          </section>
         )}
 
         {/* ── Toggle "More Details" (Collapsed by default) ── */}
@@ -791,14 +855,18 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
           onClick={() => setShowDetails((prev) => !prev)}
           aria-expanded={showDetails}
           aria-controls="add-more-details-panel"
-          className="w-full flex items-center justify-between px-3.5 py-2.5 min-h-[44px] rounded-xl border border-border/70 bg-muted/30 hover:bg-muted/60 text-xs font-semibold text-foreground transition-colors active:scale-[0.99]"
+          className={`w-full flex items-center justify-between px-4 py-3 min-h-[52px] rounded-2xl border text-sm font-semibold text-foreground transition-colors active:scale-[0.99] ${
+            showDetails
+              ? 'border-primary/40 bg-primary/5'
+              : 'border-dashed border-border bg-muted/30 hover:bg-muted/60'
+          }`}
         >
-          <span className="flex items-center gap-2">
-            <SlidersHorizontal size={14} className="text-primary" />
+          <span className="flex items-center gap-2.5">
+            <SlidersHorizontal size={16} className="text-primary" />
             <span>{showDetails ? t('leadForm.hideDetails') : `+ ${t('leadForm.moreDetails')}`}</span>
           </span>
           <ChevronDown
-            size={15}
+            size={18}
             className={`text-muted-foreground transition-transform duration-200 ${
               showDetails ? 'rotate-180' : ''
             }`}
@@ -808,91 +876,68 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
         {/* ── Collapsed Content: All other fields (budget, area, property type, notes, etc.) ── */}
         <div
           id="add-more-details-panel"
-          className={`grid transition-all duration-300 ease-out ${
-            showDetails ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'
+          aria-hidden={!showDetails}
+          {...(!showDetails ? ({ inert: '' } as Record<string, string>) : {})}
+          className={`grid transition-all duration-300 ease-out motion-reduce:transition-none ${
+            showDetails
+              ? 'grid-rows-[1fr] opacity-100'
+              : 'grid-rows-[0fr] opacity-0 pointer-events-none -mt-5'
           }`}
         >
           <div className="overflow-hidden">
-            <div className="space-y-3.5 pt-2 pb-1 border-t border-border/50">
-              {/* Status / Stage */}
-              <div>
-                <label htmlFor="add-status" className="text-xs font-semibold text-foreground block mb-1">
-                  {t('leadForm.status')}
-                </label>
-                <div className="relative">
-                  <select
-                    id="add-status"
-                    autoComplete="off"
-                    className="input-base appearance-none pe-8 min-h-[44px] text-xs"
-                    {...register('status')}
-                  >
-                    {ALL_STATUSES.map((s) => (
-                      <option key={`add-status-${s}`} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  <SelectChevron />
-                </div>
-              </div>
-
-              {/* Email & Location */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-5">
+              {/* Contact: email & location */}
+              <section className="rounded-2xl border border-border/70 bg-card p-4 space-y-4 shadow-sm">
                 <div>
-                  <label htmlFor="add-email" className="text-xs font-semibold text-foreground block mb-1">
-                    {t('leadForm.email')}{' '}
-                    <span className="text-muted-foreground font-normal text-[10px]">
-                      {t('leadForm.optional')}
-                    </span>
-                  </label>
-                  <input
-                    id="add-email"
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    className={`input-base min-h-[44px] text-xs ${errors.email ? 'border-red-400' : ''}`}
-                    placeholder="ahmed@email.com"
-                    {...register('email', {
-                      pattern: { value: /^\S+@\S+\.\S+$/, message: t('leadForm.emailInvalid') },
-                    })}
-                  />
+                  <FieldLabel htmlFor="add-email" optionalText={t('leadForm.optional')}>
+                    {t('leadForm.email')}
+                  </FieldLabel>
+                  <IconWrap icon={<Mail size={18} />}>
+                    <input
+                      id="add-email"
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      className={`${inputBase} ps-11 ${errors.email ? 'border-red-400' : ''}`}
+                      placeholder="ahmed@email.com"
+                      {...register('email', {
+                        pattern: { value: /^\S+@\S+\.\S+$/, message: t('leadForm.emailInvalid') },
+                      })}
+                    />
+                  </IconWrap>
                   {errors.email && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">{errors.email.message}</p>
+                    <p className="mt-1.5 text-sm text-red-500 font-medium">{errors.email.message}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="add-location" className="text-xs font-semibold text-foreground block mb-1">
-                    {t('leadForm.location')}{' '}
-                    <span className="text-muted-foreground font-normal text-[10px]">
-                      {t('leadForm.optional')}
-                    </span>
-                  </label>
-                  <input
-                    id="add-location"
-                    type="text"
-                    autoComplete="address-level2"
-                    className="input-base min-h-[44px] text-xs"
-                    placeholder="Cairo / New Cairo"
-                    {...register('location')}
-                  />
+                  <FieldLabel htmlFor="add-location" optionalText={t('leadForm.optional')}>
+                    {t('leadForm.location')}
+                  </FieldLabel>
+                  <IconWrap icon={<MapPin size={18} />}>
+                    <input
+                      id="add-location"
+                      type="text"
+                      autoComplete="address-level2"
+                      className={`${inputBase} ps-11`}
+                      placeholder="Cairo / New Cairo"
+                      {...register('location')}
+                    />
+                  </IconWrap>
                 </div>
-              </div>
+              </section>
 
-              {/* Developer & Project */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Property: developer & project */}
+              <section className="rounded-2xl border border-border/70 bg-card p-4 space-y-4 shadow-sm">
                 <div>
-                  <label htmlFor="add-developer" className="text-xs font-semibold text-foreground block mb-1">
-                    {t('leadForm.developer')}{' '}
-                    <span className="text-muted-foreground font-normal text-[10px]">
-                      {t('leadForm.optional')}
-                    </span>
-                  </label>
+                  <FieldLabel htmlFor="add-developer" optionalText={t('leadForm.optional')}>
+                    {t('leadForm.developer')}
+                  </FieldLabel>
                   <div className="relative">
                     <select
                       id="add-developer"
                       autoComplete="off"
-                      className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                      className={`${inputBase} appearance-none pe-9`}
                       value={selectedDeveloperId}
                       onChange={(e) => handleDeveloperChange(e.target.value)}
                     >
@@ -908,17 +953,14 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 </div>
 
                 <div>
-                  <label htmlFor="add-project" className="text-xs font-semibold text-foreground block mb-1">
-                    {t('leadForm.project')}{' '}
-                    <span className="text-muted-foreground font-normal text-[10px]">
-                      {t('leadForm.optional')}
-                    </span>
-                  </label>
+                  <FieldLabel htmlFor="add-project" optionalText={t('leadForm.optional')}>
+                    {t('leadForm.project')}
+                  </FieldLabel>
                   <div className="relative">
                     <select
                       id="add-project"
                       autoComplete="off"
-                      className={`input-base appearance-none pe-8 min-h-[44px] text-xs ${
+                      className={`${inputBase} appearance-none pe-9 ${
                         !selectedDeveloperId ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                       disabled={!selectedDeveloperId}
@@ -940,13 +982,47 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     <SelectChevron />
                   </div>
                 </div>
-              </div>
+              </section>
 
+              {/* Stage & follow-up */}
+              <section className="rounded-2xl border border-border/70 bg-card p-4 space-y-4 shadow-sm">
+                <div>
+                  <FieldLabel htmlFor="add-status">{t('leadForm.status')}</FieldLabel>
+                  <div className="relative">
+                    <select
+                      id="add-status"
+                      autoComplete="off"
+                      className={`${inputBase} appearance-none pe-9`}
+                      {...register('status')}
+                    >
+                      {ALL_STATUSES.map((s) => (
+                        <option key={`add-status-${s}`} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectChevron />
+                  </div>
+                </div>
 
+                <div>
+                  <FieldLabel htmlFor="add-followup" optionalText={t('leadForm.optional')}>
+                    {t('leadForm.followUp')}
+                  </FieldLabel>
+                  <IconWrap icon={<CalendarDays size={18} />}>
+                    <input
+                      id="add-followup"
+                      type="date"
+                      className={`${inputBase} ps-11`}
+                      {...register('followUpDue')}
+                    />
+                  </IconWrap>
+                </div>
+              </section>
 
               {/* Referral Assignment */}
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
                   <input
                     type="checkbox"
                     checked={referralEnabled}
@@ -954,20 +1030,20 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                       setReferralEnabled(e.target.checked);
                       if (!e.target.checked) setValue('referralTo', '');
                     }}
-                    className="h-4 w-4 accent-primary"
+                    className="h-5 w-5 accent-primary"
                   />
-                  <span className="text-xs font-semibold text-foreground">
+                  <span className="text-sm font-semibold text-foreground">
                     {t('leadForm.referral')}
                   </span>
                 </label>
-                <p className="mt-1 text-[11px] text-muted-foreground">{t('leadForm.referralHint')}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t('leadForm.referralHint')}</p>
                 {referralEnabled && (
-                  <div className="relative mt-2.5 animate-rise-in">
+                  <div className="relative mt-3 animate-rise-in">
                     <select
                       id="add-referral-to"
                       disabled={!referralEnabled}
                       autoComplete="off"
-                      className="input-base appearance-none pe-8 min-h-[44px] text-xs"
+                      className={`${inputBase} appearance-none pe-9`}
                       {...register('referralTo', {
                         required: referralEnabled ? t('leadForm.referralRequired') : false,
                       })}
@@ -983,41 +1059,23 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                     </select>
                     <SelectChevron />
                     {errors.referralTo && (
-                      <p className="mt-1 text-xs text-red-500 font-medium">{errors.referralTo.message}</p>
+                      <p className="mt-1.5 text-sm text-red-500 font-medium">{errors.referralTo.message}</p>
                     )}
                   </div>
                 )}
-              </div>
-
-              {/* First Follow-Up Date */}
-              <div>
-                <label htmlFor="add-followup" className="text-xs font-semibold text-foreground block mb-1">
-                  {t('leadForm.followUp')}{' '}
-                  <span className="text-muted-foreground font-normal text-[10px]">
-                    {t('leadForm.optional')}
-                  </span>
-                </label>
-                <input
-                  id="add-followup"
-                  type="date"
-                  className="input-base min-h-[44px] text-xs"
-                  {...register('followUpDue')}
-                />
-              </div>
+              </section>
 
               {/* Notes */}
-              <div>
-                <label htmlFor="add-notes" className="text-xs font-semibold text-foreground block mb-1">
-                  {t('leadForm.notes')}
-                </label>
+              <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+                <FieldLabel htmlFor="add-notes">{t('leadForm.notes')}</FieldLabel>
                 <textarea
                   id="add-notes"
-                  rows={2}
-                  className="input-base resize-none text-xs"
+                  rows={3}
+                  className="input-base resize-none text-base sm:text-sm border-border/80"
                   placeholder="e.g. Interested in Palm Hills New Cairo, 3BR unit"
                   {...register('notes')}
                 />
-              </div>
+              </section>
             </div>
           </div>
         </div>
@@ -1025,7 +1083,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
 
       {/* ── Sticky Bottom Actions ── */}
       <div
-        className="sticky bottom-0 z-10 bg-card/95 backdrop-blur-md border-t border-border px-4 sm:px-6 py-3 flex items-center justify-between gap-2"
+        className="sticky bottom-0 z-10 bg-card/95 backdrop-blur-md border-t border-border px-4 sm:px-6 py-3 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2"
         style={{
           bottom: keyboardInset > 0 ? `${keyboardInset}px` : undefined,
           paddingBottom: keyboardInset > 0 ? '12px' : 'max(14px, env(safe-area-inset-bottom))',
@@ -1034,24 +1092,24 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
         <button
           type="button"
           onClick={onCancel}
-          className="btn-secondary min-h-[44px] px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0"
+          className="btn-ghost min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl sm:flex-shrink-0"
         >
           {t('leadForm.cancel')}
         </button>
 
-        <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2">
           <button
             type="submit"
             onClick={() => {
               submitModeRef.current = 'another';
             }}
             disabled={isSubmitting}
-            className="btn-secondary min-h-[44px] px-3 py-2 text-xs sm:text-sm font-medium rounded-xl inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+            className="btn-secondary min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl inline-flex items-center justify-center gap-1.5"
           >
             {isSubmitting && submitModeRef.current === 'another' ? (
-              <Loader2 size={13} className="animate-spin" />
+              <Loader2 size={15} className="animate-spin" />
             ) : (
-              <Plus size={13} />
+              <Plus size={15} />
             )}
             <span className="truncate">{t('leadForm.saveAnother')}</span>
           </button>
@@ -1062,16 +1120,16 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
               submitModeRef.current = 'single';
             }}
             disabled={isSubmitting}
-            className="btn-press min-h-[44px] px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs sm:text-sm shadow-md hover:brightness-105 active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+            className="btn-press min-h-[48px] px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm sm:text-base shadow-md hover:brightness-105 active:scale-95 transition-all inline-flex items-center justify-center gap-2"
           >
             {isSubmitting && submitModeRef.current === 'single' ? (
               <>
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 <span>{t('leadForm.adding')}</span>
               </>
             ) : (
               <>
-                <Check size={14} strokeWidth={2.5} />
+                <Check size={16} strokeWidth={2.5} />
                 <span>{t('leadForm.addLead')}</span>
               </>
             )}
