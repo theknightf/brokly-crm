@@ -320,6 +320,7 @@ interface ReportData {
     connected: number;
     noAnswer: number;
     incoming: number;
+    statusUpdates?: number;
   }[];
   previousPeriod?: {
     from: string;
@@ -2621,9 +2622,17 @@ function CallsTab({
       {/* Calls by Employee */}
       {data.callsByEmployee.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">
-            Calls by Employee
-          </h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-foreground">Calls and status updates by employee</h2>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-muted px-3 py-1 text-foreground">
+                Calls {data.callsByEmployee.reduce((s, e) => s + e.calls, 0)}
+              </span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+                Status updates {data.callsByEmployee.reduce((s, e) => s + (e.statusUpdates || 0), 0)}
+              </span>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-mobile">
               <thead>
@@ -2633,6 +2642,9 @@ function CallsTab({
                   </th>
                   <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground">
                     Calls
+                  </th>
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-primary">
+                    Status updates
                   </th>
                   <th className="text-right py-2 px-3 text-xs font-semibold text-emerald-600">
                     Connected
@@ -2671,6 +2683,9 @@ function CallsTab({
                       <td className="py-2.5 px-3 text-right font-bold text-foreground">
                         {emp.calls}
                       </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-primary">
+                        {emp.statusUpdates ?? 0}
+                      </td>
                       <td className="py-2.5 px-3 text-right text-emerald-600 font-medium">
                         {emp.connected}
                       </td>
@@ -2701,6 +2716,7 @@ function CallsTab({
           calls: drawerEmp?.calls ?? 0,
           connected: drawerEmp?.connected ?? 0,
           noAnswer: drawerEmp?.noAnswer ?? 0,
+          statusUpdates: drawerEmp?.statusUpdates ?? 0,
         }}
       />
 

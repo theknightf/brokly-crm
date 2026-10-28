@@ -213,6 +213,53 @@ export async function GET(request: Request) {
     if (c.direction === 'incoming') e.incoming++;
   });
 
+  // ── Status updates per employee (from the single validated action log) ──
+  // Counted for the same date range as the calls above. If user_actions is not available the
+  // error is ignored and every employee simply shows 0.
+  {
+    let suQuery = supabase
+      .from('user_actions')
+      .select('user_id')
+      .eq('action_type', 'STATUS_CHANGE')
+      .limit(50000);
+    if (hasRange) {
+      suQuery = suQuery
+        .gte('created_at', `${fromParam}T00:00:00`)
+        .lte('created_at', `${toParam}T23:59:59.999`);
+    }
+    const { data: statusRows } = await suQuery;
+    const statusByUser: Record<string, number> = {};
+    ((statusRows as any[]) || []).forEach((r: any) => {
+      if (r.user_id) statusByUser[r.user_id] = (statusByUser[r.user_id] || 0) + 1;
+    });
+
+    // Employees who updated statuses but made no calls still get a row.
+    const missing = Object.keys(statusByUser).filter((uid) => !callsByEmployee[uid]);
+    if (missing.length) {
+      const { data: extra } = await supabase
+        .from('user_profiles')
+        .select('id, full_name')
+        .in('id', missing);
+      const names: Record<string, string> = {};
+      (extra || []).forEach((p: any) => (names[p.id] = p.full_name || ''));
+      missing.forEach((uid) => {
+        if (!names[uid] && names[uid] !== '') return; // not visible to this viewer
+        callsByEmployee[uid] = {
+          userId: uid,
+          name: names[uid] || 'Unknown',
+          calls: 0,
+          totalDurationSeconds: 0,
+          connected: 0,
+          noAnswer: 0,
+          incoming: 0,
+        };
+      });
+    }
+    Object.keys(callsByEmployee).forEach((uid) => {
+      callsByEmployee[uid].statusUpdates = statusByUser[uid] || 0;
+    });
+  }
+
   // ── Team performance & profitability ──────────────────────────────────────
   // Non-admins only see the teams they are allowed to (their own team / the
   // teams they lead). Admin sees all teams.

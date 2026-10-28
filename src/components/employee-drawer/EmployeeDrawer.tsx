@@ -20,7 +20,7 @@ export interface EmployeeDrawerProps {
   from: string;
   to: string;
   /** Totals already shown in the report row, used for the header pills. */
-  summary: { calls: number; connected: number; noAnswer: number };
+  summary: { calls: number; connected: number; noAnswer: number; statusUpdates?: number };
 }
 
 const initials = (name: string) =>
@@ -132,6 +132,9 @@ function DrawerBody({
           </span>
           <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
             No answer {summary.noAnswer}
+          </span>
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            Status updates {summary.statusUpdates ?? 0}
           </span>
         </div>
         <div role="tablist" aria-label="Employee details" className="-mb-px flex gap-1">
