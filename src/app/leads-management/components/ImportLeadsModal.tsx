@@ -401,12 +401,16 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       if (!res.ok) throw new Error(j?.error || 'Import failed');
       const imported = Number(j.imported || 0);
       const routedDuplicates = Number(j.routedDuplicates || 0);
-      toast.success(
-        routedDuplicates > 0
-          ? `Successfully imported ${imported} leads (${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} routed to Duplicate Center). File saved to Import History.`
-          : `Successfully imported ${imported} leads. File saved to Import History.`,
-        { duration: 5000 }
-      );
+      if (routedDuplicates > 0) {
+        toast.success(
+          `Imported ${imported} new lead${imported === 1 ? '' : 's'}. ${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} found and not added — sent to the lead owner${routedDuplicates === 1 ? '' : 's'} for review. File saved to Import History.`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.success(`Successfully imported ${imported} leads. File saved to Import History.`, {
+          duration: 5000,
+        });
+      }
       handleClose();
       onImported();
     } catch (e: any) {

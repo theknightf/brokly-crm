@@ -25,9 +25,11 @@ import {
   Handshake,
   Phone,
   CopyCheck,
+  Copy,
   CalendarCheck2,
   FileSpreadsheet,
 } from 'lucide-react';
+import { usePendingDuplicates } from '@/hooks/usePendingDuplicates';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole, canViewTeams } from '@/lib/roles';
@@ -74,6 +76,12 @@ const navGroups: NavGroup[] = [
         labelKey: 'common.leads',
         icon: <Users size={18} />,
         href: '/leads-management',
+      },
+      {
+        id: 'nav-duplicates',
+        labelKey: 'common.duplicates',
+        icon: <Copy size={18} />,
+        href: '/duplicates',
       },
       {
         id: 'nav-customers',
@@ -357,6 +365,9 @@ function SidebarContent({
 }) {
   const { user, profile, signOut } = useAuth();
   const { t } = useLanguage();
+  const pendingDuplicates = usePendingDuplicates();
+  const badgeFor = (item: NavItem): number | undefined =>
+    item.id === 'nav-duplicates' ? (pendingDuplicates > 0 ? pendingDuplicates : undefined) : item.badge;
 
   const isAdminOrOwner = isAdminRole(profile?.role);
   const canWatchTeams = canViewTeams(profile?.role);
@@ -436,14 +447,17 @@ function SidebarContent({
                       {!collapsed && (
                         <>
                           <span className="flex-1 truncate">{t(item.labelKey)}</span>
-                          {item.badge !== undefined && (
-                            <span className="bg-primary text-primary-foreground text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center tabular-nums">
-                              {item.badge}
+                          {badgeFor(item) !== undefined && (
+                            <span
+                              className="bg-primary text-primary-foreground text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center tabular-nums"
+                              aria-label={`${badgeFor(item)} pending`}
+                            >
+                              {(badgeFor(item) as number) > 99 ? '99+' : badgeFor(item)}
                             </span>
                           )}
                         </>
                       )}
-                      {collapsed && item.badge !== undefined && (
+                      {collapsed && badgeFor(item) !== undefined && (
                         <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-primary rounded-full" />
                       )}
                     </Link>

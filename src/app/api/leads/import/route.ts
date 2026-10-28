@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { notifyDuplicateOwnersServer } from '@/lib/duplicateNotify';
+import { checkAndRecordDuplicates } from '@/lib/duplicateCheck';
+import { normalizePhone as normalizePhoneKey } from '@/lib/phone';
 import * as XLSX from 'xlsx';
 
 export const dynamic = 'force-dynamic';
@@ -69,8 +71,8 @@ export async function POST(request: Request) {
   const rawAssignedTo: string =
     body.globalAssignedTo !== undefined ? String(body.globalAssignedTo) : '';
   const globalAssignedTo: string = rawAssignedTo === 'unassigned' ? '' : rawAssignedTo;
-  // Duplicates are NEVER skipped, merged or re-routed: they are inserted like any
-  // other lead and the DB trigger marks is_duplicate / duplicate_of_lead_id.
+  // Duplicates are NOT inserted: they are recorded in duplicate_leads for the
+  // original owner (see insertNewRows below) and counted in the response summary.
   const sourceId: string | null = body.sourceId || null;
 
   const originalFileName: string =
@@ -269,7 +271,6 @@ export async function POST(request: Request) {
   }
 
   let imported = 0;
-  const routedDuplicates = 0; // duplicates are not reported to the importer
   const duplicateIds: string[] = [];
   let skipped = 0;
   let updated = 0;
@@ -397,7 +398,38 @@ export async function POST(request: Request) {
     toInsert.push(insertPayload);
   }
 
-  if (toInsert.length > 0) {
+  /**
+   * Duplicate gate: rows whose normalized phone / e-mail already exist are NOT
+   * inserted. Each one is recorded in duplicate_leads for the original owner
+   * (server-side RPC, so it also works when this user cannot see that lead).
+   */
+  const dupRows: { rowNumber: number; name: string; phone: string }[] = [];
+  const insertNewRows = async (list: any[]) => {
+    if (!list.length) return;
+    const fresh: any[] = [];
+    const RPC_CHUNK = 1000;
+    for (let i = 0; i < list.length; i += RPC_CHUNK) {
+      const part = list.slice(i, i + RPC_CHUNK);
+      const { duplicates } = await checkAndRecordDuplicates(supabase as any, part);
+      part.forEach((r, k) => {
+        if (duplicates[k]) {
+          dupRows.push({ rowNumber: r._rowNum || 0, name: r.name, phone: r.phone });
+          structuredErrorDetails.push({
+            rowNumber: r._rowNum || 0,
+            name: r.name,
+            phone: r.phone,
+            type: 'duplicate_routed',
+            reason: 'Lead already exists — sent to its owner for review',
+          });
+        } else {
+          fresh.push(r);
+        }
+      });
+    }
+    await insertChunks(fresh);
+  };
+
+  const insertChunks = async (toInsert: any[]) => {
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const rawChunk = toInsert.slice(i, i + chunkSize);
@@ -435,21 +467,55 @@ export async function POST(request: Request) {
         for (const r of (data || []) as any[]) if (r?.is_duplicate) duplicateIds.push(r.id);
       }
     }
+  };
+
+  // Rows that repeat a phone already seen in this file are checked in a second
+  // pass, after the first occurrence was inserted, so they match it.
+  const firstPass: any[] = [];
+  const repeats: any[] = [];
+  const seenInFile = new Set<string>();
+  for (const r of toInsert) {
+    const key = normalizePhoneKey(r.phone);
+    if (key.length >= 8 && seenInFile.has(key)) repeats.push(r);
+    else {
+      if (key.length >= 8) seenInFile.add(key);
+      firstPass.push(r);
+    }
+  }
+  try {
+    await insertNewRows(firstPass);
+    await insertNewRows(repeats);
+  } catch (err: any) {
+    const msg = err?.message || 'Duplicate check failed';
+    if (importLogId) {
+      await (supabase as any)
+        .from('import_logs')
+        .update({
+          status: 'Failed',
+          summary: msg,
+          error_details: [{ rowNumber: 0, reason: msg, type: 'error' }],
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', importLogId);
+    }
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  // ONE grouped notification per original owner. Never a warning for the importer.
+  const routedDuplicates = dupRows.length;
+
+  // Safety net for rows that slipped past the check (legacy DB trigger marked them).
   if (duplicateIds.length) await notifyDuplicateOwnersServer(supabase as any, duplicateIds);
 
   const totalProcessed = rows.length;
   const totalFailedOrInvalid = invalid + errors.length;
   const finalStatus: 'Completed' | 'Partially Imported' | 'Failed' =
-    imported + updated === 0
+    imported + updated + routedDuplicates === 0
       ? 'Failed'
       : totalFailedOrInvalid > 0
         ? 'Partially Imported'
         : 'Completed';
 
-  const summary = `Successfully imported ${imported} leads${updated > 0 ? `, ${updated} updated` : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}${invalid > 0 ? `, ${invalid} invalid` : ''}.`;
+  const summary = `Successfully imported ${imported} leads${routedDuplicates > 0 ? `, ${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} sent to owners for review` : ''}${updated > 0 ? `, ${updated} updated` : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}${invalid > 0 ? `, ${invalid} invalid` : ''}.`;
 
   // Finalize import_logs record
   if (importLogId) {
@@ -491,6 +557,8 @@ export async function POST(request: Request) {
     summary,
     imported,
     routedDuplicates,
+    duplicatesFound: routedDuplicates,
+    duplicateRows: dupRows.slice(0, 50),
     updated,
     skipped,
     invalid,

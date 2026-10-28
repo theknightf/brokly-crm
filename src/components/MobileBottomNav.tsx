@@ -6,6 +6,7 @@ import { LayoutDashboard, Users, CalendarClock, CalendarCheck2, Menu } from 'luc
 import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePendingDuplicates } from '@/hooks/usePendingDuplicates';
 
 interface MobileBottomNavProps {
   onOpenMenu: () => void;
@@ -25,6 +26,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { profile } = useAuth();
   const { t } = useLanguage();
+  const pendingDuplicates = usePendingDuplicates();
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
@@ -95,10 +97,15 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
         <button
           onClick={onOpenMenu}
           className="mobile-nav-item flex flex-col items-center justify-center flex-1 gap-1 text-[10px] font-medium text-muted-foreground transition-all"
-          aria-label="Open menu"
+          aria-label={pendingDuplicates > 0 ? `Open menu, ${pendingDuplicates} duplicates to review` : 'Open menu'}
         >
-          <span className="w-10 h-6 flex items-center justify-center rounded-full">
+          <span className="relative w-10 h-6 flex items-center justify-center rounded-full">
             <Menu size={20} strokeWidth={2} />
+            {pendingDuplicates > 0 && (
+              <span className="absolute -top-1 end-0.5 min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-4 text-center tabular-nums">
+                {pendingDuplicates > 9 ? '9+' : pendingDuplicates}
+              </span>
+            )}
           </span>
           {t('common.menu')}
         </button>

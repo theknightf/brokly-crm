@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
 import { notifyDuplicateOwnersServer } from '@/lib/duplicateNotify';
+import { checkAndRecordDuplicates } from '@/lib/duplicateCheck';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/leads — create a lead. Duplicates are NEVER blocked or re-routed: the DB
- * trigger marks is_duplicate / duplicate_of_lead_id and only the original owner is notified.
+ * POST /api/leads — create a lead. A duplicate (normalized phone, or e-mail) is NOT
+ * created: it is recorded in duplicate_leads for the original owner to review and the
+ * caller only gets a generic 409 "This lead already exists".
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -24,6 +26,18 @@ export async function POST(request: Request) {
   if (!phone && !email) return NextResponse.json({ error: 'phone or email required' }, { status: 400 });
 
   const db: any = supabase as any;
+
+  try {
+    const { duplicates } = await checkAndRecordDuplicates(supabase as any, [body]);
+    if (duplicates[0]) {
+      return NextResponse.json(
+        { error: 'This lead already exists', code: 'DUPLICATE_LEAD' },
+        { status: 409 }
+      );
+    }
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Duplicate check failed' }, { status: 500 });
+  }
 
   const requestedStatus = body.stage || body.status || body.crm_status || 'Fresh Leads';
   const rawNotes = String(body.notes || '').trim();

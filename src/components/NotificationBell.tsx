@@ -223,7 +223,21 @@ export default function NotificationBell() {
         const resDed = await fetch('/api/notifications/my-alerts?limit=20', { cache: 'no-store' });
         if (resDed.ok) {
           const j = await resDed.json();
+          const isDupNotice = (n: any) => String(n.reference_link || '').startsWith('/duplicates');
           for (const n of j.notifications || []) {
+            if (isDupNotice(n)) {
+              list.push({
+                id: `dupreview-${n.id}`,
+                type: 'duplicate',
+                title: n.title || 'Duplicate lead needs review',
+                text: n.message || '',
+                entityType: 'duplicate',
+                entityId: n.id,
+                createdAt: n.created_at,
+                referenceLink: '/duplicates',
+              });
+              continue;
+            }
             list.push({
               id: `ded-${n.id}`,
               type: 'deduction',
@@ -237,7 +251,7 @@ export default function NotificationBell() {
             });
           }
           // real-time toast for new unread deductions
-          const newDeds = (j.notifications || []).filter((n: any) => !n.is_read && new Date(n.created_at).getTime() > new Date(lastReadRef.current || '2000-01-01').getTime());
+          const newDeds = (j.notifications || []).filter((n: any) => !isDupNotice(n) && !n.is_read &&new Date(n.created_at).getTime() > new Date(lastReadRef.current || '2000-01-01').getTime());
           if (newDeds.length > 0) {
             for (const d of newDeds.slice(0, 2)) {
               toast.error(`${d.title}: ${d.reason || d.message} (${d.amount} EGP)`, { duration: 6000 });
@@ -484,7 +498,7 @@ export default function NotificationBell() {
               ) : (
                 items.map((n) => {
                   const unread = n.createdAt > lastReadRef.current;
-                  const href = n.type === 'deduction' ? (n.referenceLink || '/dashboard') : n.entityType === 'lead' ? `/leads-management?leadId=${n.entityId}` : n.entityType === 'follow_up' ? `/leads-management` : '/';
+                  const href = n.type === 'deduction' ? (n.referenceLink || '/dashboard') : n.entityType === 'duplicate' ? '/duplicates' : n.entityType === 'lead' ? `/leads-management?leadId=${n.entityId}` : n.entityType === 'follow_up' ? `/leads-management` : '/';
                   return (
                     <li
                       key={n.id}

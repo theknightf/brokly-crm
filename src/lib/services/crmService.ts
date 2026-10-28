@@ -320,6 +320,48 @@ async function notifyDuplicateOwners(leadIds: string[]) {
   }
 }
 
+/** Thrown when the server reports that the lead already exists (see duplicate_leads). */
+export class DuplicateLeadError extends Error {
+  code = 'DUPLICATE_LEAD' as const;
+  constructor() {
+    super('This lead already exists');
+    this.name = 'DuplicateLeadError';
+  }
+}
+
+/**
+ * Server-side duplicate gate. The match + the duplicate_leads record happen in a
+ * SECURITY DEFINER function behind /api/leads/check-duplicate, so it works even
+ * when this user cannot see the original lead. Returns one flag per lead.
+ */
+async function checkDuplicatesServer(leads: any[]): Promise<boolean[]> {
+  const res = await fetch('/api/leads/check-duplicate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rows: leads.map((l) => ({
+        name: l.name,
+        phone: l.phone,
+        email: l.email,
+        source: l.source,
+        notes: l.notes,
+        project: l.project,
+        developer: l.developer,
+        location: l.location,
+        propertyType: l.propertyType,
+        unit: l.unit,
+        budgetMin: l.budgetMin,
+        budgetMax: l.budgetMax,
+        status: l.status,
+        agent: l.agent,
+      })),
+    }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j?.error || 'Duplicate check failed');
+  return Array.isArray(j.duplicates) ? j.duplicates : leads.map(() => false);
+}
+
 export interface LeadQueryFilters {
   page?: number;
   pageSize?: number;
@@ -712,7 +754,9 @@ export const leadsService = {
 
   async create(lead: any, userId: string) {
     const supabase = createClient();
-    // Duplicates are never blocked: the DB trigger marks is_duplicate / duplicate_of_lead_id.
+    // A duplicate is not created: it is recorded for the original owner to review.
+    const [isDuplicate] = await checkDuplicatesServer([lead]);
+    if (isDuplicate) throw new DuplicateLeadError();
     // Auto-assignment when the admin rotation toggle is on.
     const rotation = await computeRotationAssignments([lead]);
     const rot = rotation.get(0);
@@ -789,6 +833,10 @@ export const leadsService = {
   async bulkInsert(rows: any[], userId: string) {
     if (!rows.length) return [];
     const supabase = createClient();
+    // Duplicates are not inserted: they are recorded for the original owner to review.
+    const dupFlags = await checkDuplicatesServer(rows);
+    rows = rows.filter((_, i) => !dupFlags[i]);
+    if (!rows.length) return [];
     // Auto-assignment for unassigned imported rows when rotation is on.
     const rotation = await computeRotationAssignments(rows);
     const finalRows = rows.map((r, i) => {

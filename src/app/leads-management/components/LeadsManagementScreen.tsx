@@ -1272,6 +1272,11 @@ export default function LeadsManagementScreen({
       toast.success(`Lead "${lead.name}" added successfully`);
       return true;
     } catch (err: any) {
+      if (err?.code === 'DUPLICATE_LEAD') {
+        // Deliberately generic: never reveal who owns the original lead.
+        toast.info('This lead already exists');
+        return false;
+      }
       toast.error(err?.message || 'Failed to add lead');
       return false;
     }
