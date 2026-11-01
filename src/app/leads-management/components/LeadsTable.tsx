@@ -421,6 +421,16 @@ const LeadTableRow = React.memo(function LeadTableRow({
             </button>
           </span>
         )}
+        {lead.email && (
+          <button
+            type="button"
+            onClick={() => copyText(String(lead.email), 'Email copied')}
+            title={`Copy ${lead.email}`}
+            className="block max-w-[180px] truncate text-start text-[11px] text-zinc-500 hover:text-lime-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 rounded"
+          >
+            {lead.email}
+          </button>
+        )}
       </td>
 
       {/* Status / stage */}
@@ -490,38 +500,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
 
       {/* Quick actions */}
       <td className={TD}>
-        <div className="flex items-center justify-center gap-0.5">
-          <button
-            type="button"
-            onClick={handleCall}
-            disabled={!hasPhone}
-            title={t('leads.call')}
-            aria-label={`${t('leads.call')}: ${title}`}
-            className={`${ICON_BTN} hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400`}
-          >
-            <Phone size={15} />
-          </button>
-          {hasPhone ? (
-            <a
-              href={getWhatsAppLinkForLead(lead.phone, lead.name)}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={t('leads.whatsapp')}
-              aria-label={`${t('leads.whatsapp')}: ${title}`}
-              className={`${ICON_BTN} hover:bg-green-500/10 hover:text-green-600 dark:hover:text-green-400`}
-            >
-              <MessageCircle size={15} />
-            </a>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => onView?.(lead)}
-            title={t('leads.viewProfile')}
-            aria-label={`${t('leads.viewProfile')}: ${title}`}
-            className={`${ICON_BTN} hover:bg-lime-500/10 hover:text-lime-600 dark:hover:text-lime-400`}
-          >
-            <Eye size={15} />
-          </button>
+        <div className="flex items-center justify-center">
           <button
             ref={menuAnchorRef}
             type="button"
@@ -547,6 +526,39 @@ const LeadTableRow = React.memo(function LeadTableRow({
               className="stage-dropdown-panel"
             >
               <div className="py-1">
+                <button
+                  role="menuitem"
+                  disabled={!hasPhone}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleCall();
+                  }}
+                  className={`${menuItem} disabled:opacity-40 disabled:pointer-events-none`}
+                >
+                  <Phone size={14} /> {t('leads.call')}
+                </button>
+                {hasPhone && (
+                  <a
+                    role="menuitem"
+                    href={getWhatsAppLinkForLead(lead.phone, lead.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMenuOpen(false)}
+                    className={menuItem}
+                  >
+                    <MessageCircle size={14} /> {t('leads.whatsapp')}
+                  </a>
+                )}
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onView?.(lead);
+                  }}
+                  className={menuItem}
+                >
+                  <Eye size={14} /> {t('leads.viewProfile')}
+                </button>
                 <button
                   role="menuitem"
                   onClick={() => {

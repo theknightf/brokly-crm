@@ -2,8 +2,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Plus,
-  Download,
-  Upload,
   SlidersHorizontal,
   Loader2,
   CalendarClock,
@@ -41,8 +39,8 @@ import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
 import LeadBoard from './LeadBoard';
 import LeadsFilters, { useLeadFilterOptions, activityOf } from './LeadsFilters';
-import LeadsToolbar, { LeadsFilterDrawer } from './LeadsToolbar';
-import LeadsStatusStrip from './LeadsStatusStrip';
+import { LeadsFilterDrawer } from './LeadsToolbar';
+import LeadsCommandCenter from './LeadsCommandCenter';
 import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
@@ -1662,70 +1660,19 @@ export default function LeadsManagementScreen({
 
   return (
     <div className="page-aurora min-h-[calc(100dvh-8rem)] space-y-5 sm:space-y-3 rounded-[2rem] p-3 sm:p-4 pb-24 sm:pb-4 flex flex-col">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 sm:px-4 sm:py-2.5 shadow-sm backdrop-blur-xl">
-        <div className="animate-rise-in min-w-0 sm:flex sm:items-baseline sm:gap-3">
-          <h1 className="page-title sm:text-xl">{title || t('leads.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5 sm:mt-0 truncate">
-            {subtitle ||
-              `${total} lead${total !== 1 ? 's' : ''} in your list${
-                filters.status ? ` · status: ${filters.status}` : initialStatus ? ` · status: ${initialStatus}` : ''
-              }`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap animate-rise-in" style={{ animationDelay: '80ms' }}>
-          <button
-            onClick={handleExport}
-            className="btn-secondary flex items-center gap-1.5 text-sm"
-            title="Export to CSV"
-          >
-            <Download size={15} />
-            <span className="hidden sm:inline">{t('leads.export')}</span>
-          </button>
-          <button
-            onClick={() => setImportModalOpen(true)}
-            className="btn-secondary flex items-center gap-1.5 text-sm"
-            title="Import leads"
-          >
-            <Upload size={15} />
-            <span className="hidden sm:inline">{t('leads.import')}</span>
-          </button>
-          <a
-            href="/import-history"
-            className="btn-secondary flex items-center gap-1.5 text-sm"
-            title="View Excel Import History & Download Uploaded Sheets"
-          >
-            <ClipboardList size={15} />
-            <span className="hidden sm:inline">Import History</span>
-          </a>
-          {/* ── Prominent Add Lead CTA ── */}
-          <div className="relative">
-            {/* Animated glow ring */}
-            <span className="absolute inset-0 rounded-xl bg-primary/40 animate-ping" style={{ animationDuration: '2s' }} />
-            <button
-              id="add-lead-btn"
-              onClick={() => setAddModalOpen(true)}
-              className="relative flex items-center gap-2 px-5 py-2.5 sm:py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-[0_8px_24px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_12px_30px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 hover:brightness-105 active:scale-95 transition-all duration-200 whitespace-nowrap"
-              title="Add lead (press N)"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-              <span>{t('leads.add')}</span>
-              <span className="hidden sm:flex items-center justify-center ml-1 w-5 h-5 rounded-md bg-primary-foreground/20 text-primary-foreground text-[10px] font-bold tracking-wider">N</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <LeadsToolbar
+      <LeadsCommandCenter
+        title={title || t('leads.title')}
+        subtitle={subtitle}
         filters={filters}
         onChange={(f) => {
           setFilters(f);
           setCurrentPage(1);
         }}
         options={filterOptions}
+        statusCounts={statusCounts}
+        total={total}
         drawerCount={drawerFilterCount}
         onOpenFilters={() => setShowFilters(true)}
-        filtersOpen={showFilters}
         viewMode={viewMode}
         onViewModeChange={(mode) => {
           setViewMode(mode);
@@ -1735,16 +1682,9 @@ export default function LeadsManagementScreen({
           }
         }}
         onClearAll={clearFilters}
-      />
-
-      <LeadsStatusStrip
-        filters={filters}
-        statusCounts={statusCounts}
-        total={total}
-        onSelect={(status) => {
-          setFilters((f) => ({ ...f, status }));
-          setCurrentPage(1);
-        }}
+        onAdd={() => setAddModalOpen(true)}
+        onExport={handleExport}
+        onImport={() => setImportModalOpen(true)}
       />
 
       <LeadsFilterDrawer
