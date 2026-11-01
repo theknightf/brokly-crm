@@ -1,14 +1,14 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { EMPTY_FILTERS, type Agent, type DateRange, type FilterState } from './types';
+import { EMPTY_FILTERS, type DateRange, type FilterState } from './types';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   value: FilterState;
   onApply: (next: FilterState) => void;
-  agents: Agent[];
+  agents: { id: string; name: string }[];
   sources: string[];
   channels: string[];
 }

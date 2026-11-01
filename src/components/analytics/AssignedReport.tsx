@@ -1,6 +1,7 @@
 'use client';
 import React, { useMemo, useState } from 'react';
-import type { Team, TeamReport } from './types';
+import { PanelEmpty, PanelError, PanelSkeleton } from './StatusBadge';
+import type { AssignedData, Loadable } from './types';
 import { nf } from './utils';
 
 export function TeamChips({
@@ -8,7 +9,7 @@ export function TeamChips({
   value,
   onChange,
 }: {
-  teams: Team[];
+  teams: { id: string; name: string }[];
   value: string;
   onChange: (teamId: string) => void;
 }) {
@@ -39,22 +40,25 @@ export function TeamChips({
 }
 
 interface Props {
-  teams: Team[];
-  reports: TeamReport[];
+  state: Loadable<AssignedData>;
   teamId: string;
   onTeamChange: (teamId: string) => void;
+  onRetry: () => void;
 }
 
 /**
- * Leads Assigned = leads the agent currently owns. Assign From = leads received through a
- * reassignment. Total Volume = Leads Assigned + Assign From (and the last row sums the rows above).
+ * Leads assigned = leads the agent currently owns that were assigned directly.
+ * Assign from   = currently owned leads that were received through a reassignment.
+ * Total volume  = Leads assigned + Assign from (= every lead the agent owns).
+ * The last row sums the rows above it.
  */
-export default function AssignedReport({ teams, reports, teamId, onTeamChange }: Props) {
+export default function AssignedReport({ state, teamId, onTeamChange, onRetry }: Props) {
   const [sortDesc, setSortDesc] = useState(true);
+  const data = state.data;
   const rows = useMemo(() => {
-    const r = reports.filter((x) => !teamId || x.teamId === teamId);
+    const r = (data?.agents ?? []).filter((x) => !teamId || x.teamId === teamId);
     return r.slice().sort((a, b) => (sortDesc ? b.total - a.total : a.total - b.total));
-  }, [reports, teamId, sortDesc]);
+  }, [data, teamId, sortDesc]);
 
   const totals = rows.reduce(
     (s, r) => ({ leads: s.leads + r.leadsAssigned, from: s.from + r.assignFrom, total: s.total + r.total }),
@@ -67,42 +71,52 @@ export default function AssignedReport({ teams, reports, teamId, onTeamChange }:
         <h3 className="text-sm font-semibold text-slate-200">Assigned report</h3>
         <p className="text-xs text-slate-500">Leads currently owned, leads received by reassignment, and the total volume per agent.</p>
       </div>
-      <TeamChips teams={teams} value={teamId} onChange={onTeamChange} />
+      <TeamChips teams={data?.teams ?? []} value={teamId} onChange={onTeamChange} />
 
       <div className="overflow-x-auto rounded-2xl border border-slate-800/80 bg-[#161B22]">
-        <table className="w-full min-w-[560px] text-sm">
-          <thead className="bg-slate-900/60 text-xs uppercase tracking-wide text-slate-400">
-            <tr>
-              <th className="px-4 py-3 text-start font-semibold">Agent / Team</th>
-              <th className="px-4 py-3 text-end font-semibold">Leads assigned</th>
-              <th className="px-4 py-3 text-end font-semibold">Assign from</th>
-              <th className="px-4 py-3 text-end font-semibold">
-                <button type="button" onClick={() => setSortDesc((v) => !v)} className="hover:text-slate-200">
-                  Total volume {sortDesc ? '↓' : '↑'}
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.agentId} className="border-t border-slate-800/60 hover:bg-slate-800/40">
-                <td className="px-4 py-3">
-                  <span className="font-medium text-slate-100">{r.agentName}</span>
-                  <span className="ms-2 text-xs text-slate-500">{r.teamName}</span>
-                </td>
-                <td className="px-4 py-3 text-end tabular-nums text-slate-200">{nf(r.leadsAssigned)}</td>
-                <td className="px-4 py-3 text-end tabular-nums text-slate-300">{nf(r.assignFrom)}</td>
-                <td className="px-4 py-3 text-end font-semibold tabular-nums text-lime-400">{nf(r.total)}</td>
+        {state.error && !data ? (
+          <PanelError message={state.error} onRetry={onRetry} />
+        ) : state.loading && !data ? (
+          <div className="p-4">
+            <PanelSkeleton rows={6} />
+          </div>
+        ) : rows.length === 0 ? (
+          <PanelEmpty text="No assigned leads match these filters." />
+        ) : (
+          <table className={`w-full min-w-[560px] text-sm ${state.loading ? 'opacity-60 transition-opacity' : ''}`}>
+            <thead className="bg-slate-900/60 text-xs uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="px-4 py-3 text-start font-semibold">Agent / Team</th>
+                <th className="px-4 py-3 text-end font-semibold">Leads assigned</th>
+                <th className="px-4 py-3 text-end font-semibold">Assign from</th>
+                <th className="px-4 py-3 text-end font-semibold">
+                  <button type="button" onClick={() => setSortDesc((v) => !v)} className="hover:text-slate-200">
+                    Total volume {sortDesc ? '↓' : '↑'}
+                  </button>
+                </th>
               </tr>
-            ))}
-            <tr className="border-t-2 border-slate-700 bg-slate-900/60 font-semibold">
-              <td className="px-4 py-3 text-slate-100">Total Accounts ({rows.length})</td>
-              <td className="px-4 py-3 text-end tabular-nums text-slate-100">{nf(totals.leads)}</td>
-              <td className="px-4 py-3 text-end tabular-nums text-slate-100">{nf(totals.from)}</td>
-              <td className="px-4 py-3 text-end tabular-nums text-lime-400">{nf(totals.total)}</td>
-            </tr>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.agentId} className="border-t border-slate-800/60 hover:bg-slate-800/40">
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-slate-100">{r.agentName}</span>
+                    <span className="ms-2 text-xs text-slate-500">{r.teamName}</span>
+                  </td>
+                  <td className="px-4 py-3 text-end tabular-nums text-slate-200">{nf(r.leadsAssigned)}</td>
+                  <td className="px-4 py-3 text-end tabular-nums text-slate-300">{nf(r.assignFrom)}</td>
+                  <td className="px-4 py-3 text-end font-semibold tabular-nums text-lime-400">{nf(r.total)}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-slate-700 bg-slate-900/60 font-semibold">
+                <td className="px-4 py-3 text-slate-100">Total Accounts ({rows.length})</td>
+                <td className="px-4 py-3 text-end tabular-nums text-slate-100">{nf(totals.leads)}</td>
+                <td className="px-4 py-3 text-end tabular-nums text-slate-100">{nf(totals.from)}</td>
+                <td className="px-4 py-3 text-end tabular-nums text-lime-400">{nf(totals.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

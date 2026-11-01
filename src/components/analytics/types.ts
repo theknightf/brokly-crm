@@ -1,7 +1,4 @@
-/** Types for the Analytics & Reports dashboard (/analytics). */
-
-export type CallDirection = 'incoming' | 'outgoing';
-export type CallOutcome = 'answered' | 'no_answer' | 'busy' | 'failed' | 'closed';
+/** Types for the Reports > Analytics dashboard (real data from /api/reports/analytics/*). */
 
 export type PipelineStage =
   | 'following_up'
@@ -12,62 +9,15 @@ export type PipelineStage =
   | 'reserved'
   | 'closed_won';
 
-export interface Agent {
-  id: string;
-  name: string;
-  teamId: string;
-}
-
-export interface Team {
-  id: string;
-  name: string;
-}
-
-export interface Lead {
-  id: string;
-  name: string;
-  phone: string;
-  source: string;
-  channel: string;
-  isColdCall: boolean;
-  createdBy: string; // agent id
-  assignedTo: string; // agent id
-  createdAt: string; // ISO
-  assignedAt: string; // ISO
-  stage: PipelineStage;
-  notes?: string;
-}
-
-export interface CallRecord {
-  id: string;
-  /** null when the number does not match any lead ("+ Add Lead" is shown instead). */
-  leadId: string | null;
-  leadName: string | null;
-  phone: string;
-  agentId: string;
-  direction: CallDirection;
-  outcome: CallOutcome;
-  durationSeconds: number;
-  at: string; // ISO
-}
-
-export interface TeamReport {
-  agentId: string;
-  agentName: string;
-  teamId: string;
-  teamName: string;
-  leadsAssigned: number;
-  assignFrom: number;
-  /** leadsAssigned + assignFrom */
-  total: number;
-}
-
-export interface FunnelRow {
-  agentId: string;
-  agentName: string;
-  teamId: string;
-  counts: Record<PipelineStage, number>;
-}
+export const PIPELINE_STAGES: { key: PipelineStage; label: string }[] = [
+  { key: 'following_up', label: 'Following up' },
+  { key: 'following_up_after_meeting', label: 'Following up after meeting' },
+  { key: 'interested', label: 'Interested' },
+  { key: 'meeting', label: 'Meeting' },
+  { key: 'reschedule_meeting', label: 'Reschedule meeting' },
+  { key: 'reserved', label: 'Reserved' },
+  { key: 'closed_won', label: 'Closed won' },
+];
 
 export interface DateRange {
   from: string; // YYYY-MM-DD or ''
@@ -78,24 +28,10 @@ export interface FilterState {
   assignDate: DateRange;
   actionDate: DateRange;
   creationDate: DateRange;
-  source: string; // '' = all
-  channel: string; // '' = all
+  source: string; // broker / lead source, '' = all
+  channel: string; // call channel, '' = all
   isColdCall: 'any' | 'yes' | 'no';
-  createdBy: string; // agent id, '' = all
-}
-
-export type Timeframe = 'day' | 'weekly' | 'monthly' | 'year';
-
-export interface TimelinePoint {
-  label: string;
-  calls: number;
-}
-
-export interface OverviewStats {
-  totalCalls: number;
-  totalCallsByHour: number;
-  outcome: { answered: number; noAnswer: number; closed: number };
-  dial: { incoming: number; outgoing: number };
+  createdBy: string; // user id, '' = all
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -108,12 +44,84 @@ export const EMPTY_FILTERS: FilterState = {
   createdBy: '',
 };
 
-export const PIPELINE_STAGES: { key: PipelineStage; label: string }[] = [
-  { key: 'following_up', label: 'Following up' },
-  { key: 'following_up_after_meeting', label: 'Following up after meeting' },
-  { key: 'interested', label: 'Interested' },
-  { key: 'meeting', label: 'Meeting' },
-  { key: 'reschedule_meeting', label: 'Reschedule meeting' },
-  { key: 'reserved', label: 'Reserved' },
-  { key: 'closed_won', label: 'Closed won' },
-];
+export interface FilterOptions {
+  sources: string[];
+  channels: string[];
+  agents: { id: string; name: string }[];
+}
+
+export type Timeframe = 'day' | 'weekly' | 'monthly' | 'year';
+
+export interface TimelinePoint {
+  label: string;
+  calls: number;
+}
+
+export interface OverviewStats {
+  totalCalls: number;
+  /** calls divided by the number of distinct hours that had at least one call */
+  callsByHour: number;
+  answered: number;
+  noAnswer: number;
+  closed: number;
+  incoming: number;
+  outgoing: number;
+  timeline: TimelinePoint[];
+}
+
+export type CallBucket = 'answered' | 'no_answer' | 'closed';
+
+export interface CallLogRow {
+  id: string;
+  lead_id: string | null;
+  lead_name: string | null;
+  phone: string | null;
+  direction: string | null;
+  channel: string | null;
+  outcome: string | null;
+  bucket: CallBucket;
+  duration_seconds: number;
+  created_at: string;
+  source: string | null;
+  is_cold: boolean | null;
+  lead_stage: string | null;
+  user_id: string | null;
+  agent_name: string | null;
+  agent_avatar: string | null;
+  owner_name: string | null;
+}
+
+export interface CallsPage {
+  total: number;
+  rows: CallLogRow[];
+  page: number;
+  pageSize: number;
+}
+
+export type SortKey = 'lead' | 'phone' | 'agent' | 'direction' | 'outcome' | 'duration' | 'at';
+
+export interface AssignedAgent {
+  agentId: string;
+  agentName: string;
+  teamId: string | null;
+  teamName: string;
+  leadsAssigned: number;
+  assignFrom: number;
+  total: number;
+  stages: Record<PipelineStage, number>;
+  /** every crm_status the agent's leads are in, with counts */
+  allStages: Record<string, number>;
+  /** total calls made by the agent (same filters as the Calls Log) */
+  calls: number;
+}
+
+export interface AssignedData {
+  teams: { id: string; name: string }[];
+  agents: AssignedAgent[];
+}
+
+export interface Loadable<T> {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+}
