@@ -311,9 +311,12 @@ export default function LeadsManagementScreen({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const initSearchParams = useSearchParams();
   const [filters, setFilters] = useState<FilterState>(() => {
-    if (typeof window !== 'undefined') {
-      const p = new URLSearchParams(window.location.search);
+    {
+      // useSearchParams (not window.location): during a client-side navigation the address bar
+      // still holds the previous page's URL when this first render runs.
+      const p = initSearchParams;
       const urlCalled = (p.get('called') || '') as FilterState['called'];
       const urlAction = (p.get('actionTaken') || '') as FilterState['actionTaken'];
       const urlStatus = resolveStatusParam(p.get('stage')) || resolveStatusParam(p.get('status')) || initialStatus || '';
@@ -334,22 +337,6 @@ export default function LeadsManagementScreen({
         calledTo: p.get('calledTo') || '',
       };
     }
-    return {
-      search: '',
-      status: initialStatus || '',
-      source: '',
-      agent: '',
-      project: '',
-      propertyType: '',
-      action: '',
-      contacted: '',
-      actionTaken: '',
-      actionFrom: '',
-      actionTo: '',
-      called: '',
-      calledFrom: '',
-      calledTo: '',
-    };
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -1182,6 +1169,9 @@ export default function LeadsManagementScreen({
         );
         toast.success(`Assigned ${ids.length} leads to ${userNames.join(' & ')}`);
         setSelectedIds(new Set());
+        // Reload from the server: the patch above is only a preview; ownership, visibility
+        // (leads you no longer own) and counts must come from the database.
+        void fetchLeads();
         return;
       }
       const result = await leadsService.bulkAssignRoundRobin(ids, users);
@@ -1217,6 +1207,7 @@ export default function LeadsManagementScreen({
         `Assigned ${ids.length} leads: ${counts.map((c) => `${c.name} × ${c.count}`).join(', ')}`
       );
       setSelectedIds(new Set());
+      void fetchLeads();
     } catch (err: any) {
       toast.error(err?.message || 'Assignment failed — no leads were changed');
     }
@@ -1229,6 +1220,7 @@ export default function LeadsManagementScreen({
       setLeads((prev) => prev.map((l) => (selectedIds.has(l.id) ? { ...l, team: teamName } : l)));
       toast.success(`${ids.length} leads assigned to team "${teamName}"`);
       setSelectedIds(new Set());
+      void fetchLeads();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to assign leads to team');
     }
@@ -1253,6 +1245,7 @@ export default function LeadsManagementScreen({
       );
       toast.success(`Referred ${ids.length} leads to ${referredToName}`);
       setSelectedIds(new Set());
+      void fetchLeads();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to refer leads');
     }
