@@ -56,7 +56,7 @@ export default function FunnelMatrix({ state, teamId, onTeamChange, onRetry, con
       </div>
       <TeamChips teams={data?.teams ?? []} value={teamId} onChange={onTeamChange} />
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-800/80 bg-[#161B22]">
+      <div className="custom-scrollbar overflow-x-auto rounded-2xl border border-slate-800/80 bg-[#161B22]">
         {state.error && !data ? (
           <PanelError message={state.error} onRetry={onRetry} />
         ) : state.loading && !data ? (
