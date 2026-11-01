@@ -108,7 +108,6 @@ export async function POST(request: Request) {
 
   const uploaderName =
     uploaderProfile?.full_name ||
-    user.user_metadata?.full_name ||
     uploaderProfile?.email ||
     user.email ||
     'User';

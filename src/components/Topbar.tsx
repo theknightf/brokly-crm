@@ -62,8 +62,8 @@ export default function Topbar({
   };
 
   const displayName =
-    profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-  const displayRole = profile?.role || user?.user_metadata?.role || 'agent';
+    profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const displayRole = profile?.role || 'agent';
   const initials = displayName
     .split(' ')
     .map((p: string) => p[0])

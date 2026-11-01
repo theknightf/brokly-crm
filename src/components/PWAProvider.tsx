@@ -28,7 +28,7 @@ export function PWAProvider() {
         window.location.reload();
       });
       navigator.serviceWorker
-        .register('/sw.js', { updateViaCache: 'none' })
+        .register(`/sw.js?v=${process.env.NEXT_PUBLIC_BUILD_ID || 'dev'}`, { updateViaCache: 'none' })
         .then((reg) => {
           reg.update().catch(() => {});
           if (reg.waiting) {

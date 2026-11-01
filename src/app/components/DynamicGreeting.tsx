@@ -17,7 +17,7 @@ export default function DynamicGreeting() {
 
   const firstName = useMemo(() => {
     const full =
-      profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || '';
+      profile?.full_name || user?.email?.split('@')[0] || '';
     return full.split(' ')[0] || 'friend';
   }, [profile, user]);
 

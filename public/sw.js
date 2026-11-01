@@ -7,7 +7,9 @@
  *  2026-09-05: v1.2.0 — bypass _next/data to kill stale-chunk infinite loads,
  *  navigation timeout so flaky networks fall back instead of hanging.
  */
-const VERSION = 'brokly-v1.3.2';
+// Version comes from the registration URL (/sw.js?v=<build id>), so it changes on every deploy.
+const BUILD = new URL(self.location.href).searchParams.get('v') || 'dev';
+const VERSION = `brokly-${BUILD}`;
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
@@ -112,6 +114,8 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.startsWith('/_next/data/')) return;
+  // Auth flows and anything user-specific are always network-only (never cached, never delayed).
+  if (url.pathname.startsWith('/auth/') || url.pathname.startsWith('/api/auth')) return;
   if (url.pathname.endsWith('/revalidate')) return;
 
   // App shell navigations: network-first with TIMEOUT + offline fallback.
@@ -121,7 +125,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetchWithTimeout(request, NAV_TIMEOUT_MS)
         .then((response) => {
-          if (response && response.ok) {
+          // Only the plain, non-redirected home shell is cached: never a login redirect or a page of another user.
+          if (response && response.ok && !response.redirected && url.pathname === '/') {
             const copy = response.clone();
             caches.open(SHELL_CACHE).then((cache) => cache.put('/', copy));
           }

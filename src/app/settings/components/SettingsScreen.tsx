@@ -60,6 +60,7 @@ const TABS: { key: SettingsTab; label: string; icon: React.ReactNode; descriptio
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({ profile, user }: { profile: any; user: any }) {
+  const { refreshProfile } = useAuth();
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
   const [saving, setSaving] = useState(false);
@@ -79,6 +80,8 @@ function ProfileTab({ profile, user }: { profile: any; user: any }) {
         .eq('id', user.id);
       if (error) throw error;
       toast.success('Profile updated successfully');
+      // user_profiles is the single source of truth: re-read it everywhere (sidebar, topbar, greeting).
+      await refreshProfile();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update profile');
     } finally {

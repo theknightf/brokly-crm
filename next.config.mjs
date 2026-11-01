@@ -5,6 +5,11 @@ const nextConfig = {
   distDir: process.env.DIST_DIR || '.next',
   outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
+  // Changes on every deploy: the service worker derives its cache names from it, so each release
+  // starts with fresh caches and the activate step purges the old ones.
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || process.env.BUILD_ID || String(Date.now()),
+  },
   serverExternalPackages: [
     '@supabase/ssr',
     '@supabase/supabase-js',

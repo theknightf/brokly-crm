@@ -201,7 +201,7 @@ export default function EmployeeAttendanceView() {
     totalHours: history.reduce((s, h) => s + (h.duration_seconds || 0), 0),
   }), [history]);
 
-  const name = profile?.full_name || (user as any)?.user_metadata?.full_name || '';
+  const name = profile?.full_name || '';
   const gpsVerified = today?.check_in_lat != null || geo?.verified === true;
 
   return (
