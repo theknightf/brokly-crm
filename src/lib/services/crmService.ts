@@ -1206,6 +1206,50 @@ export const leadsService = {
         ? { assignedTo: filterOrAssignee }
         : (filterOrAssignee || {});
 
+    // Fast path: one GROUP BY in SQL (migration 20261102000000). Used for the filters it can express;
+    // anything else (activity/call date filters, recently-called exclusions…) takes the paged path below.
+    const needsPagedPath = Boolean(
+      params.action || params.actionTaken || params.contacted || params.actionFrom || params.actionTo ||
+        params.called || params.calledFrom || params.calledTo || params.assignedTo ||
+        (params.recentlyCalledIds && params.recentlyCalledIds.length)
+    );
+    if (!needsPagedPath) {
+      try {
+        const scope = await getCachedActorScope(supabase);
+        const restricted = !!scope.userId && !isAdminRole(scope.role);
+        const isLead = scope.role === 'team_leader' || scope.role === 'Team Lead' || scope.role === 'manager';
+        let ownerIds: string[] | null = null;
+        if (params.agent) {
+          const exact = params.agent.replace(/[\\%_]/g, '');
+          let { data: us } = await supabase.from('user_profiles').select('id').ilike('full_name', exact);
+          if (!us?.length) {
+            ({ data: us } = await supabase.from('user_profiles').select('id').ilike('full_name', `%${params.agent}%`));
+          }
+          ownerIds = (us || []).map((u: any) => u.id);
+        }
+        const { data: rows, error: rpcErr } = await supabase.rpc('lead_status_counts_filtered', {
+          p_search: params.search?.trim() || null,
+          p_source: params.source || null,
+          p_project: params.project || null,
+          p_property_type: params.propertyType || null,
+          p_only_mine: restricted && !isLead,
+          p_member_ids: restricted && isLead ? scope.memberIds : null,
+          // an owner filter that matches nobody must match nothing (empty array), not everything
+          p_owner_ids: ownerIds,
+          p_agent_text: params.agent || null,
+        });
+        if (!rpcErr && Array.isArray(rows)) {
+          const c: Record<string, number> = {};
+          (rows as { status: string; count: number }[]).forEach((r) => {
+            c[r.status] = Number(r.count);
+          });
+          return c;
+        }
+      } catch {
+        // function not deployed yet / transient error: use the paged path
+      }
+    }
+
     try {
       const baseQuery = supabase
         .from('leads')
@@ -1225,7 +1269,8 @@ export const leadsService = {
       // A single select is capped at 1000 rows by PostgREST; page through everything so the
       // per-status counts add up to the real total.
       const pagedQuery: any = (filteredQuery as any).order('id', { ascending: true });
-      const { data, error } = await fetchAllRows<any>((from, to) => pagedQuery.range(from, to));
+      // concurrency 1: this builder is reused (and mutated by .range()) for every page.
+      const { data, error } = await fetchAllRows<any>((from, to) => pagedQuery.range(from, to), 1000, 100000, 1);
       if (error || !Array.isArray(data)) {
         // Fallback to rpc if available and no extra filters
         const hasExtraFilters = Boolean(

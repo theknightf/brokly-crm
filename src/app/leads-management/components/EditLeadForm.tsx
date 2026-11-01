@@ -361,8 +361,12 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
   const nameField = register('name');
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} noValidate>
-      <div className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
+    <form
+      onSubmit={handleSubmit(onFormSubmit)}
+      noValidate
+      className="flex min-h-0 flex-col [&_.input-base]:min-h-[44px] [&_.input-base]:text-base sm:[&_.input-base]:min-h-0 sm:[&_.input-base]:text-sm"
+    >
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:space-y-6 sm:px-6 sm:py-5 max-h-[calc(100dvh-13rem)] sm:max-h-[70vh]">
         <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
           <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
             <span className="flex items-center gap-2">
@@ -431,7 +435,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
           </div>
         </details>
 
-        <details className="group rounded-2xl border border-border bg-card overflow-hidden">
+        <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
           <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
             <span className="flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -833,14 +837,14 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         </div>
       </div>
 
-      <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-2">
-        <button type="button" onClick={onCancel} className="btn-secondary">
+      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t border-border bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4">
+        <button type="button" onClick={onCancel} className="btn-secondary min-h-[44px] w-full sm:w-auto">
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="btn-primary flex items-center gap-2"
+          className="btn-primary flex min-h-[44px] w-full items-center justify-center gap-2 sm:w-auto"
         >
           {isSubmitting && <Loader2 size={14} className="animate-spin" />}
           Save changes

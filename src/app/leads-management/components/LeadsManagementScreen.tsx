@@ -458,7 +458,16 @@ export default function LeadsManagementScreen({
   const sortDirRef = useRef(sortDir);
   sortDirRef.current = sortDir;
 
-  const loadStatusCounts = useCallback(async (overrideFilters?: FilterState) => {
+  // The counts query pages through every lead, so never run two at once: while one is in flight,
+  // further requests collapse into a single re-run with the latest filters.
+  const countsBusyRef = useRef(false);
+  const countsAgainRef = useRef<{ f?: FilterState } | null>(null);
+  const loadStatusCounts = useCallback(async (overrideFilters?: FilterState): Promise<void> => {
+    if (countsBusyRef.current) {
+      countsAgainRef.current = { f: overrideFilters };
+      return;
+    }
+    countsBusyRef.current = true;
     try {
       const activeFilters = overrideFilters || filtersRef.current;
       const counts = await leadsService.getStatusCounts({
@@ -479,7 +488,13 @@ export default function LeadsManagementScreen({
       if (counts && typeof counts === 'object') {
         setStatusCounts(counts);
       }
-    } catch {}
+    } catch {
+    } finally {
+      countsBusyRef.current = false;
+      const again = countsAgainRef.current;
+      countsAgainRef.current = null;
+      if (again) void loadStatusCounts(again.f);
+    }
   }, []);
 
   useEffect(() => {
