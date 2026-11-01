@@ -45,11 +45,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  // Grok (xAI) is used when XAI_API_KEY is set; otherwise Gemini.
+  const useGrok = !!process.env.XAI_API_KEY;
+  const apiKey = useGrok ? process.env.XAI_API_KEY : process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
     return new Response(
       JSON.stringify({
-        error: 'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GOOGLE_GENERATIVE_AI_API_KEY.',
+        error: 'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح XAI_API_KEY (Grok) أو GOOGLE_GENERATIVE_AI_API_KEY (Gemini).',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
@@ -66,12 +68,27 @@ export async function POST(request: Request) {
   // Send only the last 10 messages to the model to minimize token consumption and data leakage
   const recentMessages = body.messages.slice(-10);
 
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  let model: any;
+  if (useGrok) {
+    // Loaded lazily so the Gemini path keeps working even if @ai-sdk/xai is not installed.
+    try {
+      const { xai } = await import('@ai-sdk/xai');
+      model = xai(process.env.XAI_MODEL || 'grok-3-mini');
+    } catch (e) {
+      console.error('Grok provider unavailable (run npm install):', e);
+      return new Response(
+        JSON.stringify({ error: 'مزوّد Grok غير مثبّت على الخادم. شغّل npm install ثم أعد النشر.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } else {
+    model = google(process.env.GEMINI_MODEL || 'gemini-2.0-flash');
+  }
   const tools = createAssistantTools(supabase, user.id);
 
   try {
     const result = streamText({
-      model: google(modelName) as any,
+      model,
       system: SYSTEM_PROMPT,
       messages: recentMessages,
       tools,
