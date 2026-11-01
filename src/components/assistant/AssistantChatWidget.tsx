@@ -12,21 +12,41 @@ import {
   Check,
   AlertCircle,
   Trash2,
-  User,
-  Bot,
-  Calendar,
-  FileText,
-  Clock,
-  ArrowRight
+  Copy,
+  CalendarClock,
+  Search,
+  PenLine,
+  ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+
+// Starter prompts shown on the hub card and as quick chips under the conversation.
+const MISSIONS: { icon: React.ReactNode; label: string; prompt: string }[] = [
+  { icon: <CalendarClock size={14} />, label: 'ملخص متابعات اليوم والمتأخرة', prompt: 'هاتلي ملخص متابعات اليوم والمتأخرة' },
+  { icon: <Search size={14} />, label: 'مين العميل اللي سأل عن النرجس؟', prompt: 'مين العميل اللي سأل عن النرجس؟' },
+  { icon: <PenLine size={14} />, label: 'رسالة واتساب لمتابعة زيارة موقع', prompt: 'اكتبلي رسالة واتساب ودية للعميل لمتابعة زيارة موقع' },
+];
+
+const timeOf = (d?: Date) =>
+  d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
 export default function AssistantChatWidget() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<any | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const initials =
+    (user?.name || '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p: string) => p[0])
+      .join('')
+      .toUpperCase() || 'ME';
 
   const {
     messages,
@@ -35,8 +55,8 @@ export default function AssistantChatWidget() {
     handleSubmit,
     isLoading,
     setMessages,
+    setInput,
     error,
-    reload,
   } = useChat({
     api: '/api/assistant',
     onError: (err) => {
@@ -117,6 +137,15 @@ export default function AssistantChatWidget() {
     setPendingAction(null);
   };
 
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('تم النسخ');
+    } catch {
+      toast.error('تعذر النسخ');
+    }
+  };
+
   return (
     <>
       {/* Floating Launcher Button */}
@@ -124,11 +153,11 @@ export default function AssistantChatWidget() {
         {!isOpen && (
           <button
             onClick={() => setIsOpen(true)}
-            className="group flex items-center justify-center gap-2 h-12 w-12 hover:w-auto hover:px-4 focus-visible:w-auto focus-visible:px-4 rounded-full bg-gradient-to-r from-primary to-lime-500 text-black font-extrabold shadow-xl active:scale-95 transition-all text-xs tracking-wide overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group flex items-center justify-center gap-2 h-12 w-12 hover:w-auto hover:px-4 focus-visible:w-auto focus-visible:px-4 rounded-full bg-lime-400 text-zinc-950 font-extrabold shadow-xl shadow-lime-500/20 active:scale-95 transition-all text-xs tracking-wide overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-300"
             aria-label="Open AI Assistant"
             title="مساعد بروكلي الذكي"
           >
-            <Sparkles size={18} className="flex-shrink-0 animate-spin" style={{ animationDuration: '4s' }} />
+            <Sparkles size={18} className="flex-shrink-0" />
             <span className="hidden group-hover:inline group-focus-visible:inline whitespace-nowrap">مساعد بروكلي الذكي</span>
           </button>
         )}
@@ -136,33 +165,43 @@ export default function AssistantChatWidget() {
 
       {/* Slide-over Chat Panel */}
       {isOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-card border-l border-border shadow-2xl flex flex-col transition-all duration-300 animate-in slide-in-from-right">
+        <div
+          role="dialog"
+          aria-label="Brokly Copilot"
+          className="fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-full flex-col border-l border-white/10 bg-[#0B0E14] text-zinc-200 shadow-2xl animate-in slide-in-from-right duration-300 sm:w-[440px]"
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center">
-                <Sparkles size={16} />
+          <div className="flex items-center justify-between gap-3 border-b border-white/5 bg-zinc-900/60 px-4 py-3 backdrop-blur-md">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-lime-400/10 text-lime-400 ring-1 ring-lime-400/40">
+                <Sparkles size={18} />
+                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0B0E14] bg-lime-400" aria-hidden="true" />
               </div>
-              <div>
-                <h3 className="text-xs font-bold text-foreground">مساعد بروكلي العقاري</h3>
-                <span className="text-[10px] text-muted-foreground block font-mono">
-                  Gemini Free Tier • Brokly AI
-                </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="truncate text-sm font-bold text-zinc-100">Brokly Copilot</h3>
+                  <span className="rounded-md border border-lime-400/30 bg-lime-400/10 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-lime-400">
+                    Pro
+                  </span>
+                </div>
+                <span className="block truncate text-[11px] text-zinc-500">مساعد المبيعات العقاري</span>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
               <button
                 onClick={clearChat}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
                 title="محادثة جديدة"
+                aria-label="محادثة جديدة"
               >
                 <Trash2 size={16} />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
                 title="إغلاق"
+                aria-label="إغلاق"
               >
                 <X size={18} />
               </button>
@@ -170,132 +209,132 @@ export default function AssistantChatWidget() {
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
+          <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 text-xs">
             {messages.length === 0 ? (
-              <div className="py-8 px-2 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center">
-                  <Bot size={24} />
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-md">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-lime-400/10 text-lime-400 ring-1 ring-lime-400/30">
+                    <Sparkles size={20} />
+                  </div>
+                  <h4 className="text-base font-bold leading-snug text-zinc-100">Brokly Sales Intelligence</h4>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-400">
+                    اسألني عن متطلبات العملاء وملاحظاتهم، أو متابعات اليوم، أو اطلب صياغة رسالة واتساب جاهزة. بجيب البيانات من الـ CRM
+                    نفسه ومش بخمّن.
+                  </p>
                 </div>
-                <h4 className="font-bold text-foreground text-sm">أهلاً بك! إزاي أقدر أساعدك اليوم؟</h4>
-                <p className="text-muted-foreground text-[11px] leading-relaxed max-w-xs mx-auto">
-                  اسألني عن متطلبات العملاء، ملاحظاتهم، متابعات اليوم، أو اطلب مني صياغة رسالة واتساب للعميل.
-                </p>
 
-                {/* Quick Prompts */}
-                <div className="pt-2 flex flex-col gap-1.5 text-right font-medium">
-                  <button
-                    onClick={() => {
-                      const evt = { target: { value: 'مين العميل اللي سأل عن النرجس؟' } } as any;
-                      handleInputChange(evt);
-                    }}
-                    className="p-2 rounded-xl bg-muted/50 hover:bg-muted text-foreground transition-all border border-border/50 text-[11px] text-right"
-                  >
-                    🔍 "مين العميل اللي سأل عن النرجس؟"
-                  </button>
-                  <button
-                    onClick={() => {
-                      const evt = { target: { value: 'هاتلي ملخص متابعات اليوم والمتأخرة' } } as any;
-                      handleInputChange(evt);
-                    }}
-                    className="p-2 rounded-xl bg-muted/50 hover:bg-muted text-foreground transition-all border border-border/50 text-[11px] text-right"
-                  >
-                    📅 "هاتلي ملخص متابعات اليوم والمتأخرة"
-                  </button>
-                  <button
-                    onClick={() => {
-                      const evt = { target: { value: 'اكتبلي رسالة واتساب ودية للعميل لمتابعة زيارة موقع' } } as any;
-                      handleInputChange(evt);
-                    }}
-                    className="p-2 rounded-xl bg-muted/50 hover:bg-muted text-foreground transition-all border border-border/50 text-[11px] text-right"
-                  >
-                    💬 "اكتبلي رسالة واتساب ودية لمتابعة زيارة موقع"
-                  </button>
+                <div className="space-y-2">
+                  <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">اقتراحات سريعة</p>
+                  {MISSIONS.map((m) => (
+                    <button
+                      key={m.label}
+                      type="button"
+                      onClick={() => setInput(m.prompt)}
+                      className="flex min-h-[44px] w-full items-center gap-3 rounded-xl border border-white/10 bg-zinc-900/60 px-3 text-start text-[12px] font-medium text-zinc-200 transition-all duration-200 hover:border-lime-400/50 hover:bg-zinc-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
+                    >
+                      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-lime-400/10 text-lime-400">
+                        {m.icon}
+                      </span>
+                      <span className="flex-1">{m.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
               messages.map((m) => {
                 const isUser = m.role === 'user';
                 return (
-                  <div
-                    key={m.id}
-                    className={`flex gap-2.5 ${isUser ? 'flex-row-reverse text-left' : 'flex-row text-right'}`}
-                  >
-                    <div
-                      className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] ${
-                        isUser
-                          ? 'bg-foreground text-background'
-                          : 'bg-primary/20 text-primary font-bold'
-                      }`}
-                    >
-                      {isUser ? <User size={13} /> : <Bot size={13} />}
+                  <div key={m.id} className={`flex flex-col gap-1.5 ${isUser ? 'items-end' : 'items-start'}`}>
+                    <div className={`flex items-center gap-2 px-1 text-[10px] text-zinc-500 ${isUser ? 'flex-row-reverse' : ''}`}>
+                      <span
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold ${
+                          isUser ? 'bg-zinc-700 text-zinc-100' : 'bg-lime-400/10 text-lime-400 ring-1 ring-lime-400/30'
+                        }`}
+                      >
+                        {isUser ? initials : <Sparkles size={11} />}
+                      </span>
+                      <span className="font-semibold text-zinc-400">{isUser ? user?.name || 'أنت' : 'Brokly Copilot'}</span>
+                      {timeOf((m as any).createdAt) && <span>{timeOf((m as any).createdAt)}</span>}
                     </div>
 
-                    <div className="space-y-1.5 max-w-[85%]">
+                    {m.content && (
                       <div
-                        className={`p-3 rounded-2xl leading-relaxed whitespace-pre-wrap ${
+                        dir="auto"
+                        className={`max-w-[92%] whitespace-pre-wrap rounded-2xl px-3.5 py-3 text-[13px] leading-relaxed ${
                           isUser
-                            ? 'bg-primary text-black font-semibold rounded-tr-none'
-                            : 'bg-muted text-foreground border border-border rounded-tl-none'
+                            ? 'rounded-te-sm bg-zinc-800 text-zinc-100'
+                            : 'rounded-ts-sm border border-white/10 bg-zinc-900/70 text-zinc-200'
                         }`}
                       >
                         {m.content}
+                        {!isUser && (
+                          <div className="mt-2.5 flex justify-end border-t border-white/5 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => copyText(m.content)}
+                              className="flex min-h-[32px] items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-lime-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
+                            >
+                              <Copy size={12} /> نسخ
+                            </button>
+                          </div>
+                        )}
                       </div>
+                    )}
 
-                      {/* Tool Output Details & Action Buttons (Lead Card / WhatsApp) */}
-                      {m.toolInvocations?.map((inv) => {
-                        if (inv.state !== 'result' || !inv.result) return null;
-                        const res = inv.result;
+                    {/* Tool Output Details & Action Buttons (Lead Card / WhatsApp) */}
+                    {m.toolInvocations?.map((inv) => {
+                      if (inv.state !== 'result' || !inv.result) return null;
+                      const res = inv.result;
 
-                        if (res.leads && Array.isArray(res.leads)) {
-                          return (
-                            <div key={inv.toolCallId} className="space-y-2 pt-1">
-                              {res.leads.map((lead: any) => (
-                                <div
-                                  key={lead.leadId}
-                                  className="p-2.5 rounded-xl bg-card border border-border space-y-1.5 text-right shadow-sm"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-bold text-foreground">{lead.name}</span>
-                                    <span className="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                      {lead.status || 'Active'}
-                                    </span>
-                                  </div>
-
-                                  {lead.matchingSnippet && (
-                                    <p className="text-[11px] text-muted-foreground bg-muted/40 p-1.5 rounded">
-                                      📝 "{lead.matchingSnippet}"
-                                    </p>
-                                  )}
-
-                                  <div className="flex items-center justify-end gap-2 pt-1">
-                                    {lead.whatsappUrl && (
-                                      <a
-                                        href={lead.whatsappUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 text-[10px] font-bold flex items-center gap-1 transition-all"
-                                      >
-                                        <MessageCircle size={12} />
-                                        <span>واتساب</span>
-                                      </a>
-                                    )}
-                                    <Link
-                                      href={lead.openUrl || `/leads-management?leadId=${lead.leadId}`}
-                                      className="px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-bold flex items-center gap-1 transition-all"
-                                    >
-                                      <ExternalLink size={12} />
-                                      <span>عرض العميل</span>
-                                    </Link>
-                                  </div>
+                      if (res.leads && Array.isArray(res.leads)) {
+                        return (
+                          <div key={inv.toolCallId} className="w-full max-w-[92%] space-y-2">
+                            {res.leads.map((lead: any) => (
+                              <div
+                                key={lead.leadId}
+                                className="space-y-2.5 rounded-2xl border border-white/10 bg-zinc-900/70 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="truncate text-sm font-bold text-zinc-100">{lead.name}</span>
+                                  <span className="flex-shrink-0 rounded-full border border-lime-400/30 bg-lime-400/10 px-2 py-0.5 text-[10px] font-semibold text-lime-400">
+                                    {lead.status || 'Active'}
+                                  </span>
                                 </div>
-                              ))}
-                            </div>
-                          );
-                        }
 
-                        return null;
-                      })}
-                    </div>
+                                {lead.matchingSnippet && (
+                                  <p dir="auto" className="rounded-lg bg-white/[0.03] p-2 text-[11px] leading-relaxed text-zinc-400">
+                                    📝 &quot;{lead.matchingSnippet}&quot;
+                                  </p>
+                                )}
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {lead.whatsappUrl && (
+                                    <a
+                                      href={lead.whatsappUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-lime-400 px-3 text-[12px] font-bold text-zinc-950 shadow-lg shadow-lime-500/10 transition-all hover:bg-lime-300 active:scale-[0.98]"
+                                    >
+                                      <MessageCircle size={14} />
+                                      <span>واتساب</span>
+                                    </a>
+                                  )}
+                                  <Link
+                                    href={lead.openUrl || `/leads-management?lead=${lead.leadId}`}
+                                    className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-zinc-800/60 px-3 text-[12px] font-semibold text-zinc-200 transition-all hover:border-lime-400/50 hover:bg-zinc-800"
+                                  >
+                                    <ExternalLink size={14} />
+                                    <span>عرض العميل</span>
+                                  </Link>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })}
                   </div>
                 );
               })
@@ -303,18 +342,18 @@ export default function AssistantChatWidget() {
 
             {/* Pending Write Action Preview Card */}
             {pendingAction && (
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-right space-y-2.5 animate-in fade-in">
-                <div className="flex items-center gap-1.5 text-amber-500 font-bold text-xs">
+              <div className="space-y-2.5 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3.5 animate-in fade-in">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
                   <AlertCircle size={16} />
                   <span>تأكيد الإجراء المطلوب</span>
                 </div>
-                <p className="text-foreground text-[11px] font-medium leading-relaxed">
+                <p dir="auto" className="text-[12px] font-medium leading-relaxed text-zinc-200">
                   {pendingAction.message}
                 </p>
 
                 {pendingAction.text && (
-                  <div className="p-2 rounded bg-card border border-border text-[11px] font-mono text-muted-foreground">
-                    "{pendingAction.text}"
+                  <div dir="auto" className="rounded-lg border border-white/10 bg-zinc-900/70 p-2 font-mono text-[11px] text-zinc-400">
+                    &quot;{pendingAction.text}&quot;
                   </div>
                 )}
 
@@ -322,14 +361,14 @@ export default function AssistantChatWidget() {
                   <button
                     onClick={handleCancelAction}
                     disabled={isConfirming}
-                    className="px-3 py-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground text-[11px] font-semibold"
+                    className="min-h-[40px] rounded-lg px-3 text-[12px] font-semibold text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-white"
                   >
                     إلغاء
                   </button>
                   <button
                     onClick={() => handleConfirmAction(pendingAction)}
                     disabled={isConfirming}
-                    className="px-4 py-1.5 rounded-lg bg-primary text-black font-extrabold text-[11px] flex items-center gap-1.5 hover:brightness-110 active:scale-95 transition-all"
+                    className="flex min-h-[40px] items-center gap-1.5 rounded-lg bg-lime-400 px-4 text-[12px] font-extrabold text-zinc-950 transition-all hover:bg-lime-300 active:scale-95 disabled:opacity-60"
                   >
                     {isConfirming ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
                     <span>تأكيد وتنفيذ</span>
@@ -339,14 +378,14 @@ export default function AssistantChatWidget() {
             )}
 
             {isLoading && (
-              <div className="flex items-center gap-2 text-muted-foreground text-[11px] py-1">
-                <Loader2 size={14} className="animate-spin text-primary" />
+              <div className="flex items-center gap-2 px-1 py-1 text-[11px] text-zinc-400" role="status">
+                <Loader2 size={14} className="animate-spin text-lime-400" />
                 <span>جاري البحث والتحليل...</span>
               </div>
             )}
 
             {error && (
-              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] flex items-center gap-2">
+              <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-[11px] text-red-300" role="alert">
                 <AlertCircle size={14} className="shrink-0" />
                 <span>حدث خطأ في استلام الرد. برجاء المحاولة مجدداً.</span>
               </div>
@@ -355,10 +394,27 @@ export default function AssistantChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Quick prompts while chatting */}
+          {messages.length > 0 && (
+            <div className="custom-scrollbar flex gap-2 overflow-x-auto border-t border-white/5 px-3 py-2">
+              {MISSIONS.map((m) => (
+                <button
+                  key={m.label}
+                  type="button"
+                  onClick={() => setInput(m.prompt)}
+                  className="flex min-h-[36px] flex-shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-zinc-900/60 px-3 text-[11px] font-medium text-zinc-300 transition-all hover:border-lime-400/50 hover:text-lime-400"
+                >
+                  <span className="text-lime-400">{m.icon}</span>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Message Input Box */}
           <form
             onSubmit={handleSubmit}
-            className="p-3 border-t border-border bg-card/80 backdrop-blur-sm flex items-center gap-2"
+            className="flex items-center gap-2 border-t border-white/5 bg-zinc-900/60 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
           >
             <input
               type="text"
@@ -367,16 +423,21 @@ export default function AssistantChatWidget() {
               placeholder="اكتب سؤالك أو طلبك هنا..."
               disabled={isLoading}
               dir="auto"
-              className="flex-1 py-2 px-3 bg-muted/60 border border-border rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-all"
+              aria-label="رسالة للمساعد"
+              className="min-h-[44px] flex-1 rounded-full border border-zinc-800 bg-zinc-900/80 px-4 text-base text-zinc-100 placeholder:text-zinc-500 transition-colors focus:border-lime-400/80 focus:outline-none focus:ring-1 focus:ring-lime-400 sm:text-sm"
             />
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="p-2 rounded-xl bg-primary text-black hover:brightness-110 active:scale-95 disabled:opacity-40 transition-all"
+              aria-label="إرسال"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-lime-400 text-zinc-950 shadow-lg shadow-lime-500/10 transition-all hover:bg-lime-300 active:scale-95 disabled:opacity-40"
             >
-              <Send size={15} />
+              <Send size={16} />
             </button>
           </form>
+          <p className="flex items-center justify-center gap-1.5 bg-zinc-900/60 px-3 pb-2 text-center text-[10px] text-zinc-600">
+            <ShieldCheck size={11} /> قد تحتوي الردود على أخطاء، راجع البيانات قبل أي إجراء.
+          </p>
         </div>
       )}
     </>

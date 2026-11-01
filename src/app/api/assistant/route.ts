@@ -45,13 +45,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Grok (xAI) is used when XAI_API_KEY is set; otherwise Gemini.
-  const useGrok = !!process.env.XAI_API_KEY;
-  const apiKey = useGrok ? process.env.XAI_API_KEY : process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  // Groq is used when GROQ_API_KEY is set (keys start with gsk_); otherwise Gemini.
+  const useGroq = !!process.env.GROQ_API_KEY;
+  const apiKey = useGroq ? process.env.GROQ_API_KEY : process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
     return new Response(
       JSON.stringify({
-        error: 'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح XAI_API_KEY (Grok) أو GOOGLE_GENERATIVE_AI_API_KEY (Gemini).',
+        error: 'خدمة المساعد الذكي غير مهيأة حالياً. برجاء التأكد من تعيين مفتاح GROQ_API_KEY (Groq) أو GOOGLE_GENERATIVE_AI_API_KEY (Gemini).',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
@@ -69,15 +69,15 @@ export async function POST(request: Request) {
   const recentMessages = body.messages.slice(-10);
 
   let model: any;
-  if (useGrok) {
-    // Loaded lazily so the Gemini path keeps working even if @ai-sdk/xai is not installed.
+  if (useGroq) {
+    // Loaded lazily so the Gemini path keeps working even if @ai-sdk/groq is not installed.
     try {
-      const { xai } = await import('@ai-sdk/xai');
-      model = xai(process.env.XAI_MODEL || 'grok-3-mini');
+      const { groq } = await import('@ai-sdk/groq');
+      model = groq(process.env.GROQ_MODEL || 'llama-3.3-70b-versatile');
     } catch (e) {
-      console.error('Grok provider unavailable (run npm install):', e);
+      console.error('Groq provider unavailable (run npm install):', e);
       return new Response(
-        JSON.stringify({ error: 'مزوّد Grok غير مثبّت على الخادم. شغّل npm install ثم أعد النشر.' }),
+        JSON.stringify({ error: 'مزوّد Groq غير مثبّت على الخادم. شغّل npm install ثم أعد النشر.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
