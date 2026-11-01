@@ -1,6 +1,6 @@
 'use client';
 import React, { useMemo, useState } from 'react';
-import { PanelEmpty, PanelError, PanelSkeleton } from './StatusBadge';
+import { CountBadge, PanelEmpty, PanelError, PanelSkeleton, leadsLink } from './StatusBadge';
 import type { AssignedData, Loadable } from './types';
 import { nf } from './utils';
 
@@ -105,7 +105,7 @@ export default function AssignedReport({ state, teamId, onTeamChange, onRetry }:
                   </td>
                   <td className="px-4 py-3 text-end tabular-nums text-slate-200">{nf(r.leadsAssigned)}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-slate-300">{nf(r.assignFrom)}</td>
-                  <td className="px-4 py-3 text-end font-semibold tabular-nums text-lime-400">{nf(r.total)}</td>
+                  <td className="px-4 py-3 text-end"><CountBadge value={r.total} tone="lime" href={leadsLink(r.agentName)} /></td>
                 </tr>
               ))}
               <tr className="border-t-2 border-slate-700 bg-slate-900/60 font-semibold">

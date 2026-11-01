@@ -520,22 +520,34 @@ async function applyLeadFilters(
   if (source) query = query.eq('source', source);
   if (agent) {
     try {
-      const { data: matchedUsers } = await supabase
+      // An exact (case-insensitive) name wins, so "aya" never also matches "Maya".
+      const exactName = agent.replace(/[\\%_]/g, '');
+      const { data: exactUsers } = await supabase
         .from('user_profiles')
         .select('id')
-        .ilike('full_name', `%${agent}%`);
-      const userIds = (matchedUsers || []).map((u: any) => u.id);
+        .ilike('full_name', exactName);
+      let userIds = (exactUsers || []).map((u: any) => u.id);
+      if (!userIds.length) {
+        const { data: matchedUsers } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .ilike('full_name', `%${agent}%`);
+        userIds = (matchedUsers || []).map((u: any) => u.id);
+      }
       if (userIds.length > 0) {
+        // Filter by the REAL owner (assigned_to / co-assignees). The `agent` text column is a
+        // stale copy on many leads, so it only counts for leads that have no owner at all.
         const { data: laRows } = await supabase
           .from('lead_assignees')
           .select('lead_id')
           .in('user_id', userIds);
-        const extraIds = (laRows || []).map((r: any) => r.lead_id);
-        if (extraIds.length > 0) {
-          query = query.or(`agent.ilike.%${agent}%,id.in.(${extraIds.join(',')})`);
-        } else {
-          query = query.or(`agent.ilike.%${agent}%,assigned_to.in.(${userIds.join(',')})`);
-        }
+        const extraIds = (laRows || []).map((r: any) => r.lead_id).slice(0, 150);
+        const parts = [
+          `assigned_to.in.(${userIds.join(',')})`,
+          `and(assigned_to.is.null,agent.ilike.%${agent}%)`,
+        ];
+        if (extraIds.length > 0) parts.push(`id.in.(${extraIds.join(',')})`);
+        query = query.or(parts.join(','));
       } else {
         query = query.ilike('agent', `%${agent}%`);
       }

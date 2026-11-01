@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import type { CallBucket } from './types';
 
@@ -39,20 +40,32 @@ export function DirectionBadge({ direction }: { direction: string | null | undef
 }
 
 /** Small numeric pill used by the funnel grid. */
-export function CountBadge({ value, tone = 'slate' }: { value: number; tone?: 'slate' | 'lime' | 'purple' | 'emerald' }) {
+export function CountBadge({ value, tone = 'slate', href }: { value: number; tone?: 'slate' | 'lime' | 'purple' | 'emerald'; href?: string }) {
   const tones = {
     slate: 'bg-slate-800/70 text-slate-200 border-slate-700/60',
     lime: 'bg-lime-400/10 text-lime-400 border-lime-400/20',
     purple: 'bg-violet-600/15 text-violet-300 border-violet-500/25',
     emerald: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   } as const;
-  return (
-    <span
-      className={`inline-flex min-w-[2.5rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums ${tones[tone]}`}
-    >
-      {value}
-    </span>
-  );
+  const cls = `inline-flex min-w-[2.5rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums ${tones[tone]}`;
+  // Counts open the matching leads in Leads Management (nothing to open when the count is 0).
+  if (href && value > 0) {
+    return (
+      <Link href={href} className={`${cls} hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400`} title="Open these leads">
+        {value}
+      </Link>
+    );
+  }
+  return <span className={cls}>{value}</span>;
+}
+
+/** /leads-management deep link: owner by name and/or an exact stage. */
+export function leadsLink(agentName?: string, stage?: string): string {
+  const q = new URLSearchParams();
+  if (agentName) q.set('agent', agentName);
+  if (stage) q.set('status', stage);
+  const s = q.toString();
+  return s ? `/leads-management?${s}` : '/leads-management';
 }
 
 /** Skeleton + empty + error building blocks shared by the analytics views. */

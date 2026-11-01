@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { CountBadge, PanelEmpty, PanelError, PanelSkeleton } from './StatusBadge';
+import { CountBadge, PanelEmpty, PanelError, PanelSkeleton, leadsLink } from './StatusBadge';
 import { TeamChips } from './AssignedReport';
 import { ALL_STATUSES } from '@/lib/ui';
 import type { AssignedData, Loadable } from './types';
@@ -87,10 +87,10 @@ export default function FunnelMatrix({ state, teamId, onTeamChange, onRetry, con
                   <td className="px-3 py-3 text-center font-semibold tabular-nums text-[#00EBFF]">{nf(r.calls)}</td>
                   {stages.map((s) => (
                     <td key={s} className="px-3 py-3 text-center">
-                      <CountBadge value={r.allStages?.[s] || 0} tone={TONE[s] || 'slate'} />
+                      <CountBadge value={r.allStages?.[s] || 0} tone={TONE[s] || 'slate'} href={leadsLink(r.agentName, s)} />
                     </td>
                   ))}
-                  <td className="px-3 py-3 text-center font-semibold tabular-nums text-lime-400">{nf(r.total)}</td>
+                  <td className="px-3 py-3 text-center font-semibold tabular-nums text-lime-400"><CountBadge value={r.total} tone="lime" href={leadsLink(r.agentName)} /></td>
                 </tr>
               ))}
               <tr className="border-t-2 border-slate-700 bg-slate-900/60 font-semibold">
@@ -98,7 +98,7 @@ export default function FunnelMatrix({ state, teamId, onTeamChange, onRetry, con
                 <td className="px-3 py-3 text-center tabular-nums text-[#00EBFF]">{nf(totalCalls)}</td>
                 {stages.map((s) => (
                   <td key={s} className="px-3 py-3 text-center tabular-nums text-slate-100">
-                    {nf(stageTotal(s))}
+                    <CountBadge value={stageTotal(s)} href={leadsLink(undefined, s)} />
                   </td>
                 ))}
                 <td className="px-3 py-3 text-center tabular-nums text-lime-400">{nf(totalLeads)}</td>
