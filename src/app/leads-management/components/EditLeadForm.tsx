@@ -364,8 +364,20 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
     <form
       onSubmit={handleSubmit(onFormSubmit)}
       noValidate
-      className="flex min-h-0 flex-col [&_.input-base]:min-h-[44px] [&_.input-base]:text-base sm:[&_.input-base]:min-h-0 sm:[&_.input-base]:text-sm"
+      className="flex min-h-0 flex-col bg-[#0B0E14] text-zinc-200 [color-scheme:dark] [&_.label-base]:text-xs [&_.label-base]:font-medium [&_.label-base]:text-zinc-300 [&_.input-base]:min-h-[44px] [&_.input-base]:rounded-lg [&_.input-base]:border-zinc-800 [&_.input-base]:bg-zinc-900/80 [&_.input-base]:text-base [&_.input-base]:text-zinc-100 [&_.input-base]:transition-colors [&_.input-base]:placeholder:text-zinc-500 [&_.input-base:focus]:border-lime-400/80 [&_.input-base:focus]:ring-1 [&_.input-base:focus]:ring-lime-400 sm:[&_.input-base]:min-h-0 sm:[&_.input-base]:text-sm [&_details]:border-white/10 [&_details]:bg-zinc-900/60 [&_details]:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] [&_summary]:bg-white/[0.03] [&_summary]:text-zinc-100 [&_summary_.bg-primary]:bg-lime-400 [&_summary_.bg-primary]:text-zinc-950 [&_.text-foreground]:text-zinc-100 [&_.text-muted-foreground]:text-zinc-400 [&_.border-border]:border-white/10"
     >
+      <div className="flex flex-wrap items-center gap-2 border-b border-white/5 bg-zinc-900/60 px-4 py-3 backdrop-blur-md sm:px-6">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-lime-400/10 text-sm font-bold text-lime-400 ring-1 ring-lime-400/30" aria-hidden="true">
+          {(lead.name || '?').trim().charAt(0).toUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-zinc-100">Updating profile for {lead.name || 'lead'}</p>
+          <p className="text-[11px] text-zinc-500">ID {String(lead.id || '').slice(0, 8)}</p>
+        </div>
+        <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-2.5 py-0.5 text-xs font-semibold text-lime-400">
+          {lead.status || 'Fresh Leads'}
+        </span>
+      </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:space-y-6 sm:px-6 sm:py-5 max-h-[calc(100dvh-13rem)] sm:max-h-[70vh]">
         <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
           <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
@@ -837,14 +849,14 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t border-border bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4">
-        <button type="button" onClick={onCancel} className="btn-secondary min-h-[44px] w-full sm:w-auto">
+      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t border-white/5 bg-[#0B0E14]/95 backdrop-blur-md px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4">
+        <button type="button" onClick={onCancel} className="min-h-[44px] w-full rounded-lg px-4 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 sm:w-auto">
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="btn-primary flex min-h-[44px] w-full items-center justify-center gap-2 sm:w-auto"
+          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-lime-400 px-6 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-lime-500/10 transition-all hover:bg-lime-300 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 disabled:opacity-60 sm:w-auto"
         >
           {isSubmitting && <Loader2 size={14} className="animate-spin" />}
           Save changes
