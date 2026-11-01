@@ -95,7 +95,14 @@ export async function POST(request: Request) {
       maxSteps: 5,
     });
 
-    return result.toDataStreamResponse();
+    return result.toDataStreamResponse({
+      // Surface the provider's reason (bad key, unknown model, rate limit…) instead of a blank error.
+      getErrorMessage: (e: unknown) => {
+        console.error('Assistant stream error:', e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return msg.replace(/gsk_[A-Za-z0-9]+|AIza[A-Za-z0-9_-]+/g, '***').slice(0, 300);
+      },
+    });
   } catch (error: any) {
     console.error('Assistant error:', error);
     return new Response(

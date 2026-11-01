@@ -387,7 +387,7 @@ export default function AssistantChatWidget() {
             {error && (
               <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-[11px] text-red-300" role="alert">
                 <AlertCircle size={14} className="shrink-0" />
-                <span>حدث خطأ في استلام الرد. برجاء المحاولة مجدداً.</span>
+                <span dir="auto">حدث خطأ في استلام الرد. {error.message ? `(${error.message.slice(0, 200)})` : null}</span>
               </div>
             )}
 
