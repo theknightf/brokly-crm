@@ -47,7 +47,9 @@ export const EMPTY_FILTERS: FilterState = {
 export interface FilterOptions {
   sources: string[];
   channels: string[];
+  /** every configured pipeline stage / status (admin settings) */
   agents: { id: string; name: string }[];
+  stages: string[];
 }
 
 export type Timeframe = 'day' | 'weekly' | 'monthly' | 'year';

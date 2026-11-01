@@ -11,6 +11,7 @@ interface Props {
   teamId: string;
   onTeamChange: (teamId: string) => void;
   onRetry: () => void;
+  configuredStages?: string[];
 }
 
 const TONE: Record<string, 'lime' | 'purple' | 'emerald'> = {
@@ -22,11 +23,11 @@ const TONE: Record<string, 'lime' | 'purple' | 'emerald'> = {
 };
 
 /** Every pipeline stage, in the app's stage order, plus any extra stage found in the data. */
-export function stageColumns(agents: { allStages: Record<string, number> }[]): string[] {
+export function stageColumns(agents: { allStages: Record<string, number> }[], configured: string[] = []): string[] {
   const present = new Set<string>();
   agents.forEach((a) => Object.keys(a.allStages || {}).forEach((s) => present.add(s)));
   const known = ALL_STATUSES;
-  const extra = Array.from(present)
+  const extra = Array.from(new Set([...configured, ...present]))
     .filter((s) => !ALL_STATUSES.includes(s))
     .sort();
   return [...known, ...extra];
@@ -36,10 +37,10 @@ export function stageColumns(agents: { allStages: Record<string, number> }[]): s
  * One row per agent: total calls, the lead count in EVERY pipeline stage (current stage), and the
  * agent's total leads. The last row sums the rows above it.
  */
-export default function FunnelMatrix({ state, teamId, onTeamChange, onRetry }: Props) {
+export default function FunnelMatrix({ state, teamId, onTeamChange, onRetry, configuredStages = [] }: Props) {
   const data = state.data;
   const visible = (data?.agents ?? []).filter((r) => !teamId || r.teamId === teamId);
-  const stages = stageColumns(visible);
+  const stages = stageColumns(visible, configuredStages);
   const stageTotal = (s: string) => visible.reduce((n, r) => n + (r.allStages?.[s] || 0), 0);
   const totalCalls = visible.reduce((n, r) => n + (r.calls || 0), 0);
   const totalLeads = visible.reduce((n, r) => n + r.total, 0);

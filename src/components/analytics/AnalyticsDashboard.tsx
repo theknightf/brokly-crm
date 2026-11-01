@@ -75,7 +75,7 @@ export default function AnalyticsDashboard({ embedded = false }: { embedded?: bo
             ]
           );
         } else {
-          const cols = stageColumns(agents);
+          const cols = stageColumns(agents, d.options.stages);
           exportCsv(
             `funnel-matrix-${stamp}.csv`,
             ['Agent', 'Total calls', ...cols, 'Total leads'],
@@ -223,7 +223,7 @@ export default function AnalyticsDashboard({ embedded = false }: { embedded?: bo
         <AssignedReport state={d.assigned} teamId={teamId} onTeamChange={setTeamId} onRetry={d.reload} />
       )}
       {view === 'funnel' && (
-        <FunnelMatrix state={d.assigned} teamId={teamId} onTeamChange={setTeamId} onRetry={d.reload} />
+        <FunnelMatrix state={d.assigned} teamId={teamId} onTeamChange={setTeamId} onRetry={d.reload} configuredStages={d.options.stages} />
       )}
 
       <FilterDrawer

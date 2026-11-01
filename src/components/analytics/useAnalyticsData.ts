@@ -33,7 +33,7 @@ export function useAnalyticsData(filters: FilterState, active: boolean) {
   const [overview, setOverview] = useState<Loadable<OverviewStats>>(idle());
   const [calls, setCalls] = useState<Loadable<CallsPage>>(idle());
   const [assigned, setAssigned] = useState<Loadable<AssignedData>>(idle());
-  const [options, setOptions] = useState<FilterOptions>({ sources: [], channels: [], agents: [] });
+  const [options, setOptions] = useState<FilterOptions>({ sources: [], channels: [], agents: [], stages: [] });
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [live, setLive] = useState<LiveStatus>('connecting');
