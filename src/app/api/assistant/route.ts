@@ -17,6 +17,43 @@ You can draft WhatsApp messages to clients in friendly Egyptian Arabic when requ
 
 Reply in the language the user writes (Egyptian Arabic or English).`;
 
+
+// Groq retires/renames models and not every key can use every model, so when GROQ_MODEL is not set
+// we ask Groq which models THIS key can use and pick the best tool-capable chat model.
+const GROQ_PREFERRED = [
+  'qwen/qwen3-32b',
+  'llama-3.3-70b-versatile',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'llama-3.1-8b-instant',
+];
+let groqModelCache: { id: string; at: number } | null = null;
+
+async function resolveGroqModel(apiKey: string): Promise<string> {
+  if (process.env.GROQ_MODEL) return process.env.GROQ_MODEL;
+  if (groqModelCache && Date.now() - groqModelCache.at < 10 * 60_000) return groqModelCache.id;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) {
+      const json: any = await res.json();
+      const ids: string[] = (json?.data || []).map((m: any) => String(m.id));
+      const usable = ids.filter((id) => !/whisper|guard|tts|embed|orpheus|playai/i.test(id));
+      const pick = GROQ_PREFERRED.find((p) => usable.includes(p)) || usable[0];
+      if (pick) {
+        groqModelCache = { id: pick, at: Date.now() };
+        return pick;
+      }
+    }
+  } catch {
+    /* fall through to the default */
+  }
+  return GROQ_PREFERRED[0];
+}
+
 export async function POST(request: Request) {
   // 1. Auth check - strictly use logged-in user's session client (respecting RLS)
   const supabase = await createClient();
@@ -73,7 +110,7 @@ export async function POST(request: Request) {
     // Loaded lazily so the Gemini path keeps working even if @ai-sdk/groq is not installed.
     try {
       const { groq } = await import('@ai-sdk/groq');
-      model = groq(process.env.GROQ_MODEL || 'llama-3.3-70b-versatile');
+      model = groq(await resolveGroqModel(apiKey as string));
     } catch (e) {
       console.error('Groq provider unavailable (run npm install):', e);
       return new Response(
@@ -93,6 +130,8 @@ export async function POST(request: Request) {
       messages: recentMessages,
       tools,
       maxSteps: 5,
+      // Qwen3 is a reasoning model: ask Groq to keep its chain-of-thought out of the answer text.
+      providerOptions: { groq: { reasoningFormat: 'hidden' } } as any,
     });
 
     return result.toDataStreamResponse({
