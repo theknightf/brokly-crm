@@ -15,6 +15,8 @@ const RecentActivity = dynamic(() => import('./components/RecentActivity'));
 const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
 const GettingStarted = dynamic(() => import('./components/GettingStarted'));
 const UnifiedMasterDashboard = dynamic(() => import('./components/UnifiedMasterDashboard'));
+const DailyLeaderboard = dynamic(() => import('./components/DailyLeaderboard'));
+const AttendanceSelfCard = dynamic(() => import('@/components/AttendanceSelfCard'));
 
 function DashboardSkeleton() {
   return (
@@ -40,6 +42,13 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const { profile, loading, user } = useAuth();
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const refresh = () => {
+    setRefreshing(true);
+    setRefreshKey((k) => k + 1);
+    setTimeout(() => setRefreshing(false), 800);
+  };
 
   // Hydration guard: while auth is resolving OR user exists but profile (role) hasn't loaded yet,
   // show a unified skeleton – prevents flash of Sales dashboard for Owner/Admin.
@@ -62,36 +71,31 @@ export default function DashboardPage() {
     );
   }
 
+  // Sales-user home: KPIs first, then today's work (follow-ups/calls + attendance), targets,
+  // pipeline stages, leaderboard, charts and activity. Refresh remounts the data sections.
   return (
     <AppLayout>
       <div className="flex flex-col gap-6">
-        <div className="order-1">
-          <DashboardHeader />
+        <DashboardHeader onRefresh={refresh} refreshing={refreshing} />
+        <DashboardKpis key={`kpi-${refreshKey}`} />
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 min-w-0">
+            <SalesFollowUpsWidget key={`fu-${refreshKey}`} />
+          </div>
+          <div className="min-w-0">
+            <AttendanceSelfCard />
+          </div>
         </div>
-        <div className="order-2">
-          <SalesFollowUpsWidget />
-        </div>
-        <div className="order-3">
-          <DashboardKpis />
-        </div>
-        <div className="order-4">
-          <MyTargetsTasks />
-        </div>
-        <div className="order-5">
-          <KPIBentoGrid />
-        </div>
-        <div className="order-6">
-          <DashboardCharts />
-        </div>
-        <div className="order-7 grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <MyTargetsTasks key={`tt-${refreshKey}`} />
+        <KPIBentoGrid key={`stages-${refreshKey}`} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <DailyLeaderboard key={`lb-${refreshKey}`} />
           <div className="hidden lg:block">
-            <RecentActivity />
-          </div>
-          <div className="lg:hidden">
-            <GettingStarted />
+            <RecentActivity key={`ra-${refreshKey}`} />
           </div>
         </div>
-        <div className="hidden lg:block order-8"><GettingStarted /></div>
+        <DashboardCharts key={`charts-${refreshKey}`} />
+        <GettingStarted />
       </div>
     </AppLayout>
   );

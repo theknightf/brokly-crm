@@ -59,7 +59,7 @@ function StatusCard({ status, count, total, colorClass, interactive }: StatusCar
     <Link
       href={`/leads-management?status=${encodeURIComponent(status)}`}
       title={`Open ${status} in Leads Management`}
-      className={`rounded-2xl border border-border bg-card p-4 flex flex-col gap-2 cursor-pointer transition-all hover:shadow-[0_0_18px_rgba(132,204,22,0.25)] hover:border-primary/50 hover:-translate-y-0.5 active:scale-[0.98]`}
+      className={`rounded-xl border border-black/5 bg-white dark:border-white/5 dark:bg-zinc-900/60 p-3.5 flex flex-col gap-2 cursor-pointer transition-colors hover:border-lime-500/40 dark:hover:border-lime-400/40 active:scale-[0.98]`}
     >
       {inner}
     </Link>
@@ -186,25 +186,12 @@ export default function KPIBentoGrid() {
         )}
       </div>
 
-      {/* Total leads hero card */}
-      <Link
-        href="/leads-management"
-        title="Open all leads in Leads Management"
-        className="rounded-2xl border border-border bg-card px-6 py-4 flex items-center justify-between cursor-pointer transition-all hover:shadow-[0_0_18px_rgba(132,204,22,0.25)] hover:border-primary/50 active:scale-[0.99]"
-      >
-        <div>
-          <p className="text-sm text-muted-foreground font-medium">Total Leads</p>
-          <p className="text-4xl font-bold text-foreground tabular-nums mt-0.5">
-            {total.toLocaleString()}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">All statuses combined</p>
-          <p className="text-sm font-semibold text-primary mt-1">
-            {ALL_STATUSES.length} stages tracked
-          </p>
-        </div>
-      </Link>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold text-foreground">Pipeline stages</h2>
+        <Link href="/leads-management" className="text-xs font-semibold text-primary hover:underline">
+          {total.toLocaleString()} leads · view all
+        </Link>
+      </div>
 
       {/* Status cards grid (admin-reorderable) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">

@@ -14,6 +14,7 @@ import {
   AlertCircle,
   MapPin,
   ArrowUpRight,
+  ChevronDown,
 } from 'lucide-react';
 import { leadsService, followUpsService, siteVisitsService } from '@/lib/services/crmService';
 import { useFollowUpSync } from '@/hooks/useFollowUpSync';
@@ -53,7 +54,7 @@ function KpiCard({ icon, iconBg, label, value, sub, href }: KpiCardProps) {
   return (
     <Link
       href={href}
-      className="card-base !p-4 flex items-start gap-3 group transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+      className="flex items-start gap-3 rounded-xl border border-black/5 bg-white p-3.5 group transition-colors hover:border-lime-500/40 active:scale-[0.98] dark:border-white/5 dark:bg-zinc-900/60 dark:hover:border-lime-400/40"
     >
       <div
         className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}
@@ -80,6 +81,7 @@ export default function DashboardKpis() {
   const [fuCounts, setFuCounts] = useState({ overdue: 0, dueToday: 0, upcoming: 0 });
   const [visits, setVisits] = useState({ scheduled: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
+  const [showMore, setShowMore] = useState(false);
 
   const load = useCallback(() => {
     return Promise.all([
@@ -113,105 +115,123 @@ export default function DashboardKpis() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="card-base !p-4 h-20 animate-pulse bg-muted/30" />
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-black/5 dark:border-white/5 h-[72px] animate-pulse bg-muted/30" />
         ))}
       </div>
     );
   }
 
+  // Primary ribbon: what a sales user checks first. Everything else stays one click away under "More metrics".
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-      <KpiCard
-        icon={<Users size={16} className="text-teal" />}
-        iconBg="bg-teal-soft"
-        label="Total leads"
-        value={stats.total.toLocaleString()}
-        href="/leads-management"
-      />
-      <KpiCard
-        icon={<Flame size={16} className="text-clay" />}
-        iconBg="bg-clay-soft"
-        label="Hot leads"
-        value={stats.hot.toLocaleString()}
-        sub="Marked as Hot"
-        href="/leads-management"
-      />
-      <KpiCard
-        icon={<UserPlus size={16} className="text-gold-dark" />}
-        iconBg="bg-gold-soft"
-        label="New leads (30d)"
-        value={stats.new30d.toLocaleString()}
-        href="/leads-management"
-      />
-      <KpiCard
-        icon={<AlertCircle size={16} className="text-dusk" />}
-        iconBg="bg-dusk-soft"
-        label="Unassigned"
-        value={stats.unassigned.toLocaleString()}
-        sub={`of ${stats.total.toLocaleString()} total`}
-        href="/leads-management"
-      />
-      <KpiCard
-        icon={<BadgeCheck size={16} className="text-gold-dark" />}
-        iconBg="bg-gold-soft"
-        label="Reservations"
-        value={stats.reservations.toLocaleString()}
-        href="/leads-management?status=Reservation"
-      />
-      <KpiCard
-        icon={<Handshake size={16} className="text-sage" />}
-        iconBg="bg-sage-soft"
-        label="Done deals"
-        value={stats.doneDeals.toLocaleString()}
-        sub={`${stats.conversionPct}% conversion`}
-        href="/deals"
-      />
-      <KpiCard
-        icon={<Wallet size={16} className="text-teal-ink" />}
-        iconBg="bg-teal-soft"
-        label="Revenue"
-        value={`EGP ${stats.revenue.toLocaleString()}`}
-        href="/reports"
-      />
-      <KpiCard
-        icon={<Clock size={16} className="text-clay" />}
-        iconBg="bg-clay-soft"
-        label="Overdue follow-ups"
-        value={fuCounts.overdue.toLocaleString()}
-        href="/follow-ups?tab=overdue"
-      />
-      <KpiCard
-        icon={<AlertCircle size={16} className="text-gold-dark" />}
-        iconBg="bg-gold-soft"
-        label="Follow-ups due today"
-        value={fuCounts.dueToday.toLocaleString()}
-        href="/follow-ups?tab=today"
-      />
-      <KpiCard
-        icon={<CalendarClock size={16} className="text-teal" />}
-        iconBg="bg-teal-soft"
-        label="Upcoming follow-ups"
-        value={fuCounts.upcoming.toLocaleString()}
-        href="/follow-ups?tab=upcoming"
-      />
-      <KpiCard
-        icon={<MapPin size={16} className="text-dusk" />}
-        iconBg="bg-dusk-soft"
-        label="Site visits"
-        value={visits.scheduled.toLocaleString()}
-        sub={`${visits.completed.toLocaleString()} completed`}
-        href="/locations"
-      />
-      <KpiCard
-        icon={<TrendingUp size={16} className="text-sage" />}
-        iconBg="bg-sage-soft"
-        label="Conversion rate"
-        value={`${stats.conversionPct}%`}
-        sub="Deals ÷ leads"
-        href="/reports"
-      />
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <KpiCard
+          icon={<Users size={16} className="text-teal" />}
+          iconBg="bg-teal-soft"
+          label="Total leads"
+          value={stats.total.toLocaleString()}
+          href="/leads-management"
+        />
+        <KpiCard
+          icon={<UserPlus size={16} className="text-gold-dark" />}
+          iconBg="bg-gold-soft"
+          label="New leads (30d)"
+          value={stats.new30d.toLocaleString()}
+          href="/leads-management"
+        />
+        <KpiCard
+          icon={<Clock size={16} className="text-clay" />}
+          iconBg="bg-clay-soft"
+          label="Overdue follow-ups"
+          value={fuCounts.overdue.toLocaleString()}
+          href="/follow-ups?tab=overdue"
+        />
+        <KpiCard
+          icon={<AlertCircle size={16} className="text-gold-dark" />}
+          iconBg="bg-gold-soft"
+          label="Due today"
+          value={fuCounts.dueToday.toLocaleString()}
+          href="/follow-ups?tab=today"
+        />
+        <KpiCard
+          icon={<BadgeCheck size={16} className="text-gold-dark" />}
+          iconBg="bg-gold-soft"
+          label="Reservations"
+          value={stats.reservations.toLocaleString()}
+          href="/leads-management?status=Reservation"
+        />
+        <KpiCard
+          icon={<Handshake size={16} className="text-sage" />}
+          iconBg="bg-sage-soft"
+          label="Done deals"
+          value={stats.doneDeals.toLocaleString()}
+          sub={`${stats.conversionPct}% conversion`}
+          href="/deals"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowMore((v) => !v)}
+        aria-expanded={showMore}
+        className="inline-flex items-center gap-1 rounded-md px-1 text-xs font-semibold text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400"
+      >
+        <ChevronDown size={14} className={`transition-transform ${showMore ? 'rotate-180' : ''}`} />
+        {showMore ? 'Fewer metrics' : 'More metrics'}
+      </button>
+
+      {showMore && (
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 animate-in fade-in">
+          <KpiCard
+            icon={<Flame size={16} className="text-clay" />}
+            iconBg="bg-clay-soft"
+            label="Hot leads"
+            value={stats.hot.toLocaleString()}
+            sub="Marked as Hot"
+            href="/leads-management"
+          />
+          <KpiCard
+            icon={<AlertCircle size={16} className="text-dusk" />}
+            iconBg="bg-dusk-soft"
+            label="Unassigned"
+            value={stats.unassigned.toLocaleString()}
+            sub={`of ${stats.total.toLocaleString()} total`}
+            href="/leads-management"
+          />
+          <KpiCard
+            icon={<CalendarClock size={16} className="text-teal" />}
+            iconBg="bg-teal-soft"
+            label="Upcoming follow-ups"
+            value={fuCounts.upcoming.toLocaleString()}
+            href="/follow-ups?tab=upcoming"
+          />
+          <KpiCard
+            icon={<MapPin size={16} className="text-dusk" />}
+            iconBg="bg-dusk-soft"
+            label="Site visits"
+            value={visits.scheduled.toLocaleString()}
+            sub={`${visits.completed.toLocaleString()} completed`}
+            href="/locations"
+          />
+          <KpiCard
+            icon={<Wallet size={16} className="text-teal-ink" />}
+            iconBg="bg-teal-soft"
+            label="Revenue"
+            value={`EGP ${stats.revenue.toLocaleString()}`}
+            href="/reports"
+          />
+          <KpiCard
+            icon={<TrendingUp size={16} className="text-sage" />}
+            iconBg="bg-sage-soft"
+            label="Conversion rate"
+            value={`${stats.conversionPct}%`}
+            sub="Deals ÷ leads"
+            href="/reports"
+          />
+        </div>
+      )}
     </div>
   );
 }
