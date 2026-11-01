@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { resilientFetch } from '@/lib/resilientFetch';
 
 const PFX = 'sb_';
 
@@ -104,6 +105,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placehol
 export function createClient() {
   return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY,
     {
+      global: { fetch: resilientFetch },
       cookies: {
         getAll: () => (canUseCookies() ? fromCookies() : fromStorage()),
         setAll(cookiesToSet) {

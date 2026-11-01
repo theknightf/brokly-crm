@@ -139,9 +139,11 @@ async function syncLeadFollowUpRow(leadId: string): Promise<void> {
 async function logActivity(actionType: string, entityType: string, entityId: string, detail = '') {
   try {
     const supabase = createClient();
+    // getSession() reads the local session; getUser() would add a network round trip to every logged action.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     await supabase.from('activity_log').insert({
       user_id: user?.id ?? undefined,
       action_type: actionType,
@@ -1330,18 +1332,28 @@ export const leadsService = {
           return 0;
         }
       };
-      const dealRows = await (async () => {
+      // Revenue is summed in SQL (deal_revenue RPC); the row fetch is only a fallback if the RPC is missing.
+      const revenuePromise = (async (): Promise<number> => {
+        try {
+          const r: any = await supabase.rpc('deal_revenue');
+          if (!r?.error && r?.data != null) return Number(r.data) || 0;
+        } catch {
+          /* fall through to the row-based fallback */
+        }
         try {
           const r = await supabase
             .from('leads')
             .select('final_price, total_price')
             .in('crm_status', ['Done Deal', 'Won']);
-          return r?.error ? [] : r.data || [];
+          return (r?.error ? [] : r.data || []).reduce(
+            (sum: number, row: any) => sum + Number(row.final_price || row.total_price || 0),
+            0
+          );
         } catch {
-          return [];
+          return 0;
         }
       })();
-      const [statusCounts, newCount, unassignedCount, hotCount] = await Promise.all([
+      const [statusCounts, newCount, unassignedCount, hotCount, revenue] = await Promise.all([
         this.getStatusCounts().catch(() => ({})),
         countExact(
           supabase
@@ -1361,16 +1373,13 @@ export const leadsService = {
             .select('id', { count: 'exact', head: true })
             .eq('lead_rating', 'Hot')
         ),
+        revenuePromise,
       ]);
       const doneDeals =
         Number((statusCounts as Record<string, number>)['Done Deal'] || 0) +
         Number((statusCounts as Record<string, number>)['Won'] || 0);
       const total = Object.values(statusCounts as Record<string, number>).reduce(
         (sum: number, v: any) => sum + Number(v || 0),
-        0
-      );
-      const revenue = (dealRows || []).reduce(
-        (sum: number, r: any) => sum + Number(r.final_price || r.total_price || 0),
         0
       );
       return {

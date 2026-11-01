@@ -33,6 +33,8 @@ export default function DeductionAlertProvider() {
 
     // Poll fallback + initial unread check
     const poll = async () => {
+      // Realtime already delivers new alerts; this is only a fallback, so skip it in background tabs.
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         const res = await fetch('/api/notifications/my-alerts?unread=true&limit=10', { cache: 'no-store' });
         if (!res.ok) return;
@@ -41,7 +43,7 @@ export default function DeductionAlertProvider() {
       } catch {}
     };
     poll();
-    const interval = setInterval(poll, 15000);
+    const interval = setInterval(poll, 60000);
 
     // Realtime via Supabase (when publication enabled)
     try {

@@ -378,8 +378,15 @@ export default function NotificationBell() {
     if (!user) return;
     const client = createClient();
     let channel: ReturnType<typeof client.channel> | null = null;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
     try {
-      const refresh = () => load();
+      // activity_log gets an INSERT for nearly every action by every user; reloading on each one made
+      // every open tab hammer the database. Coalesce bursts into one reload and skip background tabs.
+      const refresh = () => {
+        if (document.visibilityState === 'hidden') return;
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => load(), 8000);
+      };
       channel = client
         .channel('notif-bell')
         .on(
@@ -392,9 +399,12 @@ export default function NotificationBell() {
     } catch {
       // realtime unavailable — polling covers updates
     }
-    const poll = setInterval(load, 30000);
+    const poll = setInterval(() => {
+      if (document.visibilityState !== 'hidden') load();
+    }, 60000);
     return () => {
       clearInterval(poll);
+      if (debounce) clearTimeout(debounce);
       if (channel) client.removeChannel(channel);
     };
   }, [user, load]);
