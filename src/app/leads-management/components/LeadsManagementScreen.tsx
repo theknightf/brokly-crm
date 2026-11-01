@@ -460,6 +460,8 @@ export default function LeadsManagementScreen({
 
   // The counts query pages through every lead, so never run two at once: while one is in flight,
   // further requests collapse into a single re-run with the latest filters.
+  const skipCountsRef = useRef(false);
+  const countsKeyRef = useRef<string | null>(null);
   const countsBusyRef = useRef(false);
   const countsAgainRef = useRef<{ f?: FilterState } | null>(null);
   const loadStatusCounts = useCallback(async (overrideFilters?: FilterState): Promise<void> => {
@@ -496,10 +498,6 @@ export default function LeadsManagementScreen({
       if (again) void loadStatusCounts(again.f);
     }
   }, []);
-
-  useEffect(() => {
-    void loadStatusCounts();
-  }, [loadStatusCounts]);
 
   // Keep URL search params in sync with active filters so opening a lead,
   // logging a call, drawer closes, or router navigation never wipes active filters
@@ -606,6 +604,10 @@ export default function LeadsManagementScreen({
   const fetchLeads = useCallback(async (overrideFilters?: FilterState) => {
     const activeFilters = overrideFilters || filtersRef.current;
     const requestId = ++fetchRef.current;
+    // Stage counts ignore the stage filter, page and sort: start them alongside the list (not after
+    // it) and skip them when only the stage / page / sort changed.
+    if (skipCountsRef.current) skipCountsRef.current = false;
+    else void loadStatusCounts(activeFilters);
     if (firstLoadRef.current) setLoading(true);
     try {
       const res = await leadsService.getPage({
@@ -634,7 +636,6 @@ export default function LeadsManagementScreen({
       setLeads((res.data || []) as Lead[]);
       setTotal(res.total);
       setLoadError(null);
-      void loadStatusCounts(activeFilters);
     } catch (err: any) {
       if (requestId !== fetchRef.current) return;
       setLoadError(err?.message || 'Failed to load leads');
@@ -655,6 +656,12 @@ export default function LeadsManagementScreen({
   useEffect(() => {
     const isSearchTyping = !firstLoadRef.current && prevSearchRef.current !== filters.search;
     prevSearchRef.current = filters.search;
+
+    // Counts depend on every filter except the stage: reuse them when only stage/page/sort changed.
+    const { status: _stage, ...countFilters } = filters;
+    const countsKey = JSON.stringify(countFilters);
+    skipCountsRef.current = countsKeyRef.current === countsKey;
+    countsKeyRef.current = countsKey;
 
     if (!isSearchTyping) {
       fetchLeads();
