@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 
 import {
   BarChart3,
+  Activity,
   Loader2,
   RefreshCw,
   Users,
@@ -34,6 +35,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { exportPDF, exportCSV } from '@/lib/exportReport';
 import CallLogsReport from './CallLogsReport';
+import AnalyticsDashboard from '@/components/analytics/AnalyticsDashboard';
 import EmployeeDrawer from '@/components/employee-drawer/EmployeeDrawer';
 import { ALL_REAL_STATUSES } from '../../leads-management/components/leadStages';
 import {
@@ -342,7 +344,7 @@ function fmtMinutes(seconds: number): string {
   return `${m}m`;
 }
 
-type TabKey = 'overview' | 'leads' | 'sales' | 'team' | 'attendance' | 'calls';
+type TabKey = 'overview' | 'leads' | 'sales' | 'team' | 'attendance' | 'calls' | 'analytics';
 
 // Landing cards — a small set of friendly CATEGORY CARDS. `target` is either
 // an in-page tab key or a route to an existing dedicated page/section.
@@ -360,6 +362,7 @@ const CATEGORY_CARDS: {
   { key: 'leadsFollowUps', title: 'Leads & follow-ups', desc: 'Where leads come from and follow-up status', icon: BarChart3, target: 'leads' },
   { key: 'salesRevenue', title: 'Sales & revenue', desc: 'Deals closed and money earned', icon: DollarSign, target: 'sales' },
   { key: 'calls', title: 'Calls', desc: 'Call volume, duration and outcomes', icon: Phone, target: 'calls' },
+  { key: 'analytics', title: 'Analytics', desc: 'Calls over time, call log, assigned report and funnel matrix', icon: Activity, target: 'analytics' },
   { key: 'attendance', title: 'Attendance', desc: 'Who was on time, late or absent', icon: Clock, target: 'attendance' },
 ];
 
@@ -388,6 +391,7 @@ const VIEW_TITLES: Record<string, string> = {
   leads: 'Leads & follow-ups',
   sales: 'Sales & revenue',
   calls: 'Calls',
+  analytics: 'Analytics',
   attendance: 'Attendance',
 };
 
@@ -576,7 +580,7 @@ export default function ReportsScreen() {
     : undefined;
 
   const openReport = (target: ReportCardTarget) => {
-    if (target === 'overview' || target === 'leads' || target === 'sales' || target === 'team' || target === 'attendance' || target === 'calls') {
+    if (target === 'overview' || target === 'leads' || target === 'sales' || target === 'team' || target === 'attendance' || target === 'calls' || target === 'analytics') {
       setView(target);
     } else {
       router.push(target);
@@ -909,6 +913,9 @@ export default function ReportsScreen() {
                   </p>
                 </div>
               ) : null}
+
+              {/* Analytics (calls over time, calls log, assigned report, funnel matrix) */}
+              {view === 'analytics' && <AnalyticsDashboard embedded />}
 
               {/* Overview tab */}
               <div className={view === 'overview' ? 'block space-y-6' : 'hidden'}>
