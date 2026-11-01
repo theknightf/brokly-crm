@@ -186,8 +186,7 @@ export default function KPIBentoGrid() {
         )}
       </div>
 
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-semibold text-foreground">Pipeline stages</h2>
+      <div className="flex items-baseline justify-end gap-3">
         <Link href="/leads-management" className="text-xs font-semibold text-primary hover:underline">
           {total.toLocaleString()} leads · view all
         </Link>
