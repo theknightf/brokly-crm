@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Link from 'next/link';
 import { CountBadge, PanelEmpty, PanelError, PanelSkeleton, leadsLink } from './StatusBadge';
 import { TeamChips } from './AssignedReport';
 import { ALL_STATUSES } from '@/lib/ui';
@@ -72,7 +73,9 @@ export default function FunnelMatrix({ state, teamId, onTeamChange, onRetry, con
                 <th className="px-3 py-3 text-center font-semibold text-[#00EBFF]">Total calls</th>
                 {stages.map((s) => (
                   <th key={s} className="px-3 py-3 text-center font-semibold">
-                    {s}
+                    <Link href={leadsLink(undefined, s)} className="cursor-pointer transition-colors hover:text-lime-400" title={`Open all ${s} leads`}>
+                      {s}
+                    </Link>
                   </th>
                 ))}
                 <th className="px-3 py-3 text-center font-semibold">Total leads</th>

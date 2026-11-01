@@ -51,8 +51,13 @@ export function CountBadge({ value, tone = 'slate', href }: { value: number; ton
   // Counts open the matching leads in Leads Management (nothing to open when the count is 0).
   if (href && value > 0) {
     return (
-      <Link href={href} className={`${cls} hover:brightness-125 focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400`} title="Open these leads">
+      <Link
+        href={href}
+        className={`${cls} group/cnt cursor-pointer gap-0.5 transition-all hover:border-lime-400/50 hover:bg-slate-800/60 hover:shadow-[0_0_8px_rgba(163,230,53,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400`}
+        title="Open these leads"
+      >
         {value}
+        <ArrowUpRight size={10} aria-hidden="true" className="opacity-40 transition-opacity group-hover/cnt:opacity-100" />
       </Link>
     );
   }

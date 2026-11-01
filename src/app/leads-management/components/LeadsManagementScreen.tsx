@@ -545,12 +545,14 @@ export default function LeadsManagementScreen({
   const qpSearch = searchParams.get('search');
   const qpStatus = searchParams.get('status');
   const qpStage = searchParams.get('stage');
+  const qpAgent = searchParams.get('agent');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const leadId = params.get('lead');
     const openNew = params.get('new') === '1';
     const searchParam = params.get('search');
+    const agentParam = params.get('agent');
     const calledParam = params.get('called') as FilterState['called'];
     const actionTakenParam = params.get('actionTaken') as FilterState['actionTaken'];
 
@@ -565,6 +567,12 @@ export default function LeadsManagementScreen({
       }
       if (resolved && resolved !== prev.status) {
         updated.status = resolved;
+        changed = true;
+      }
+      if (agentParam && agentParam !== prev.agent) {
+        // Analytics deep link (?agent=&status=): replace the owner AND the stage together.
+        updated.agent = agentParam;
+        if (!resolved && prev.status) updated.status = '' as FilterState['status'];
         changed = true;
       }
       if (calledParam && calledParam !== prev.called) {
@@ -591,7 +599,7 @@ export default function LeadsManagementScreen({
         if (lead) setViewLead(lead as Lead);
       })
       .catch(() => {});
-  }, [qpLead, qpNew, qpSearch, qpStatus, qpStage]);
+  }, [qpLead, qpNew, qpSearch, qpStatus, qpStage, qpAgent]);
 
   const fetchLeads = useCallback(async (overrideFilters?: FilterState) => {
     const activeFilters = overrideFilters || filtersRef.current;
