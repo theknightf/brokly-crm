@@ -56,6 +56,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "1.2.22",
+    "@ai-sdk/xai": "1.2.18",
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
     "@dhiwise/component-tagger": "1.0.16",

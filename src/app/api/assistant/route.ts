@@ -72,10 +72,7 @@ export async function POST(request: Request) {
   if (useGrok) {
     // Loaded lazily so the Gemini path keeps working even if @ai-sdk/xai is not installed.
     try {
-      // Variable specifier + webpackIgnore: the build must not require the package (it is not in the
-      // lock file yet). Once `npm install @ai-sdk/xai` is committed this becomes a normal import.
-      const pkg = '@ai-sdk/xai';
-      const { xai } = await import(/* webpackIgnore: true */ pkg);
+      const { xai } = await import('@ai-sdk/xai');
       model = xai(process.env.XAI_MODEL || 'grok-3-mini');
     } catch (e) {
       console.error('Grok provider unavailable (run npm install):', e);
