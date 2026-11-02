@@ -92,13 +92,13 @@ export default function DressCodeEvaluationForm() {
 
       <div className="mt-4">
         <p id="dc-rating-label" className="block text-xs font-medium text-foreground mb-2">Dress Code Rating *</p>
-        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-labelledby="dc-rating-label">
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1" role="radiogroup" aria-labelledby="dc-rating-label">
           {[
             { v: 1, label: 'Casual', sub: 'Score 1 · Low' },
             { v: 2, label: 'Semi-Formal', sub: 'Score 2 · Medium' },
             { v: 3, label: 'Classic / Formal', sub: 'Score 3 · High' },
           ].map(o => (
-            <button key={o.v} type="button" role="radio" aria-checked={rating===o.v} onClick={() => setRating(o.v)} className={`p-3 rounded-xl font-bold text-sm transition-all flex flex-col items-center gap-1 border-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${rating===o.v ? 'bg-lime-500/15 border-lime-400 text-lime-600 dark:text-lime-400 shadow-[0_0_12px_rgba(163,230,53,0.2)]' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100'}`}>
+            <button key={o.v} type="button" role="radio" aria-checked={rating===o.v} onClick={() => setRating(o.v)} className={`px-2 py-2.5 rounded-lg font-semibold text-sm transition-all flex flex-col items-center gap-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${rating===o.v ? 'bg-card text-primary shadow-sm ring-1 ring-lime-500/40' : 'text-muted-foreground hover:text-foreground'}`}>
               <span className="text-sm">{o.label}</span>
               <span className="text-[11px] opacity-70">{o.sub}</span>
             </button>

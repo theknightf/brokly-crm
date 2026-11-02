@@ -137,6 +137,7 @@ export default function UnifiedMasterDashboard() {
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               Live
             </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border border-border text-[11px] font-semibold text-muted-foreground tabular-nums"><Users size={11} aria-hidden />{data.summary.presentToday}/{data.summary.totalEmployees} active</span>
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {data.period?.from} — {data.period?.to} <span className="mx-1 text-muted-foreground">•</span> {data.leadSummary?.total ?? 0} leads <span className="mx-1 text-muted-foreground">•</span> {data.summary.totalEmployees} team
