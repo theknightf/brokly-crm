@@ -17,13 +17,6 @@ function RankIcon({ rank }: { rank: number }) {
   return <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{rank}</div>;
 }
 
-function gradeOf(score: number) {
-  if (score >= 85) return { g: 'A', cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' };
-  if (score >= 70) return { g: 'B', cls: 'bg-lime-500/15 text-lime-700 dark:text-lime-400' };
-  if (score >= 55) return { g: 'C', cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' };
-  return { g: 'D', cls: 'bg-red-500/15 text-red-600 dark:text-red-400' };
-}
-
 function ScoreBar({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
   return (
     <div className="flex-1 min-w-0">
@@ -93,7 +86,6 @@ export default function WeightedLeaderboard() {
                 </div>
               </div>
               <div className="text-end flex-shrink-0">
-                <span className={`mb-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${gradeOf(u.totalScore).cls}`}>Grade {gradeOf(u.totalScore).g}</span>
                 <div className="flex items-center gap-1 justify-end"><TrendingUp size={12} className="text-primary"/><span className="text-xl font-extrabold text-primary tabular-nums">{u.totalScore}</span><span className="text-xs text-muted-foreground">/100</span></div>
                 <p className="text-[11px] text-muted-foreground">{u.metrics.totalCalls} calls · {u.metrics.presentDays}/{u.metrics.totalDays} days · {u.metrics.avgDressRating!=null ? `${u.metrics.avgDressRating}/5` : 'no rating'}</p>
               </div>

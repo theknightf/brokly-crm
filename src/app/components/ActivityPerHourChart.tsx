@@ -1,6 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
 import { BarChart3, RefreshCw } from 'lucide-react';
 
 type Hour = { hour: number; label: string; count: number };
@@ -33,15 +33,6 @@ export default function ActivityPerHourChart({ date, teamId, agentId }: { date?:
 
   const total = data.reduce((sum, d) => sum + (d.count || 0), 0);
   const peak = data.reduce<Hour | undefined>((best, d) => (!best || d.count > best.count ? d : best), undefined);
-  // Busiest 3-hour stretch, highlighted on the chart and named in the header.
-  let peakStart = -1;
-  let peakSum = 0;
-  for (let i = 0; i + 2 < data.length; i++) {
-    const sum = data[i].count + data[i + 1].count + data[i + 2].count;
-    if (sum > peakSum) { peakSum = sum; peakStart = i; }
-  }
-  const inPeak = (i: number) => peakStart >= 0 && i >= peakStart && i < peakStart + 3;
-  const peakLabel = peakStart >= 0 ? `${data[peakStart].label} – ${data[peakStart + 2].label}` : '';
   // Charts alone are not screen-reader friendly: state the key insight in words.
   const summary =
     total > 0 && peak
@@ -49,23 +40,13 @@ export default function ActivityPerHourChart({ date, teamId, agentId }: { date?:
       : 'Activity per hour: no activity recorded yet.';
 
   return (
-    <div className="dash-card p-5 h-full">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div>
-          <h2 className="font-bold text-base text-foreground flex items-center gap-2">
-            <span className="dash-icon-chip bg-lime-500/15 text-lime-600 dark:text-lime-400 !w-8 !h-8"><BarChart3 size={15} aria-hidden /></span>
-            Activity per hour
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1">9 AM – 6 PM</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {peakLabel && total > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
-              Peak {peakLabel}
-            </span>
-          )}
-          <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground tabular-nums">{total.toLocaleString()} actions</span>
-        </div>
+    <div className="dash-card p-4 h-full">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h2 className="font-bold text-sm text-foreground flex items-center gap-2">
+          <span className="dash-icon-chip bg-lime-500/15 text-lime-600 dark:text-lime-400 !w-8 !h-8"><BarChart3 size={15} aria-hidden /></span>
+          Activity Per Hour (9 AM - 6 PM)
+        </h2>
+        <span className="text-xs font-semibold text-muted-foreground tabular-nums">{total.toLocaleString()}</span>
       </div>
 
       <div className="h-[200px] text-muted-foreground">
@@ -101,7 +82,6 @@ export default function ActivityPerHourChart({ date, teamId, agentId }: { date?:
                 />
                 {/* --primary is the darker lime on the light theme and the neon lime on dark (>=3:1 vs the surface) */}
                 <Bar dataKey="count" fill="var(--primary)" radius={[6, 6, 0, 0]} maxBarSize={36} isAnimationActive={false}>
-                  {data.map((d, i) => <Cell key={d.hour} fill="var(--primary)" fillOpacity={inPeak(i) ? 1 : 0.45} />)}
                   <LabelList dataKey="count" position="top" fontSize={11} fill="currentColor" formatter={(v: any) => (v ? String(v) : '')} />
                 </Bar>
               </BarChart>

@@ -59,25 +59,18 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
       ) : (
         <div className="divide-y divide-border flex-1">
           {rows.slice(0,10).map(r=>(
-            <div key={r.user_id} className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted ${r.rank<=3 ? 'bg-gradient-to-r from-lime-500/5 to-transparent' : ''}`}>
-              <span className="relative shrink-0">
-                <span className="w-10 h-10 rounded-full bg-lime-500/10 border border-lime-500/25 flex items-center justify-center text-xs font-bold text-primary">
-                  {(r.full_name || '?').split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
-                </span>
-                <span className={`absolute -bottom-1 -end-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold tabular-nums ring-2 ring-card ${r.rank===1?'bg-amber-400 text-zinc-900': r.rank===2?'bg-slate-300 text-slate-900': r.rank===3?'bg-orange-400 text-zinc-900':'bg-muted text-muted-foreground'}`}>{r.rank}</span>
-              </span>
+            <div key={r.user_id} className={`flex items-center gap-3 p-3 transition-colors hover:bg-muted ${r.rank<=3 ? 'bg-gradient-to-r from-lime-500/5 to-transparent' : ''}`}>
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-sm tabular-nums ${r.rank===1?'bg-gradient-to-br from-amber-300 to-amber-500 text-white': r.rank===2?'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800': r.rank===3?'bg-gradient-to-br from-orange-300 to-orange-500 text-white':'bg-muted text-muted-foreground'}`}>{r.rank}</span>
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground truncate">{r.full_name}</p>
-                  <span className="text-sm font-extrabold text-primary tabular-nums shrink-0">{r.totalActions.toLocaleString()} <span className="text-xs font-medium text-muted-foreground">actions</span></span>
-                </div>
-                <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden" aria-hidden>
-                  <div className="h-full rounded-full bg-lime-500 transition-[width] duration-700 ease-out" style={{ width: `${Math.round(((r.totalActions || 0) / topActions) * 100)}%` }} />
-                </div>
-                <p className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground tabular-nums">
-                  <span>{r.calls ?? 0} calls</span><span>{r.statusUpdates ?? 0} updates</span><span>{r.meetings ?? 0} meetings</span><span>{r.deals ?? 0} deals</span>
+                <p className="text-sm font-semibold text-foreground truncate">{r.full_name}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {r.role} · {r.calls ?? 0} calls · {r.statusUpdates ?? 0} updates · {r.meetings ?? 0} meetings · {r.deals ?? 0} deals
                 </p>
+                <div className="mt-1.5 h-1 rounded-full bg-muted overflow-hidden" aria-hidden>
+                  <div className="h-full rounded-full bg-lime-500" style={{ width: `${Math.round(((r.totalActions || 0) / topActions) * 100)}%` }} />
+                </div>
               </div>
+              <span className="text-sm font-extrabold text-primary tabular-nums shrink-0">{r.totalActions.toLocaleString()} actions</span>
             </div>
           ))}
         </div>
