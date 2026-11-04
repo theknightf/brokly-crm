@@ -69,31 +69,32 @@ class _PostCallLifecycleWaiter with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
 
     if (!context.mounted) return;
-    Future.delayed(const Duration(milliseconds: 550), () async {
-      // Automatically capture and sync device call log metadata (duration, timestamp, status)
-      DeviceCallMetadata? metadata;
-      if (!kIsWeb) {
-        try {
-          metadata = await CallLogsService().captureAndSyncCallForLead(
+
+    // Capture and sync the device call log (duration, timestamp, status) in the background. This reads
+    // the OS call log and makes two Supabase calls, so it must never block the popup: the sheet opens on
+    // the next frame and applies the metadata as soon as it arrives.
+    Future<DeviceCallMetadata?>? metadataFuture;
+    if (!kIsWeb) {
+      metadataFuture = CallLogsService()
+          .captureAndSyncCallForLead(
             leadId: lead.id,
             leadName: lead.name,
             leadPhone: lead.phone,
             callStartedAt: callStartedAt,
             projectName: lead.project,
-          );
-        } catch (_) {}
-      }
+          )
+          .catchError((_) => null);
+    }
 
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!context.mounted) return;
-      final resolvedDuration = metadata != null ? metadata.durationSeconds : initialDuration;
-
       await LogCallDialog.show(
         context,
         lead: lead,
         initialChannel: 'Call',
-        initialDurationSeconds: resolvedDuration,
+        initialDurationSeconds: initialDuration,
         isPostCallPopup: true,
-        capturedMetadata: metadata,
+        metadataFuture: metadataFuture,
       );
       onCompleted?.call();
     });
@@ -127,6 +128,9 @@ class LogCallDialog extends StatefulWidget {
   final bool isPostCallPopup;
   final DeviceCallMetadata? capturedMetadata;
 
+  /// Resolves later with the device call-log entry; applied to the open sheet without blocking it.
+  final Future<DeviceCallMetadata?>? metadataFuture;
+
   const LogCallDialog({
     super.key,
     required this.lead,
@@ -134,6 +138,7 @@ class LogCallDialog extends StatefulWidget {
     this.initialDurationSeconds = 60,
     this.isPostCallPopup = false,
     this.capturedMetadata,
+    this.metadataFuture,
   });
 
   /// Dial the lead's phone number via native dialer and automatically pop up
@@ -177,6 +182,7 @@ class LogCallDialog extends StatefulWidget {
     int initialDurationSeconds = 60,
     bool isPostCallPopup = false,
     DeviceCallMetadata? capturedMetadata,
+    Future<DeviceCallMetadata?>? metadataFuture,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -190,6 +196,7 @@ class LogCallDialog extends StatefulWidget {
         initialDurationSeconds: initialDurationSeconds,
         isPostCallPopup: isPostCallPopup,
         capturedMetadata: capturedMetadata,
+        metadataFuture: metadataFuture,
       ),
     );
   }
@@ -202,6 +209,9 @@ class _LogCallDialogState extends State<LogCallDialog> {
   late String _channel;
   String _outcome = 'Answered';
   late int _durationSeconds;
+  DeviceCallMetadata? _metadata;
+  bool _durationTouched = false;
+  bool _outcomeTouched = false;
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -345,10 +355,20 @@ class _LogCallDialogState extends State<LogCallDialog> {
   void initState() {
     super.initState();
     _channel = widget.initialChannel;
-    _durationSeconds = widget.capturedMetadata?.durationSeconds ?? widget.initialDurationSeconds;
-    if (widget.capturedMetadata != null) {
-      _outcome = widget.capturedMetadata!.detectedOutcome;
+    _metadata = widget.capturedMetadata;
+    _durationSeconds = _metadata?.durationSeconds ?? widget.initialDurationSeconds;
+    if (_metadata != null) {
+      _outcome = _metadata!.detectedOutcome;
     }
+    widget.metadataFuture?.then((m) {
+      if (!mounted || m == null) return;
+      setState(() {
+        _metadata = m;
+        // Never overwrite something the user already picked while the log was loading.
+        if (!_durationTouched) _durationSeconds = m.durationSeconds;
+        if (!_outcomeTouched) _outcome = m.detectedOutcome;
+      });
+    });
     final defaultPrice = (widget.lead.budgetMax ?? widget.lead.budgetMin ?? 3500000).toInt();
     _calcPriceCtrl = TextEditingController(text: defaultPrice.toString());
 
@@ -425,17 +445,17 @@ class _LogCallDialogState extends State<LogCallDialog> {
 
     final selectedOpt = _selectedOption;
     final callLog = CallLogModel(
-      id: widget.capturedMetadata?.syncedCallLogId ?? '',
+      id: _metadata?.syncedCallLogId ?? '',
       entityType: 'lead',
       entityId: widget.lead.id,
       contactName: widget.lead.name,
       contactPhone: widget.lead.phone,
       channel: _channel,
-      direction: widget.capturedMetadata?.direction ?? 'outgoing',
+      direction: _metadata?.direction ?? 'outgoing',
       durationSeconds: _channel == 'Call' ? _durationSeconds : 0,
       outcome: _outcome,
       notes: _notesController.text.trim(),
-      clientRef: widget.capturedMetadata?.clientRef,
+      clientRef: _metadata?.clientRef,
       projectName: widget.lead.project,
     );
 
@@ -589,7 +609,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 ),
               ],
             ),
-            if (widget.capturedMetadata != null) ...[
+            if (_metadata != null) ...[
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -604,7 +624,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Device Call Synced: ${widget.capturedMetadata!.callTypeLabel} (${widget.capturedMetadata!.detectedOutcome}) • ${widget.capturedMetadata!.durationSeconds}s • ${DateFormat('HH:mm:ss').format(widget.capturedMetadata!.timestamp.toLocal())}',
+                        'Device Call Synced: ${_metadata!.callTypeLabel} (${_metadata!.detectedOutcome}) • ${_metadata!.durationSeconds}s • ${DateFormat('HH:mm:ss').format(_metadata!.timestamp.toLocal())}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -700,7 +720,10 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 final opt = _outcomeOptions[index];
                 final isSelected = opt.key == _outcome;
                 return InkWell(
-                  onTap: () => setState(() => _outcome = opt.key),
+                  onTap: () => setState(() {
+                    _outcomeTouched = true;
+                    _outcome = opt.key;
+                  }),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -890,7 +913,10 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 max: 600,
                 divisions: 60,
                 activeColor: AppColors.neonLime,
-                onChanged: (val) => setState(() => _durationSeconds = val.toInt()),
+                onChanged: (val) => setState(() {
+                  _durationTouched = true;
+                  _durationSeconds = val.toInt();
+                }),
               ),
             ],
 
