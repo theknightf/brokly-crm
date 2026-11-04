@@ -210,6 +210,27 @@ class _LogCallDialogState extends State<LogCallDialog> {
   String _outcome = 'Answered';
   late int _durationSeconds;
   DeviceCallMetadata? _metadata;
+  String? _stageOverride;
+  static const List<String> _stageChoices = [
+    'Fresh Leads',
+    'Cold Calls',
+    'Pending Leads',
+    'Following Up',
+    'Meeting',
+    'Follow Up After Meeting',
+    'Interested',
+    'Reservation',
+    'Done Deal',
+    'Not Interested',
+    'Cancellation',
+    'Wrong Number',
+    'Data Rotation',
+    'Closed Number',
+    'No Answer',
+    'No Answer At All',
+    'Low Budget',
+    'Reschedule Meeting',
+  ];
   bool _durationTouched = false;
   bool _outcomeTouched = false;
   final _notesController = TextEditingController();
@@ -388,6 +409,9 @@ class _LogCallDialogState extends State<LogCallDialog> {
   _CallOutcomeOption get _selectedOption =>
       _outcomeOptions.firstWhere((o) => o.key == _outcome, orElse: () => _outcomeOptions.first);
 
+  /// Stage the lead moves to: the user's pick, otherwise the stage suggested by the outcome.
+  String get _selectedStage => _stageOverride ?? _selectedOption.nextStage;
+
   bool get _needsSchedule =>
       _outcome == 'Follow-up' ||
       _outcome == 'Follow Up After Meeting' ||
@@ -444,6 +468,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
     }
 
     final selectedOpt = _selectedOption;
+    final stageToSave = _selectedStage;
     final callLog = CallLogModel(
       id: _metadata?.syncedCallLogId ?? '',
       entityType: 'lead',
@@ -467,7 +492,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Saved: $_outcome (${selectedOpt.labelAr}) → ${selectedOpt.nextStage}',
+            'Saved: $_outcome (${selectedOpt.labelAr}) → $stageToSave',
           ),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
@@ -483,7 +508,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
             followUpDate: followUpDateStr,
             followUpTime: followUpTimeStr,
           ),
-          leadsProvider.updateStatus(widget.lead.id, selectedOpt.nextStage),
+          leadsProvider.updateStatus(widget.lead.id, stageToSave),
         ]);
       } catch (_) {}
     }());
@@ -569,7 +594,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                               border: Border.all(color: selectedOpt.color.withAlpha(80)),
                             ),
                             child: Text(
-                              '→ ${selectedOpt.nextStage}',
+                              '→ $_selectedStage',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
@@ -722,6 +747,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 return InkWell(
                   onTap: () => setState(() {
                     _outcomeTouched = true;
+                    if (_outcome != opt.key) _stageOverride = null; // Stage 2 resets when the outcome changes
                     _outcome = opt.key;
                   }),
                   borderRadius: BorderRadius.circular(12),
@@ -788,6 +814,31 @@ class _LogCallDialogState extends State<LogCallDialog> {
                   ),
                 );
               },
+            ),
+
+            // Stage 2: the lead's next stage. Pre-selected from the outcome but always changeable.
+            const SizedBox(height: 14),
+            Text(
+              'Move lead to stage / مرحلة العميل',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final stage in _stageChoices)
+                  ChoiceChip(
+                    label: Text(stage, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                    selected: stage == _selectedStage,
+                    selectedColor: selectedOpt.color.withAlpha(isDark ? 60 : 40),
+                    onSelected: (_) => setState(() => _stageOverride = stage),
+                  ),
+              ],
             ),
 
             // Conditional Follow-up / Meeting Date & Time Section

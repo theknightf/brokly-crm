@@ -12,7 +12,8 @@ const config: CapacitorConfig = {
   // (cleartext: true allows http while testing; remove once HTTPS).
   server: {
     url: process.env.APP_ORIGIN || 'http://192.168.1.7:4028',
-    cleartext: true,
+    // Plain http is only for LAN testing; a production https origin must not allow cleartext.
+    cleartext: !(process.env.APP_ORIGIN || '').startsWith('https://'),
   },
   android: {
     allowMixedContent: true,
