@@ -62,6 +62,23 @@ class _PostCallLifecycleWaiter with WidgetsBindingObserver {
     }
   }
 
+  /// Stages a freshly worked lead can still be in; a connected call moves it to "Following Up" without any
+  /// input. Leads already further down the pipeline are never moved backwards.
+  static const _earlyStages = {
+    'Fresh Leads',
+    'Fresh Lead',
+    'Cold Calls',
+    'Pending Leads',
+    'No Answer',
+    'No Answer At All',
+  };
+
+  void _autoMarkConnected(LeadsProvider provider, DeviceCallMetadata? m) {
+    if (m == null || m.durationSeconds <= 0 || m.direction != 'outgoing') return;
+    if (!_earlyStages.contains(lead.status)) return;
+    unawaited(provider.updateStatus(lead.id, 'Following Up').catchError((_) {}));
+  }
+
   void _triggerModal({required int initialDuration}) {
     if (_modalShown) return;
     _modalShown = true;
@@ -75,6 +92,7 @@ class _PostCallLifecycleWaiter with WidgetsBindingObserver {
     // the next frame and applies the metadata as soon as it arrives.
     Future<DeviceCallMetadata?>? metadataFuture;
     if (!kIsWeb) {
+      final leadsProvider = context.read<LeadsProvider>();
       metadataFuture = CallLogsService()
           .captureAndSyncCallForLead(
             leadId: lead.id,
@@ -83,7 +101,11 @@ class _PostCallLifecycleWaiter with WidgetsBindingObserver {
             callStartedAt: callStartedAt,
             projectName: lead.project,
           )
-          .catchError((_) => null);
+          .catchError((_) => null)
+          .then((m) {
+        _autoMarkConnected(leadsProvider, m);
+        return m;
+      });
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -211,6 +233,164 @@ class _LogCallDialogState extends State<LogCallDialog> {
   late int _durationSeconds;
   DeviceCallMetadata? _metadata;
   String? _stageOverride;
+  // Post-call popup starts compact (one tap saves); "more options" expands to the full form.
+  bool _expanded = false;
+
+  // One-tap stage buttons shown at the top of the compact popup (outcome keys from _outcomeOptions).
+  static const List<String> _quickKeys = [
+    'Interested',
+    'Follow-up',
+    'Meeting',
+    'Not Interested',
+    'No Answer',
+    'Wrong Phone',
+    'Won Deal',
+  ];
+
+  /// Pick an outcome (and its stage) and save immediately; the sheet dismisses itself.
+  void _quickSave(String outcomeKey) {
+    if (_isSubmitting) return;
+    setState(() {
+      _outcomeTouched = true;
+      _outcome = outcomeKey;
+      _stageOverride = null; // the outcome's own stage
+    });
+    _submit();
+  }
+
+  Widget _buildQuickPopup(bool isDark, double bottomInset) {
+    final connected = _metadata != null && _metadata!.durationSeconds > 0;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+    final quick = [
+      for (final k in _quickKeys) _outcomeOptions.firstWhere((o) => o.key == k),
+    ];
+
+    return Container(
+      padding: EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 16 + bottomInset),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141820) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: isDark ? const Color(0xFF282D38) : AppColors.lightBorder),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.lead.name.isNotEmpty ? widget.lead.name : 'Lead',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textPrimary),
+                      ),
+                      Text(
+                        widget.lead.phone,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                if (connected)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withAlpha(25),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF10B981).withAlpha(90)),
+                    ),
+                    child: Text(
+                      'Connected • ${_metadata!.durationSeconds}s',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Tap a stage to save / اختار المرحلة',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: textMuted),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final opt in quick)
+                  SizedBox(
+                    width: (MediaQuery.of(context).size.width - 32 - 8) / 2,
+                    child: InkWell(
+                      onTap: _isSubmitting ? null : () => _quickSave(opt.key),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: opt.color.withAlpha(isDark ? 40 : 22),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: opt.color.withAlpha(110)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(opt.icon, size: 18, color: opt.color),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    opt.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: opt.color),
+                                  ),
+                                  Text(
+                                    opt.labelAr,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () => setState(() => _expanded = true),
+              icon: const Icon(LucideIcons.pencil, size: 14),
+              label: const Text('Add notes / more options'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   static const List<String> _stageChoices = [
     'Fresh Leads',
     'Cold Calls',
@@ -519,6 +699,11 @@ class _LogCallDialogState extends State<LogCallDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final selectedOpt = _selectedOption;
+
+    // Post-call popup: compact, one-tap stage buttons at the top; the full form is one tap away.
+    if (widget.isPostCallPopup && !_expanded) {
+      return _buildQuickPopup(isDark, bottomInset);
+    }
 
     return Container(
       constraints: BoxConstraints(

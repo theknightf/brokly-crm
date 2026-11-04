@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestSupabase } from '@/lib/supabase/requestAuth';
 import { ALL_REAL_STATUSES } from '@/app/leads-management/components/leadStages';
 
 export const dynamic = 'force-dynamic';
@@ -30,10 +30,7 @@ const confirmSchema = z.discriminatedUnion('action', [
  * Validates session, inputs, and relies on user-scoped Supabase client for strict RLS.
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getRequestSupabase(request);
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

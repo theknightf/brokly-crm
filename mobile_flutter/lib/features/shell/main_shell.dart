@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
+import '../assistant/assistant_screen.dart';
 import '../attendance/attendance_screen.dart';
 import '../calculator/unit_calculator_screen.dart';
 import '../call_logs/call_logs_screen.dart';
@@ -152,8 +153,29 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
       ),
-      floatingActionButton: _currentIndex == 1
-          ? FloatingActionButton(
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // AI assistant, reachable from every tab.
+          FloatingActionButton.small(
+            heroTag: 'assistant-fab',
+            backgroundColor: isDark ? AppColors.darkCard : Colors.white,
+            foregroundColor: AppColors.neonLime,
+            elevation: 3,
+            tooltip: 'Brokly AI',
+            child: const Icon(LucideIcons.sparkles, size: 18),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AssistantScreen()),
+              );
+            },
+          ),
+          if (_currentIndex == 1) ...[
+            const SizedBox(height: 10),
+            FloatingActionButton(
+              heroTag: 'add-lead-fab',
               backgroundColor: AppColors.neonLime,
               foregroundColor: const Color(0xFF142407),
               elevation: 4,
@@ -164,8 +186,10 @@ class _MainShellState extends State<MainShell> {
                   MaterialPageRoute(builder: (_) => const AddLeadScreen()),
                 );
               },
-            )
-          : null,
+            ),
+          ],
+        ],
+      ),
     );
   }
 

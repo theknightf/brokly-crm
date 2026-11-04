@@ -61,6 +61,8 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Website that hosts /api/assistant (https://...). The AI key stays on that server, never in the APK.
+          API_BASE_URL: ${{ secrets.APP_ORIGIN || vars.APP_ORIGIN }}
         run: |
           DART_DEFINES=""
           if [ -n "$SUPABASE_URL" ]; then
@@ -68,6 +70,11 @@ jobs:
           fi
           if [ -n "$SUPABASE_ANON_KEY" ]; then
             DART_DEFINES="$DART_DEFINES --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+          fi
+          if [ -n "$API_BASE_URL" ]; then
+            DART_DEFINES="$DART_DEFINES --dart-define=API_BASE_URL=$API_BASE_URL"
+          else
+            echo "::warning::APP_ORIGIN is not set; the AI assistant will show 'not configured' in this APK."
           fi
           flutter build apk --release $DART_DEFINES
 

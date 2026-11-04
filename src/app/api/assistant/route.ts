@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestSupabase } from '@/lib/supabase/requestAuth';
 import { checkRateLimit } from '@/lib/assistant/rateLimiter';
 import { createAssistantTools } from '@/lib/assistant/tools';
 
@@ -56,10 +56,8 @@ async function resolveGroqModel(apiKey: string): Promise<string> {
 
 export async function POST(request: Request) {
   // 1. Auth check - strictly use logged-in user's session client (respecting RLS)
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Cookie session (web/PWA) or Bearer access token (native app); RLS applies either way.
+  const { supabase, user } = await getRequestSupabase(request);
 
   if (!user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
