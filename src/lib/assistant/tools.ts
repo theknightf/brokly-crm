@@ -36,7 +36,9 @@ export function createAssistantTools(supabase: any, userId: string) {
       execute: async ({ query, status, limit }) => {
         const keywords = extractKeywords(query);
         const normQuery = normalizeArabic(query);
-        const term = keywords[0] || normQuery || query;
+        // Commas, parentheses, quotes and wildcards are PostgREST filter syntax: one in the user's text
+        // would break the .or() filter and the search would silently return nothing.
+        const term = (keywords[0] || normQuery || query).replace(/[,()"'\\%*]/g, ' ').trim();
 
         // Search leads table via user RLS
         let leadsQuery = supabase
@@ -86,7 +88,7 @@ export function createAssistantTools(supabase: any, userId: string) {
             matchingSnippet: l.notes ? l.notes.slice(0, 150) : null,
             noteDate: l.created_at ? l.created_at.slice(0, 10) : null,
             authorAgent: l.agent || 'Agent',
-            openUrl: `/leads-management?leadId=${l.id}`,
+            openUrl: `/leads-management?lead=${l.id}`,
             whatsappUrl: l.phone ? `https://wa.me/${l.phone.replace(/\D/g, '')}` : null,
           });
         }
@@ -105,7 +107,7 @@ export function createAssistantTools(supabase: any, userId: string) {
               matchingSnippet: c.body ? c.body.slice(0, 150) : null,
               noteDate: c.created_at ? c.created_at.slice(0, 10) : null,
               authorAgent: c.user_profiles?.full_name || 'Agent',
-              openUrl: `/leads-management?leadId=${c.leads.id}`,
+              openUrl: `/leads-management?lead=${c.leads.id}`,
               whatsappUrl: c.leads.phone ? `https://wa.me/${c.leads.phone.replace(/\D/g, '')}` : null,
             });
           }
@@ -185,7 +187,7 @@ export function createAssistantTools(supabase: any, userId: string) {
                 title: followUps[0].title,
               }
             : null,
-          openUrl: `/leads-management?leadId=${lead.id}`,
+          openUrl: `/leads-management?lead=${lead.id}`,
           whatsappUrl: lead.phone ? `https://wa.me/${lead.phone.replace(/\D/g, '')}` : null,
         };
 
