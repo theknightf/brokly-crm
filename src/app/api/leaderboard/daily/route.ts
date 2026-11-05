@@ -1,77 +1,44 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestSupabase } from '@/lib/supabase/requestAuth';
 
 export const dynamic = 'force-dynamic';
 
-const MEETING_OUTCOMES = ['Meeting', 'Schedule Meeting', 'Site Visit'];
-
-// GET /api/leaderboard/daily?date=YYYY-MM-DD
-// Ranks agents by TOTAL daily actions (desc): calls made + status updates + notes +
-// meetings logged + deals closed on that date. Breakdown is returned per agent
-// so the UI can show exactly what the number is made of.
+// GET /api/leaderboard/daily?date=YYYY-MM-DD   (date = Cairo calendar day; default: today in Cairo)
+// Ranks agents by TOTAL daily actions (desc): calls made + status updates + notes + meetings logged + deals
+// closed. The numbers come from the daily_leaderboard() SQL function, which aggregates server-side
+// (SECURITY DEFINER) so every rep sees the team board, uses the Cairo day boundaries (not UTC) and is not
+// cut off by PostgREST's 1000-row cap. "answered" counts calls where the lead actually picked up.
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user } = await getRequestSupabase(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const url = new URL(request.url);
-  const date = url.searchParams.get('date') || new Date().toISOString().slice(0,10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+  const date = url.searchParams.get('date');
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+  }
 
-  const start = `${date}T00:00:00`, end = `${date}T23:59:59.999`;
-  const db:any = supabase;
+  const { data, error } = await supabase.rpc('daily_leaderboard', { p_date: date || null });
+  if (error) {
+    console.error('daily_leaderboard failed:', error);
+    return NextResponse.json({ error: 'Could not load the leaderboard.', users: [] }, { status: 500 });
+  }
 
-  const [usersRes, callsRes, statusRes, dealsRes, notesRes, visitsRes] = await Promise.all([
-    db.from('user_profiles').select('id, full_name, email, role').eq('is_active', true).limit(100),
-    // Calls made that day (any outcome)
-    db.from('call_logs').select('user_id, outcome, created_at').gte('created_at', start).lte('created_at', end),
-    // Status updates that day
-    db.from('user_actions').select('user_id, action_type').gte('created_at', start).lte('created_at', end).eq('action_type', 'STATUS_CHANGE'),
-    // Deals closed that day (status moved to Done Deal, attributed to assignee)
-    db.from('leads').select('assigned_to, crm_status, updated_at').eq('crm_status', 'Done Deal').gte('updated_at', start).lte('updated_at', end),
-    // Notes added that day (NOTE actions are part of the action definition)
-    db.from('user_actions').select('user_id').gte('created_at', start).lte('created_at', end).eq('action_type', 'NOTE'),
-    // Field meetings / site visits checked in that day (table may not exist yet)
-    db.from('site_visits').select('user_id, check_in_at').gte('check_in_at', start).lte('check_in_at', end).then(
-      (r: any) => r,
-      () => ({ data: [] as any[] })
-    ),
-  ]);
+  const n = (v: unknown) => Number(v) || 0;
+  const users = ((data as any[]) || []).map((r, i) => ({
+    user_id: r.user_id,
+    full_name: r.full_name || 'User',
+    role: r.role || '',
+    calls: n(r.calls),
+    answered: n(r.answered_calls),
+    answeredLeads: n(r.answered_leads),
+    statusUpdates: n(r.status_updates),
+    meetings: n(r.meetings),
+    deals: n(r.deals),
+    notes: n(r.notes),
+    totalActions: n(r.total_actions),
+    rank: i + 1,
+  }));
 
-  const users = usersRes.data||[];
-  const calls = callsRes.data || [];
-  const statusUpdates = statusRes.data || [];
-  const deals = dealsRes.data || [];
-  const notes = (notesRes as any)?.data || [];
-  const visits = (visitsRes as any)?.data || [];
-
-  const countBy = (arr:any[], key:string, uid:string) => arr.filter((x:any)=> x[key]===uid).length;
-
-  const ranked = users.map((u:any)=>{
-    const userCalls = (calls as any[]).filter((x:any)=> x.user_id===u.id);
-    const callCount = userCalls.length;
-    const statusCount = countBy(statusUpdates, 'user_id', u.id);
-    const meetingCalls = userCalls.filter((x:any)=> MEETING_OUTCOMES.includes(x.outcome || '')).length;
-    const visitCount = countBy(visits, 'user_id', u.id);
-    const meetingCount = meetingCalls + visitCount;
-    const dealCount = countBy(deals, 'assigned_to', u.id);
-    const noteCount = countBy(notes, 'user_id', u.id);
-    return {
-      user_id: u.id,
-      full_name: u.full_name||u.email,
-      role: u.role,
-      calls: callCount,
-      statusUpdates: statusCount,
-      meetings: meetingCount,
-      deals: dealCount,
-      notes: noteCount,
-      totalActions: callCount + statusCount + meetingCount + dealCount + noteCount,
-    };
-  }).filter((r:any)=> r.totalActions>0).sort((a:any,b:any)=> b.totalActions - a.totalActions).map((r:any,i:number)=>({...r, rank:i+1}));
-
-  // Fill rest with 0
-  const zero = users.filter((u:any)=> !ranked.find((r:any)=>r.user_id===u.id)).map((u:any)=>({ user_id:u.id, full_name: u.full_name||u.email, role:u.role, calls:0, statusUpdates:0, meetings:0, deals:0, notes:0, totalActions:0, rank: ranked.length+1 }));
-  const all = [...ranked, ...zero].sort((a:any,b:any)=> b.totalActions - a.totalActions).map((r:any,i:number)=>({...r, rank:i+1}));
-
-  return NextResponse.json({ date, users: all, generated_at: new Date().toISOString() });
+  return NextResponse.json({ date: date || null, users, generated_at: new Date().toISOString() });
 }

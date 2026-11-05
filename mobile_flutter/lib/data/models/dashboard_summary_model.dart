@@ -48,6 +48,7 @@ class LeaderboardEntryModel {
   final int leadsCount;
   final int actionsCount;
   final int score;
+  final int answeredCount;
 
   const LeaderboardEntryModel({
     required this.userId,
@@ -61,6 +62,7 @@ class LeaderboardEntryModel {
     this.leadsCount = 0,
     this.actionsCount = 0,
     this.score = 0,
+    this.answeredCount = 0,
   });
 
   String get initials {
@@ -94,6 +96,10 @@ class DashboardSummaryModel {
   final int onlineUsersCount;
   final int targetCallsToday;
 
+  /// Unique leads (and calls) that actually answered the current user (all time).
+  final int answeredLeads;
+  final int answeredCalls;
+
   const DashboardSummaryModel({
     this.totalLeads = 0,
     this.newLeadsThisMonth = 0,
@@ -114,6 +120,8 @@ class DashboardSummaryModel {
     this.currentUserRank = 1,
     this.onlineUsersCount = 1,
     this.targetCallsToday = 30,
+    this.answeredLeads = 0,
+    this.answeredCalls = 0,
   });
 
   /// Next high-priority or overdue follow-up for the Hero Alert Card

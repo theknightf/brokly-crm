@@ -355,6 +355,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                // Leads (and calls) that actually picked up: "تم الرد"
+                Row(
+                  children: [
+                    _buildCompactKpiCard(
+                      label: 'ANSWERED / تم الرد',
+                      value: _summary.answeredLeads.toString(),
+                      badge: '${_summary.answeredCalls} calls',
+                      badgeColor: const Color(0xFF3B82F6),
+                      icon: LucideIcons.phoneCall,
+                      iconColor: const Color(0xFF3B82F6),
+                      isDark: isDark,
+                      onTap: () => widget.onNavigateTab?.call(1),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 20),
 
                 // ── 3. Priority Follow-up Hero Alert Card ─────────────────────

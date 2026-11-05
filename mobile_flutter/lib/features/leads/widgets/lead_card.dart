@@ -178,6 +178,26 @@ class LeadCard extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(width: 6),
+                                  // Lead has picked up at least one call.
+                                  if (context.select<LeadsProvider, bool>((p) => p.isAnswered(lead.id))) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3B82F6).withAlpha(25),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFF3B82F6).withAlpha(80)),
+                                      ),
+                                      child: const Text(
+                                        'تم الرد',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF3B82F6),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
                                   if (isVerified)
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),

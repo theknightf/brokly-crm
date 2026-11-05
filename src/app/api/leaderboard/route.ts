@@ -1,8 +1,45 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { getRequestSupabase } from '@/lib/supabase/requestAuth';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { loadOfficeHours } from '@/lib/officeHours';
 
 export const dynamic = 'force-dynamic';
+
+// Calendar days are Cairo days. The server runs in UTC, so `new Date()` / bare 'T00:00:00' timestamps put
+// the first 2-3 hours of every Cairo day on the previous day and hid today's early activity.
+const TZ = 'Africa/Cairo';
+function cairoToday(): Date {
+  const s = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date()); // YYYY-MM-DD
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function cairoOffset(dateStr: string): string {
+  try {
+    const part = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'longOffset' })
+      .formatToParts(new Date(`${dateStr}T12:00:00Z`))
+      .find((p) => p.type === 'timeZoneName')?.value;
+    const off = (part || '').replace('GMT', '');
+    return /^[+-]\d{2}:\d{2}$/.test(off) ? off : '+02:00';
+  } catch {
+    return '+02:00';
+  }
+}
+const dayStart = (d: string) => `${d}T00:00:00${cairoOffset(d)}`;
+const dayEnd = (d: string) => `${d}T23:59:59.999${cairoOffset(d)}`;
+
+// Same notion of "answered" as the is_answered_outcome() SQL function.
+const UNANSWERED = new Set(['no answer', 'no answer at all', 'busy', 'closed number', 'wrong phone', 'wrong number', 'voicemail', 'cancelled', 'canceled', 'no reply', 'whatsapp sent', 'whatsapp follow-up']);
+const ANSWERED = new Set(['answered', 'completed', 'connected', 'reached', 'interested', 'follow-up', 'follow up', 'followup', 'follow up after meeting', 'call back later', 'callback', 'meeting', 'schedule meeting', 'site visit', 'not interested', 'won deal', 'done deal']);
+function isAnswered(c: any): boolean {
+  if (String(c.channel || 'Call').trim().toLowerCase() !== 'call') return false;
+  const o = String(c.outcome || '').trim().replace(/_/g, ' ').toLowerCase();
+  if (UNANSWERED.has(o)) return false;
+  if (ANSWERED.has(o)) return true;
+  return Number(c.duration_seconds || 0) > 0;
+}
+// Calls that moved the lead forward (the old list matched outcomes that are never written).
+const CONVERTED = new Set(['interested', 'meeting', 'schedule meeting', 'site visit', 'won deal', 'done deal', 'follow up after meeting', 'successful', 'converted', 'won']);
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function fmt(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -53,15 +90,14 @@ function dressScore(avgRating: number | null): number {
 // GET /api/leaderboard?period=day|week|month&from=&to=
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { supabase, user } = await getRequestSupabase(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const url = new URL(request.url);
     const periodParam = (url.searchParams.get('period') || 'month') as 'day' | 'week' | 'month';
     const fromParam = url.searchParams.get('from');
     const toParam = url.searchParams.get('to');
-    const now = new Date();
+    const now = cairoToday();
     const valid = /^\d{4}-\d{2}-\d{2}$/;
     let range: { start: string; end: string };
     if (fromParam && toParam && valid.test(fromParam) && valid.test(toParam)) {
@@ -71,7 +107,13 @@ export async function GET(request: Request) {
     }
     const totalDays = daysInRange(range.start, range.end);
 
-    const db: any = supabase;
+    // Rankings compare everyone, but row-level security only lets a rep read their own attendance, calls and
+    // evaluations (so every other rep scored 0). The caller is already authenticated above; the aggregate
+    // reads below use the service role, and only scores/counts are returned, never the underlying rows.
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const db: any = serviceKey
+      ? createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+      : supabase;
     const { data: usersRaw } = await db.from('user_profiles').select('id, full_name, email, role, is_active, created_at').eq('is_active', true).order('full_name');
     const users = (usersRaw || []).filter((u: any) => u.role !== 'owner' && u.role !== 'admin');
     if (!users || users.length === 0) return NextResponse.json({ period: periodParam, range, users: [] });
@@ -81,12 +123,20 @@ export async function GET(request: Request) {
 
     const [attendanceRes, callsRes, evalRes] = await Promise.all([
       db.from('attendance').select('user_id, attendance_date, check_in_time').gte('attendance_date', range.start).lte('attendance_date', range.end),
-      db.from('call_logs').select('user_id, outcome, created_at').gte('created_at', `${range.start}T00:00:00`).lte('created_at', `${range.end}T23:59:59.999`),
+      fetchAllRows((from, to) =>
+        db.from('call_logs').select('user_id, outcome, channel, duration_seconds, created_at')
+          .gte('created_at', dayStart(range.start)).lte('created_at', dayEnd(range.end))
+          .order('created_at').range(from, to)
+      ),
       db.from('evaluations').select('employee_id, dress_code_rating, date').gte('date', range.start).lte('date', range.end),
     ]);
 
     // New: fetch status change events from user_actions (single validated action log) for the same period
-    const statusChangesRes = await db.from('user_actions').select('user_id, action_type, created_at').gte('created_at', `${range.start}T00:00:00`).lte('created_at', `${range.end}T23:59:59.999`).eq('action_type', 'STATUS_CHANGE');
+    const statusChangesRes = await fetchAllRows((from, to) =>
+      db.from('user_actions').select('user_id, action_type, created_at')
+        .gte('created_at', dayStart(range.start)).lte('created_at', dayEnd(range.end))
+        .eq('action_type', 'STATUS_CHANGE').order('created_at').range(from, to)
+    );
 
     const attendance = attendanceRes.data || [];
     const calls = callsRes.data || [];
@@ -128,7 +178,8 @@ export async function GET(request: Request) {
 
       const userCalls = callsByUser.get(u.id) || [];
       const totalCalls = userCalls.length;
-      const converted = userCalls.filter((c: any) => ['Successful', 'Converted', 'Won'].includes(c.outcome || '')).length;
+      const converted = userCalls.filter((c: any) => CONVERTED.has(String(c.outcome || '').trim().replace(/_/g, ' ').toLowerCase())).length;
+      const answeredCalls = userCalls.filter(isAnswered).length;
 
       const userEvals = evalByUser.get(u.id) || [];
       const avgRating = userEvals.length > 0 ? userEvals.reduce((s: number, e: any) => s + e.dress_code_rating, 0) / userEvals.length : null;
@@ -150,6 +201,7 @@ export async function GET(request: Request) {
         period: range,
         metrics: {
           totalCalls,
+          answeredCalls,
           convertedLeads: converted,
           presentDays: present,
           totalDays,

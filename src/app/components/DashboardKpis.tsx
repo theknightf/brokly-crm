@@ -15,9 +15,12 @@ import {
   MapPin,
   ArrowUpRight,
   ChevronDown,
+  PhoneCall,
 } from 'lucide-react';
 import { leadsService, followUpsService, siteVisitsService } from '@/lib/services/crmService';
 import { useFollowUpSync } from '@/hooks/useFollowUpSync';
+import { useAuth } from '@/contexts/AuthContext';
+import { createClient } from '@/lib/supabase/client';
 
 interface Stats {
   total: number;
@@ -83,11 +86,23 @@ export default function DashboardKpis() {
   const [loading, setLoading] = useState(true);
   const [showMore, setShowMore] = useState(false);
 
+  const [answered, setAnswered] = useState({ leads: 0, calls: 0 });
+  const { user } = useAuth();
+  const userId = user?.id;
+
   const load = useCallback(() => {
+    // Unique leads (and calls) that actually answered this rep; never blocks the other KPIs.
+    const answeredReq = (createClient().rpc('answered_summary') as any)
+      .then((r: any) => {
+        const mine = ((r?.data as any[]) || []).find((x) => x.user_id === userId);
+        setAnswered({ leads: Number(mine?.answered_leads) || 0, calls: Number(mine?.answered_calls) || 0 });
+      })
+      .catch(() => {});
     return Promise.all([
       leadsService.getDashboardStats(),
       followUpsService.getDashboardCounts(),
       siteVisitsService.getCounts(),
+      answeredReq,
     ])
       .then(([s, f, v]) => {
         setStats(s || EMPTY);
@@ -96,7 +111,7 @@ export default function DashboardKpis() {
       })
       .catch(() => setStats(EMPTY))
       .finally(() => setLoading(false));
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     let mounted = true;
@@ -135,11 +150,12 @@ export default function DashboardKpis() {
           href="/leads-management"
         />
         <KpiCard
-          icon={<UserPlus size={16} className="text-gold-dark" />}
-          iconBg="bg-gold-soft"
-          label="New leads (30d)"
-          value={stats.new30d.toLocaleString()}
-          href="/leads-management"
+          icon={<PhoneCall size={16} className="text-sage" />}
+          iconBg="bg-sage-soft"
+          label="Answered / تم الرد"
+          value={answered.leads.toLocaleString()}
+          sub={`${answered.calls.toLocaleString()} answered calls`}
+          href="/call-logs"
         />
         <KpiCard
           icon={<Clock size={16} className="text-clay" />}
@@ -184,6 +200,13 @@ export default function DashboardKpis() {
 
       {showMore && (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 animate-in fade-in">
+          <KpiCard
+            icon={<UserPlus size={16} className="text-gold-dark" />}
+            iconBg="bg-gold-soft"
+            label="New leads (30d)"
+            value={stats.new30d.toLocaleString()}
+            href="/leads-management"
+          />
           <KpiCard
             icon={<Flame size={16} className="text-clay" />}
             iconBg="bg-clay-soft"

@@ -342,10 +342,39 @@ class LeadsProvider extends ChangeNotifier {
       _allLeads = await _service.getAll();
       _isLoading = false;
       notifyListeners();
+      unawaited(_loadAnsweredLeadIds());
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  // ── "Answered" badge: leads that picked up a call (from the lead_answered_stats view) ──
+  Set<String> _answeredLeadIds = {};
+
+  bool isAnswered(String leadId) => _answeredLeadIds.contains(leadId);
+
+  Future<void> _loadAnsweredLeadIds() async {
+    try {
+      final ids = <String>{};
+      for (int from = 0; from < 10000; from += 1000) {
+        final rows = await _client
+            .from('lead_answered_stats')
+            .select('lead_id')
+            .order('lead_id')
+            .range(from, from + 999);
+        final list = rows as List<dynamic>;
+        for (final r in list) {
+          final id = r['lead_id']?.toString();
+          if (id != null) ids.add(id);
+        }
+        if (list.length < 1000) break;
+      }
+      _answeredLeadIds = ids;
+      notifyListeners();
+    } catch (_) {
+      // Badge is a nicety; never break the list if the view is unavailable.
     }
   }
 

@@ -274,7 +274,76 @@ class DashboardService {
     int onlineUsersCount = 0;
     int currentUserRank = 1;
 
+    // Preferred path: one server-side aggregate over the whole team (Cairo month window). Reading the raw
+    // call_logs/leads tables here only returned the current user's own rows (row-level security) and was
+    // cut off at 1000 rows, so every other rep showed 0 and the ranking was wrong.
+    bool rpcOk = false;
     try {
+      String ymd(DateTime d) =>
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      final nowLocal = DateTime.now();
+      final res = await _client.rpc('period_leaderboard', params: {
+        'p_from': ymd(DateTime(nowLocal.year, nowLocal.month, 1)),
+        'p_to': ymd(nowLocal),
+      });
+      final rows = (res as List<dynamic>).cast<Map<String, dynamic>>();
+      int n(dynamic v) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? 0;
+      final built = <LeaderboardEntryModel>[];
+      for (final r in rows) {
+        final uid = r['user_id']?.toString() ?? '';
+        if (uid.isEmpty) continue;
+        final dials = n(r['calls']);
+        final tours = n(r['meetings']);
+        final leadsAdded = n(r['leads_added']);
+        final acted = n(r['leads_acted']);
+        final name = (r['full_name']?.toString().trim().isNotEmpty ?? false)
+            ? r['full_name'].toString().trim()
+            : 'Agent';
+        built.add(LeaderboardEntryModel(
+          userId: uid,
+          fullName: name,
+          role: r['role']?.toString() ?? 'agent',
+          isCurrentUser: uid == currentUserId,
+          isOnline: uid == currentUserId,
+          dialsCount: dials,
+          siteToursCount: tours,
+          leadsCount: leadsAdded,
+          actionsCount: acted,
+          answeredCount: n(r['answered_calls']),
+          score: (leadsAdded * 40) + (dials * 15) + (tours * 25) + (acted * 2),
+        ));
+      }
+      if (built.isNotEmpty) {
+        built.sort((a, b) {
+          final cmp = b.score.compareTo(a.score);
+          return cmp != 0 ? cmp : b.dialsCount.compareTo(a.dialsCount);
+        });
+        for (int i = 0; i < built.length; i++) {
+          final e = built[i];
+          if (e.isCurrentUser) currentUserRank = i + 1;
+          leaderboard.add(LeaderboardEntryModel(
+            userId: e.userId,
+            fullName: e.fullName,
+            role: e.role,
+            isCurrentUser: e.isCurrentUser,
+            isOnline: e.isOnline,
+            rank: i + 1,
+            dialsCount: e.dialsCount,
+            siteToursCount: e.siteToursCount,
+            leadsCount: e.leadsCount,
+            actionsCount: e.actionsCount,
+            answeredCount: e.answeredCount,
+            score: e.score,
+          ));
+        }
+        onlineUsersCount = 1;
+        rpcOk = true;
+      }
+    } catch (_) {
+      // Function missing/unavailable: fall back to the client-side computation below.
+    }
+
+    if (!rpcOk) try {
       final usersRes = await _client
           .from('user_profiles')
           .select('id, full_name, email, role, is_active')
@@ -453,6 +522,19 @@ class DashboardService {
       );
     }
 
+    // Unique leads / calls that answered the current user (aggregates only; see answered_summary()).
+    int answeredLeads = 0;
+    int answeredCalls = 0;
+    try {
+      final res = await _client.rpc('answered_summary');
+      for (final r in (res as List<dynamic>)) {
+        if (r['user_id']?.toString() == currentUserId) {
+          answeredLeads = (r['answered_leads'] as num?)?.toInt() ?? 0;
+          answeredCalls = (r['answered_calls'] as num?)?.toInt() ?? 0;
+        }
+      }
+    } catch (_) {}
+
     // 8. Compute Real SLA Score %
     final totalDueItems = overdue + today + completedFollowUpsToday + actionedLeadsToday;
     final handledItems = completedFollowUpsToday + actionedLeadsToday + callsToday;
@@ -476,6 +558,8 @@ class DashboardService {
       priorityFollowUps: priorityFollowUps.take(5).toList(),
       actionTasks: actionTasks,
       leaderboard: leaderboard,
+      answeredLeads: answeredLeads,
+      answeredCalls: answeredCalls,
       slaScorePct: slaScorePct,
       currentUserRank: currentUserRank,
       onlineUsersCount: onlineUsersCount > 0 ? onlineUsersCount : 1,
