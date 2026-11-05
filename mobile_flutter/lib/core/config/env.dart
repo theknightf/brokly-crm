@@ -13,11 +13,6 @@ class Env {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZHhsbXVzdWZ3d2lvZ2hhaGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3OTU4MTksImV4cCI6MjEwMTM3MTgxOX0.g3rPRAJ_PcbTbtxDLNV1JNRRCsAOE7bZYxv_sDys3EM',
   );
 
-  /// Base URL of the Brokly web app (e.g. https://your-app.vercel.app) that hosts /api/assistant.
-  /// The AI provider key stays on that server; the app only sends the signed-in user's own token.
-  /// Set at build time: --dart-define=API_BASE_URL=https://...
-  static const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: '');
-
   /// Default Cairo Office coordinates and radius (meters) matching PWA settings
   static const double defaultOfficeLat = 30.0444;
   static const double defaultOfficeLng = 31.2357;

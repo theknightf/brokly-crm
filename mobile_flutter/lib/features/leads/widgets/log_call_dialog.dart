@@ -62,23 +62,6 @@ class _PostCallLifecycleWaiter with WidgetsBindingObserver {
     }
   }
 
-  /// Stages a freshly worked lead can still be in; a connected call moves it to "Following Up" without any
-  /// input. Leads already further down the pipeline are never moved backwards.
-  static const _earlyStages = {
-    'Fresh Leads',
-    'Fresh Lead',
-    'Cold Calls',
-    'Pending Leads',
-    'No Answer',
-    'No Answer At All',
-  };
-
-  void _autoMarkConnected(LeadsProvider provider, DeviceCallMetadata? m) {
-    if (m == null || m.durationSeconds <= 0 || m.direction != 'outgoing') return;
-    if (!_earlyStages.contains(lead.status)) return;
-    unawaited(provider.updateStatus(lead.id, 'Following Up').catchError((_) {}));
-  }
-
   void _triggerModal({required int initialDuration}) {
     if (_modalShown) return;
     _modalShown = true;
@@ -86,37 +69,31 @@ class _PostCallLifecycleWaiter with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
 
     if (!context.mounted) return;
-
-    // Capture and sync the device call log (duration, timestamp, status) in the background. This reads
-    // the OS call log and makes two Supabase calls, so it must never block the popup: the sheet opens on
-    // the next frame and applies the metadata as soon as it arrives.
-    Future<DeviceCallMetadata?>? metadataFuture;
-    if (!kIsWeb) {
-      final leadsProvider = context.read<LeadsProvider>();
-      metadataFuture = CallLogsService()
-          .captureAndSyncCallForLead(
+    Future.delayed(const Duration(milliseconds: 550), () async {
+      // Automatically capture and sync device call log metadata (duration, timestamp, status)
+      DeviceCallMetadata? metadata;
+      if (!kIsWeb) {
+        try {
+          metadata = await CallLogsService().captureAndSyncCallForLead(
             leadId: lead.id,
             leadName: lead.name,
             leadPhone: lead.phone,
             callStartedAt: callStartedAt,
             projectName: lead.project,
-          )
-          .catchError((_) => null)
-          .then((m) {
-        _autoMarkConnected(leadsProvider, m);
-        return m;
-      });
-    }
+          );
+        } catch (_) {}
+      }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!context.mounted) return;
+      final resolvedDuration = metadata != null ? metadata.durationSeconds : initialDuration;
+
       await LogCallDialog.show(
         context,
         lead: lead,
         initialChannel: 'Call',
-        initialDurationSeconds: initialDuration,
+        initialDurationSeconds: resolvedDuration,
         isPostCallPopup: true,
-        metadataFuture: metadataFuture,
+        capturedMetadata: metadata,
       );
       onCompleted?.call();
     });
@@ -150,9 +127,6 @@ class LogCallDialog extends StatefulWidget {
   final bool isPostCallPopup;
   final DeviceCallMetadata? capturedMetadata;
 
-  /// Resolves later with the device call-log entry; applied to the open sheet without blocking it.
-  final Future<DeviceCallMetadata?>? metadataFuture;
-
   const LogCallDialog({
     super.key,
     required this.lead,
@@ -160,7 +134,6 @@ class LogCallDialog extends StatefulWidget {
     this.initialDurationSeconds = 60,
     this.isPostCallPopup = false,
     this.capturedMetadata,
-    this.metadataFuture,
   });
 
   /// Dial the lead's phone number via native dialer and automatically pop up
@@ -204,7 +177,6 @@ class LogCallDialog extends StatefulWidget {
     int initialDurationSeconds = 60,
     bool isPostCallPopup = false,
     DeviceCallMetadata? capturedMetadata,
-    Future<DeviceCallMetadata?>? metadataFuture,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -218,7 +190,6 @@ class LogCallDialog extends StatefulWidget {
         initialDurationSeconds: initialDurationSeconds,
         isPostCallPopup: isPostCallPopup,
         capturedMetadata: capturedMetadata,
-        metadataFuture: metadataFuture,
       ),
     );
   }
@@ -231,188 +202,6 @@ class _LogCallDialogState extends State<LogCallDialog> {
   late String _channel;
   String _outcome = 'Answered';
   late int _durationSeconds;
-  DeviceCallMetadata? _metadata;
-  String? _stageOverride;
-  // Post-call popup starts compact (one tap saves); "more options" expands to the full form.
-  bool _expanded = false;
-
-  // One-tap stage buttons shown at the top of the compact popup (outcome keys from _outcomeOptions).
-  static const List<String> _quickKeys = [
-    'Interested',
-    'Follow-up',
-    'Meeting',
-    'Not Interested',
-    'No Answer',
-    'Wrong Phone',
-    'Won Deal',
-  ];
-
-  /// Pick an outcome (and its stage) and save immediately; the sheet dismisses itself.
-  void _quickSave(String outcomeKey) {
-    if (_isSubmitting) return;
-    setState(() {
-      _outcomeTouched = true;
-      _outcome = outcomeKey;
-      _stageOverride = null; // the outcome's own stage
-    });
-    _submit();
-  }
-
-  Widget _buildQuickPopup(bool isDark, double bottomInset) {
-    final connected = _metadata != null && _metadata!.durationSeconds > 0;
-    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
-    final textMuted = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
-    final quick = [
-      for (final k in _quickKeys) _outcomeOptions.firstWhere((o) => o.key == k),
-    ];
-
-    return Container(
-      padding: EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 16 + bottomInset),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF141820) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: isDark ? const Color(0xFF282D38) : AppColors.lightBorder),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.lead.name.isNotEmpty ? widget.lead.name : 'Lead',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textPrimary),
-                      ),
-                      Text(
-                        widget.lead.phone,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textMuted),
-                      ),
-                    ],
-                  ),
-                ),
-                if (connected)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withAlpha(25),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF10B981).withAlpha(90)),
-                    ),
-                    child: Text(
-                      'Connected • ${_metadata!.durationSeconds}s',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Tap a stage to save / اختار المرحلة',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: textMuted),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final opt in quick)
-                  SizedBox(
-                    width: (MediaQuery.of(context).size.width - 32 - 8) / 2,
-                    child: InkWell(
-                      onTap: _isSubmitting ? null : () => _quickSave(opt.key),
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        height: 52,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: opt.color.withAlpha(isDark ? 40 : 22),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: opt.color.withAlpha(110)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(opt.icon, size: 18, color: opt.color),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    opt.label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: opt.color),
-                                  ),
-                                  Text(
-                                    opt.labelAr,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: textMuted),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            TextButton.icon(
-              onPressed: () => setState(() => _expanded = true),
-              icon: const Icon(LucideIcons.pencil, size: 14),
-              label: const Text('Add notes / more options'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static const List<String> _stageChoices = [
-    'Fresh Leads',
-    'Cold Calls',
-    'Pending Leads',
-    'Following Up',
-    'Meeting',
-    'Follow Up After Meeting',
-    'Interested',
-    'Reservation',
-    'Done Deal',
-    'Not Interested',
-    'Cancellation',
-    'Wrong Number',
-    'Data Rotation',
-    'Closed Number',
-    'No Answer',
-    'No Answer At All',
-    'Low Budget',
-    'Reschedule Meeting',
-  ];
-  bool _durationTouched = false;
-  bool _outcomeTouched = false;
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -556,20 +345,10 @@ class _LogCallDialogState extends State<LogCallDialog> {
   void initState() {
     super.initState();
     _channel = widget.initialChannel;
-    _metadata = widget.capturedMetadata;
-    _durationSeconds = _metadata?.durationSeconds ?? widget.initialDurationSeconds;
-    if (_metadata != null) {
-      _outcome = _metadata!.detectedOutcome;
+    _durationSeconds = widget.capturedMetadata?.durationSeconds ?? widget.initialDurationSeconds;
+    if (widget.capturedMetadata != null) {
+      _outcome = widget.capturedMetadata!.detectedOutcome;
     }
-    widget.metadataFuture?.then((m) {
-      if (!mounted || m == null) return;
-      setState(() {
-        _metadata = m;
-        // Never overwrite something the user already picked while the log was loading.
-        if (!_durationTouched) _durationSeconds = m.durationSeconds;
-        if (!_outcomeTouched) _outcome = m.detectedOutcome;
-      });
-    });
     final defaultPrice = (widget.lead.budgetMax ?? widget.lead.budgetMin ?? 3500000).toInt();
     _calcPriceCtrl = TextEditingController(text: defaultPrice.toString());
 
@@ -588,9 +367,6 @@ class _LogCallDialogState extends State<LogCallDialog> {
 
   _CallOutcomeOption get _selectedOption =>
       _outcomeOptions.firstWhere((o) => o.key == _outcome, orElse: () => _outcomeOptions.first);
-
-  /// Stage the lead moves to: the user's pick, otherwise the stage suggested by the outcome.
-  String get _selectedStage => _stageOverride ?? _selectedOption.nextStage;
 
   bool get _needsSchedule =>
       _outcome == 'Follow-up' ||
@@ -648,19 +424,18 @@ class _LogCallDialogState extends State<LogCallDialog> {
     }
 
     final selectedOpt = _selectedOption;
-    final stageToSave = _selectedStage;
     final callLog = CallLogModel(
-      id: _metadata?.syncedCallLogId ?? '',
+      id: widget.capturedMetadata?.syncedCallLogId ?? '',
       entityType: 'lead',
       entityId: widget.lead.id,
       contactName: widget.lead.name,
       contactPhone: widget.lead.phone,
       channel: _channel,
-      direction: _metadata?.direction ?? 'outgoing',
+      direction: widget.capturedMetadata?.direction ?? 'outgoing',
       durationSeconds: _channel == 'Call' ? _durationSeconds : 0,
       outcome: _outcome,
       notes: _notesController.text.trim(),
-      clientRef: _metadata?.clientRef,
+      clientRef: widget.capturedMetadata?.clientRef,
       projectName: widget.lead.project,
     );
 
@@ -672,7 +447,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Saved: $_outcome (${selectedOpt.labelAr}) → $stageToSave',
+            'Saved: $_outcome (${selectedOpt.labelAr}) → ${selectedOpt.nextStage}',
           ),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
@@ -688,7 +463,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
             followUpDate: followUpDateStr,
             followUpTime: followUpTimeStr,
           ),
-          leadsProvider.updateStatus(widget.lead.id, stageToSave),
+          leadsProvider.updateStatus(widget.lead.id, selectedOpt.nextStage),
         ]);
       } catch (_) {}
     }());
@@ -699,11 +474,6 @@ class _LogCallDialogState extends State<LogCallDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final selectedOpt = _selectedOption;
-
-    // Post-call popup: compact, one-tap stage buttons at the top; the full form is one tap away.
-    if (widget.isPostCallPopup && !_expanded) {
-      return _buildQuickPopup(isDark, bottomInset);
-    }
 
     return Container(
       constraints: BoxConstraints(
@@ -779,7 +549,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                               border: Border.all(color: selectedOpt.color.withAlpha(80)),
                             ),
                             child: Text(
-                              '→ $_selectedStage',
+                              '→ ${selectedOpt.nextStage}',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
@@ -819,7 +589,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 ),
               ],
             ),
-            if (_metadata != null) ...[
+            if (widget.capturedMetadata != null) ...[
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -834,7 +604,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Device Call Synced: ${_metadata!.callTypeLabel} (${_metadata!.detectedOutcome}) • ${_metadata!.durationSeconds}s • ${DateFormat('HH:mm:ss').format(_metadata!.timestamp.toLocal())}',
+                        'Device Call Synced: ${widget.capturedMetadata!.callTypeLabel} (${widget.capturedMetadata!.detectedOutcome}) • ${widget.capturedMetadata!.durationSeconds}s • ${DateFormat('HH:mm:ss').format(widget.capturedMetadata!.timestamp.toLocal())}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -930,11 +700,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 final opt = _outcomeOptions[index];
                 final isSelected = opt.key == _outcome;
                 return InkWell(
-                  onTap: () => setState(() {
-                    _outcomeTouched = true;
-                    if (_outcome != opt.key) _stageOverride = null; // Stage 2 resets when the outcome changes
-                    _outcome = opt.key;
-                  }),
+                  onTap: () => setState(() => _outcome = opt.key),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -999,31 +765,6 @@ class _LogCallDialogState extends State<LogCallDialog> {
                   ),
                 );
               },
-            ),
-
-            // Stage 2: the lead's next stage. Pre-selected from the outcome but always changeable.
-            const SizedBox(height: 14),
-            Text(
-              'Move lead to stage / مرحلة العميل',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final stage in _stageChoices)
-                  ChoiceChip(
-                    label: Text(stage, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                    selected: stage == _selectedStage,
-                    selectedColor: selectedOpt.color.withAlpha(isDark ? 60 : 40),
-                    onSelected: (_) => setState(() => _stageOverride = stage),
-                  ),
-              ],
             ),
 
             // Conditional Follow-up / Meeting Date & Time Section
@@ -1149,10 +890,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 max: 600,
                 divisions: 60,
                 activeColor: AppColors.neonLime,
-                onChanged: (val) => setState(() {
-                  _durationTouched = true;
-                  _durationSeconds = val.toInt();
-                }),
+                onChanged: (val) => setState(() => _durationSeconds = val.toInt()),
               ),
             ],
 
