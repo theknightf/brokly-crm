@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { ALL_STATUSES } from '@/lib/ui';
 
 interface Card { stage: string; count: number; trend: string; trendValue: number }
 
@@ -37,7 +38,9 @@ export function fetchKpiCardsCached(teamId?: string, agentId?: string, force = f
  * stage opens Leads Management with that exact status pre-applied. */
 function hrefForStage(stage: string): string {
   if (!stage || stage === 'All Leads') return '/leads-management';
-  return `/leads-management?status=${encodeURIComponent(stage)}`;
+  const known = (ALL_STATUSES as string[]).includes(stage);
+  const value = known ? stage.trim().toLowerCase().replace(/[\s_]+/g, '-') : stage;
+  return `/leads-management?stage=${encodeURIComponent(value)}`;
 }
 
 /** Accent per pipeline stage (visual only). Full class names so Tailwind keeps them. */

@@ -564,7 +564,8 @@ export default function LeadsManagementScreen({
   const qpAgent = searchParams.get('agent');
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    // Hook value first: during a client-side navigation window.location can still be the previous URL.
+    const params = new URLSearchParams(searchParams.toString() || window.location.search);
     const leadId = params.get('lead');
     const openNew = params.get('new') === '1';
     const searchParam = params.get('search');
