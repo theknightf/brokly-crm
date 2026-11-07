@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants/lead_stages.dart';
 import '../core/memory/memory_guard.dart';
 import '../core/utils/date_utils.dart';
+import '../data/models/last_call_info.dart';
 import '../data/models/lead_model.dart';
 import '../data/services/leads_service.dart';
 import '../data/services/supabase_service.dart';
@@ -352,10 +353,39 @@ class LeadsProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       unawaited(_loadAnsweredLeadIds());
+      unawaited(refreshLastCalls());
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  // ── Last call per lead (the line on the lead card) ──
+  Map<String, LastCallInfo> _lastCalls = {};
+
+  LastCallInfo? lastCallFor(String leadId) => _lastCalls[leadId];
+
+  Future<void> refreshLastCalls() async {
+    try {
+      final map = <String, LastCallInfo>{};
+      for (int from = 0; from < 20000; from += 1000) {
+        final rows = await _client
+            .from('lead_last_call')
+            .select('lead_id, created_at, outcome, duration_seconds, direction, source')
+            .order('lead_id')
+            .range(from, from + 999);
+        final list = rows as List<dynamic>;
+        for (final r in list) {
+          final id = r['lead_id']?.toString();
+          if (id != null) map[id] = LastCallInfo.fromJson(Map<String, dynamic>.from(r as Map));
+        }
+        if (list.length < 1000) break;
+      }
+      _lastCalls = map;
+      notifyListeners();
+    } catch (_) {
+      // The line is a nicety; never break the list if the view is unavailable.
     }
   }
 

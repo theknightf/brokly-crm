@@ -7,6 +7,8 @@ import '../../core/theme/app_colors.dart';
 import '../../data/services/device_call_sync_service.dart';
 import '../../data/services/pending_call_saves.dart';
 import '../../state/call_logs_provider.dart';
+import '../../state/leads_provider.dart';
+import '../assistant/assistant_chat_screen.dart';
 import '../attendance/attendance_screen.dart';
 import '../calculator/unit_calculator_screen.dart';
 import '../call_logs/call_logs_screen.dart';
@@ -52,6 +54,7 @@ class _MainShellState extends State<MainShell> {
     _unregisterSaved = PendingCallSaves.instance.addOnSaved(() {
       if (!mounted) return;
       context.read<CallLogsProvider>().fetchCalls(silent: true);
+      context.read<LeadsProvider>().refreshLastCalls(); // the lead card's "last call" line
     });
     // Sign-in is done by the time the shell is shown: load call-sync settings, sync on app open, and refresh the
     // call list whenever a sync adds calls.
@@ -59,6 +62,7 @@ class _MainShellState extends State<MainShell> {
     _unregisterCallSync = DeviceCallSyncService.instance.addOnSynced((r) {
       if (!mounted || r.inserted == 0) return;
       context.read<CallLogsProvider>().fetchCalls(silent: true);
+      context.read<LeadsProvider>().refreshLastCalls();
     });
     // Under memory pressure drop every tab except the one on screen; they rebuild when visited again.
     _unregisterTrim = MemoryGuard.onTrim((critical) {
@@ -218,7 +222,51 @@ class _MainShellState extends State<MainShell> {
                 );
               },
             )
-          : null,
+          : FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF0C1017),
+              foregroundColor: Colors.white,
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: AppColors.neonLime.withAlpha(140), width: 1.2),
+              ),
+              icon: Container(
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.neonLime, AppColors.primary],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(LucideIcons.sparkles, size: 13, color: Color(0xFF142407)),
+                ),
+              ),
+              label: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Brokly AI',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    'مساعد المبيعات',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.neonLime,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              onPressed: () => AssistantChatScreen.showAsModal(context),
+            ),
     );
   }
 

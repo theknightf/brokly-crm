@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/utils/whatsapp_utils.dart';
+import '../../../data/models/last_call_info.dart';
 import '../../../data/models/lead_model.dart';
 import '../../../state/leads_provider.dart';
 import '../edit_lead_screen.dart';
@@ -21,6 +23,16 @@ class LeadCard extends StatelessWidget {
     required this.lead,
     required this.onTap,
   });
+
+  /// Short relative time for the "last call" line.
+  static String _ago(DateTime at) {
+    final diff = DateTime.now().difference(at);
+    if (diff.inMinutes < 1) return tr('just now', 'الآن');
+    if (diff.inMinutes < 60) return tr('${diff.inMinutes}m ago', 'منذ ${diff.inMinutes} د');
+    if (diff.inHours < 24) return tr('${diff.inHours}h ago', 'منذ ${diff.inHours} س');
+    if (diff.inDays < 7) return tr('${diff.inDays}d ago', 'منذ ${diff.inDays} يوم');
+    return '${at.day}/${at.month}';
+  }
 
   Future<void> _makeCall(BuildContext context) async {
     await LogCallDialog.dialAndTrack(context, lead: lead);
@@ -447,6 +459,56 @@ class LeadCard extends StatelessWidget {
                             ),
                           ),
                       ],
+                    ),
+
+                    // Last call logged for this lead, visible without opening the lead.
+                    Builder(
+                      builder: (context) {
+                        final last = context.select<LeadsProvider, LastCallInfo?>((p) => p.lastCallFor(lead.id));
+                        if (last == null) return const SizedBox.shrink();
+                        final missed = last.direction == 'missed';
+                        final color = missed
+                            ? const Color(0xFFEF4444)
+                            : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569));
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                missed
+                                    ? LucideIcons.phoneMissed
+                                    : (last.direction == 'incoming' ? LucideIcons.phoneIncoming : LucideIcons.phoneOutgoing),
+                                size: 12,
+                                color: color,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${tr('Last call', 'آخر مكالمة')}: ${last.outcome}'
+                                  '${last.durationSeconds > 0 ? ' • ${AppDateUtils.formatDuration(last.durationSeconds)}' : ''}'
+                                  ' • ${_ago(last.at)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+                                ),
+                              ),
+                              if (last.isAuto)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3B82F6).withAlpha(25),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFF3B82F6).withAlpha(80)),
+                                  ),
+                                  child: const Text(
+                                    'AUTO',
+                                    style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800, color: Color(0xFF3B82F6)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
 
