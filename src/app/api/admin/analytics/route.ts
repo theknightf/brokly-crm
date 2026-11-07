@@ -102,8 +102,8 @@ export async function GET(request: Request) {
     if (userIds.length === 0)
       return NextResponse.json({ users: [], rows: [], online: [], not_setup: false });
 
-    // ── 1. Calls + stage updates per period, from the period_leaderboard() SQL function ──────────────
-    // The "actions" counter is calls + real stage updates (deduplicated, Cairo days, no 1000-row cap). It used to be
+    // ── 1. Calls and stage updates per period, from the period_leaderboard() SQL function ───────────
+    // The "actions" counter is real stage updates only (deduplicated, Cairo days, no 1000-row cap). It used to be
     // the raw number of user_actions rows, which also held notes, meetings and duplicate copies, so one saved call
     // was counted several times.
     const lbKeys = ['day', 'week', 'month', 'range', 'total'] as const;
@@ -174,7 +174,7 @@ export async function GET(request: Request) {
         leads: countByUser(leadsByPeriod[periodKey], u.id, 'created_by'),
         calls: Number(lbOf(periodKey, u.id)?.calls) || 0,
         statusUpdates: Number(lbOf(periodKey, u.id)?.status_updates) || 0,
-        actions: Number(lbOf(periodKey, u.id)?.total_actions) || 0, // calls + status updates
+        actions: Number(lbOf(periodKey, u.id)?.total_actions) || 0, // an action = a status update (calls are a separate number)
         activeSeconds: sumActive(dailyByPeriod[periodKey], u.id),
       });
       const scoreKey: 'day' | 'week' | 'month' | 'range' = period === 'range' ? 'range' : period;

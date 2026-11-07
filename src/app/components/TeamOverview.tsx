@@ -164,7 +164,7 @@ export default function TeamOverview() {
       updates: sum('status_updates'),
       meetings: sum('meetings'),
       deals: sum('deals'),
-      active: rows.filter((r) => r.total_actions > 0).length,
+      active: rows.filter((r) => r.total_actions > 0 || r.calls > 0).length,
       size: rows.length,
     };
   }, [members]);

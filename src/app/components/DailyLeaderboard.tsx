@@ -25,7 +25,8 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
   const [error, setError] = useState(false);
   const [selectedDate, setSelectedDate] = useState(date || localToday());
   // Only people with activity are ranked; an all-zero day falls through to the empty state.
-  const active = rows.filter((r) => (r.totalActions || 0) > 0);
+  // Listed when they made a call or a status update (an "action" is a status update; calls are shown separately).
+  const active = rows.filter((r) => (r.totalActions || 0) > 0 || (r.calls || 0) > 0);
   const topActions = Math.max(1, ...active.map((r) => r.totalActions || 0));
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
                   <div className="h-full rounded-full bg-lime-500" style={{ width: `${Math.round(((r.totalActions || 0) / topActions) * 100)}%` }} />
                 </div>
               </div>
-              <span title="Calls + stage updates" className="text-sm font-extrabold text-primary tabular-nums shrink-0">{(r.totalActions || 0).toLocaleString()} actions</span>
+              <span title="Actions = status updates (calls are counted separately)" className="text-sm font-extrabold text-primary tabular-nums shrink-0">{(r.totalActions || 0).toLocaleString()} actions</span>
             </div>
             );
           })}
