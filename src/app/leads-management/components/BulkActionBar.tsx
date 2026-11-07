@@ -45,6 +45,22 @@ export interface BulkLead {
   name?: string;
   phone?: string;
   email?: string;
+  /** Used for the owner's "what am I about to assign" breakdown. */
+  status?: string;
+  source?: string;
+  assignedToName?: string;
+  agent?: string;
+}
+
+function tally(values: (string | undefined | null)[], emptyLabel: string): { label: string; count: number }[] {
+  const map = new Map<string, number>();
+  for (const v of values) {
+    const key = (v || '').toString().trim() || emptyLabel;
+    map.set(key, (map.get(key) || 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
 export interface LeadForAssignment {
@@ -131,6 +147,53 @@ export default function BulkActionBar({
   const [assignStage, setAssignStage] = useState('');
   const [teamPending, setTeamPending] = useState<string | null>(null);
   const [teamStage, setTeamStage] = useState('');
+
+  // What is about to be assigned: total, and how those leads split by current stage, source and current owner.
+  const breakdown = {
+    stages: tally(selectedLeads.map((l) => l.status), 'No stage'),
+    sources: tally(selectedLeads.map((l) => l.source), 'No source'),
+    owners: tally(selectedLeads.map((l) => l.assignedToName || l.agent), 'Unassigned'),
+  };
+
+  const breakdownGroup = (title: string, rows: { label: string; count: number }[]) => (
+    <div>
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {title} <span className="font-normal normal-case">({rows.length})</span>
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {rows.slice(0, 8).map((r) => (
+          <span
+            key={`${title}-${r.label}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-xs text-foreground"
+          >
+            <span className="max-w-[140px] truncate">{r.label}</span>
+            <span className="font-bold tabular-nums text-primary">{r.count}</span>
+          </span>
+        ))}
+        {rows.length > 8 && (
+          <span className="px-1 py-1 text-xs text-muted-foreground">+{rows.length - 8} more</span>
+        )}
+      </div>
+    </div>
+  );
+
+  const selectionSummary = (targetStage: string) => (
+    <div className="space-y-3 rounded-xl border border-border bg-card p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-foreground">
+          {selectedLeads.length} lead{selectedLeads.length !== 1 ? 's' : ''} selected
+        </p>
+        {targetStage && (
+          <span className="rounded-full bg-lime-500/10 px-2.5 py-0.5 text-xs font-semibold text-lime-600 dark:text-lime-300">
+            → {targetStage}
+          </span>
+        )}
+      </div>
+      {breakdownGroup('Current stage / المرحلة الحالية', breakdown.stages)}
+      {breakdownGroup('Source / المصدر', breakdown.sources)}
+      {breakdownGroup('Currently with / عند من', breakdown.owners)}
+    </div>
+  );
 
   const stagePicker = (value: string, onChange: (v: string) => void) => (
     <div>
@@ -693,7 +756,7 @@ export default function BulkActionBar({
           subtitle={`${selectedLeads.length} selected lead${
             selectedLeads.length !== 1 ? 's' : ''
           }`}
-          size="sm"
+          size="md"
         >
           <div className="p-6 space-y-4">
             <p className="text-xs text-muted-foreground">
@@ -762,6 +825,7 @@ export default function BulkActionBar({
               </div>
             )}
 
+            {mustPickStage && selectionSummary(assignStage)}
             {mustPickStage && stagePicker(assignStage, setAssignStage)}
 
             <div className="flex items-start gap-2 rounded-xl bg-amber-50 text-amber-700 px-3 py-2 text-xs">
@@ -825,9 +889,10 @@ export default function BulkActionBar({
           onClose={() => setTeamPending(null)}
           title={`Assign to team "${teamPending}"`}
           subtitle={`${selectedLeads.length} selected lead${selectedLeads.length !== 1 ? 's' : ''}`}
-          size="sm"
+          size="md"
         >
           <div className="p-6 space-y-4">
+            {selectionSummary(teamStage)}
             {stagePicker(teamStage, setTeamStage)}
             <div className="flex justify-end gap-3 pt-1">
               <button type="button" onClick={() => setTeamPending(null)} className="btn-secondary">
