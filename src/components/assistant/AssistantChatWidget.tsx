@@ -89,6 +89,7 @@ export default function AssistantChatWidget() {
         /* ignore */
       }
       if (!next) voice.stopSpeaking();
+      else voice.unlockSpeech();
       return next;
     });
   };
@@ -481,7 +482,10 @@ export default function AssistantChatWidget() {
 
           {/* Message Input Box */}
           <form
-            onSubmit={handleSubmit}
+            onSubmit={(e) => {
+              voice.stopSpeaking();
+              handleSubmit(e);
+            }}
             className="flex items-center gap-2 border-t border-white/5 bg-zinc-900/60 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
           >
             {voice.supportsSpeaking && (
@@ -513,7 +517,14 @@ export default function AssistantChatWidget() {
             {voice.supportsListening && (
               <button
                 type="button"
-                onClick={voice.listening ? voice.stopListening : voice.startListening}
+                onClick={
+                  voice.listening
+                    ? voice.stopListening
+                    : () => {
+                        voice.unlockSpeech();
+                        voice.startListening();
+                      }
+                }
                 disabled={isLoading}
                 aria-pressed={voice.listening}
                 aria-label={voice.listening ? 'إيقاف التسجيل' : 'تحدّث بالصوت'}

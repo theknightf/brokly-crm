@@ -53,6 +53,7 @@ export function useVoice({ lang = 'ar-EG', onInterim, onFinal, onError }: Option
   const [supportsSpeaking, setSupportsSpeaking] = useState(false);
   const recRef = useRef<RecognitionLike | null>(null);
   const finalRef = useRef('');
+  const interimRef = useRef('');
   const cbRef = useRef({ onInterim, onFinal, onError });
   cbRef.current = { onInterim, onFinal, onError };
 
@@ -81,29 +82,57 @@ export function useVoice({ lang = 'ar-EG', onInterim, onFinal, onError }: Option
     setSpeaking(false);
   }, []);
 
-  const speak = useCallback(
-    (raw: string) => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) return;
-      const text = toSpeakable(raw);
-      if (!text) return;
-      window.speechSynthesis.cancel();
-      const isArabic = ARABIC.test(text);
-      const wanted = isArabic ? 'ar' : 'en';
-      const utter = new SpeechSynthesisUtterance(text.slice(0, 1200));
+  // iOS Safari only lets speechSynthesis start from a user gesture. Calling this inside a tap handler (mic /
+  // speaker buttons) "unlocks" it, so the reply can be spoken later when it arrives asynchronously.
+  const unlockSpeech = useCallback(() => {
+    try {
+      if (!window.speechSynthesis) return;
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      window.speechSynthesis.speak(u);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const speak = useCallback((raw: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const text = toSpeakable(raw);
+    if (!text) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+
+    // Chrome silently stops utterances longer than ~15 s, so the reply is spoken sentence by sentence.
+    const sentences = (text.match(/[^.!?؟۔\n]+[.!?؟۔]*/g) || [text]).map((s) => s.trim()).filter(Boolean);
+    const chunks: string[] = [];
+    for (const s of sentences) {
+      if (s.length <= 180) {
+        chunks.push(s);
+      } else {
+        for (let i = 0; i < s.length; i += 180) chunks.push(s.slice(i, i + 180));
+      }
+    }
+    const queue = chunks.slice(0, 12);
+
+    const voices = synth.getVoices();
+    const pickVoice = (lang: string, wanted: string) =>
+      voices.find((v) => v.lang.toLowerCase().replace('_', '-') === lang.toLowerCase()) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith(wanted));
+
+    queue.forEach((chunk, i) => {
+      const isArabic = ARABIC.test(chunk);
+      const utter = new SpeechSynthesisUtterance(chunk);
       utter.lang = isArabic ? 'ar-EG' : 'en-US';
-      const voices = window.speechSynthesis.getVoices();
-      const voice =
-        voices.find((v) => v.lang.toLowerCase() === utter.lang.toLowerCase()) ||
-        voices.find((v) => v.lang.toLowerCase().startsWith(wanted));
+      const voice = pickVoice(utter.lang, isArabic ? 'ar' : 'en');
       if (voice) utter.voice = voice;
-      utter.rate = 1;
-      utter.onstart = () => setSpeaking(true);
-      utter.onend = () => setSpeaking(false);
+      if (i === 0) utter.onstart = () => setSpeaking(true);
+      utter.onend = () => {
+        if (i === queue.length - 1) setSpeaking(false);
+      };
       utter.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(utter);
-    },
-    []
-  );
+      synth.speak(utter);
+    });
+  }, []);
 
   const stopListening = useCallback(() => {
     try {
@@ -134,6 +163,7 @@ export function useVoice({ lang = 'ar-EG', onInterim, onFinal, onError }: Option
     rec.continuous = false;
     rec.maxAlternatives = 1;
     finalRef.current = '';
+    interimRef.current = '';
 
     rec.onresult = (e: any) => {
       let interim = '';
@@ -142,15 +172,19 @@ export function useVoice({ lang = 'ar-EG', onInterim, onFinal, onError }: Option
         if (r.isFinal) finalRef.current += r[0].transcript;
         else interim += r[0].transcript;
       }
-      cbRef.current.onInterim?.((finalRef.current + interim).trim());
+      interimRef.current = (finalRef.current + interim).trim();
+      cbRef.current.onInterim?.(interimRef.current);
     };
     rec.onerror = (e: any) => {
       cbRef.current.onError?.(String(e?.error || 'error'));
     };
     rec.onend = () => {
       setListening(false);
-      const text = finalRef.current.trim();
+      // Stopping with the mic button (or a short pause) often ends the session with only an interim result:
+      // send what was heard instead of dropping it.
+      const text = (finalRef.current.trim() || interimRef.current.trim());
       finalRef.current = '';
+      interimRef.current = '';
       if (text) cbRef.current.onFinal?.(text);
     };
 
@@ -173,5 +207,6 @@ export function useVoice({ lang = 'ar-EG', onInterim, onFinal, onError }: Option
     stopListening,
     speak,
     stopSpeaking,
+    unlockSpeech,
   };
 }

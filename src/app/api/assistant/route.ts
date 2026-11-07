@@ -101,14 +101,16 @@ export async function POST(request: Request) {
   }
 
   // Send only the last 10 messages to the model to minimize token consumption and data leakage
-  const recentMessages = body.messages.slice(-10);
+  const recentMessages = body.messages.slice(-8);
 
   let model: any;
+  let groqModelId = '';
   if (useGroq) {
     // Loaded lazily so the Gemini path keeps working even if @ai-sdk/groq is not installed.
     try {
       const { groq } = await import('@ai-sdk/groq');
-      model = groq(await resolveGroqModel(apiKey as string));
+      groqModelId = await resolveGroqModel(apiKey as string);
+      model = groq(groqModelId);
     } catch (e) {
       console.error('Groq provider unavailable (run npm install):', e);
       return new Response(
@@ -128,8 +130,11 @@ export async function POST(request: Request) {
       messages: recentMessages,
       tools,
       maxSteps: 5,
-      // Qwen3 is a reasoning model: ask Groq to keep its chain-of-thought out of the answer text.
-      providerOptions: { groq: { reasoningFormat: 'hidden' } } as any,
+      // Only reasoning models accept reasoning_format; sending it to a plain chat model (e.g. llama) makes Groq
+      // reject the whole request with a 400, which showed up as a generic "error receiving the reply".
+      ...(/qwen3|deepseek-r1/i.test(groqModelId)
+        ? { providerOptions: { groq: { reasoningFormat: 'hidden' } } as any }
+        : {}),
     });
 
     return result.toDataStreamResponse({
