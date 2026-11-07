@@ -1,5 +1,6 @@
 package com.example.brokly_mobile
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -15,6 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     companion object {
         private const val CHANNEL_NAME = "com.brokly.crm/notifications"
+        private const val DEVICE_CHANNEL_NAME = "com.brokly.crm/device"
         private const val NOTIF_CHANNEL_ID = "brokly_crm_high_alerts"
         private const val NOTIF_CHANNEL_TITLE = "Brokly CRM Real-Time Alerts"
         private const val EXTRA_LEAD_ID = "deep_link_lead_id"
@@ -22,6 +24,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private var methodChannel: MethodChannel? = null
+    private var deviceChannel: MethodChannel? = null
     private var pendingLeadId: String? = null
     private var pendingNotifId: String? = null
 
@@ -34,6 +37,27 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         createNotificationChannel()
+
+        // Memory info + OS trim signals for MemoryGuard (Dart).
+        val deviceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_CHANNEL_NAME)
+        this.deviceChannel = deviceChannel
+        deviceChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getMemoryInfo" -> {
+                    val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    val info = ActivityManager.MemoryInfo()
+                    am.getMemoryInfo(info)
+                    result.success(
+                        mapOf(
+                            "isLowRamDevice" to am.isLowRamDevice,
+                            "memoryClassMb" to am.memoryClass,
+                            "totalMemMb" to (info.totalMem / (1024 * 1024)).toInt()
+                        )
+                    )
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
         methodChannel = channel
@@ -65,6 +89,13 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    // Flutter only forwards TRIM_MEMORY_RUNNING_LOW; pass every level so Dart can release caches early
+    // (UI hidden / background / moderate / complete) instead of waiting for the low-memory killer.
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        deviceChannel?.invokeMethod("onTrimMemory", level)
     }
 
     override fun onNewIntent(intent: Intent) {

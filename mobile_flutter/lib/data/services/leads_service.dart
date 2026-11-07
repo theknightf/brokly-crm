@@ -18,10 +18,9 @@ class LeadsService {
       }
     }
 
-    try {
-      var query = _client.from('leads').select(
-        '*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)',
-      );
+    // Fresh query per page: builders must not be reused across .range() calls.
+    PostgrestFilterBuilder<PostgrestList> scoped(String columns) {
+      var query = _client.from('leads').select(columns);
 
       // Role scoping
       if (authIds != null) {
@@ -46,40 +45,37 @@ class LeadsService {
         final q = search.trim();
         query = query.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
       }
+      return query;
+    }
 
-      final response = await query.order('created_at', ascending: false);
-      final List<dynamic> data = response as List<dynamic>;
-      return data.map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
+    try {
+      return await _fetchAllPaged(() => scoped(
+            '*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)',
+          ));
     } catch (e) {
       // Fallback without foreign key join if schema relationship differs
-      var fallbackQuery = _client.from('leads').select('*');
-
-      if (authIds != null) {
-        if (assignedToFilter != null && assignedToFilter.isNotEmpty) {
-          fallbackQuery = fallbackQuery.eq('assigned_to', assignedToFilter);
-        } else if (authIds.length == 1) {
-          final uid = authIds.first;
-          fallbackQuery = fallbackQuery.or('assigned_to.eq.$uid,created_by.eq.$uid');
-        } else {
-          final idsStr = authIds.join(',');
-          fallbackQuery = fallbackQuery.or('assigned_to.in.($idsStr),created_by.in.($idsStr)');
-        }
-      } else if (assignedToFilter != null && assignedToFilter.isNotEmpty) {
-        fallbackQuery = fallbackQuery.eq('assigned_to', assignedToFilter);
-      }
-
-      if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'All Leads') {
-        fallbackQuery = fallbackQuery.eq('crm_status', statusFilter);
-      }
-
-      if (search != null && search.trim().isNotEmpty) {
-        final q = search.trim();
-        fallbackQuery = fallbackQuery.or('name.ilike.%$q%,phone.ilike.%$q%,email.ilike.%$q%,project.ilike.%$q%');
-      }
-
-      final data = await fallbackQuery.order('created_at', ascending: false);
-      return (data as List<dynamic>).map((json) => LeadModel.fromJson(json as Map<String, dynamic>)).toList();
+      return _fetchAllPaged(() => scoped('*'));
     }
+  }
+
+  /// Loads every matching lead in pages of 1000. Two reasons: PostgREST silently caps a single response at
+  /// 1000 rows (an unpaged select dropped everything after that), and parsing one huge JSON body at once makes
+  /// a memory spike (raw JSON + decoded maps + models) that the low-memory killer punishes on 2-3 GB phones.
+  /// Each page is turned into models and its raw JSON is released before the next page is requested.
+  Future<List<LeadModel>> _fetchAllPaged(PostgrestFilterBuilder<PostgrestList> Function() build) async {
+    const pageSize = 1000;
+    final leads = <LeadModel>[];
+    for (var from = 0; from < 50000; from += pageSize) {
+      final page = await build()
+          .order('created_at', ascending: false)
+          .order('id')
+          .range(from, from + pageSize - 1);
+      for (final json in page) {
+        leads.add(LeadModel.fromJson(json));
+      }
+      if (page.length < pageSize) break;
+    }
+    return leads;
   }
 
   /// Single lead by id

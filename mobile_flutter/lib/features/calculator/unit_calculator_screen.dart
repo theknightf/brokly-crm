@@ -1411,6 +1411,10 @@ class _UnitCalculatorScreenState extends State<UnitCalculatorScreen> {
                       ? Image.network(
                           imgUrl,
                           fit: BoxFit.cover,
+                          // Decode at the 74 dp thumbnail size (x3 for dense screens) instead of the
+                          // full-resolution photo: a 12 MP image is ~48 MB decoded, a thumbnail ~0.2 MB.
+                          cacheWidth: 222,
+                          cacheHeight: 222,
                           errorBuilder: (_, __, ___) =>
                               const Icon(LucideIcons.building2, color: AppColors.neonLime),
                         )

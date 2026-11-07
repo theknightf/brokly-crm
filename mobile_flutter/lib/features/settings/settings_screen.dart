@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../state/auth_provider.dart';
 import '../../state/theme_provider.dart';
+import 'call_sync_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -136,6 +137,9 @@ class SettingsScreen extends StatelessWidget {
                 onChanged: (_) => theme.toggleTheme(),
               ),
             ),
+
+            // Android only: renders nothing on iOS / web.
+            const CallSyncCard(),
             const SizedBox(height: 24),
 
             _buildSectionHeader('APPLICATION & SYSTEM', isDark),

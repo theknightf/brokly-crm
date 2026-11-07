@@ -1,6 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
+import '../../core/memory/memory_guard.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/services/device_call_sync_service.dart';
+import '../../data/services/pending_call_saves.dart';
+import '../../state/call_logs_provider.dart';
 import '../attendance/attendance_screen.dart';
 import '../calculator/unit_calculator_screen.dart';
 import '../call_logs/call_logs_screen.dart';
@@ -32,6 +38,46 @@ class _MainShellState extends State<MainShell> {
   // 7: Unit Calculator (drawer & quick toolbox access)
   int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // Tabs opened so far; only these are built and kept alive.
+  final Set<int> _visited = {0};
+  VoidCallback? _unregisterTrim;
+  VoidCallback? _unregisterSaved;
+  VoidCallback? _unregisterCallSync;
+
+  @override
+  void initState() {
+    super.initState();
+    // When a queued call save finally reaches the server (e.g. after being offline), refresh the call list.
+    _unregisterSaved = PendingCallSaves.instance.addOnSaved(() {
+      if (!mounted) return;
+      context.read<CallLogsProvider>().fetchCalls(silent: true);
+    });
+    // Sign-in is done by the time the shell is shown: load call-sync settings, sync on app open, and refresh the
+    // call list whenever a sync adds calls.
+    unawaited(DeviceCallSyncService.instance.onSignedIn());
+    _unregisterCallSync = DeviceCallSyncService.instance.addOnSynced((r) {
+      if (!mounted || r.inserted == 0) return;
+      context.read<CallLogsProvider>().fetchCalls(silent: true);
+    });
+    // Under memory pressure drop every tab except the one on screen; they rebuild when visited again.
+    _unregisterTrim = MemoryGuard.onTrim((critical) {
+      if (!mounted) return;
+      setState(() {
+        _visited
+          ..clear()
+          ..add(_currentIndex);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _unregisterTrim?.call();
+    _unregisterSaved?.call();
+    _unregisterCallSync?.call();
+    super.dispose();
+  }
 
   String get _currentTitle {
     switch (_currentIndex) {
@@ -69,15 +115,22 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final screens = [
-      DashboardScreen(onNavigateTab: (index) => setState(() => _currentIndex = index)),
-      const LeadsScreen(),
-      const AttendanceScreen(),
-      const FollowUpsScreen(),
-      const CallLogsScreen(),
-      const CustomersScreen(),
-      const SettingsScreen(),
-      const UnitCalculatorScreen(showAppBar: false),
+    // Screens are built on first visit instead of all 8 up front (IndexedStack builds every child), so a
+    // phone that only ever opens Home + Leads never pays for Attendance, Calculator, Settings...
+    _visited.add(_currentIndex);
+    final screenBuilders = <Widget Function()>[
+      () => DashboardScreen(onNavigateTab: (index) => setState(() => _currentIndex = index)),
+      () => const LeadsScreen(),
+      () => const AttendanceScreen(),
+      () => const FollowUpsScreen(),
+      () => const CallLogsScreen(),
+      () => const CustomersScreen(),
+      () => const SettingsScreen(),
+      () => const UnitCalculatorScreen(showAppBar: false),
+    ];
+    final screens = <Widget>[
+      for (var i = 0; i < screenBuilders.length; i++)
+        _visited.contains(i) ? screenBuilders[i]() : const SizedBox.shrink(),
     ];
 
     // Determine bottom nav active index (0..3, or none if accessing auxiliary drawer pages)

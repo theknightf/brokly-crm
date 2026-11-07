@@ -17,7 +17,12 @@ import {
   Search,
   PenLine,
   ShieldCheck,
+  Mic,
+  Square,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
+import { useVoice } from './useVoice';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,6 +61,7 @@ export default function AssistantChatWidget() {
     isLoading,
     setMessages,
     setInput,
+    append,
     error,
   } = useChat({
     api: '/api/assistant',
@@ -64,6 +70,68 @@ export default function AssistantChatWidget() {
       toast.error('تعذر الرد من المساعد الذكي حالياً.');
     },
   });
+
+  // ── Voice: tap the mic, speak, and the message is sent when you stop; replies can be read aloud ──
+  const [voiceReplies, setVoiceReplies] = useState(false);
+  useEffect(() => {
+    try {
+      setVoiceReplies(localStorage.getItem('brokly:assistant-voice-replies') === '1');
+    } catch {
+      /* storage blocked */
+    }
+  }, []);
+  const toggleVoiceReplies = () => {
+    setVoiceReplies((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem('brokly:assistant-voice-replies', next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      if (!next) voice.stopSpeaking();
+      return next;
+    });
+  };
+
+  const voice = useVoice({
+    lang: 'ar-EG',
+    onInterim: (text) => setInput(text),
+    onFinal: (text) => {
+      setInput('');
+      void append({ role: 'user', content: text });
+    },
+    onError: (code) => {
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        toast.error('اسمح للمتصفح باستخدام الميكروفون من إعدادات الموقع.');
+      } else if (code === 'unsupported') {
+        toast.error('المتصفح ده مش بيدعم الكتابة بالصوت.');
+      } else if (code === 'no-speech') {
+        toast.message('ما سمعتش حاجة، جرّب تاني.');
+      } else if (code !== 'aborted') {
+        toast.error('تعذّر التسجيل الصوتي، حاول مرة أخرى.');
+      }
+    },
+  });
+
+  // Read the assistant's answer aloud once it has finished streaming.
+  const wasLoadingRef = useRef(false);
+  useEffect(() => {
+    if (wasLoadingRef.current && !isLoading && voiceReplies) {
+      const last = messages[messages.length - 1];
+      if (last?.role === 'assistant' && last.content) voice.speak(last.content);
+    }
+    wasLoadingRef.current = isLoading;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
+  // Closing the panel stops the mic and the voice.
+  useEffect(() => {
+    if (!isOpen) {
+      voice.stopListening();
+      voice.stopSpeaking();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -416,16 +484,52 @@ export default function AssistantChatWidget() {
             onSubmit={handleSubmit}
             className="flex items-center gap-2 border-t border-white/5 bg-zinc-900/60 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
           >
+            {voice.supportsSpeaking && (
+              <button
+                type="button"
+                onClick={voice.speaking ? voice.stopSpeaking : toggleVoiceReplies}
+                aria-pressed={voiceReplies}
+                aria-label={voice.speaking ? 'إيقاف القراءة' : voiceReplies ? 'إيقاف قراءة الردود بصوت' : 'قراءة الردود بصوت'}
+                title={voice.speaking ? 'إيقاف القراءة' : voiceReplies ? 'الردود بصوت: شغّال' : 'الردود بصوت: مقفول'}
+                className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors active:scale-95 ${
+                  voiceReplies || voice.speaking
+                    ? 'border-lime-400/50 bg-lime-400/10 text-lime-400'
+                    : 'border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {voice.speaking ? <Square size={14} /> : voiceReplies ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              </button>
+            )}
             <input
               type="text"
               value={input}
               onChange={handleInputChange}
-              placeholder="اكتب سؤالك أو طلبك هنا..."
+              placeholder={voice.listening ? 'بسمعك... اتكلم دلوقتي' : 'اكتب سؤالك أو طلبك هنا...'}
               disabled={isLoading}
               dir="auto"
               aria-label="رسالة للمساعد"
               className="min-h-[44px] flex-1 rounded-full border border-zinc-800 bg-zinc-900/80 px-4 text-base text-zinc-100 placeholder:text-zinc-500 transition-colors focus:border-lime-400/80 focus:outline-none focus:ring-1 focus:ring-lime-400 sm:text-sm"
             />
+            {voice.supportsListening && (
+              <button
+                type="button"
+                onClick={voice.listening ? voice.stopListening : voice.startListening}
+                disabled={isLoading}
+                aria-pressed={voice.listening}
+                aria-label={voice.listening ? 'إيقاف التسجيل' : 'تحدّث بالصوت'}
+                title={voice.listening ? 'إيقاف التسجيل' : 'تحدّث بالصوت'}
+                className={`relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-all active:scale-95 disabled:opacity-40 ${
+                  voice.listening
+                    ? 'border-red-400/60 bg-red-500/15 text-red-300'
+                    : 'border-zinc-800 bg-zinc-900/80 text-zinc-300 hover:border-lime-400/50 hover:text-lime-400'
+                }`}
+              >
+                {voice.listening && (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-red-400/20" aria-hidden />
+                )}
+                <Mic size={16} className="relative" />
+              </button>
+            )}
             <button
               type="submit"
               disabled={isLoading || !input.trim()}

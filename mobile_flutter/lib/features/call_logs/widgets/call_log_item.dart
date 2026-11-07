@@ -83,12 +83,38 @@ class CallLogItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      call.contactPhone,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            call.contactPhone,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                            ),
+                          ),
+                        ),
+                        // Added automatically from the phone's call log.
+                        if (call.isDeviceSync) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6).withAlpha(25),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFF3B82F6).withAlpha(80)),
+                            ),
+                            child: const Text(
+                              'AUTO',
+                              style: TextStyle(
+                                color: Color(0xFF3B82F6),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

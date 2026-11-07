@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/memory/memory_guard.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/local_push_notification_service.dart';
 import '../data/models/app_notification_model.dart';
@@ -76,8 +77,9 @@ class NotificationsProvider extends ChangeNotifier {
     });
 
     // Poll every 25s to catch newly due/overdue follow-up reminders & assignments
-    _pollTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-      if (_client.auth.currentUser != null) {
+    _pollTimer = Timer.periodic(Duration(seconds: MemoryGuard.isLowRam ? 60 : 25), (_) {
+      // No polling (and no list rebuilds) while the app is in the background.
+      if (MemoryGuard.isForeground && _client.auth.currentUser != null) {
         refresh();
       }
     });

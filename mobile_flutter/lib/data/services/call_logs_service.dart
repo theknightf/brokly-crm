@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/call_log_model.dart';
+import 'device_call_sync_service.dart';
 import 'supabase_service.dart';
 import 'users_service.dart';
 
@@ -300,20 +301,41 @@ class CallLogsService {
       } catch (_) {}
 
       try {
-        await _client.from('lead_comments').insert({
-          'lead_id': leadId,
-          'user_id': user?.id,
-          'body': noteText,
-        });
+        // A retry of the same save must not add the same comment twice.
+        final since = DateTime.now().toUtc().subtract(const Duration(minutes: 30)).toIso8601String();
+        final dup = await _client
+            .from('lead_comments')
+            .select('id')
+            .eq('lead_id', leadId)
+            .eq('body', noteText)
+            .gte('created_at', since)
+            .limit(1);
+        if ((dup as List<dynamic>).isEmpty) {
+          await _client.from('lead_comments').insert({
+            'lead_id': leadId,
+            'user_id': user?.id,
+            'body': noteText,
+          });
+        }
       } catch (_) {}
 
-      try {
-        await _client.from('leads').update(updates).eq('id', leadId);
-      } catch (_) {}
+      // The lead update (last action, stage, follow-up date, notes) is the part that "saves progress".
+      // It is NOT swallowed: if it fails, logCall throws so PendingCallSaves keeps the save and retries it.
+      await _client.from('leads').update(updates).eq('id', leadId);
 
       // If a follow-up or meeting date was scheduled, upsert/insert into follow_ups
       if (followUpDate != null && followUpDate.trim().isNotEmpty) {
         try {
+          final existingFu = await _client
+              .from('follow_ups')
+              .select('id')
+              .eq('lead_id', leadId)
+              .eq('due_date', followUpDate.trim())
+              .eq('follow_up_status', 'Pending')
+              .limit(1);
+          if ((existingFu as List<dynamic>).isNotEmpty) {
+            throw StateError('follow-up already scheduled');
+          }
           final isMeeting = call.outcome == 'Schedule Meeting' ||
               call.outcome == 'Meeting' ||
               call.outcome == 'Site Visit';
@@ -351,121 +373,13 @@ class CallLogsService {
     return saved;
   }
 
-  /// Native call log syncing via the call_log package.
-  /// Captures duration, timestamp, and call status and attaches them to matched leads' history.
+  /// Device call-log sync. This used to upload every recent call (including numbers that are not leads, with the
+  /// phone-book contact name). It now delegates to [DeviceCallSyncService], which matches calls to leads on the
+  /// device, uploads only those, and runs only when the agent turned call sync on in Settings.
+  /// [limit] and [filterLeadId] are kept for compatibility and ignored. Returns how many calls were added.
   Future<int> syncDeviceCallLogs({int limit = 20, String? filterLeadId}) async {
-    if (kIsWeb) return 0;
-    final user = _client.auth.currentUser;
-    if (user == null) return 0;
-
-    int syncedCount = 0;
-    try {
-      final Iterable<CallLogEntry> entries = await CallLog.get();
-      final recent = entries.take(limit).toList();
-
-      for (final entry in recent) {
-        final phone = entry.number?.trim() ?? '';
-        if (phone.isEmpty) continue;
-
-        // Normalize phone suffix
-        final normalized = phone.replaceAll(RegExp(r'\D'), '');
-        if (normalized.isEmpty) continue;
-        final suffix = normalized.length >= 8
-            ? normalized.substring(normalized.length - 8)
-            : normalized;
-
-        // Try to match with existing lead
-        String? leadId;
-        String? leadName = entry.name;
-        try {
-          final dup = await _client
-              .from('leads')
-              .select('id, name')
-              .ilike('phone', '%$suffix%')
-              .limit(1)
-              .maybeSingle();
-          if (dup != null) {
-            leadId = dup['id']?.toString();
-            leadName = dup['name']?.toString() ?? leadName;
-          }
-        } catch (_) {}
-
-        if (filterLeadId != null && leadId != filterLeadId) {
-          continue;
-        }
-
-        final callTypeLabel = _callTypeToLabel(entry.callType);
-        final direction = entry.callType == CallType.incoming ? 'incoming' : 'outgoing';
-        final duration = entry.duration ?? 0;
-        final isMissedOrRejected = entry.callType == CallType.missed ||
-            entry.callType == CallType.rejected ||
-            entry.callType == CallType.blocked;
-        final outcome = (isMissedOrRejected || duration == 0) ? 'No Answer' : 'Answered';
-        final tsMillis = entry.timestamp ?? DateTime.now().millisecondsSinceEpoch;
-        final callTimestamp = DateTime.fromMillisecondsSinceEpoch(tsMillis);
-        final formattedTs = DateFormat('yyyy-MM-dd HH:mm:ss').format(callTimestamp.toLocal());
-
-        final clientRef = 'native-$tsMillis-$normalized';
-
-        // Check if already logged
-        final existing = await _client
-            .from('call_logs')
-            .select('id')
-            .eq('client_ref', clientRef)
-            .maybeSingle();
-
-        if (existing == null) {
-          final noteStr =
-              'Device Call Log ($callTypeLabel • $outcome • ${duration}s at $formattedTs)';
-          try {
-            await _client.from('call_logs').insert({
-              'user_id': user.id,
-              'entity_type': 'lead',
-              'entity_id': leadId ?? '',
-              'contact_name': leadName ?? phone,
-              'contact_phone': phone,
-              'channel': 'Call',
-              'direction': direction,
-              'duration_seconds': duration,
-              'outcome': outcome,
-              'notes': noteStr,
-              'client_ref': clientRef,
-              'created_at': callTimestamp.toUtc().toIso8601String(),
-            });
-          } catch (_) {
-            await _client.from('call_logs').insert({
-              'user_id': user.id,
-              'entity_type': 'lead',
-              'entity_id': leadId ?? '',
-              'contact_name': leadName ?? phone,
-              'contact_phone': phone,
-              'channel': 'Call',
-              'direction': direction,
-              'duration_seconds': duration,
-              'outcome': outcome,
-              'notes': noteStr,
-            });
-          }
-
-          if (leadId != null && leadId.isNotEmpty) {
-            await _attachCallMetadataToLeadHistory(
-              leadId: leadId,
-              userId: user.id,
-              callTimestamp: callTimestamp,
-              durationSeconds: duration,
-              callTypeLabel: callTypeLabel,
-              outcome: outcome,
-            );
-          }
-
-          syncedCount++;
-        }
-      }
-    } catch (_) {
-      // Permission denied or not supported on current platform
-    }
-
-    return syncedCount;
+    final result = await DeviceCallSyncService.instance.syncNow();
+    return result.inserted;
   }
 
   Future<void> _attachCallMetadataToLeadHistory({

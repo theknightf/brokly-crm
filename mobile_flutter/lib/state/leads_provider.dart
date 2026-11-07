@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants/lead_stages.dart';
+import '../core/memory/memory_guard.dart';
 import '../core/utils/date_utils.dart';
 import '../data/models/lead_model.dart';
 import '../data/services/leads_service.dart';
@@ -189,10 +190,18 @@ class LeadsProvider extends ChangeNotifier {
     try {
       _subscription?.unsubscribe();
       _subscription = _service.subscribeToChanges(() {
-        fetchLeads(silent: true);
+        // Every change by anyone used to trigger a full reload of all leads. Coalesce a burst of events
+        // into one reload (longer on low-RAM phones) so the list is not rebuilt and re-parsed constantly.
+        _refetchTimer?.cancel();
+        _refetchTimer = Timer(
+          Duration(seconds: MemoryGuard.isLowRam ? 8 : 3),
+          () => fetchLeads(silent: true),
+        );
       });
     } catch (_) {}
   }
+
+  Timer? _refetchTimer;
 
   bool _matchesNonStageCriteria(LeadModel l) {
     // 1. Search query
@@ -378,6 +387,14 @@ class LeadsProvider extends ChangeNotifier {
     }
   }
 
+  /// Local-only stage change for instant UI feedback; the server write is done elsewhere (PendingCallSaves).
+  void applyLocalStatus(String leadId, String newStatus) {
+    final index = _allLeads.indexWhere((l) => l.id == leadId);
+    if (index == -1) return;
+    _allLeads[index] = _allLeads[index].copyWith(status: newStatus, actionTakenToday: true);
+    notifyListeners();
+  }
+
   Future<void> updateStatus(String leadId, String newStatus) async {
     // Optimistic update
     final index = _allLeads.indexWhere((l) => l.id == leadId);
@@ -433,6 +450,7 @@ class LeadsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _refetchTimer?.cancel();
     _authSub?.cancel();
     _subscription?.unsubscribe();
     super.dispose();

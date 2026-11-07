@@ -16,6 +16,11 @@ class CallLogModel {
   final String? agentName;
   final String? createdAt;
 
+  /// Where the row came from: `manual` (logged by the agent) or `device_sync` (read from the phone's call log).
+  final String source;
+
+  bool get isDeviceSync => source == 'device_sync';
+
   CallLogModel({
     required this.id,
     this.userId,
@@ -32,6 +37,7 @@ class CallLogModel {
     this.projectName,
     this.agentName,
     this.createdAt,
+    this.source = 'manual',
   });
 
   factory CallLogModel.fromJson(Map<String, dynamic> json) {
@@ -51,6 +57,7 @@ class CallLogModel {
       projectName: json['project_name']?.toString(),
       agentName: json['agent_name']?.toString(),
       createdAt: json['created_at']?.toString(),
+      source: json['source']?.toString() ?? 'manual',
     );
   }
 

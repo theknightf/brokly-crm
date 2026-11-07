@@ -1962,6 +1962,26 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                       ),
                                     ),
                                   ),
+                                  // Added automatically from the phone's call log.
+                                  if (call.isDeviceSync) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF3B82F6).withAlpha(25),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFF3B82F6).withAlpha(80)),
+                                      ),
+                                      child: const Text(
+                                        'AUTO',
+                                        style: TextStyle(
+                                          color: Color(0xFF3B82F6),
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -2028,6 +2048,38 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             ],
                           ),
                         ),
+                        // Let the agent add the outcome / a note to an auto-synced call afterwards. The dialog
+                        // updates this same row (matched by its client_ref), so nothing is duplicated.
+                        if (call.isDeviceSync && _lead != null)
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                                minimumSize: const Size(0, 32),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () async {
+                                await LogCallDialog.show(
+                                  context,
+                                  lead: _lead!,
+                                  initialDurationSeconds: call.durationSeconds,
+                                  capturedMetadata: DeviceCallMetadata(
+                                    durationSeconds: call.durationSeconds,
+                                    timestamp: DateTime.tryParse(call.createdAt ?? '')?.toLocal() ?? DateTime.now(),
+                                    detectedOutcome: call.outcome,
+                                    direction: call.direction,
+                                    callTypeLabel: call.direction,
+                                    clientRef: call.clientRef ?? '',
+                                    syncedCallLogId: call.id,
+                                  ),
+                                );
+                                if (mounted) _loadAll();
+                              },
+                              icon: const Icon(LucideIcons.pencil, size: 12),
+                              label: const Text('Add outcome / note', style: TextStyle(fontSize: 11)),
+                            ),
+                          ),
                       ],
                     ),
                   ),

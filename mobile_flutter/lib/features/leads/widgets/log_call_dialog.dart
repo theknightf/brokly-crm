@@ -10,7 +10,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/call_log_model.dart';
 import '../../../data/models/lead_model.dart';
 import '../../../data/services/call_logs_service.dart';
-import '../../../state/call_logs_provider.dart';
+import '../../../data/services/pending_call_saves.dart';
 import '../../../state/leads_provider.dart';
 
 /// Lifecycle observer that detects when the user returns from the native phone
@@ -182,7 +182,8 @@ class LogCallDialog extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       isDismissible: false,
-      enableDrag: true,
+      // A swipe-down would silently throw away the call outcome that was just entered.
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (_) => LogCallDialog(
         lead: lead,
@@ -435,37 +436,56 @@ class _LogCallDialogState extends State<LogCallDialog> {
       durationSeconds: _channel == 'Call' ? _durationSeconds : 0,
       outcome: _outcome,
       notes: _notesController.text.trim(),
-      clientRef: widget.capturedMetadata?.clientRef,
+      // Always carry a client_ref: it makes a retry update the same call-log row instead of adding a duplicate.
+      clientRef: widget.capturedMetadata?.clientRef ??
+          'manual-${widget.lead.id}-${DateTime.now().millisecondsSinceEpoch}',
       projectName: widget.lead.project,
     );
 
-    final callLogsProvider = context.read<CallLogsProvider>();
     final leadsProvider = context.read<LeadsProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final leadId = widget.lead.id;
+    final stage = selectedOpt.nextStage;
+    final summary = '$_outcome (${selectedOpt.labelAr}) → $stage';
+
+    // The agent sees the new stage immediately; the server write is made durable below.
+    leadsProvider.applyLocalStatus(leadId, stage);
 
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
         SnackBar(
-          content: Text(
-            'Saved: $_outcome (${selectedOpt.labelAr}) → ${selectedOpt.nextStage}',
-          ),
+          content: Text('Saving: $summary'),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
         ),
       );
     }
 
+    // Written to the phone first, then sent. If the connection is down or the app is killed, it is kept and
+    // retried automatically, so a finished call is never lost.
     unawaited(() async {
-      try {
-        await Future.wait([
-          callLogsProvider.logCall(
-            callLog,
-            followUpDate: followUpDateStr,
-            followUpTime: followUpTimeStr,
+      final savedNow = await PendingCallSaves.instance.enqueue(
+        call: callLog,
+        leadId: leadId,
+        stage: stage,
+        followUpDate: followUpDateStr,
+        followUpTime: followUpTimeStr,
+      );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            savedNow
+                ? 'Saved: $summary'
+                : 'No connection — kept on this phone, it will sync automatically',
           ),
-          leadsProvider.updateStatus(widget.lead.id, selectedOpt.nextStage),
-        ]);
-      } catch (_) {}
+          backgroundColor: savedNow ? AppColors.primary : const Color(0xFFF59E0B),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }());
   }
 
