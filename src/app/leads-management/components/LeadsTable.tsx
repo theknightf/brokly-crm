@@ -65,6 +65,9 @@ interface LeadsTableProps {
   /** Any filter/search active: the empty state offers a "clear filters" CTA. */
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
+  /** Stage filter currently applied: the empty state names it and offers "All Leads". */
+  activeStage?: string;
+  onClearStage?: () => void;
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
@@ -665,6 +668,8 @@ export default function LeadsTable({
   loading = false,
   hasActiveFilters = false,
   onClearFilters,
+  activeStage,
+  onClearStage,
 }: LeadsTableProps) {
   const { user } = useAuth();
   const { t, lang } = useLanguage();
@@ -779,7 +784,19 @@ export default function LeadsTable({
   const safeOnView = onView ?? emptyFn;
   const safeOnEdit = onEdit ?? emptyFn;
 
-  const emptyState = (
+  const emptyState = activeStage && onClearStage ? (
+    // A stage card is selected and it has no leads: say which stage, and offer the way back to every lead.
+    <EmptyState
+      icon={<Users size={24} className="text-muted-foreground" />}
+      title={`No leads found in “${activeStage}”`}
+      description="Pick another stage, or show all leads."
+      action={
+        <button type="button" onClick={onClearStage} className="btn-primary h-11">
+          All Leads
+        </button>
+      }
+    />
+  ) : (
     <EmptyState
       icon={<Users size={24} className="text-muted-foreground" />}
       title={hasActiveFilters ? t('leads.noResults') : t('leads.noLeads')}

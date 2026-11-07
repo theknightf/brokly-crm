@@ -113,6 +113,11 @@ const STATUS_PARAM_ALIAS: Record<string, LeadStatus> = {
   cancel: 'Cancellation',
 };
 
+/** Stage name as it appears in the address bar: "Not Interested" -> "not-interested". */
+export function stageToParam(stage: string): string {
+  return stage.trim().toLowerCase().replace(/[\s_]+/g, '-');
+}
+
 export function resolveStatusParam(raw: string | null): LeadStatus | '' {
   if (!raw) return '';
   const v = raw.trim();
@@ -123,6 +128,9 @@ export function resolveStatusParam(raw: string | null): LeadStatus | '' {
     (s) => s.toLowerCase() === v.toLowerCase()
   );
   if (exact) return exact as LeadStatus;
+  // Shareable kebab-case form: ?stage=not-interested
+  const kebab = [...ALL_REAL_STATUSES, 'Duplicate Leads'].find((s) => stageToParam(s) === stageToParam(v));
+  if (kebab) return kebab as LeadStatus;
   const key = v.toLowerCase().replace(/[\s-]+/g, '_');
   if (STAGE_PARAM_MAP[key] || STATUS_PARAM_ALIAS[key]) {
     return (STAGE_PARAM_MAP[key] || STATUS_PARAM_ALIAS[key]) as LeadStatus;
@@ -513,8 +521,13 @@ export default function LeadsManagementScreen({
     if (filters.actionTaken) url.searchParams.set('actionTaken', filters.actionTaken);
     else url.searchParams.delete('actionTaken');
 
-    if (filters.status) url.searchParams.set('status', filters.status);
-    else url.searchParams.delete('status');
+    // The stage lives in the URL as ?stage=not-interested so the view can be shared and survives a reload.
+    // (?status=… is still accepted when reading, for older links.)
+    // Non-standard stage names (rare dashboard deep links) are kept verbatim so a reload resolves them identically.
+    const knownStage = ([...ALL_REAL_STATUSES, 'Duplicate Leads'] as string[]).includes(filters.status);
+    if (filters.status) url.searchParams.set('stage', knownStage ? stageToParam(filters.status) : filters.status);
+    else url.searchParams.delete('stage');
+    url.searchParams.delete('status');
 
     if (filters.search) url.searchParams.set('search', filters.search);
     else url.searchParams.delete('search');
@@ -1884,6 +1897,11 @@ export default function LeadsManagementScreen({
             loading={loading}
             hasActiveFilters={activeFilterCount > 0 || !!filters.search}
             onClearFilters={clearFilters}
+            activeStage={filters.status || undefined}
+            onClearStage={() => {
+              setFilters((f) => ({ ...f, status: '' as FilterState['status'] }));
+              setCurrentPage(1);
+            }}
           />
         )}
       </div>

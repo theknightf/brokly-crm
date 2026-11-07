@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { FilterState } from './LeadsManagementScreen';
-import { PIPELINE_STAGES } from './leadStages';
+import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 import { accentFor } from '@/app/components/KpiCardsGrid';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -51,7 +51,7 @@ export default function LeadsStatusStrip({ filters, statusCounts, total, onSelec
         {t('leads.allLeadsPill')}
         {count(allCount, !filters.status)}
       </button>
-      {PIPELINE_STAGES.map((stage) => {
+      {[...PIPELINE_STAGES, ...OUTCOME_STAGES].map((stage) => {
         const active = filters.status === stage;
         const accent = accentFor(stage);
         return (
