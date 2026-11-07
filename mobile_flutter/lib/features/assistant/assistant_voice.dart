@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 /// Voice for the assistant chat: speech-to-text (tap the mic, talk, the message is sent when you stop) and
@@ -85,8 +86,13 @@ class AssistantVoice extends ChangeNotifier {
           onPartial?.call(_heard);
           if (r.finalResult) _finish();
         },
+        // These three moved into SpeechListenOptions in newer releases but still work; kept here so the code
+        // compiles on every 7.x version.
+        // ignore: deprecated_member_use
         localeId: _arabicLocale, // null = the phone's default language
+        // ignore: deprecated_member_use
         listenFor: const Duration(seconds: 40),
+        // ignore: deprecated_member_use
         pauseFor: const Duration(seconds: 3),
         listenOptions: stt.SpeechListenOptions(
           partialResults: true,
@@ -112,7 +118,7 @@ class AssistantVoice extends ChangeNotifier {
     if (status == 'done' || status == 'notListening') _finish();
   }
 
-  void _onError(stt.SpeechRecognitionError e) {
+  void _onError(SpeechRecognitionError e) {
     final permission = e.errorMsg.contains('permission');
     final silent = e.errorMsg.contains('no_match') || e.errorMsg.contains('speech_timeout');
     if (permission) {
