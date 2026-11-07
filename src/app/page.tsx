@@ -16,6 +16,7 @@ const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
 const GettingStarted = dynamic(() => import('./components/GettingStarted'));
 const UnifiedMasterDashboard = dynamic(() => import('./components/UnifiedMasterDashboard'));
 const DailyLeaderboard = dynamic(() => import('./components/DailyLeaderboard'));
+const TeamOverview = dynamic(() => import('./components/TeamOverview'));
 const AttendanceSelfCard = dynamic(() => import('@/components/AttendanceSelfCard'));
 
 function DashboardSkeleton() {
@@ -89,6 +90,9 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="flex flex-col gap-8">
         <DashboardHeader onRefresh={refresh} refreshing={refreshing} />
+
+        {/* Team leaders only: renders nothing for everyone else (the database returns no team members). */}
+        <TeamOverview key={`team-${refreshKey}`} />
 
         <Section title="Today" hint="Check in and work your follow-ups">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
