@@ -77,7 +77,7 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{r.full_name || 'User'}</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {r.role} · {r.calls ?? 0} calls · <span className="text-emerald-500 font-semibold">{r.answered ?? 0} answered / تم الرد</span> · {r.statusUpdates ?? 0} updates · {r.meetings ?? 0} meetings · {r.deals ?? 0} deals
+                  <span className="font-semibold text-foreground">{r.calls ?? 0}</span> calls / مكالمات · <span className="font-semibold text-foreground">{r.statusUpdates ?? 0}</span> status updates / تحديثات · <span className="text-emerald-500 font-semibold">{r.answered ?? 0} answered / تم الرد</span>
                 </p>
                 <div className="mt-1.5 h-1 rounded-full bg-muted overflow-hidden" aria-hidden>
                   <div className="h-full rounded-full bg-lime-500" style={{ width: `${Math.round(((r.totalActions || 0) / topActions) * 100)}%` }} />

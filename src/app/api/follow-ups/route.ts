@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,7 +70,11 @@ export async function GET() {
     const isAdmin = isAdminRole(profileRole as any);
     const isTeamLeader = !isAdmin && (profileRole === 'team_leader' || profileRole === 'Team Lead' || profileRole === 'manager');
 
-    let query: any = db.from('follow_ups').select('*').order('due_date', { ascending: true }).limit(500);
+    // A plain `.limit(500)` returned only the 500 OLDEST rows (everything due up to mid-October), so the owner's list
+    // showed stale items and none of today's or upcoming follow-ups. Read every row, page by page, instead.
+    const base = () =>
+      db.from('follow_ups').select('*').order('due_date', { ascending: true }).order('id', { ascending: true });
+    let scope: (q: any) => any = (q) => q;
 
     if (!isAdmin) {
       if (isTeamLeader) {
@@ -93,9 +98,9 @@ export async function GET() {
         const leadIds = (teamLeads || []).map((l: any) => l.id);
 
         if (leadIds.length > 0) {
-          query = query.or(`created_by.in.(${memberIds.join(',')}),lead_id.in.(${leadIds.join(',')})`);
+          scope = (q) => q.or(`created_by.in.(${memberIds.join(',')}),lead_id.in.(${leadIds.join(',')})`);
         } else {
-          query = query.in('created_by', memberIds);
+          scope = (q) => q.in('created_by', memberIds);
         }
       } else {
         // Regular Agent: only follow-ups created by user or linked to leads assigned to / created by user
@@ -105,13 +110,13 @@ export async function GET() {
         const leadIds = (userLeads || []).map((l: any) => l.id);
 
         if (leadIds.length > 0) {
-          query = query.or(`created_by.eq.${user.id},lead_id.in.(${leadIds.join(',')})`);
+          scope = (q) => q.or(`created_by.eq.${user.id},lead_id.in.(${leadIds.join(',')})`);
         } else {
-          query = query.eq('created_by', user.id);
+          scope = (q) => q.eq('created_by', user.id);
         }
       }
     }
-    const { data, error } = await query;
+    const { data, error } = await fetchAllRows<any>((from, to) => scope(base()).range(from, to), 1000, 10000);
     if (error) {
       // Same convention as /api/workspace/follow-ups: HTTP 200 with an empty
       // list + error text, so the UI can show the message instead of a blank page.

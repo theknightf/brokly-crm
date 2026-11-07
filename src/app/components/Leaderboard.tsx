@@ -14,10 +14,10 @@ interface Row {
   online: boolean;
   score: number;
   rank: number;
-  today: { leads: number; calls: number; actions: number; activeSeconds: number };
-  week: { leads: number; calls: number; actions: number; activeSeconds: number };
-  month: { leads: number; calls: number; actions: number; activeSeconds: number };
-  total: { leads: number; calls: number; actions: number; activeSeconds: number };
+  today: { leads: number; calls: number; actions: number; statusUpdates?: number; activeSeconds: number };
+  week: { leads: number; calls: number; actions: number; statusUpdates?: number; activeSeconds: number };
+  month: { leads: number; calls: number; actions: number; statusUpdates?: number; activeSeconds: number };
+  total: { leads: number; calls: number; actions: number; statusUpdates?: number; activeSeconds: number };
 }
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -181,7 +181,7 @@ export default function Leaderboard() {
                 <div className="hidden sm:flex items-center gap-2 text-center">
                   <Metric label="Leads" value={s.leads} />
                   <Metric label="Calls" value={s.calls} />
-                  <Metric label="Actions" value={s.actions} />
+                  <Metric label="Status updates" value={s.statusUpdates ?? 0} />
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Zap size={12} className="text-primary" />
