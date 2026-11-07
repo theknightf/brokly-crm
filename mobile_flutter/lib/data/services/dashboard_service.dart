@@ -343,7 +343,8 @@ class DashboardService {
       // Function missing/unavailable: fall back to the client-side computation below.
     }
 
-    if (!rpcOk) try {
+    if (!rpcOk) {
+    try {
       final usersRes = await _client
           .from('user_profiles')
           .select('id, full_name, email, role, is_active')
@@ -502,6 +503,7 @@ class DashboardService {
         );
       }
     } catch (_) {}
+    }
 
     // If RLS restricts user_profiles to current user only, ensure current user is on leaderboard
     if (leaderboard.isEmpty && currentUserId.isNotEmpty) {

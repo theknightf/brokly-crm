@@ -54,7 +54,19 @@ jobs:
 
       - name: Analyze Flutter Code
         working-directory: mobile_flutter
-        run: flutter analyze
+        # The raw log needs admin rights to download, so every analyzer finding is also printed as an annotation
+        # (visible on the run page and through the public API). The step still fails when there are findings.
+        run: |
+          set +e
+          flutter analyze > analyze.txt 2>&1
+          status=$?
+          cat analyze.txt
+          if [ $status -ne 0 ]; then
+            grep -E '^\s*(error|warning|info) •' analyze.txt | head -45 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+          exit $status
 
       - name: Build Release APK
         working-directory: mobile_flutter

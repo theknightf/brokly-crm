@@ -1,10 +1,8 @@
 name: Build Android APK
 
+# Manual only. It needs the APP_ORIGIN secret (the production https URL the WebView opens); without it the
+# "Check APP_ORIGIN" step fails on purpose, so it must not run (and show red) on every push.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
