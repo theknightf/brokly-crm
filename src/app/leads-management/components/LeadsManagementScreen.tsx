@@ -28,6 +28,7 @@ import {
   LayoutGrid,
   List,
   ClipboardList,
+  History,
   Activity,
   MessageSquare,
   X,
@@ -46,6 +47,7 @@ import LeadsStatusStrip from './LeadsStatusStrip';
 import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
+import AssignmentHistoryModal from './AssignmentHistoryModal';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Lead, LeadStatus, LeadSource, PropertyType, LeadAction } from './mockLeads';
@@ -358,6 +360,7 @@ export default function LeadsManagementScreen({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [assignmentHistoryOpen, setAssignmentHistoryOpen] = useState(false);
   const [viewLead, setViewLead] = useState<Lead | null>(null);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -1180,6 +1183,8 @@ export default function LeadsManagementScreen({
   ) => {
     const ids = Array.from(selectedIds);
     if (!ids.length || !users.length) return;
+    // Snapshot before anything changes: the history records what these leads looked like when assigned.
+    const batchLeads = leads.filter((l) => selectedIds.has(l.id));
     try {
       if (mode === 'co_assign' || users.length <= 2) {
         const userIds = users.slice(0, 2).map((u) => u.id);
@@ -1204,6 +1209,13 @@ export default function LeadsManagementScreen({
           })
         );
         await applyChosenStage(ids, stage);
+        void leadsService.logAssignmentBatch({
+          kind: 'agents',
+          stage,
+          leads: batchLeads,
+          assignees: users.slice(0, 2).map((u) => ({ id: u.id, name: u.name, count: ids.length })),
+          createdByName: user?.name,
+        });
         toast.success(`Assigned ${ids.length} leads to ${userNames.join(' & ')}${stage ? ` · stage: ${stage}` : ''}`);
         setSelectedIds(new Set());
         // Reload from the server: the patch above is only a preview; ownership, visibility
@@ -1241,8 +1253,15 @@ export default function LeadsManagementScreen({
         count: done.filter((a) => a.userId === u.id).length,
       }));
       await applyChosenStage(ids, stage);
+      void leadsService.logAssignmentBatch({
+        kind: 'agents',
+        stage,
+        leads: batchLeads,
+        assignees: counts.map((c, i) => ({ id: users[i]?.id, name: c.name, count: c.count })),
+        createdByName: user?.name,
+      });
       toast.success(
-        `Assigned ${ids.length} leads: ${counts.map((c) => `${c.name} × ${c.count}`).join(', ')}${stage ? ` · stage: ${stage}` : ''}`
+        `Assigned ${ids.length} leads:${counts.map((c) => `${c.name} × ${c.count}`).join(', ')}${stage ? ` · stage: ${stage}` : ''}`
       );
       setSelectedIds(new Set());
       void fetchLeads();
@@ -1253,9 +1272,18 @@ export default function LeadsManagementScreen({
 
   const handleBulkAssignTeam = async (teamName: string, stage?: string) => {
     const ids = Array.from(selectedIds);
+    const batchLeads = leads.filter((l) => selectedIds.has(l.id));
     try {
       await leadsService.bulkSetTeam(ids, teamName);
       await applyChosenStage(ids, stage);
+      void leadsService.logAssignmentBatch({
+        kind: 'team',
+        teamName,
+        stage,
+        leads: batchLeads,
+        assignees: [],
+        createdByName: user?.name,
+      });
       setLeads((prev) => prev.map((l) => (selectedIds.has(l.id) ? { ...l, team: teamName } : l)));
       toast.success(`${ids.length} leads assigned to team "${teamName}"`);
       setSelectedIds(new Set());
@@ -1715,6 +1743,17 @@ export default function LeadsManagementScreen({
             <ClipboardList size={15} />
             <span className="hidden sm:inline">Import History</span>
           </a>
+          {isAdminRole(user?.role) && (
+            <button
+              type="button"
+              onClick={() => setAssignmentHistoryOpen(true)}
+              className="btn-secondary flex items-center gap-1.5 text-sm"
+              title="History of bulk assignments"
+            >
+              <History size={15} />
+              <span className="hidden sm:inline">Assignment history</span>
+            </button>
+          )}
           {/* ── Prominent Add Lead CTA ── */}
           <div className="relative">
             {/* Animated glow ring */}
@@ -1848,6 +1887,8 @@ export default function LeadsManagementScreen({
           />
         )}
       </div>
+
+      <AssignmentHistoryModal open={assignmentHistoryOpen} onClose={() => setAssignmentHistoryOpen(false)} />
 
       {/* Bulk action bar */}
       <BulkActionBar

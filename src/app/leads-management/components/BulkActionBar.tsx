@@ -29,6 +29,7 @@ import { isAdminRole } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
+import { tally } from '@/lib/assignmentHistory';
 
 interface AssignableUser {
   id: string;
@@ -52,16 +53,6 @@ export interface BulkLead {
   agent?: string;
 }
 
-function tally(values: (string | undefined | null)[], emptyLabel: string): { label: string; count: number }[] {
-  const map = new Map<string, number>();
-  for (const v of values) {
-    const key = (v || '').toString().trim() || emptyLabel;
-    map.set(key, (map.get(key) || 0) + 1);
-  }
-  return Array.from(map.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-}
 
 export interface LeadForAssignment {
   id: string;

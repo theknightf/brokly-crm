@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
+import { summarizeLeads, type AssignmentBatchInput } from '@/lib/assignmentHistory';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 import { isAdminRole } from '@/lib/roles';
 
@@ -1210,6 +1211,29 @@ export const leadsService = {
     }
     invalidateCache();
     emitFollowUpsChanged();
+  },
+
+  /**
+   * Writes one row to the assignment history (who assigned, how many, to whom, into which stage, and what the leads
+   * looked like). Best effort: a failure here must never make the assignment itself look failed.
+   */
+  async logAssignmentBatch(batch: AssignmentBatchInput) {
+    try {
+      const supabase = createClient();
+      const summary = summarizeLeads(batch.leads);
+      await supabase.from('lead_assignment_batches').insert({
+        created_by_name: batch.createdByName || null,
+        kind: batch.kind,
+        team_name: batch.teamName || null,
+        stage: batch.stage || null,
+        lead_count: batch.leads.length,
+        lead_ids: batch.leads.map((l) => l.id).filter(Boolean),
+        assignees: batch.assignees,
+        ...summary,
+      });
+    } catch {
+      /* history is a nicety */
+    }
   },
 
   /** Bulk-assign a team label (leads.team) to the selected leads. */
