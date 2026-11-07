@@ -1190,6 +1190,28 @@ export const leadsService = {
     return (data || []) as { lead_id: string; user_id: string; user_name: string }[];
   },
 
+  /**
+   * Put every listed lead in one stage with a single statement per chunk (used when the owner picks the stage while
+   * assigning). A chunk either fully applies or fails, and the error is thrown so the caller can report it.
+   */
+  async bulkSetStatus(ids: string[], status: string) {
+    if (!ids.length) return;
+    const supabase = createClient();
+    const scope = await getCachedActorScope(supabase);
+    const patch: any = {
+      crm_status: status,
+      lead_status: mapCrmStatusToLegacy(status),
+      last_action_at: new Date().toISOString(),
+    };
+    if (scope.userId) patch.last_action_by = scope.userId;
+    for (let i = 0; i < ids.length; i += 150) {
+      const { error } = await supabase.from('leads').update(patch).in('id', ids.slice(i, i + 150));
+      if (error) throw new Error(describeLeadWriteError(error, 'stage update'));
+    }
+    invalidateCache();
+    emitFollowUpsChanged();
+  },
+
   /** Bulk-assign a team label (leads.team) to the selected leads. */
   async bulkSetTeam(ids: string[], teamName: string) {
     const supabase = createClient();

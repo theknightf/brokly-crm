@@ -1160,8 +1160,22 @@ export default function LeadsManagementScreen({
     }
   };
 
+  // `stage` is the stage the owner chose in the assign dialog; it is applied right after the assignment succeeds.
+  const applyChosenStage = async (ids: string[], stage?: string) => {
+    if (!stage) return;
+    try {
+      await leadsService.bulkSetStatus(ids, stage);
+      const idSet = new Set(ids);
+      setLeads((prev) => prev.map((l) => (idSet.has(l.id) ? { ...l, status: stage as LeadStatus } : l)));
+      void loadStatusCounts();
+    } catch (err: any) {
+      toast.error(`Assigned, but the stage could not be set to "${stage}": ${err?.message || 'try again'}`);
+    }
+  };
+
   const handleBulkAssignMany = async (
     users: { id: string; name: string }[],
+    stage?: string,
     mode: 'co_assign' | 'round_robin' = 'co_assign'
   ) => {
     const ids = Array.from(selectedIds);
@@ -1189,7 +1203,8 @@ export default function LeadsManagementScreen({
             };
           })
         );
-        toast.success(`Assigned ${ids.length} leads to ${userNames.join(' & ')}`);
+        await applyChosenStage(ids, stage);
+        toast.success(`Assigned ${ids.length} leads to ${userNames.join(' & ')}${stage ? ` · stage: ${stage}` : ''}`);
         setSelectedIds(new Set());
         // Reload from the server: the patch above is only a preview; ownership, visibility
         // (leads you no longer own) and counts must come from the database.
@@ -1225,8 +1240,9 @@ export default function LeadsManagementScreen({
         name: u.name,
         count: done.filter((a) => a.userId === u.id).length,
       }));
+      await applyChosenStage(ids, stage);
       toast.success(
-        `Assigned ${ids.length} leads: ${counts.map((c) => `${c.name} × ${c.count}`).join(', ')}`
+        `Assigned ${ids.length} leads: ${counts.map((c) => `${c.name} × ${c.count}`).join(', ')}${stage ? ` · stage: ${stage}` : ''}`
       );
       setSelectedIds(new Set());
       void fetchLeads();
@@ -1235,10 +1251,11 @@ export default function LeadsManagementScreen({
     }
   };
 
-  const handleBulkAssignTeam = async (teamName: string) => {
+  const handleBulkAssignTeam = async (teamName: string, stage?: string) => {
     const ids = Array.from(selectedIds);
     try {
       await leadsService.bulkSetTeam(ids, teamName);
+      await applyChosenStage(ids, stage);
       setLeads((prev) => prev.map((l) => (selectedIds.has(l.id) ? { ...l, team: teamName } : l)));
       toast.success(`${ids.length} leads assigned to team "${teamName}"`);
       setSelectedIds(new Set());

@@ -67,8 +67,9 @@ interface BulkActionBarProps {
   selectedCount: number;
   selectedLeads: BulkLead[];
   onDelete: () => void;
-  onAssignMany: (users: AssignableUser[]) => Promise<void>;
-  onAssignTeam: (teamName: string) => void;
+  /** `stage` is passed when the owner picked the stage while assigning (required for owners/admins). */
+  onAssignMany: (users: AssignableUser[], stage?: string) => Promise<void>;
+  onAssignTeam: (teamName: string, stage?: string) => void;
   onRefer?: (userId: string, userName: string) => Promise<void>;
   /** Apply one status to every selected lead. */
   onChangeStatus?: (status: string) => Promise<void>;
@@ -125,6 +126,44 @@ export default function BulkActionBar({
   const [referError, setReferError] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  // Owners and admins must choose the stage the leads will be in BEFORE assigning them.
+  const mustPickStage = isAdminRole(user?.role);
+  const [assignStage, setAssignStage] = useState('');
+  const [teamPending, setTeamPending] = useState<string | null>(null);
+  const [teamStage, setTeamStage] = useState('');
+
+  const stagePicker = (value: string, onChange: (v: string) => void) => (
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-1.5">
+        Stage / المرحلة <span className="text-destructive">*</span>
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="input-base w-full"
+        aria-required
+      >
+        <option value="">Choose the stage first…</option>
+        <optgroup label="Pipeline">
+          {PIPELINE_STAGES.map((s) => (
+            <option key={`stage-p-${s}`} value={s}>
+              {s}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Outcomes">
+          {OUTCOME_STAGES.map((s) => (
+            <option key={`stage-o-${s}`} value={s}>
+              {s}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+      <p className="mt-1 text-xs text-muted-foreground">
+        The selected leads are moved to this stage as they are assigned.
+      </p>
+    </div>
+  );
 
   const withPhone = selectedLeads.filter((l) => l.phone);
   const withEmail = selectedLeads.filter((l) => l.email);
@@ -134,6 +173,7 @@ export default function BulkActionBar({
     if (assignModalOpen) {
       setSelectedUserIds(new Set());
       setAssignError(null);
+      setAssignStage('');
     }
   }, [assignModalOpen]);
 
@@ -443,8 +483,14 @@ export default function BulkActionBar({
                   <button
                     key={`bulk-team-${t.id}`}
                     onClick={() => {
-                      onAssignTeam(t.name);
                       setOpen('none');
+                      if (mustPickStage) {
+                        // The owner picks the stage first; the assignment happens when they confirm.
+                        setTeamStage('');
+                        setTeamPending(t.name);
+                      } else {
+                        onAssignTeam(t.name);
+                      }
                     }}
                     className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                   >
@@ -716,6 +762,8 @@ export default function BulkActionBar({
               </div>
             )}
 
+            {mustPickStage && stagePicker(assignStage, setAssignStage)}
+
             <div className="flex items-start gap-2 rounded-xl bg-amber-50 text-amber-700 px-3 py-2 text-xs">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
               <span>
@@ -746,7 +794,7 @@ export default function BulkActionBar({
                   setAssigning(true);
                   setAssignError(null);
                   try {
-                    await onAssignMany(selectedUsers);
+                    await onAssignMany(selectedUsers, mustPickStage ? assignStage : undefined);
                     setAssignModalOpen(false);
                     setSelectedUserIds(new Set());
                   } catch (err: any) {
@@ -755,13 +803,48 @@ export default function BulkActionBar({
                     setAssigning(false);
                   }
                 }}
-                disabled={assigning || selectedUsers.length === 0}
+                disabled={assigning || selectedUsers.length === 0 || (mustPickStage && !assignStage)}
                 className="btn-primary flex items-center gap-2"
               >
                 {assigning && <Loader2 size={14} className="animate-spin" />}
                 {assigning
                   ? 'Assigning…'
-                  : `Assign leads`}
+                  : mustPickStage && !assignStage
+                    ? 'Choose a stage to assign'
+                    : `Assign leads`}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Owner: pick the stage, then confirm assigning the selected leads to the team */}
+      {teamPending && (
+        <Modal
+          open
+          onClose={() => setTeamPending(null)}
+          title={`Assign to team "${teamPending}"`}
+          subtitle={`${selectedLeads.length} selected lead${selectedLeads.length !== 1 ? 's' : ''}`}
+          size="sm"
+        >
+          <div className="p-6 space-y-4">
+            {stagePicker(teamStage, setTeamStage)}
+            <div className="flex justify-end gap-3 pt-1">
+              <button type="button" onClick={() => setTeamPending(null)} className="btn-secondary">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!teamStage}
+                onClick={() => {
+                  const name = teamPending;
+                  const stage = teamStage;
+                  setTeamPending(null);
+                  onAssignTeam(name, stage);
+                }}
+                className="btn-primary"
+              >
+                {teamStage ? 'Assign to team' : 'Choose a stage to assign'}
               </button>
             </div>
           </div>
