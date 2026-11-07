@@ -2340,10 +2340,8 @@ export const teamsService = {
 
   async delete(id: string) {
     const supabase = createClient();
-    // Unassign all users from this team first
-    await supabase.from('user_profiles').update({ team_id: null }).eq('team_id', id);
-    const { error } = await supabase.from('teams').delete().eq('id', id);
-    if (error) throw error;
+    const { error } = await supabase.rpc('team_delete', { p_team: id });
+    if (error) throw new Error(error.message || 'Could not delete the team.');
     invalidateCache();
   },
 
@@ -2380,101 +2378,30 @@ export const teamsService = {
     }
   },
 
+  // Membership changes run as ONE database transaction (team_* functions) instead of several browser writes that
+  // could fail halfway and leave a person in a team on one table and not another. Errors are surfaced, not ignored.
   async addMember(teamId: string, userId: string, isLeader: boolean) {
     const supabase = createClient();
-    // A user belongs to at most one team: drop any memberships they hold in
-    // other teams and remove their leader flag there (keeps teams.leader_id
-    // and user_profiles.team_id consistent).
-    const { data: other } = await supabase
-      .from('team_memberships')
-      .select('team_id, is_leader')
-      .eq('user_id', userId)
-      .neq('team_id', teamId);
-    for (const row of other || []) {
-      await supabase
-        .from('team_memberships')
-        .delete()
-        .eq('user_id', userId)
-        .eq('team_id', row.team_id);
-      if (row.is_leader) {
-        const { data: t } = await supabase
-          .from('teams')
-          .select('leader_id')
-          .eq('id', row.team_id)
-          .maybeSingle();
-        if (t?.leader_id === userId) {
-          await supabase.from('teams').update({ leader_id: null }).eq('id', row.team_id);
-        }
-      }
-    }
-    // If setting as leader, clear existing leader flag in this team
-    if (isLeader) {
-      await supabase
-        .from('team_memberships')
-        .update({ is_leader: false })
-        .eq('team_id', teamId)
-        .eq('is_leader', true);
-    }
-    // Add membership
-    const { error: memberError } = await supabase
-      .from('team_memberships')
-      .upsert(
-        { team_id: teamId, user_id: userId, is_leader: isLeader },
-        { onConflict: 'team_id,user_id' }
-      );
-    if (memberError) throw memberError;
-    // Update user_profiles.team_id
-    const { error: profileErr } = await supabase
-      .from('user_profiles')
-      .update({ team_id: teamId })
-      .eq('id', userId);
-    if (profileErr) throw profileErr;
-    // If leader, update teams.leader_id
-    if (isLeader) {
-      await supabase.from('teams').update({ leader_id: userId }).eq('id', teamId);
-    }
+    const { error } = await supabase.rpc('team_add_member', {
+      p_team: teamId,
+      p_user: userId,
+      p_is_leader: isLeader,
+    });
+    if (error) throw new Error(error.message || 'Could not add the member.');
     invalidateCache();
   },
 
   async removeMember(teamId: string, userId: string) {
     const supabase = createClient();
-    const { error } = await supabase
-      .from('team_memberships')
-      .delete()
-      .eq('team_id', teamId)
-      .eq('user_id', userId);
-    if (error) throw error;
-    // Clear team_id from user_profiles
-    await supabase
-      .from('user_profiles')
-      .update({ team_id: null })
-      .eq('id', userId)
-      .eq('team_id', teamId);
-    // If this was the leader, clear leader_id from team
-    const { data: team } = await supabase
-      .from('teams')
-      .select('leader_id')
-      .eq('id', teamId)
-      .single();
-    if (team?.leader_id === userId) {
-      await supabase.from('teams').update({ leader_id: null }).eq('id', teamId);
-    }
+    const { error } = await supabase.rpc('team_remove_member', { p_team: teamId, p_user: userId });
+    if (error) throw new Error(error.message || 'Could not remove the member.');
     invalidateCache();
   },
 
   async setLeader(teamId: string, userId: string) {
     const supabase = createClient();
-    // Clear existing leader flag
-    await supabase.from('team_memberships').update({ is_leader: false }).eq('team_id', teamId);
-    // Set new leader
-    await supabase
-      .from('team_memberships')
-      .update({ is_leader: true })
-      .eq('team_id', teamId)
-      .eq('user_id', userId);
-    // Update teams.leader_id
-    const { error } = await supabase.from('teams').update({ leader_id: userId }).eq('id', teamId);
-    if (error) throw error;
+    const { error } = await supabase.rpc('team_set_leader', { p_team: teamId, p_user: userId });
+    if (error) throw new Error(error.message || 'Could not change the team leader.');
     invalidateCache();
   },
 

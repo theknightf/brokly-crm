@@ -220,7 +220,8 @@ function AddMemberModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const available = allUsers.filter((u) => !existingMemberIds.includes(u.id));
+  // Deactivated accounts cannot be added (the database refuses them too).
+  const available = allUsers.filter((u) => !existingMemberIds.includes(u.id) && u.isActive !== false);
   const hasMembersInOtherTeams = available.some((u) => Boolean(u.teamId));
 
   useEffect(() => {
