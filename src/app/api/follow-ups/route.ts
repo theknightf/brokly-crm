@@ -74,49 +74,60 @@ export async function GET() {
     // showed stale items and none of today's or upcoming follow-ups. Read every row, page by page, instead.
     const base = () =>
       db.from('follow_ups').select('*').order('due_date', { ascending: true }).order('id', { ascending: true });
-    let scope: (q: any) => any = (q) => q;
+    // One query per scope, results merged. A single `lead_id IN (...)` with hundreds of ids made the request URL too
+    // long, so agents with many leads (e.g. 400+) got an error and an empty page.
+    const scopes: ((q: any) => any)[] = [];
 
-    if (!isAdmin) {
+    if (isAdmin) {
+      scopes.push((q) => q);
+    } else {
+      let ownerIds: string[] = [user.id];
       if (isTeamLeader) {
-        // Team Leader: view follow-ups belonging to self and all team members
-        let memberIds: string[] = [user.id];
         try {
           const { data: teams } = await db.from('teams').select('id').eq('leader_id', user.id);
           const teamIds = (teams || []).map((t: any) => t.id);
           if (teamIds.length > 0) {
             const { data: members } = await db.from('team_memberships').select('user_id').in('team_id', teamIds);
             if (members && members.length > 0) {
-              memberIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
+              ownerIds = Array.from(new Set([user.id, ...members.map((m: any) => m.user_id)]));
             }
           }
         } catch {}
-
-        // Fetch leads assigned to or created by any team member
-        const { data: teamLeads } = await db.from('leads').select('id').or(
-          `assigned_to.in.(${memberIds.join(',')}),created_by.in.(${memberIds.join(',')})`
-        );
-        const leadIds = (teamLeads || []).map((l: any) => l.id);
-
-        if (leadIds.length > 0) {
-          scope = (q) => q.or(`created_by.in.(${memberIds.join(',')}),lead_id.in.(${leadIds.join(',')})`);
-        } else {
-          scope = (q) => q.in('created_by', memberIds);
-        }
-      } else {
-        // Regular Agent: only follow-ups created by user or linked to leads assigned to / created by user
-        const { data: userLeads } = await db.from('leads').select('id').or(
-          `assigned_to.eq.${user.id},created_by.eq.${user.id}`
-        );
-        const leadIds = (userLeads || []).map((l: any) => l.id);
-
-        if (leadIds.length > 0) {
-          scope = (q) => q.or(`created_by.eq.${user.id},lead_id.in.(${leadIds.join(',')})`);
-        } else {
-          scope = (q) => q.eq('created_by', user.id);
-        }
+      }
+      scopes.push((q) => q.in('created_by', ownerIds));
+      // Only leads carrying a follow-up date can have a live follow-up, which keeps this list short.
+      const idList = ownerIds.join(',');
+      const { data: scopedLeads } = await fetchAllRows<any>(
+        (from, to) =>
+          db
+            .from('leads')
+            .select('id')
+            .or(`assigned_to.in.(${idList}),created_by.in.(${idList})`)
+            .not('follow_up_due', 'is', null)
+            .order('id', { ascending: true })
+            .range(from, to),
+        1000,
+        20000
+      );
+      const scopedIds = (scopedLeads || []).map((l: any) => l.id);
+      for (let i = 0; i < scopedIds.length; i += 80) {
+        const chunk = scopedIds.slice(i, i + 80);
+        scopes.push((q) => q.in('lead_id', chunk));
       }
     }
-    const { data, error } = await fetchAllRows<any>((from, to) => scope(base()).range(from, to), 1000, 10000);
+
+    let error: any = null;
+    const merged = new Map<string, any>();
+    for (let i = 0; i < scopes.length && !error; i += 5) {
+      const results = await Promise.all(
+        scopes.slice(i, i + 5).map((sc) => fetchAllRows<any>((from, to) => sc(base()).range(from, to), 1000, 10000))
+      );
+      for (const r of results) {
+        if (r.error) error = r.error;
+        for (const row of r.data || []) merged.set(row.id, row);
+      }
+    }
+    const data = Array.from(merged.values());
     if (error) {
       // Same convention as /api/workspace/follow-ups: HTTP 200 with an empty
       // list + error text, so the UI can show the message instead of a blank page.
@@ -131,8 +142,8 @@ export async function GET() {
     const all: any[] = data || [];
     const leadIds = Array.from(new Set(all.map((r) => r.lead_id).filter(Boolean))) as string[];
     const leadMap = new Map<string, any>();
-    for (let i = 0; i < leadIds.length; i += 150) {
-      const chunk = leadIds.slice(i, i + 150);
+    for (let i = 0; i < leadIds.length; i += 100) {
+      const chunk = leadIds.slice(i, i + 100);
       const { data: ls } = await db
         .from('leads')
         .select('id, name, phone, crm_status, assigned_to, follow_up_due, budget_max, last_action_at')
@@ -142,19 +153,19 @@ export async function GET() {
     // Latest call per lead (context for the cockpit cards). Best-effort: the view may not exist on older databases.
     const lastCalls = new Map<string, any>();
     try {
-      for (let i = 0; i < leadIds.length; i += 150) {
+      for (let i = 0; i < leadIds.length; i += 100) {
         const { data: cs } = await db
           .from('lead_last_call')
           .select('lead_id, created_at, outcome')
-          .in('lead_id', leadIds.slice(i, i + 150));
+          .in('lead_id', leadIds.slice(i, i + 100));
         for (const c of cs || []) lastCalls.set(c.lead_id, c);
       }
     } catch {}
     const ownerIds = Array.from(new Set(Array.from(leadMap.values()).map((l) => l.assigned_to).filter(Boolean))) as string[];
     const ownerNames = new Map<string, string>();
-    for (let i = 0; i < ownerIds.length; i += 150) {
-      const { data: us } = await db.from('user_profiles').select('id, name').in('id', ownerIds.slice(i, i + 150));
-      for (const u of us || []) ownerNames.set(u.id, u.name);
+    for (let i = 0; i < ownerIds.length; i += 100) {
+      const { data: us } = await db.from('user_profiles').select('id, full_name').in('id', ownerIds.slice(i, i + 100));
+      for (const u of us || []) ownerNames.set(u.id, u.full_name);
     }
     const TERMINAL = new Set([
       'done deal', 'not interested', 'cancellation', 'duplicate leads', 'wrong number', 'closed number', 'low budget',
