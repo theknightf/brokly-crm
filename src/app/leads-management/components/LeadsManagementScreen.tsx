@@ -64,7 +64,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole } from '@/lib/roles';
-import LeadCommentsSection from './LeadCommentsSection';
+import LeadNotesSection from './LeadNotesSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
 import LeadTimeline from './LeadTimeline';
 import PostCallOutcomeModal from './PostCallOutcomeModal';
@@ -2458,7 +2458,7 @@ export default function LeadsManagementScreen({
                     ['overview', 'Overview', ClipboardList],
                     ['activity', 'Activity', Activity],
                     ['units', 'Units', Building2],
-                    ['comments', 'Comments', MessageSquare],
+                    ['comments', 'Notes', MessageSquare],
                   ] as const
                 ).map(([key, label, Icon]) => (
                   <button
@@ -2495,7 +2495,7 @@ export default function LeadsManagementScreen({
               )}
               {viewTab === 'comments' && (
                 <div className="space-y-4">
-                  <LeadCommentsSection leadId={viewLead.id} />
+                  <LeadNotesSection leadId={viewLead.id} leadNotes={viewLead.notes} />
                 </div>
               )}
             </div>
