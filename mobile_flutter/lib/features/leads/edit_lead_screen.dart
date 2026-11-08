@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/note_formatter.dart';
+import '../../core/utils/tr.dart';
 import '../../data/models/lead_model.dart';
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/leads_service.dart';
@@ -29,6 +31,7 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
   late final TextEditingController _budgetMinController;
   late final TextEditingController _budgetMaxController;
   late final TextEditingController _notesController;
+  late final ParsedNotes _parsedNotes;
 
   late String _status;
   String? _source;
@@ -75,7 +78,8 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
     _locationController = TextEditingController(text: l.location ?? '');
     _budgetMinController = TextEditingController(text: l.budgetMin?.toString() ?? '');
     _budgetMaxController = TextEditingController(text: l.budgetMax?.toString() ?? '');
-    _notesController = TextEditingController(text: l.notes ?? '');
+    _parsedNotes = NoteFormatter.parse(l.notes);
+    _notesController = TextEditingController(text: _parsedNotes.humanText);
 
     _status = l.status;
     _source = l.source;
@@ -155,7 +159,8 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
       'budget_max': double.tryParse(_budgetMaxController.text.trim()),
       'priority': _priority,
       'assigned_to': _assignedToId,
-      'notes': _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+      // The call log lines the app wrote stay on the lead; only the person's own text was editable here.
+      'notes': _parsedNotes.merge(_notesController.text).isNotEmpty ? _parsedNotes.merge(_notesController.text) : null,
     };
     if (canEditSource) {
       updates['source'] = _source;
@@ -314,12 +319,16 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 controller: _notesController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Notes',
+                maxLines: 4,
+                decoration: InputDecoration(
+                  labelText: tr('Note', 'ملاحظة'),
                   alignLabelWithHint: true,
                 ),
               ),
+              if (_parsedNotes.log.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _CallLog(entries: _parsedNotes.log),
+              ],
               const SizedBox(height: 28),
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _submit,
@@ -334,6 +343,58 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The calls the app recorded on this lead, one readable row each (newest first).
+class _CallLog extends StatelessWidget {
+  final List<NoteLogEntry> entries;
+  const _CallLog({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurface.withAlpha(150);
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        initiallyExpanded: entries.length <= 3,
+        leading: const Icon(LucideIcons.phoneCall, size: 18),
+        title: Text(
+          tr('Call log (${entries.length})', 'سجل المكالمات (${entries.length})'),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        subtitle: Text(
+          tr('Recorded automatically, kept when you save', 'مسجّل تلقائياً ويتحفظ عند الحفظ'),
+          style: TextStyle(fontSize: 11, color: muted),
+        ),
+        children: [
+          for (final e in entries)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withAlpha(12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  if (e.time != null) Text(e.time!, style: TextStyle(fontSize: 11, color: muted)),
+                  if (e.detail != null) ...[
+                    const SizedBox(height: 4),
+                    Text(e.detail!, style: const TextStyle(fontSize: 13, height: 1.35)),
+                  ],
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

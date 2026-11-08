@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { Loader2, Building2, RefreshCw, ChevronDown, UserCheck, Check, X } from 'lucide-react';
+import { parseLeadNotes, mergeLeadNotes } from '@/lib/leadNotes';
 import {
   Lead,
   LeadStatus,
@@ -92,6 +93,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
     profile?.role === 'manager' ||
     user?.role === 'manager';
   const [sourceList, setSourceList] = useState<{ id: string; name: string }[]>([]);
+  // The note box shows only what a person wrote; the call lines the apps recorded are listed below it and kept on save.
+  const parsedNotes = useMemo(() => parseLeadNotes(lead.notes), [lead.notes]);
   const [projects, setProjects] = useState<
     { id: string; name: string; developerId: string | null; developerName: string }[]
   >([]);
@@ -172,7 +175,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       assignedTo: lead.assignedTo || '',
       status: (lead.status as LeadStatus) || 'Fresh Leads',
       followUpDue: lead.followUpDue || '',
-      notes: lead.notes || '',
+      notes: parsedNotes.humanText,
       leadRating: lead.leadRating || '',
       priority: lead.priority || 'Normal',
       team: lead.team || '',
@@ -328,7 +331,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         userName: users.find((u) => u.id === id)?.name || null,
       })),
       followUpDue: data.followUpDue || undefined,
-      notes: data.notes || '',
+      notes: mergeLeadNotes(parsedNotes, data.notes || ''),
       developer: data.developer || undefined,
       project: data.project || undefined,
       leadRating: data.leadRating || '',
@@ -846,6 +849,26 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
             placeholder="Notes about this lead…"
             {...register('notes')}
           />
+          {parsedNotes.log.length > 0 && (
+            <details className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-2" open={parsedNotes.log.length <= 3}>
+              <summary className="cursor-pointer text-xs font-semibold text-foreground">
+                Call log ({parsedNotes.log.length}) <span className="font-normal text-muted-foreground">· recorded automatically, kept when you save</span>
+              </summary>
+              <ul className="mt-2 space-y-1.5">
+                {parsedNotes.log.map((e, i) => (
+                  <li key={i} className="rounded-lg bg-card px-2.5 py-1.5">
+                    <p className="text-xs font-semibold text-foreground">{e.title}</p>
+                    <p className="text-[11px] text-muted-foreground">{e.time}</p>
+                    {e.detail && (
+                      <p className="mt-0.5 text-xs text-foreground" dir="auto">
+                        {e.detail}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       </div>
 

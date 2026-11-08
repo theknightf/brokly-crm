@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_utils.dart';
+import '../../core/utils/note_formatter.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../data/models/call_log_model.dart';
 import '../../data/models/lead_model.dart';
@@ -2150,7 +2151,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          line,
+                          NoteFormatter.pretty(line),
                           style: const TextStyle(
                             color: _onSurface,
                             fontSize: 12.5,

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { leadCommentsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
+import { parseLeadNotes } from '@/lib/leadNotes';
 
 /**
  * One place for everything written about a lead.
@@ -123,7 +124,8 @@ export default function LeadNotesSection({ leadId, leadNotes }: Props) {
     out.push(...callNotes);
 
     // The note on the lead record: only when it adds something the feed does not already say.
-    const rec = (leadNotes || '').trim();
+    // Only what a person wrote on the record: the machine call lines are already shown as call entries.
+    const rec = parseLeadNotes(leadNotes).humanText.trim();
     if (rec) {
       const feed = out.map((e) => e.body.toLowerCase()).join('\n');
       if (!feed.includes(rec.toLowerCase())) {
