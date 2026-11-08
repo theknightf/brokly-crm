@@ -181,6 +181,7 @@ export default function Leaderboard() {
                 <div className="hidden sm:flex items-center gap-2 text-center">
                   <Metric label="Leads" value={s.leads} />
                   <Metric label="Calls" value={s.calls} />
+                  <Metric label="Actions (notes)" value={s.actions} />
                   <Metric label="Status updates" value={s.statusUpdates ?? 0} />
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">

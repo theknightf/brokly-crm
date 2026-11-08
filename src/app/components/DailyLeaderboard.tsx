@@ -84,7 +84,7 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
                   <div className="h-full rounded-full bg-lime-500" style={{ width: `${Math.round(((r.totalActions || 0) / topActions) * 100)}%` }} />
                 </div>
               </div>
-              <span title="Actions = status updates (calls are counted separately)" className="text-sm font-extrabold text-primary tabular-nums shrink-0">{(r.totalActions || 0).toLocaleString()} actions</span>
+              <span title="Actions = notes written (calls and status updates are counted separately)" className="text-sm font-extrabold text-primary tabular-nums shrink-0">{(r.totalActions || 0).toLocaleString()} actions</span>
             </div>
             );
           })}

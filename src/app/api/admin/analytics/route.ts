@@ -174,7 +174,7 @@ export async function GET(request: Request) {
         leads: countByUser(leadsByPeriod[periodKey], u.id, 'created_by'),
         calls: Number(lbOf(periodKey, u.id)?.calls) || 0,
         statusUpdates: Number(lbOf(periodKey, u.id)?.status_updates) || 0,
-        actions: Number(lbOf(periodKey, u.id)?.total_actions) || 0, // an action = a status update (calls are a separate number)
+        actions: Number(lbOf(periodKey, u.id)?.total_actions) || 0, // an action = a note written (calls and status updates are separate numbers)
         activeSeconds: sumActive(dailyByPeriod[periodKey], u.id),
       });
       const scoreKey: 'day' | 'week' | 'month' | 'range' = period === 'range' ? 'range' : period;
