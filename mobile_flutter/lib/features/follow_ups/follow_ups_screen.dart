@@ -91,10 +91,19 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
     final followUpLeads = allLeads.where((l) {
       if (l.followUpDue == null || l.followUpDue!.trim().isEmpty) return false;
       final st = l.status.toLowerCase().trim();
-      return st != 'done deal' &&
-          st != 'won' &&
-          st != 'lost' &&
-          st != 'cancellation';
+      // Same closed stages as the website: a lead in one of them has no live follow-up.
+      const closed = {
+        'done deal',
+        'won',
+        'lost',
+        'cancellation',
+        'not interested',
+        'duplicate leads',
+        'wrong number',
+        'closed number',
+        'low budget',
+      };
+      return !closed.contains(st);
     }).toList();
 
     final now = DateTime.now();
