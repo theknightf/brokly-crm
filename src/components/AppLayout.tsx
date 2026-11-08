@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Sidebar from './Sidebar';
@@ -7,7 +8,8 @@ import Topbar from './Topbar';
 import MobileBottomNav from './MobileBottomNav';
 import QuickActions from './QuickActions';
 import DeductionAlertProvider from './DeductionAlertProvider';
-import AssistantChatWidget from './assistant/AssistantChatWidget';
+// The assistant (chat SDK, voice) is only needed once someone opens it, so it is loaded after the page is interactive.
+const AssistantChatWidget = dynamic(() => import('./assistant/AssistantChatWidget'), { ssr: false });
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface AppLayoutProps {
