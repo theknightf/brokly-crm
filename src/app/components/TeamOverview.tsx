@@ -161,6 +161,7 @@ export default function TeamOverview() {
       answered,
       answeredLeads: sum('answered_leads'),
       pct: calls > 0 ? Math.round((answered / calls) * 100) : 0,
+      actions: sum('total_actions'),
       updates: sum('status_updates'),
       meetings: sum('meetings'),
       deals: sum('deals'),
@@ -239,10 +240,11 @@ export default function TeamOverview() {
       {members && members.length > 0 && (
         <>
           {/* Team totals */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
             {stat('Calls / المكالمات', totals.calls, `${totals.size} members`)}
             {stat('Answered / تم الرد', totals.answered, `${totals.pct}% of calls`, 'text-emerald-500')}
             {stat('Leads reached', totals.answeredLeads, 'unique leads that answered')}
+            {stat('Actions / الإجراءات', totals.actions, 'notes written', 'text-lime-500')}
             {stat('Stage updates', totals.updates)}
             {stat('Meetings', totals.meetings)}
             {stat('Deals', totals.deals, undefined, 'text-lime-500')}
@@ -250,13 +252,14 @@ export default function TeamOverview() {
 
           {/* Per-member table */}
           <div className="custom-scrollbar overflow-x-auto rounded-xl border border-black/5 bg-white dark:border-white/5 dark:bg-zinc-900/60">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[700px] text-sm">
               <thead className="text-start text-[11px] uppercase tracking-wide text-muted-foreground">
                 <tr className="border-b border-black/5 dark:border-white/5">
                   <th className="px-3 py-2.5 text-start font-semibold">Member</th>
                   <th className="px-3 py-2.5 text-center font-semibold">Calls</th>
                   <th className="px-3 py-2.5 text-center font-semibold">Answered</th>
                   <th className="px-3 py-2.5 text-center font-semibold">Rate</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">Actions</th>
                   <th className="px-3 py-2.5 text-center font-semibold">Updates</th>
                   <th className="px-3 py-2.5 text-center font-semibold">Meetings</th>
                   <th className="px-3 py-2.5 text-center font-semibold">Deals</th>
@@ -283,6 +286,7 @@ export default function TeamOverview() {
                       <td className="px-3 py-2.5 text-center tabular-nums">{m.calls}</td>
                       <td className="px-3 py-2.5 text-center tabular-nums text-emerald-500">{m.answered_calls}</td>
                       <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground">{m.calls > 0 ? `${pct}%` : '—'}</td>
+                      <td className="px-3 py-2.5 text-center tabular-nums font-semibold">{m.total_actions}</td>
                       <td className="px-3 py-2.5 text-center tabular-nums">{m.status_updates}</td>
                       <td className="px-3 py-2.5 text-center tabular-nums">{m.meetings}</td>
                       <td className="px-3 py-2.5 text-center tabular-nums">{m.deals}</td>
