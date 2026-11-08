@@ -26,6 +26,13 @@ export interface FollowUp {
   relationshipStatus?: RelationshipStatus;
   /** Linked lead id when this follow-up was scheduled from a lead. */
   leadId?: string;
+  /** Current pipeline stage of the linked lead (read-only, from the server). */
+  leadStatus?: string;
+  leadPhone?: string;
+  budgetMax?: number | null;
+  lastActionAt?: string | null;
+  lastCallAt?: string | null;
+  lastCallOutcome?: string;
 }
 
 export interface CustomerProfile {

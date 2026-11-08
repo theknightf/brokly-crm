@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 import { FollowUpStatusBadge, PriorityBadge } from './FollowUpStatusBadge';
 import FollowUpForm from './FollowUpForm';
+import FollowUpCockpit from './FollowUpCockpit';
 import {
   FollowUp,
   FollowUpStatus,
@@ -91,7 +92,26 @@ interface FilterState {
   type: FollowUpType | '';
   priority: FollowUpPriority | '';
   agent: string;
+  /** Pipeline stage of the linked lead. */
+  stage: string;
+  from: string;
+  to: string;
+  sort: 'due-asc' | 'due-desc' | 'priority';
 }
+
+const EMPTY_FILTERS: FilterState = {
+  search: '',
+  status: '',
+  type: '',
+  priority: '',
+  agent: '',
+  stage: '',
+  from: '',
+  to: '',
+  sort: 'due-asc',
+};
+
+const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
 
 function formatDate(dateStr: string) {
   if (!dateStr || typeof dateStr !== 'string') return '—';
@@ -116,7 +136,8 @@ function isOverdue(dueDate: string, status: FollowUpStatus) {
   if (!dueDate || typeof dueDate !== 'string') return false;
   const d = new Date(dueDate);
   if (Number.isNaN(d.getTime())) return false;
-  return d < new Date(new Date().toDateString());
+  const todayCairo = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
+  return dueDate.slice(0, 10) < todayCairo;
 }
 
 export default function FollowUpsManagementScreen() {
@@ -126,13 +147,8 @@ export default function FollowUpsManagementScreen() {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    status: '',
-    type: '',
-    priority: '',
-    agent: '',
-  });
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [view, setView] = useState<'cockpit' | 'list'>('cockpit');
   const [agentList, setAgentList] = useState<string[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<FollowUp | null>(null);
@@ -197,49 +213,88 @@ export default function FollowUpsManagementScreen() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const today = new Date().toISOString().split('T')[0];
+  // "Today" is the Cairo day (the UTC date is a day behind for the first hours after midnight).
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
 
-  const tabFiltered = useMemo(() => {
-    switch (activeTab) {
-      case 'overdue':
-        return followUps.filter((f) => f.status === 'Overdue' || isOverdue(f.dueDate, f.status));
-      case 'today':
-        return followUps.filter(
-          (f) => f.dueDate === today && f.status !== 'Completed' && f.status !== 'Cancelled'
-        );
-      case 'upcoming':
-        return followUps.filter(
-          (f) => f.dueDate > today && f.status !== 'Completed' && f.status !== 'Cancelled'
-        );
-      case 'completed':
-        return followUps.filter((f) => f.status === 'Completed');
-      default:
-        return followUps;
-    }
-  }, [followUps, activeTab, today]);
+  const isOpen = (f: FollowUp) => f.status !== 'Completed' && f.status !== 'Cancelled';
+  const effectiveStatus = (f: FollowUp): string =>
+    isOpen(f) && (f.status === 'Overdue' || isOverdue(f.dueDate, f.status)) ? 'Overdue' : f.status;
 
-  const filtered = useMemo(() => {
-    let r = [...tabFiltered];
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      // Null-safe: legacy/manual rows may carry NULL title/contact/property,
-      // and one .toLowerCase() on null would throw and blank the whole list.
-      r = r.filter(
-        (f) =>
+  // Filters apply first, so the tab counts always show what each tab would contain with the filters on.
+  const base = useMemo(() => {
+    const q = filters.search.trim().toLowerCase();
+    return followUps.filter((f) => {
+      // Null-safe: legacy/manual rows may carry NULL fields.
+      if (
+        q &&
+        !(
           (f.title || '').toLowerCase().includes(q) ||
           (f.contactName || '').toLowerCase().includes(q) ||
-          (f.propertyInterest || '').toLowerCase().includes(q)
-      );
-    }
-    if (filters.status) r = r.filter((f) => f.status === filters.status);
-    if (filters.type) r = r.filter((f) => f.type === filters.type);
-    if (filters.priority) r = r.filter((f) => f.priority === filters.priority);
-    if (filters.agent) r = r.filter((f) => f.agent === filters.agent);
-    return r.sort((a, b) => {
-      if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
-      return a.dueTime < b.dueTime ? -1 : 1;
+          (f.contactPhone || '').toLowerCase().includes(q) ||
+          (f.propertyInterest || '').toLowerCase().includes(q) ||
+          (f.agent || '').toLowerCase().includes(q) ||
+          (f.leadStatus || '').toLowerCase().includes(q)
+        )
+      )
+        return false;
+      if (filters.status && effectiveStatus(f) !== filters.status) return false;
+      if (filters.type && f.type !== filters.type) return false;
+      if (filters.priority && f.priority !== filters.priority) return false;
+      if (filters.agent && f.agent !== filters.agent) return false;
+      if (filters.stage && (f.leadStatus || '') !== filters.stage) return false;
+      const d = (f.dueDate || '').slice(0, 10);
+      if (filters.from && (!d || d < filters.from)) return false;
+      if (filters.to && (!d || d > filters.to)) return false;
+      return true;
     });
-  }, [tabFiltered, filters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followUps, filters]);
+
+  const inTab = useCallback(
+    (f: FollowUp, tab: typeof activeTab) => {
+      switch (tab) {
+        case 'overdue':
+          return isOpen(f) && (f.status === 'Overdue' || isOverdue(f.dueDate, f.status));
+        case 'today':
+          return isOpen(f) && (f.dueDate || '').slice(0, 10) === today;
+        case 'upcoming':
+          return isOpen(f) && (f.dueDate || '').slice(0, 10) > today;
+        case 'completed':
+          return f.status === 'Completed';
+        default:
+          return true;
+      }
+    },
+    [today]
+  );
+
+  const tabCounts = useMemo(() => {
+    const c = { all: base.length, overdue: 0, today: 0, upcoming: 0, completed: 0 };
+    for (const f of base) {
+      if (inTab(f, 'overdue')) c.overdue++;
+      if (inTab(f, 'today')) c.today++;
+      if (inTab(f, 'upcoming')) c.upcoming++;
+      if (inTab(f, 'completed')) c.completed++;
+    }
+    return c;
+  }, [base, inTab]);
+
+  const stageOptions = useMemo(
+    () => Array.from(new Set(followUps.map((f) => f.leadStatus).filter(Boolean) as string[])).sort(),
+    [followUps]
+  );
+
+  const filtered = useMemo(() => {
+    const r = base.filter((f) => inTab(f, activeTab));
+    const byDue = (a: FollowUp, b: FollowUp) => {
+      if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
+      return (a.dueTime || '') < (b.dueTime || '') ? -1 : 1;
+    };
+    if (filters.sort === 'due-desc') return r.sort((a, b) => byDue(b, a));
+    if (filters.sort === 'priority')
+      return r.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 3) - (PRIORITY_RANK[b.priority] ?? 3) || byDue(a, b));
+    return r.sort(byDue);
+  }, [base, inTab, activeTab, filters.sort]);
 
   const stats = useMemo(
     () => ({
@@ -388,22 +443,22 @@ export default function FollowUpsManagementScreen() {
     }
   };
 
-  const activeFilterCount = [filters.status, filters.type, filters.priority, filters.agent].filter(
-    Boolean
-  ).length;
+  const activeFilterCount = [
+    filters.status,
+    filters.type,
+    filters.priority,
+    filters.agent,
+    filters.stage,
+    filters.from,
+    filters.to,
+  ].filter(Boolean).length;
 
   const tabs: { key: typeof activeTab; label: string; count: number | null }[] = [
-    { key: 'all', label: 'All', count: followUps.length },
-    { key: 'overdue', label: 'Overdue', count: stats.overdue },
-    { key: 'today', label: 'Today', count: stats.today },
-    {
-      key: 'upcoming',
-      label: 'Upcoming',
-      count: followUps.filter(
-        (f) => f.dueDate > today && f.status !== 'Completed' && f.status !== 'Cancelled'
-      ).length,
-    },
-    { key: 'completed', label: 'Completed', count: stats.completed },
+    { key: 'all', label: 'All', count: tabCounts.all },
+    { key: 'overdue', label: 'Overdue', count: tabCounts.overdue },
+    { key: 'today', label: 'Today', count: tabCounts.today },
+    { key: 'upcoming', label: 'Upcoming', count: tabCounts.upcoming },
+    { key: 'completed', label: 'Completed', count: tabCounts.completed },
     { key: 'profiles', label: 'Customer Profiles', count: derivedProfiles.length },
   ];
 
@@ -492,8 +547,33 @@ export default function FollowUpsManagementScreen() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border overflow-x-auto pb-0">
+      {/* View switch */}
+      <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="View">
+        {(
+          [
+            ['cockpit', 'Cockpit'],
+            ['list', 'List & profiles'],
+          ] as ['cockpit' | 'list', string][]
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={view === key}
+            onClick={() => {
+              setView(key);
+              if (key === 'cockpit' && activeTab === 'profiles') setActiveTab('all');
+            }}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+              view === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabs (list view only: the cockpit orders the queue by momentum instead) */}
+      <div className={`${view === 'list' ? 'flex' : 'hidden'} items-center gap-1 border-b border-border overflow-x-auto pb-0`}>
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -665,16 +745,19 @@ export default function FollowUpsManagementScreen() {
               )}
               {(activeFilterCount > 0 || filters.search) && (
                 <button
-                  onClick={() =>
-                    setFilters({ search: '', status: '', type: '', priority: '', agent: '' })
-                  }
+                  onClick={() => setFilters({ ...EMPTY_FILTERS, sort: filters.sort })}
                   className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Clear all
                 </button>
               )}
+              <span
+                className={`${activeFilterCount > 0 || filters.search ? '' : 'ml-auto'} text-xs text-muted-foreground tabular-nums`}
+              >
+                {filtered.length} shown
+              </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="relative lg:col-span-2">
                 <Search
                   size={14}
@@ -745,11 +828,94 @@ export default function FollowUpsManagementScreen() {
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
                 />
               </div>
+              <div className="relative">
+                <select
+                  className="input-base appearance-none pr-8"
+                  value={filters.priority}
+                  onChange={(e) =>
+                    setFilters((p) => ({ ...p, priority: e.target.value as FollowUpPriority | '' }))
+                  }
+                >
+                  <option value="">All Priorities</option>
+                  {['High', 'Medium', 'Low'].map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={13}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                />
+              </div>
+              <div className="relative">
+                <select
+                  className="input-base appearance-none pr-8"
+                  value={filters.stage}
+                  onChange={(e) => setFilters((p) => ({ ...p, stage: e.target.value }))}
+                >
+                  <option value="">All Lead Stages</option>
+                  {stageOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={13}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                />
+              </div>
+              <div className="relative">
+                <select
+                  className="input-base appearance-none pr-8"
+                  value={filters.sort}
+                  onChange={(e) =>
+                    setFilters((p) => ({ ...p, sort: e.target.value as FilterState['sort'] }))
+                  }
+                  aria-label="Sort"
+                >
+                  <option value="due-asc">Sort: Due soonest</option>
+                  <option value="due-desc">Sort: Due latest</option>
+                  <option value="priority">Sort: Priority</option>
+                </select>
+                <ChevronDown
+                  size={13}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="w-9 shrink-0">From</span>
+                <input
+                  type="date"
+                  className="input-base"
+                  value={filters.from}
+                  max={filters.to || undefined}
+                  onChange={(e) => setFilters((p) => ({ ...p, from: e.target.value }))}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="w-9 shrink-0">To</span>
+                <input
+                  type="date"
+                  className="input-base"
+                  value={filters.to}
+                  min={filters.from || undefined}
+                  onChange={(e) => setFilters((p) => ({ ...p, to: e.target.value }))}
+                />
+              </label>
             </div>
           </div>
 
-          {/* Follow-ups list */}
-          {filtered.length === 0 ? (
+          {/* Follow-ups: action cockpit (default) or the classic list */}
+          {view === 'cockpit' ? (
+            <FollowUpCockpit
+              items={base}
+              onChanged={loadData}
+              onOpenLead={(id) => router.push(`/leads-management?lead=${id}`)}
+              onEdit={(fu) => setEditTarget(fu)}
+            />
+          ) : filtered.length === 0 ? (
             <div className="card-base flex flex-col items-center justify-center py-16 text-center">
               <CalendarDays size={40} className="text-muted-foreground mb-3 opacity-40" />
               <p className="text-base font-semibold text-foreground">No follow-ups found</p>
@@ -765,7 +931,12 @@ export default function FollowUpsManagementScreen() {
                 return (
                   <div
                     key={fu.id}
-                    className={`card-base !p-0 overflow-hidden transition-all ${overdue && !isDone ? 'border-red-200' : ''}`}
+                    onClick={(e) => {
+                      // Whole card opens the lead profile; buttons/links inside keep their own action.
+                      if (!fu.leadId || (e.target as HTMLElement).closest('button, a, select, input')) return;
+                      router.push(`/leads-management?lead=${fu.leadId}`);
+                    }}
+                    className={`card-base !p-0 overflow-hidden transition-all ${fu.leadId ? 'cursor-pointer hover:border-primary/40' : ''} ${overdue && !isDone ? 'border-red-200' : ''}`}
                   >
                     <div className="flex items-stretch">
                       {/* Priority stripe */}
@@ -801,6 +972,11 @@ export default function FollowUpsManagementScreen() {
                               >
                                 {fu.contactType}
                               </span>
+                              {fu.leadStatus && (
+                                <span className="text-xs px-2 py-0.5 rounded font-medium bg-lime-500/10 text-lime-700 dark:text-lime-300">
+                                  {fu.leadStatus}
+                                </span>
+                              )}
                               {fu.relationshipStatus && (
                                 <RelationshipBadge status={fu.relationshipStatus} />
                               )}

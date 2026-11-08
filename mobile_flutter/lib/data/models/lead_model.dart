@@ -294,6 +294,7 @@ class LeadModel {
     String? location,
     String? priority,
     String? followUpDue,
+    bool clearFollowUp = false,
     bool? hasBeenCalled,
     bool? actionTakenToday,
   }) {
@@ -318,7 +319,7 @@ class LeadModel {
       adminId: adminId,
       adminName: adminName,
       lastContact: lastContact,
-      followUpDue: followUpDue ?? this.followUpDue,
+      followUpDue: clearFollowUp ? null : (followUpDue ?? this.followUpDue),
       lastActionAt: lastActionAt,
       lastActionBy: lastActionBy,
       actionTakenToday: actionTakenToday ?? this.actionTakenToday,

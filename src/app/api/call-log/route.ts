@@ -320,9 +320,8 @@ export async function POST(request: Request) {
         patch.crm_status = nextStatus;
         patch.lead_status = STATUS_TO_LEGACY[nextStatus] || 'New';
       }
-      if (body.next_follow_up_date) {
-        patch.follow_up_due = body.next_follow_up_date;
-      }
+      // Contacted: the lead leaves the follow-up queue unless the agent scheduled a new date.
+      patch.follow_up_due = body.next_follow_up_date || null;
       try {
         await supabase.from('leads').update(patch).eq('id', entity_id);
       } catch {

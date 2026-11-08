@@ -418,10 +418,17 @@ class LeadsProvider extends ChangeNotifier {
   }
 
   /// Local-only stage change for instant UI feedback; the server write is done elsewhere (PendingCallSaves).
-  void applyLocalStatus(String leadId, String newStatus) {
+  /// [followUpDue]: a new follow-up date (yyyy-MM-dd) chosen in the same action. When null the lead leaves the
+  /// follow-up queue, because the agent has now contacted it.
+  void applyLocalStatus(String leadId, String newStatus, {String? followUpDue}) {
     final index = _allLeads.indexWhere((l) => l.id == leadId);
     if (index == -1) return;
-    _allLeads[index] = _allLeads[index].copyWith(status: newStatus, actionTakenToday: true);
+    _allLeads[index] = _allLeads[index].copyWith(
+      status: newStatus,
+      actionTakenToday: true,
+      followUpDue: followUpDue,
+      clearFollowUp: followUpDue == null,
+    );
     notifyListeners();
   }
 

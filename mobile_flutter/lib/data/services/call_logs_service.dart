@@ -278,6 +278,9 @@ class CallLogsService {
 
       if (followUpDate != null && followUpDate.trim().isNotEmpty) {
         updates['follow_up_due'] = followUpDate.trim();
+      } else {
+        // The agent contacted the lead: it leaves the follow-up queue unless a new date was chosen.
+        updates['follow_up_due'] = null;
       }
 
       // Append call note + duration/status metadata to lead's notes & lead_comments
@@ -322,6 +325,19 @@ class CallLogsService {
       // The lead update (last action, stage, follow-up date, notes) is the part that "saves progress".
       // It is NOT swallowed: if it fails, logCall throws so PendingCallSaves keeps the save and retries it.
       await _client.from('leads').update(updates).eq('id', leadId);
+
+      // Close the follow-ups that were waiting for this contact (all of them, or all but the newly chosen date).
+      try {
+        var done = _client
+            .from('follow_ups')
+            .update({'follow_up_status': 'Completed', 'completed_at': nowIso})
+            .eq('lead_id', leadId)
+            .eq('follow_up_status', 'Pending');
+        if (followUpDate != null && followUpDate.trim().isNotEmpty) {
+          done = done.neq('due_date', followUpDate.trim());
+        }
+        await done;
+      } catch (_) {}
 
       // If a follow-up or meeting date was scheduled, upsert/insert into follow_ups
       if (followUpDate != null && followUpDate.trim().isNotEmpty) {

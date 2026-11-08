@@ -125,8 +125,76 @@ export async function GET() {
         { status: 200 }
       );
     }
-    const rows = (data || []).map((r: any) => rowToFollowUp(r));
-    return NextResponse.json({ followUps: rows, count: rows.length });
+    // A follow-up linked to a lead is only "live" while the lead still carries that follow-up date: once the agent
+    // calls/updates the lead, follow_up_due is cleared (unless a new date is set), so the row must leave the queue.
+    // Closed rows (Completed / Cancelled) stay for history. Rows without a lead are kept as they are.
+    const all: any[] = data || [];
+    const leadIds = Array.from(new Set(all.map((r) => r.lead_id).filter(Boolean))) as string[];
+    const leadMap = new Map<string, any>();
+    for (let i = 0; i < leadIds.length; i += 150) {
+      const chunk = leadIds.slice(i, i + 150);
+      const { data: ls } = await db
+        .from('leads')
+        .select('id, name, phone, crm_status, assigned_to, follow_up_due, budget_max, last_action_at')
+        .in('id', chunk);
+      for (const l of ls || []) leadMap.set(l.id, l);
+    }
+    // Latest call per lead (context for the cockpit cards). Best-effort: the view may not exist on older databases.
+    const lastCalls = new Map<string, any>();
+    try {
+      for (let i = 0; i < leadIds.length; i += 150) {
+        const { data: cs } = await db
+          .from('lead_last_call')
+          .select('lead_id, created_at, outcome')
+          .in('lead_id', leadIds.slice(i, i + 150));
+        for (const c of cs || []) lastCalls.set(c.lead_id, c);
+      }
+    } catch {}
+    const ownerIds = Array.from(new Set(Array.from(leadMap.values()).map((l) => l.assigned_to).filter(Boolean))) as string[];
+    const ownerNames = new Map<string, string>();
+    for (let i = 0; i < ownerIds.length; i += 150) {
+      const { data: us } = await db.from('user_profiles').select('id, name').in('id', ownerIds.slice(i, i + 150));
+      for (const u of us || []) ownerNames.set(u.id, u.name);
+    }
+    const TERMINAL = new Set([
+      'done deal', 'not interested', 'cancellation', 'duplicate leads', 'wrong number', 'closed number', 'low budget',
+    ]);
+    const seenLeads = new Set<string>();
+    const live = all.filter((r) => {
+      if (!r.lead_id) return true;
+      if (['Completed', 'Cancelled'].includes(r.follow_up_status)) return true;
+      const lead = leadMap.get(r.lead_id);
+      if (!lead || !lead.follow_up_due) return false;
+      if (String(lead.follow_up_due).slice(0, 10) !== String(r.due_date).slice(0, 10)) return false;
+      if (TERMINAL.has(String(lead.crm_status || '').toLowerCase())) return false;
+      if (seenLeads.has(r.lead_id)) return false; // one live row per lead
+      seenLeads.add(r.lead_id);
+      return true;
+    });
+    const rows = live.map((r: any) => {
+      const base = rowToFollowUp(r);
+      const lead = r.lead_id ? leadMap.get(r.lead_id) : null;
+      const owner = lead?.assigned_to ? ownerNames.get(lead.assigned_to) : '';
+      return {
+        ...base,
+        leadStatus: lead?.crm_status || '',
+        leadPhone: lead?.phone || base.contactPhone || '',
+        budgetMax: lead?.budget_max ? Number(lead.budget_max) : null,
+        lastActionAt: lead?.last_action_at || null,
+        lastCallAt: (r.lead_id && lastCalls.get(r.lead_id)?.created_at) || null,
+        lastCallOutcome: (r.lead_id && lastCalls.get(r.lead_id)?.outcome) || '',
+        agent: base.agent || owner || '',
+        agentInitials:
+          base.agentInitials ||
+          (owner || '')
+            .split(' ')
+            .map((p: string) => p[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase(),
+      };
+    });
+    return NextResponse.json({ followUps: rows, count: rows.length, hiddenStale: all.length - live.length });
   } catch (e: any) {
     return NextResponse.json(
       { followUps: [], count: 0, error: e?.message || 'Failed to load follow-ups' },

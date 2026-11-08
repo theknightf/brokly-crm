@@ -449,7 +449,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
     final summary = '$_outcome (${selectedOpt.labelAr}) → $stage';
 
     // The agent sees the new stage immediately; the server write is made durable below.
-    leadsProvider.applyLocalStatus(leadId, stage);
+    leadsProvider.applyLocalStatus(leadId, stage, followUpDue: followUpDateStr);
 
     if (mounted) {
       Navigator.pop(context);

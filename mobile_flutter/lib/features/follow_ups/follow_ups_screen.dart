@@ -647,7 +647,14 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
     final isOverdue = lead.followUpDateTime?.isBefore(DateTime.now()) ?? false;
     final isVip = (lead.budgetMax ?? 0) >= 3000000;
 
-    return Container(
+    // Tapping anywhere on the card opens the lead profile; the buttons inside keep their own actions.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => LeadDetailScreen(leadId: lead.id)),
+      ),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF161B22) : Colors.white,
@@ -1014,6 +1021,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
