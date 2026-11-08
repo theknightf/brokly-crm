@@ -13,55 +13,55 @@ class FollowUpsService {
     final currentUserId = _client.auth.currentUser?.id;
 
     try {
-      var query = _client.from('follow_ups').select('*');
-
-      if (authIds != null) {
-        if (authIds.length == 1) {
-          final uid = authIds.first;
-          // Get IDs of leads belonging to user
-          List<String> leadIds = [];
-          try {
-            final leadsRes = await _client
-                .from('leads')
-                .select('id')
-                .or('assigned_to.eq.$uid,created_by.eq.$uid');
-            leadIds = (leadsRes as List<dynamic>)
-                .map((e) => e['id']?.toString())
-                .whereType<String>()
-                .toList();
-          } catch (_) {}
-
-          if (leadIds.isNotEmpty) {
-            query = query.or('created_by.eq.$uid,lead_id.in.(${leadIds.join(',')})');
-          } else {
-            query = query.eq('created_by', uid);
-          }
-        } else {
-          // Team Leader
-          final idsStr = authIds.join(',');
-          List<String> leadIds = [];
-          try {
-            final leadsRes = await _client
-                .from('leads')
-                .select('id')
-                .or('assigned_to.in.($idsStr),created_by.in.($idsStr)');
-            leadIds = (leadsRes as List<dynamic>)
-                .map((e) => e['id']?.toString())
-                .whereType<String>()
-                .toList();
-          } catch (_) {}
-
-          if (leadIds.isNotEmpty) {
-            query = query.or('created_by.in.($idsStr),lead_id.in.(${leadIds.join(',')})');
-          } else {
-            query = query.inFilter('created_by', authIds);
-          }
+      final List<FollowUpModel> followUps = [];
+      final seen = <String>{};
+      void addRows(dynamic res) {
+        for (final e in res as List<dynamic>) {
+          final row = e as Map<String, dynamic>;
+          final id = row['id']?.toString();
+          if (id == null || !seen.add(id)) continue;
+          followUps.add(FollowUpModel.fromJson(row));
         }
       }
 
-      final res = await query.order('due_date', ascending: true);
-      final list = res as List<dynamic>;
-      final followUps = list.map((e) => FollowUpModel.fromJson(e as Map<String, dynamic>)).toList();
+      if (authIds == null) {
+        addRows(await _client.from('follow_ups').select('*').order('due_date', ascending: true));
+      } else {
+        // Rows created by the user (or their team), plus rows of their leads. The lead ids go in small batches:
+        // one `lead_id IN (...)` with hundreds of ids made the request URL too long, so agents with many leads
+        // (400+) got an empty list. Only leads that carry a follow-up date can have a live follow-up.
+        addRows(await _client
+            .from('follow_ups')
+            .select('*')
+            .inFilter('created_by', authIds)
+            .order('due_date', ascending: true));
+
+        final idsStr = authIds.join(',');
+        List<String> leadIds = [];
+        try {
+          final leadsRes = await _client
+              .from('leads')
+              .select('id')
+              .or('assigned_to.in.($idsStr),created_by.in.($idsStr)')
+              .not('follow_up_due', 'is', null)
+              .limit(5000);
+          leadIds = (leadsRes as List<dynamic>)
+              .map((e) => e['id']?.toString())
+              .whereType<String>()
+              .toList();
+        } catch (_) {}
+
+        for (var i = 0; i < leadIds.length; i += 80) {
+          final chunk = leadIds.sublist(i, i + 80 > leadIds.length ? leadIds.length : i + 80);
+          try {
+            addRows(await _client
+                .from('follow_ups')
+                .select('*')
+                .inFilter('lead_id', chunk)
+                .order('due_date', ascending: true));
+          } catch (_) {}
+        }
+      }
 
       // If follow_ups table is empty or missing rows for leads with follow_up_due, reconcile from leads
       final existingLeadIds = followUps.map((f) => f.leadId).whereType<String>().toSet();
