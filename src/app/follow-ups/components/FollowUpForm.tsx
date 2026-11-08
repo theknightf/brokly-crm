@@ -30,6 +30,20 @@ interface LeadResult {
   unit: string;
 }
 
+// Declared outside the form: a component defined inside the form body is re-created on every render, which
+// remounts its inputs and drops focus after each typed character.
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="label-base">{label}</label>
+      {children}
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
+const cairoToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
+
 export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFormProps) {
   const [agentList, setAgentList] = useState<string[]>(() => getActiveAgentNames());
   const titleRef = useRef<HTMLInputElement>(null);
@@ -64,7 +78,7 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
     type: (initial?.type ?? 'Call') as FollowUpType,
     status: (initial?.status ?? 'Pending') as FollowUpStatus,
     priority: (initial?.priority ?? 'Medium') as FollowUpPriority,
-    dueDate: initial?.dueDate ?? new Date().toISOString().split('T')[0],
+    dueDate: initial?.dueDate ?? cairoToday(),
     dueTime: initial?.dueTime ?? new Date().toTimeString().slice(0, 5),
     agent: initial?.agent ?? '',
     notes: initial?.notes ?? '',
@@ -180,22 +194,6 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
       completedAt: form.status === 'Completed' ? now : undefined,
     });
   };
-
-  const Field = ({
-    label,
-    error,
-    children,
-  }: {
-    label: string;
-    error?: string;
-    children: React.ReactNode;
-  }) => (
-    <div>
-      <label className="label-base">{label}</label>
-      {children}
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-    </div>
-  );
 
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-5">

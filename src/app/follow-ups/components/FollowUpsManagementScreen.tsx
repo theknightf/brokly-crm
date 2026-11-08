@@ -1,425 +1,263 @@
 'use client';
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Plus,
-  Search,
-  SlidersHorizontal,
+  AlarmClock,
+  AlertCircle,
+  CalendarDays,
+  CheckCheck,
   CheckCircle2,
   Clock,
-  AlertCircle,
-  Phone,
-  Mail,
-  MessageCircle,
-  Video,
-  Users,
-  CalendarDays,
-  ChevronDown,
-  Pencil,
-  Trash2,
-  CheckCheck,
-  RotateCcw,
-  UserCircle2,
-  TrendingUp,
+  LayoutList,
   Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Sparkles,
+  Trash2,
   Wrench,
+  X,
 } from 'lucide-react';
-import { isAdminRole } from '@/lib/roles';
-import Modal from '@/components/ui/Modal';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import Modal from '@/components/ui/Modal';
+import { isAdminRole } from '@/lib/roles';
+import { useAuth } from '@/contexts/AuthContext';
 import { useFollowUpSync } from '@/hooks/useFollowUpSync';
-import { FollowUpStatusBadge, PriorityBadge } from './FollowUpStatusBadge';
+import { followUpsService } from '@/lib/services/crmService';
 import FollowUpForm from './FollowUpForm';
 import FollowUpCockpit from './FollowUpCockpit';
+import { ALL_FOLLOW_UP_TYPES, type FollowUp, type FollowUpPriority, type FollowUpType } from './mockFollowUps';
 import {
-  FollowUp,
-  FollowUpStatus,
-  FollowUpType,
-  FollowUpPriority,
-  RelationshipStatus,
-  CustomerProfile,
-  ALL_FOLLOW_UP_STATUSES,
-  ALL_FOLLOW_UP_TYPES,
-} from './mockFollowUps';
-import { followUpsService, teamService, teamsService } from '@/lib/services/crmService';
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+  addDays,
+  cairoToday,
+  completeFollowUp,
+  deleteFollowUp,
+  isOpen,
+  reopenFollowUp,
+  rescheduleFollowUp,
+  runMany,
+  saveFollowUp,
+} from './followUpOps';
 
-const typeIcon: Record<FollowUpType, React.ReactNode> = {
-  Call: <Phone size={13} />,
-  Email: <Mail size={13} />,
-  'Site Visit': <CalendarDays size={13} />,
-  Meeting: <Users size={13} />,
-  WhatsApp: <MessageCircle size={13} />,
-  'Video Call': <Video size={13} />,
-};
+/* ───────────────────────────────────────────────────────────────────────────
+   Follow-ups page.
+   - One data source (GET /api/follow-ups: only live follow-ups + history), refreshed silently in the background.
+   - Tabs split by time (Overdue / Today / Upcoming / All open / Done); filters apply first so every count matches.
+   - Two views of the same list: Queue (action cockpit, ordered by momentum) and Table (dense, bulk triage).
+   - All writes go through followUpOps, which keeps the lead's follow-up date and the follow-up row in sync.
+   ─────────────────────────────────────────────────────────────────────────── */
 
-const typeColor: Record<FollowUpType, string> = {
-  Call: 'bg-blue-50 text-blue-600',
-  Email: 'bg-purple-50 text-purple-600',
-  'Site Visit': 'bg-amber-50 text-amber-600',
-  Meeting: 'bg-cyan-50 text-cyan-600',
-  WhatsApp: 'bg-emerald-50 text-emerald-600',
-  'Video Call': 'bg-pink-50 text-pink-600',
-};
+type Tab = 'overdue' | 'today' | 'upcoming' | 'open' | 'done';
+type View = 'queue' | 'table';
+type Sort = 'due-asc' | 'due-desc' | 'priority';
 
-const relationshipConfig: Record<RelationshipStatus, { color: string; dot: string }> = {
-  New: { color: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400' },
-  Nurturing: { color: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
-  Negotiating: { color: 'bg-amber-50 text-amber-700', dot: 'bg-amber-500' },
-  'Closed Won': { color: 'bg-emerald-50 text-emerald-700', dot: 'bg-emerald-500' },
-  'Closed Lost': { color: 'bg-red-50 text-red-600', dot: 'bg-red-400' },
-  'At Risk': { color: 'bg-orange-50 text-orange-700', dot: 'bg-orange-500' },
-  Loyal: { color: 'bg-violet-50 text-violet-700', dot: 'bg-violet-500' },
-};
-
-function RelationshipBadge({ status }: { status: RelationshipStatus }) {
-  // Fall back to 'New' so one unexpected/NULL relationship_status value can
-  // never throw and blank the entire list.
-  const cfg = relationshipConfig[status] || relationshipConfig.New;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${cfg.color}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
-      {status}
-    </span>
-  );
-}
-
-interface FilterState {
-  search: string;
-  status: FollowUpStatus | '';
-  type: FollowUpType | '';
-  priority: FollowUpPriority | '';
+interface Filters {
+  q: string;
   agent: string;
-  /** Pipeline stage of the linked lead. */
   stage: string;
+  priority: FollowUpPriority | '';
+  type: FollowUpType | '';
   from: string;
   to: string;
-  sort: 'due-asc' | 'due-desc' | 'priority';
+  sort: Sort;
 }
 
-const EMPTY_FILTERS: FilterState = {
-  search: '',
-  status: '',
-  type: '',
-  priority: '',
-  agent: '',
-  stage: '',
-  from: '',
-  to: '',
-  sort: 'due-asc',
+const EMPTY: Filters = { q: '', agent: '', stage: '', priority: '', type: '', from: '', to: '', sort: 'due-asc' };
+const TABS: Tab[] = ['overdue', 'today', 'upcoming', 'open', 'done'];
+const TAB_LABEL: Record<Tab, string> = {
+  overdue: 'Overdue',
+  today: 'Today',
+  upcoming: 'Upcoming',
+  open: 'All open',
+  done: 'Done',
 };
-
 const PRIORITY_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
+const PAGE = 100;
 
-function formatDate(dateStr: string) {
-  if (!dateStr || typeof dateStr !== 'string') return '—';
-  const d = new Date(dateStr + 'T00:00:00');
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+const day = (s?: string | null) => (s || '').slice(0, 10);
+
+function fmtDate(d: string) {
+  if (!d) return '—';
+  const t = new Date(`${d}T00:00:00`);
+  return Number.isNaN(t.getTime()) ? '—' : t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function fmtTime(t?: string | null) {
+  if (!t || !t.includes(':')) return '';
+  const [h, m] = t.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '';
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-function formatTime(timeStr?: string | null) {
-  if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return '—';
-  const [h, m] = timeStr.split(':').map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m)) return '—';
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 || 12;
-  return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
-}
-
-function isOverdue(dueDate: string, status: FollowUpStatus) {
-  if (status === 'Completed' || status === 'Cancelled') return false;
-  // Guard: new Date(null) coerces to the 1970 epoch, which would wrongly flag
-  // every NULL-due-date row as overdue.
-  if (!dueDate || typeof dueDate !== 'string') return false;
-  const d = new Date(dueDate);
-  if (Number.isNaN(d.getTime())) return false;
-  const todayCairo = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
-  return dueDate.slice(0, 10) < todayCairo;
+function readUrl(): { tab: Tab; view: View; filters: Filters; openNew: boolean } {
+  const out = { tab: 'overdue' as Tab, view: 'queue' as View, filters: { ...EMPTY }, openNew: false };
+  if (typeof window === 'undefined') return out;
+  const p = new URLSearchParams(window.location.search);
+  const tab = p.get('tab');
+  // Older links used ?tab=all / ?tab=completed.
+  if (tab === 'all') out.tab = 'open';
+  else if (tab === 'completed') out.tab = 'done';
+  else if (TABS.includes(tab as Tab)) out.tab = tab as Tab;
+  if (p.get('view') === 'table') out.view = 'table';
+  out.filters.q = p.get('q') || '';
+  out.filters.agent = p.get('agent') || '';
+  out.filters.stage = p.get('stage') || '';
+  out.openNew = p.get('new') === '1';
+  return out;
 }
 
 export default function FollowUpsManagementScreen() {
   const { user, profile } = useAuth();
   const router = useRouter();
-  const [repairing, setRepairing] = useState(false);
-  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
-  const [view, setView] = useState<'cockpit' | 'list'>('cockpit');
-  const [agentList, setAgentList] = useState<string[]>([]);
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<FollowUp | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<FollowUp | null>(null);
-  const [activeTab, setActiveTab] = useState<
-    'all' | 'overdue' | 'today' | 'upcoming' | 'completed' | 'profiles'
-  >('all');
-  const [profileSearch, setProfileSearch] = useState('');
-  const [scheduleFromProfile, setScheduleFromProfile] = useState<CustomerProfile | null>(null);
+  const isAdmin = isAdminRole((profile as any)?.role);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  const initial = useRef(readUrl());
+  const [items, setItems] = useState<FollowUp[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(initial.current.tab);
+  const [view, setView] = useState<View>(initial.current.view);
+  const [filters, setFilters] = useState<Filters>(initial.current.filters);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [limit, setLimit] = useState(PAGE);
+  const [busy, setBusy] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const [addOpen, setAddOpen] = useState(initial.current.openNew);
+  const [editTarget, setEditTarget] = useState<FollowUp | null>(null);
+  const [deleteTargets, setDeleteTargets] = useState<FollowUp[] | null>(null);
+  const loadedOnce = useRef(false);
+
+  // First load shows a loader; later refreshes (focus, other tabs' changes, after an action) keep the page in place.
+  const load = useCallback(async () => {
+    if (loadedOnce.current) setRefreshing(true);
+    else setLoading(true);
     try {
-      const [fuData, teamData, assignableUsers] = await Promise.all([
-        followUpsService.getAll(),
-        teamService.getAll().catch(() => []),
-        teamsService.getAssignableUsers().catch(() => []),
-      ]);
-      const followUpItems = (fuData || []) as FollowUp[];
-      setFollowUps(followUpItems);
-      const userNames = (assignableUsers as { id: string; name: string }[])
-        .map((u) => u.name?.trim())
-        .filter(Boolean);
-      const followUpAgents = followUpItems.map((f) => f.agent?.trim()).filter(Boolean);
-      const teamAgents = (teamData as any[])
-        .filter((m) => m.status === 'Active')
-        .map((m) => m.name?.trim())
-        .filter(Boolean);
-      const combined = Array.from(new Set([...userNames, ...followUpAgents, ...teamAgents])).sort((a, b) =>
-        a.localeCompare(b)
-      );
-      setAgentList(combined);
-    } catch (err: any) {
-      const message = err?.message || 'Could not load follow-ups. Check your connection and retry.';
-      setLoadError(message);
-      toast.error(message);
+      const data = (await followUpsService.getAll()) as FollowUp[];
+      setItems(data || []);
+      setError(null);
+      loadedOnce.current = true;
+    } catch (e: any) {
+      const msg = e?.message || 'Could not load follow-ups. Check your connection and retry.';
+      if (!loadedOnce.current) setError(msg);
+      else toast.error(msg);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
-
-  useFollowUpSync(loadData);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      if (tab && ['all', 'overdue', 'today', 'upcoming', 'completed', 'profiles'].includes(tab)) {
-        setActiveTab(tab as typeof activeTab);
-      }
-      if (params.get('new') === '1') {
-        setAddModalOpen(true);
-      }
-      const url = new URL(window.location.href);
-      url.searchParams.delete('tab');
-      url.searchParams.delete('new');
-      window.history.replaceState({}, '', url.toString());
-    } catch {
-      // ignore
-    }
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // "Today" is the Cairo day (the UTC date is a day behind for the first hours after midnight).
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
+    void load();
+  }, [load]);
+  useFollowUpSync(load);
 
-  const isOpen = (f: FollowUp) => f.status !== 'Completed' && f.status !== 'Cancelled';
-  const effectiveStatus = (f: FollowUp): string =>
-    isOpen(f) && (f.status === 'Overdue' || isOverdue(f.dueDate, f.status)) ? 'Overdue' : f.status;
+  // Keep tab / view / main filters in the address bar (shareable, survives reload). Drop the one-shot ?new=1.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const set = (k: string, v: string, def = '') => (v && v !== def ? url.searchParams.set(k, v) : url.searchParams.delete(k));
+    set('tab', tab, 'overdue');
+    set('view', view, 'queue');
+    set('q', filters.q);
+    set('agent', filters.agent);
+    set('stage', filters.stage);
+    url.searchParams.delete('new');
+    window.history.replaceState({}, '', url.toString());
+  }, [tab, view, filters.q, filters.agent, filters.stage]);
 
-  // Filters apply first, so the tab counts always show what each tab would contain with the filters on.
-  const base = useMemo(() => {
-    const q = filters.search.trim().toLowerCase();
-    return followUps.filter((f) => {
-      // Null-safe: legacy/manual rows may carry NULL fields.
+  useEffect(() => {
+    setSelected(new Set());
+    setLimit(PAGE);
+  }, [tab, view, filters]);
+
+  const today = cairoToday();
+
+  // 1) filters (counts are computed after this, so they always match what you see)
+  const filtered = useMemo(() => {
+    const q = filters.q.trim().toLowerCase();
+    return items.filter((f) => {
       if (
         q &&
-        !(
-          (f.title || '').toLowerCase().includes(q) ||
-          (f.contactName || '').toLowerCase().includes(q) ||
-          (f.contactPhone || '').toLowerCase().includes(q) ||
-          (f.propertyInterest || '').toLowerCase().includes(q) ||
-          (f.agent || '').toLowerCase().includes(q) ||
-          (f.leadStatus || '').toLowerCase().includes(q)
-        )
+        ![f.contactName, f.contactPhone, f.leadPhone, f.title, f.propertyInterest, f.agent, f.leadStatus, f.notes]
+          .some((v) => (v || '').toLowerCase().includes(q))
       )
         return false;
-      if (filters.status && effectiveStatus(f) !== filters.status) return false;
-      if (filters.type && f.type !== filters.type) return false;
-      if (filters.priority && f.priority !== filters.priority) return false;
-      if (filters.agent && f.agent !== filters.agent) return false;
+      if (filters.agent && (f.agent || '') !== filters.agent) return false;
       if (filters.stage && (f.leadStatus || '') !== filters.stage) return false;
-      const d = (f.dueDate || '').slice(0, 10);
+      if (filters.priority && f.priority !== filters.priority) return false;
+      if (filters.type && f.type !== filters.type) return false;
+      const d = day(f.dueDate);
       if (filters.from && (!d || d < filters.from)) return false;
       if (filters.to && (!d || d > filters.to)) return false;
       return true;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followUps, filters]);
+  }, [items, filters]);
 
   const inTab = useCallback(
-    (f: FollowUp, tab: typeof activeTab) => {
-      switch (tab) {
-        case 'overdue':
-          return isOpen(f) && (f.status === 'Overdue' || isOverdue(f.dueDate, f.status));
-        case 'today':
-          return isOpen(f) && (f.dueDate || '').slice(0, 10) === today;
-        case 'upcoming':
-          return isOpen(f) && (f.dueDate || '').slice(0, 10) > today;
-        case 'completed':
-          return f.status === 'Completed';
-        default:
-          return true;
-      }
+    (f: FollowUp, t: Tab) => {
+      const d = day(f.dueDate);
+      if (t === 'done') return f.status === 'Completed';
+      if (!isOpen(f)) return false;
+      if (t === 'overdue') return !!d && d < today;
+      if (t === 'today') return d === today;
+      if (t === 'upcoming') return !!d && d > today;
+      return true; // open
     },
     [today]
   );
 
-  const tabCounts = useMemo(() => {
-    const c = { all: base.length, overdue: 0, today: 0, upcoming: 0, completed: 0 };
-    for (const f of base) {
-      if (inTab(f, 'overdue')) c.overdue++;
-      if (inTab(f, 'today')) c.today++;
-      if (inTab(f, 'upcoming')) c.upcoming++;
-      if (inTab(f, 'completed')) c.completed++;
-    }
+  // 2) tab counts
+  const counts = useMemo(() => {
+    const c: Record<Tab, number> = { overdue: 0, today: 0, upcoming: 0, open: 0, done: 0 };
+    for (const f of filtered) for (const t of TABS) if (inTab(f, t)) c[t]++;
     return c;
-  }, [base, inTab]);
+  }, [filtered, inTab]);
 
-  const stageOptions = useMemo(
-    () => Array.from(new Set(followUps.map((f) => f.leadStatus).filter(Boolean) as string[])).sort(),
-    [followUps]
-  );
-
-  const filtered = useMemo(() => {
-    const r = base.filter((f) => inTab(f, activeTab));
-    const byDue = (a: FollowUp, b: FollowUp) => {
-      if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
-      return (a.dueTime || '') < (b.dueTime || '') ? -1 : 1;
-    };
+  // 3) the tab's rows, sorted
+  const rows = useMemo(() => {
+    const r = filtered.filter((f) => inTab(f, tab));
+    const byDue = (a: FollowUp, b: FollowUp) =>
+      `${day(a.dueDate)} ${a.dueTime || ''}`.localeCompare(`${day(b.dueDate)} ${b.dueTime || ''}`);
+    if (tab === 'done') return r.sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || '') || byDue(b, a));
     if (filters.sort === 'due-desc') return r.sort((a, b) => byDue(b, a));
-    if (filters.sort === 'priority')
-      return r.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 3) - (PRIORITY_RANK[b.priority] ?? 3) || byDue(a, b));
+    if (filters.sort === 'priority') return r.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 3) - (PRIORITY_RANK[b.priority] ?? 3) || byDue(a, b));
     return r.sort(byDue);
-  }, [base, inTab, activeTab, filters.sort]);
+  }, [filtered, inTab, tab, filters.sort]);
 
-  const stats = useMemo(
-    () => ({
-      total: followUps.length,
-      overdue: followUps.filter((f) => f.status === 'Overdue' || isOverdue(f.dueDate, f.status))
-        .length,
-      today: followUps.filter(
-        (f) => f.dueDate === today && f.status !== 'Completed' && f.status !== 'Cancelled'
-      ).length,
-      completed: followUps.filter((f) => f.status === 'Completed').length,
-    }),
-    [followUps, today]
-  );
+  const agentOptions = useMemo(() => Array.from(new Set(items.map((f) => f.agent).filter(Boolean) as string[])).sort(), [items]);
+  const stageOptions = useMemo(() => Array.from(new Set(items.map((f) => f.leadStatus).filter(Boolean) as string[])).sort(), [items]);
+  const activeFilters = [filters.agent, filters.stage, filters.priority, filters.type, filters.from, filters.to].filter(Boolean).length;
 
-  const derivedProfiles = useMemo(() => {
-    const seen = new Set<string>();
-    return followUps
-      .filter((f) => {
-        if (seen.has(f.contactName)) return false;
-        seen.add(f.contactName);
-        return true;
-      })
-      .map((f) => ({
-        id: f.id,
-        name: f.contactName,
-        phone: f.contactPhone,
-        email: f.contactEmail,
-        contactType: f.contactType,
-        relationshipStatus: f.relationshipStatus || 'New',
-        propertyInterest: f.propertyInterest,
-        agent: f.agent,
-        agentInitials: f.agentInitials,
-        lastContactDate: f.dueDate,
-        totalFollowUps: followUps.filter((x) => x.contactName === f.contactName).length,
-      }));
-  }, [followUps]);
+  const openLead = (leadId: string) => router.push(`/leads-management?lead=${leadId}`);
 
-  const filteredProfiles = useMemo(() => {
-    if (!profileSearch) return derivedProfiles;
-    const q = profileSearch.toLowerCase();
-    return derivedProfiles.filter(
-      (p) =>
-        (p.name || '').toLowerCase().includes(q) ||
-        (p.propertyInterest || '').toLowerCase().includes(q) ||
-        (p.agent || '').toLowerCase().includes(q)
-    );
-  }, [profileSearch, derivedProfiles]);
-
-  const handleAdd = async (fu: FollowUp) => {
+  /* ── actions ─────────────────────────────────────────────────────────── */
+  const act = async (label: string, list: FollowUp[], op: (fu: FollowUp) => Promise<void>) => {
+    if (!list.length || busy) return;
+    setBusy(true);
     try {
-      const created = await followUpsService.create(fu, user?.id || '');
-      setFollowUps((p) => [created as FollowUp, ...p]);
-      toast.success('Follow-up scheduled');
-      // Refetch so the list reflects the confirmed server state (and any
-      // trigger-synced rows), not just the optimistic item.
-      await loadData();
+      const { ok, failed } = await runMany(list, op);
+      if (ok) toast.success(list.length === 1 ? label : `${label}: ${ok}${failed ? ` (${failed} failed)` : ''}`);
+      if (!ok && failed) toast.error('Nothing was changed. Check your permission or connection.');
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSave = async (fu: FollowUp) => {
+    try {
+      await saveFollowUp(fu, { existingId: editTarget?.id, userId: user?.id || '' });
+      toast.success(editTarget ? 'Follow-up updated' : 'Follow-up scheduled');
+      setAddOpen(false);
+      setEditTarget(null);
+      await load();
     } catch (e: any) {
-      // Never render phantom rows: on failure show the exact error and keep
-      // the form state so nothing is lost.
-      toast.error(e?.message || 'Failed to schedule follow-up');
-      return;
+      toast.error(e?.message || 'Could not save the follow-up');
     }
-    setAddModalOpen(false);
-    setScheduleFromProfile(null);
   };
 
-  const handleEdit = async (fu: FollowUp) => {
-    try {
-      const updated = await followUpsService.update(fu.id, fu);
-      setFollowUps((p) => p.map((x) => (x.id === fu.id ? (updated as FollowUp) : x)));
-      toast.success('Follow-up updated');
-      await loadData();
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to update follow-up');
-      return;
-    }
-    setEditTarget(null);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await followUpsService.delete(deleteTarget.id);
-    } catch {
-      // ignore — optimistic removal below
-    }
-    setFollowUps((p) => p.filter((x) => x.id !== deleteTarget.id));
-    setDeleteTarget(null);
-  };
-
-  const handleMarkComplete = async (id: string) => {
-    const now = new Date().toISOString();
-    try {
-      await followUpsService.updateStatus(id, 'Completed', now);
-    } catch {
-      // ignore — optimistic update below
-    }
-    setFollowUps((p) =>
-      p.map((x) =>
-        x.id === id
-          ? { ...x, status: 'Completed' as FollowUpStatus, completedAt: now.split('T')[0] }
-          : x
-      )
-    );
-  };
-
-  const handleReopen = async (id: string) => {
-    try {
-      await followUpsService.updateStatus(id, 'Pending');
-    } catch {
-      // ignore — optimistic update below
-    }
-    setFollowUps((p) =>
-      p.map((x) =>
-        x.id === id ? { ...x, status: 'Pending' as FollowUpStatus, completedAt: undefined } : x
-      )
-    );
-  };
-
-  const handleScheduleFromProfile = (profile: CustomerProfile) => {
-    setScheduleFromProfile(profile);
-  };
-
-  // One-click repair: rebuilds follow_ups rows for every lead carrying a
-  // follow-up date (fixes reminders scheduled while sync was broken).
   const handleRepair = async () => {
     if (repairing) return;
     setRepairing(true);
@@ -431,11 +269,8 @@ export default function FollowUpsManagementScreen() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error || 'Repair failed');
-      toast.success(
-        `Repaired reminders: ${j.created || 0} created, ${j.updated || 0} updated, ${j.cancelled || 0} cancelled`,
-        { duration: 6000 }
-      );
-      await loadData();
+      toast.success(`Repaired: ${j.created || 0} created, ${j.updated || 0} updated, ${j.cancelled || 0} cancelled`);
+      await load();
     } catch (e: any) {
       toast.error(e?.message || 'Repair failed');
     } finally {
@@ -443,741 +278,518 @@ export default function FollowUpsManagementScreen() {
     }
   };
 
-  const activeFilterCount = [
-    filters.status,
-    filters.type,
-    filters.priority,
-    filters.agent,
-    filters.stage,
-    filters.from,
-    filters.to,
-  ].filter(Boolean).length;
+  const selectedRows = rows.filter((r) => selected.has(r.id));
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
-  const tabs: { key: typeof activeTab; label: string; count: number | null }[] = [
-    { key: 'all', label: 'All', count: tabCounts.all },
-    { key: 'overdue', label: 'Overdue', count: tabCounts.overdue },
-    { key: 'today', label: 'Today', count: tabCounts.today },
-    { key: 'upcoming', label: 'Upcoming', count: tabCounts.upcoming },
-    { key: 'completed', label: 'Completed', count: tabCounts.completed },
-    { key: 'profiles', label: 'Customer Profiles', count: derivedProfiles.length },
+  /* ── render ──────────────────────────────────────────────────────────── */
+  const kpis: { tab: Tab; label: string; icon: React.ReactNode; tone: string }[] = [
+    { tab: 'overdue', label: 'Overdue', icon: <AlertCircle size={17} />, tone: 'text-red-500 bg-red-500/10' },
+    { tab: 'today', label: 'Due today', icon: <Clock size={17} />, tone: 'text-amber-600 bg-amber-500/10' },
+    { tab: 'upcoming', label: 'Upcoming', icon: <CalendarDays size={17} />, tone: 'text-sky-600 bg-sky-500/10' },
+    { tab: 'done', label: 'Done', icon: <CheckCircle2 size={17} />, tone: 'text-emerald-600 bg-emerald-500/10' },
   ];
 
-  const profileInitial = scheduleFromProfile
-    ? {
-        contactName: scheduleFromProfile.name,
-        contactType: scheduleFromProfile.contactType,
-        contactPhone: scheduleFromProfile.phone,
-        contactEmail: scheduleFromProfile.email,
-        propertyInterest: scheduleFromProfile.propertyInterest,
-        agent: scheduleFromProfile.agent,
-        agentInitials: scheduleFromProfile.agentInitials,
-        relationshipStatus: scheduleFromProfile.relationshipStatus,
-      }
-    : undefined;
-
   return (
-    <div className="space-y-5">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="page-title">Follow-ups</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Schedule and track follow-ups with your leads and customers
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {counts.overdue + counts.today} need action today · {fmtDate(today)}
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          {isAdminRole((profile as any)?.role) && (
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={refreshing || loading}
+            title="Refresh"
+            aria-label="Refresh"
+            className="btn-secondary flex h-9 w-9 items-center justify-center !p-0 disabled:opacity-60"
+          >
+            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+          </button>
+          {isAdmin && (
             <button
+              type="button"
               onClick={handleRepair}
               disabled={repairing}
-              title="Rebuild missing reminder rows for leads with follow-up dates"
+              title="Rebuild missing reminders for leads that have a follow-up date"
               className="btn-secondary flex items-center gap-1.5 text-sm disabled:opacity-50"
             >
               {repairing ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
-              {repairing ? 'Repairing…' : 'Repair missing'}
+              <span className="hidden sm:inline">Repair</span>
             </button>
           )}
-          <button
-            onClick={() => setAddModalOpen(true)}
-            className="btn-primary flex items-center gap-1.5 text-sm"
-          >
-            <Plus size={15} />
-            Schedule Follow-up
+          <button type="button" onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-1.5 text-sm">
+            <Plus size={15} /> Schedule
           </button>
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="card-base !p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-            <CalendarDays size={17} className="text-blue-600" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-foreground tabular-nums">{stats.total}</p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </div>
-        </div>
-        <div className="card-base !p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
-            <AlertCircle size={17} className="text-red-500" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-foreground tabular-nums">{stats.overdue}</p>
-            <p className="text-xs text-muted-foreground">Overdue</p>
-          </div>
-        </div>
-        <div className="card-base !p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
-            <Clock size={17} className="text-amber-600" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-foreground tabular-nums">{stats.today}</p>
-            <p className="text-xs text-muted-foreground">Due Today</p>
-          </div>
-        </div>
-        <div className="card-base !p-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 size={17} className="text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-foreground tabular-nums">{stats.completed}</p>
-            <p className="text-xs text-muted-foreground">Completed</p>
-          </div>
-        </div>
-      </div>
-
-      {/* View switch */}
-      <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="View">
-        {(
-          [
-            ['cockpit', 'Cockpit'],
-            ['list', 'List & profiles'],
-          ] as ['cockpit' | 'list', string][]
-        ).map(([key, label]) => (
+      {/* KPI cards = shortcuts to the tabs */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kpis.map((k) => (
           <button
-            key={key}
+            key={k.tab}
             type="button"
-            aria-pressed={view === key}
-            onClick={() => {
-              setView(key);
-              if (key === 'cockpit' && activeTab === 'profiles') setActiveTab('all');
-            }}
-            className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-              view === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+            onClick={() => setTab(k.tab)}
+            aria-pressed={tab === k.tab}
+            className={`card-base !p-4 flex items-center gap-3 text-start transition-colors hover:border-primary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              tab === k.tab ? 'border-primary ring-1 ring-primary/30' : ''
             }`}
           >
-            {label}
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${k.tone}`}>{k.icon}</span>
+            <span>
+              <span className="block text-xl font-bold tabular-nums text-foreground">{loading ? '—' : counts[k.tab]}</span>
+              <span className="block text-xs text-muted-foreground">{k.label}</span>
+            </span>
           </button>
         ))}
       </div>
 
-      {/* Tabs (list view only: the cockpit orders the queue by momentum instead) */}
-      <div className={`${view === 'list' ? 'flex' : 'hidden'} items-center gap-1 border-b border-border overflow-x-auto pb-0`}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              activeTab === tab.key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab.key === 'profiles' && <UserCircle2 size={13} />}
-            {tab.label}
-            {tab.count !== null && (
+      {/* Tabs + view switch */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border">
+        <div className="-mb-px flex overflow-x-auto" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors ${
+                tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {TAB_LABEL[t]}
               <span
-                className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                  activeTab === tab.key
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground'
+                className={`rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
+                  tab === t ? 'bg-primary text-primary-foreground' : t === 'overdue' && counts.overdue ? 'bg-red-500/15 text-red-600' : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {tab.count}
+                {counts[t]}
               </span>
-            )}
-          </button>
-        ))}
+            </button>
+          ))}
+        </div>
+        {tab !== 'done' && (
+          <div className="mb-2 inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="View">
+            {(
+              [
+                ['queue', 'Queue', <Sparkles key="q" size={13} />],
+                ['table', 'Table', <LayoutList key="t" size={13} />],
+              ] as [View, string, React.ReactNode][]
+            ).map(([v, label, icon]) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${
+                  view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Loading / error states — always visible instead of a blank page */}
-      {loading ? (
-        <div className="card-base flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-          <Loader2 size={16} className="animate-spin" />
-          Loading follow-ups…
-        </div>
-      ) : loadError ? (
-        <div className="card-base flex flex-col items-center justify-center py-16 text-center border-red-200">
-          <AlertCircle size={40} className="text-red-400 mb-3" />
-          <p className="text-base font-semibold text-foreground">Could not load follow-ups</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-md">{loadError}</p>
-          <button
-            onClick={loadData}
-            className="btn-secondary mt-4 flex items-center gap-1.5 text-sm"
+      {/* Filters */}
+      <div className="card-base !p-3">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+          <div className="relative col-span-2">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              className="input-base pl-8"
+              placeholder="Name, phone, project, note…"
+              value={filters.q}
+              onChange={(e) => setFilters((p) => ({ ...p, q: e.target.value }))}
+              aria-label="Search follow-ups"
+            />
+          </div>
+          <select className="input-base" value={filters.agent} onChange={(e) => setFilters((p) => ({ ...p, agent: e.target.value }))} aria-label="Agent">
+            <option value="">All agents</option>
+            {agentOptions.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <select className="input-base" value={filters.stage} onChange={(e) => setFilters((p) => ({ ...p, stage: e.target.value }))} aria-label="Lead stage">
+            <option value="">All stages</option>
+            {stageOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select
+            className="input-base"
+            value={filters.priority}
+            onChange={(e) => setFilters((p) => ({ ...p, priority: e.target.value as Filters['priority'] }))}
+            aria-label="Priority"
           >
-            <RotateCcw size={14} />
-            Retry
-          </button>
+            <option value="">All priorities</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+          <select
+            className="input-base"
+            value={filters.type}
+            onChange={(e) => setFilters((p) => ({ ...p, type: e.target.value as Filters['type'] }))}
+            aria-label="Type"
+          >
+            <option value="">All types</option>
+            {ALL_FOLLOW_UP_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            className="input-base"
+            value={filters.from}
+            max={filters.to || undefined}
+            onChange={(e) => setFilters((p) => ({ ...p, from: e.target.value }))}
+            aria-label="Due from"
+            title="Due from"
+          />
+          <input
+            type="date"
+            className="input-base"
+            value={filters.to}
+            min={filters.from || undefined}
+            onChange={(e) => setFilters((p) => ({ ...p, to: e.target.value }))}
+            aria-label="Due to"
+            title="Due to"
+          />
         </div>
-      ) : activeTab === 'profiles' ? (
-        <div className="space-y-4">
-          {/* Profile search */}
-          <div className="card-base !p-4">
-            <div className="relative max-w-sm">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                className="input-base pl-8"
-                placeholder="Search by name, property, agent…"
-                value={profileSearch}
-                onChange={(e) => setProfileSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Profile cards grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredProfiles.map((profile) => {
-              const profileFollowUps = followUps.filter((f) => f.contactName === profile.name);
-              const pendingCount = profileFollowUps.filter(
-                (f) => f.status !== 'Completed' && f.status !== 'Cancelled'
-              ).length;
-              return (
-                <div key={profile.id} className="card-base !p-5 flex flex-col gap-4">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold flex-shrink-0">
-                        {(profile.name || '?')
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">
-                          {profile.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded font-medium flex-shrink-0 ${
-                        profile.contactType === 'Customer'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-blue-50 text-blue-700'
-                      }`}
-                    >
-                      {profile.contactType}
-                    </span>
-                  </div>
-
-                  {/* Relationship status */}
-                  <div className="flex items-center gap-2">
-                    <TrendingUp size={13} className="text-muted-foreground flex-shrink-0" />
-                    <span className="text-xs text-muted-foreground">Relationship:</span>
-                    <RelationshipBadge status={profile.relationshipStatus} />
-                  </div>
-
-                  {/* Property & agent */}
-                  <div className="space-y-1.5 text-xs text-muted-foreground">
-                    <div className="flex items-start gap-1.5">
-                      <CalendarDays size={12} className="mt-0.5 flex-shrink-0" />
-                      <span className="truncate">{profile.propertyInterest}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-4 h-4 rounded-full bg-secondary flex items-center justify-center text-primary text-[8px] font-bold flex-shrink-0">
-                        {profile.agentInitials}
-                      </div>
-                      <span>{profile.agent}</span>
-                    </div>
-                  </div>
-
-                  {/* Stats row */}
-                  <div className="flex items-center gap-3 pt-1 border-t border-border text-xs text-muted-foreground">
-                    <span>
-                      <span className="font-semibold text-foreground">
-                        {profile.totalFollowUps}
-                      </span>{' '}
-                      total follow-ups
-                    </span>
-                    {pendingCount > 0 && (
-                      <span className="text-amber-600 font-medium">{pendingCount} pending</span>
-                    )}
-                    <span className="ml-auto">Last: {formatDate(profile.lastContactDate)}</span>
-                  </div>
-
-                  {/* Schedule button */}
-                  <button
-                    onClick={() => handleScheduleFromProfile(profile)}
-                    className="btn-primary w-full flex items-center justify-center gap-1.5 text-xs !py-2"
-                  >
-                    <Plus size={13} />
-                    Schedule Follow-up
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {filteredProfiles.length === 0 && (
-            <div className="card-base flex flex-col items-center justify-center py-16 text-center">
-              <UserCircle2 size={40} className="text-muted-foreground mb-3 opacity-40" />
-              <p className="text-base font-semibold text-foreground">No profiles found</p>
-              <p className="text-sm text-muted-foreground mt-1">Try adjusting your search.</p>
-            </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="tabular-nums">
+            {rows.length} {TAB_LABEL[tab].toLowerCase()}
+            {refreshing && ' · updating…'}
+          </span>
+          {tab !== 'done' && view === 'table' && (
+            <select
+              className="rounded-md border border-border bg-transparent px-2 py-1 text-xs"
+              value={filters.sort}
+              onChange={(e) => setFilters((p) => ({ ...p, sort: e.target.value as Sort }))}
+              aria-label="Sort"
+            >
+              <option value="due-asc">Due soonest</option>
+              <option value="due-desc">Due latest</option>
+              <option value="priority">Priority</option>
+            </select>
+          )}
+          {(activeFilters > 0 || filters.q) && (
+            <button
+              type="button"
+              onClick={() => setFilters({ ...EMPTY, sort: filters.sort })}
+              className="ms-auto inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+            >
+              <X size={12} /> Clear filters{activeFilters ? ` (${activeFilters})` : ''}
+            </button>
           )}
         </div>
+      </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="space-y-2" aria-busy="true">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="card-base h-24 animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="card-base flex flex-col items-center justify-center py-16 text-center">
+          <AlertCircle size={40} className="mb-3 text-red-400" />
+          <p className="text-base font-semibold text-foreground">Could not load follow-ups</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">{error}</p>
+          <button type="button" onClick={() => void load()} className="btn-secondary mt-4 flex items-center gap-1.5 text-sm">
+            <RotateCcw size={14} /> Retry
+          </button>
+        </div>
+      ) : view === 'queue' && tab !== 'done' ? (
+        <FollowUpCockpit items={rows} onChanged={load} onOpenLead={openLead} onEdit={(fu) => setEditTarget(fu)} />
       ) : (
         <>
-          {/* Filters */}
-          <div className="card-base !p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <SlidersHorizontal size={14} className="text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">Filters</span>
-              {activeFilterCount > 0 && (
-                <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full font-semibold">
-                  {activeFilterCount}
-                </span>
-              )}
-              {(activeFilterCount > 0 || filters.search) && (
-                <button
-                  onClick={() => setFilters({ ...EMPTY_FILTERS, sort: filters.sort })}
-                  className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Clear all
+          {/* Bulk bar */}
+          {selectedRows.length > 0 && (
+            <div className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-card/95 px-3 py-2 shadow-lg backdrop-blur">
+              <span className="text-sm font-semibold tabular-nums">{selectedRows.length} selected</span>
+              <span className="mx-1 h-4 w-px bg-border" />
+              {tab === 'done' ? (
+                <button disabled={busy} onClick={() => act('Reopened', selectedRows, reopenFollowUp)} className="btn-secondary !py-1.5 text-xs">
+                  Reopen
                 </button>
+              ) : (
+                <>
+                  <button disabled={busy} onClick={() => act('Done', selectedRows, completeFollowUp)} className="btn-primary !py-1.5 text-xs">
+                    Mark done
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => act('Moved to tomorrow', selectedRows, (fu) => rescheduleFollowUp(fu, addDays(today, 1), fu.dueTime || '10:00'))}
+                    className="btn-secondary !py-1.5 text-xs"
+                  >
+                    Tomorrow
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => act('Moved +3 days', selectedRows, (fu) => rescheduleFollowUp(fu, addDays(today, 3), fu.dueTime || '10:00'))}
+                    className="btn-secondary !py-1.5 text-xs"
+                  >
+                    +3 days
+                  </button>
+                </>
               )}
-              <span
-                className={`${activeFilterCount > 0 || filters.search ? '' : 'ml-auto'} text-xs text-muted-foreground tabular-nums`}
-              >
-                {filtered.length} shown
-              </span>
+              <button disabled={busy} onClick={() => setDeleteTargets(selectedRows)} className="btn-secondary !py-1.5 text-xs text-red-600">
+                Delete
+              </button>
+              <button onClick={() => setSelected(new Set())} className="ms-auto text-xs text-muted-foreground hover:text-foreground">
+                Clear
+              </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="relative lg:col-span-2">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  className="input-base pl-8"
-                  placeholder="Search by title, contact, property…"
-                  value={filters.search}
-                  onChange={(e) => setFilters((p) => ({ ...p, search: e.target.value }))}
-                />
-              </div>
-              <div className="relative">
-                <select
-                  className="input-base appearance-none pr-8"
-                  value={filters.status}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, status: e.target.value as FollowUpStatus | '' }))
-                  }
-                >
-                  <option value="">All Statuses</option>
-                  {ALL_FOLLOW_UP_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              <div className="relative">
-                <select
-                  className="input-base appearance-none pr-8"
-                  value={filters.type}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, type: e.target.value as FollowUpType | '' }))
-                  }
-                >
-                  <option value="">All Types</option>
-                  {ALL_FOLLOW_UP_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              <div className="relative">
-                <select
-                  className="input-base appearance-none pr-8"
-                  value={filters.agent}
-                  onChange={(e) => setFilters((p) => ({ ...p, agent: e.target.value }))}
-                >
-                  <option value="">All Agents</option>
-                  {agentList.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              <div className="relative">
-                <select
-                  className="input-base appearance-none pr-8"
-                  value={filters.priority}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, priority: e.target.value as FollowUpPriority | '' }))
-                  }
-                >
-                  <option value="">All Priorities</option>
-                  {['High', 'Medium', 'Low'].map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              <div className="relative">
-                <select
-                  className="input-base appearance-none pr-8"
-                  value={filters.stage}
-                  onChange={(e) => setFilters((p) => ({ ...p, stage: e.target.value }))}
-                >
-                  <option value="">All Lead Stages</option>
-                  {stageOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              <div className="relative">
-                <select
-                  className="input-base appearance-none pr-8"
-                  value={filters.sort}
-                  onChange={(e) =>
-                    setFilters((p) => ({ ...p, sort: e.target.value as FilterState['sort'] }))
-                  }
-                  aria-label="Sort"
-                >
-                  <option value="due-asc">Sort: Due soonest</option>
-                  <option value="due-desc">Sort: Due latest</option>
-                  <option value="priority">Sort: Priority</option>
-                </select>
-                <ChevronDown
-                  size={13}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="w-9 shrink-0">From</span>
-                <input
-                  type="date"
-                  className="input-base"
-                  value={filters.from}
-                  max={filters.to || undefined}
-                  onChange={(e) => setFilters((p) => ({ ...p, from: e.target.value }))}
-                />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="w-9 shrink-0">To</span>
-                <input
-                  type="date"
-                  className="input-base"
-                  value={filters.to}
-                  min={filters.from || undefined}
-                  onChange={(e) => setFilters((p) => ({ ...p, to: e.target.value }))}
-                />
-              </label>
-            </div>
-          </div>
+          )}
 
-          {/* Follow-ups: action cockpit (default) or the classic list */}
-          {view === 'cockpit' ? (
-            <FollowUpCockpit
-              items={base}
-              onChanged={loadData}
-              onOpenLead={(id) => router.push(`/leads-management?lead=${id}`)}
-              onEdit={(fu) => setEditTarget(fu)}
-            />
-          ) : filtered.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="card-base flex flex-col items-center justify-center py-16 text-center">
-              <CalendarDays size={40} className="text-muted-foreground mb-3 opacity-40" />
-              <p className="text-base font-semibold text-foreground">No follow-ups found</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Try adjusting your filters or schedule a new follow-up.
+              <CheckCheck size={40} className="mb-3 text-emerald-500 opacity-70" />
+              <p className="text-base font-semibold text-foreground">Nothing here</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {activeFilters || filters.q ? 'No follow-up matches these filters.' : `No ${TAB_LABEL[tab].toLowerCase()} follow-ups.`}
               </p>
             </div>
           ) : (
-            <div className="space-y-2.5">
-              {filtered.map((fu) => {
-                const overdue = fu.status === 'Overdue' || isOverdue(fu.dueDate, fu.status);
-                const isDone = fu.status === 'Completed';
-                return (
-                  <div
+            <div className="card-base overflow-hidden !p-0">
+              {/* header (desktop) */}
+              <div className="hidden grid-cols-[28px_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,2fr)_150px] items-center gap-3 border-b border-border bg-muted/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:grid">
+                <input
+                  type="checkbox"
+                  aria-label="Select all shown"
+                  checked={selectedRows.length > 0 && selectedRows.length === Math.min(rows.length, limit)}
+                  onChange={(e) => setSelected(e.target.checked ? new Set(rows.slice(0, limit).map((r) => r.id)) : new Set())}
+                />
+                <span>Customer</span>
+                <span>Stage</span>
+                <span>Agent</span>
+                <span>Due</span>
+                <span>Notes</span>
+                <span className="text-end">Actions</span>
+              </div>
+              <ul className="divide-y divide-border">
+                {rows.slice(0, limit).map((fu) => (
+                  <Row
                     key={fu.id}
-                    onClick={(e) => {
-                      // Whole card opens the lead profile; buttons/links inside keep their own action.
-                      if (!fu.leadId || (e.target as HTMLElement).closest('button, a, select, input')) return;
-                      router.push(`/leads-management?lead=${fu.leadId}`);
-                    }}
-                    className={`card-base !p-0 overflow-hidden transition-all ${fu.leadId ? 'cursor-pointer hover:border-primary/40' : ''} ${overdue && !isDone ? 'border-red-200' : ''}`}
-                  >
-                    <div className="flex items-stretch">
-                      {/* Priority stripe */}
-                      <div
-                        className={`w-1 flex-shrink-0 ${
-                          fu.priority === 'High'
-                            ? 'bg-red-400'
-                            : fu.priority === 'Medium'
-                              ? 'bg-amber-400'
-                              : 'bg-slate-300'
-                        }`}
-                      />
-
-                      <div className="flex-1 p-4 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                          {/* Main content */}
-                          <div className="flex-1 min-w-0 space-y-2">
-                            {/* Title row */}
-                            <div className="flex items-start gap-2 flex-wrap">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${typeColor[fu.type] || 'bg-slate-100 text-slate-600'}`}
-                              >
-                                {typeIcon[fu.type] || null}
-                                {fu.type || 'Call'}
-                              </span>
-                              <PriorityBadge priority={fu.priority} />
-                              <span
-                                className={`text-xs px-2 py-0.5 rounded font-medium ${
-                                  fu.contactType === 'Customer'
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : 'bg-blue-50 text-blue-700'
-                                }`}
-                              >
-                                {fu.contactType}
-                              </span>
-                              {fu.leadStatus && (
-                                <span className="text-xs px-2 py-0.5 rounded font-medium bg-lime-500/10 text-lime-700 dark:text-lime-300">
-                                  {fu.leadStatus}
-                                </span>
-                              )}
-                              {fu.relationshipStatus && (
-                                <RelationshipBadge status={fu.relationshipStatus} />
-                              )}
-                            </div>
-
-                            <h3
-                              className={`text-sm font-semibold leading-snug ${isDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}
-                            >
-                              {fu.title}
-                            </h3>
-
-                            {/* Contact & property */}
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <span className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[9px] font-bold flex-shrink-0">
-                                  {fu.agentInitials}
-                                </span>
-                                {fu.leadId ? (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      router.push(`/leads-management?lead=${fu.leadId}`)
-                                    }
-                                    className="font-medium text-primary hover:underline inline-flex items-center gap-1"
-                                    title="Open linked lead"
-                                  >
-                                    {fu.contactName}
-                                    <UserCircle2 size={11} />
-                                  </button>
-                                ) : (
-                                  <span>{fu.contactName}</span>
-                                )}
-                              </span>
-                              {fu.propertyInterest && (
-                                <span className="truncate max-w-[200px]">
-                                  {fu.propertyInterest}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Notes */}
-                            {fu.notes && (
-                              <p className="text-xs text-muted-foreground line-clamp-1">
-                                {fu.notes}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Right side: date, agent, status, actions */}
-                          <div className="flex sm:flex-col items-start sm:items-end gap-2 sm:gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
-                            {/* Status */}
-                            <FollowUpStatusBadge
-                              status={overdue && !isDone ? 'Overdue' : fu.status}
-                            />
-
-                            {/* Due date/time */}
-                            <div
-                              className={`flex items-center gap-1 text-xs font-medium ${
-                                overdue && !isDone ? 'text-red-500' : 'text-muted-foreground'
-                              }`}
-                            >
-                              <Clock size={11} />
-                              <span>{formatDate(fu.dueDate)}</span>
-                              <span>·</span>
-                              <span>{formatTime(fu.dueTime)}</span>
-                            </div>
-
-                            {/* Agent */}
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center text-primary text-[9px] font-bold">
-                                {fu.agentInitials}
-                              </div>
-                              <span>{fu.agent}</span>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center gap-1 mt-0.5">
-                              {!isDone && fu.status !== 'Cancelled' && (
-                                <button
-                                  onClick={() => handleMarkComplete(fu.id)}
-                                  title="Mark as completed"
-                                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors flex items-center justify-center"
-                                >
-                                  <CheckCheck size={14} />
-                                </button>
-                              )}
-                              {isDone && (
-                                <button
-                                  onClick={() => handleReopen(fu.id)}
-                                  title="Reopen follow-up"
-                                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center"
-                                >
-                                  <RotateCcw size={14} />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setEditTarget(fu)}
-                                title="Edit follow-up"
-                                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex items-center justify-center"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                onClick={() => setDeleteTarget(fu)}
-                                title="Delete follow-up"
-                                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors flex items-center justify-center"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    fu={fu}
+                    today={today}
+                    checked={selected.has(fu.id)}
+                    busy={busy}
+                    onCheck={() => toggle(fu.id)}
+                    onOpenLead={openLead}
+                    onDone={() => act('Done', [fu], completeFollowUp)}
+                    onReopen={() => act('Reopened', [fu], reopenFollowUp)}
+                    onTomorrow={() => act('Moved to tomorrow', [fu], (x) => rescheduleFollowUp(x, addDays(today, 1), x.dueTime || '10:00'))}
+                    onEdit={() => setEditTarget(fu)}
+                    onDelete={() => setDeleteTargets([fu])}
+                  />
+                ))}
+              </ul>
+              {rows.length > limit && (
+                <button
+                  type="button"
+                  onClick={() => setLimit((l) => l + PAGE)}
+                  className="w-full border-t border-border py-2.5 text-sm font-semibold text-primary hover:bg-muted/50"
+                >
+                  Show more ({rows.length - limit} left)
+                </button>
+              )}
             </div>
-          )}
-
-          {/* Results count */}
-          {filtered.length > 0 && (
-            <p className="text-xs text-muted-foreground text-center pb-2">
-              Showing {filtered.length} follow-up{filtered.length !== 1 ? 's' : ''}
-            </p>
           )}
         </>
       )}
 
-      {/* Add Modal */}
+      {/* Add / edit */}
       <Modal
-        open={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        title="Schedule Follow-up"
-        subtitle="Create a follow-up for a lead or customer"
+        open={addOpen || !!editTarget}
+        onClose={() => {
+          setAddOpen(false);
+          setEditTarget(null);
+        }}
+        title={editTarget ? 'Edit follow-up' : 'Schedule follow-up'}
         size="lg"
       >
-        <FollowUpForm onSubmit={handleAdd} onCancel={() => setAddModalOpen(false)} />
-      </Modal>
-
-      {/* Schedule from Profile Modal */}
-      <Modal
-        open={!!scheduleFromProfile}
-        onClose={() => setScheduleFromProfile(null)}
-        title={`Schedule Follow-up — ${scheduleFromProfile?.name ?? ''}`}
-        subtitle={
-          scheduleFromProfile
-            ? `${scheduleFromProfile.contactType} · ${scheduleFromProfile.relationshipStatus}`
-            : ''
-        }
-        size="lg"
-      >
-        {scheduleFromProfile && (
+        {(addOpen || editTarget) && (
           <FollowUpForm
-            initial={profileInitial}
-            onSubmit={handleAdd}
-            onCancel={() => setScheduleFromProfile(null)}
+            key={editTarget?.id || 'new'}
+            initial={editTarget || undefined}
+            onSubmit={handleSave}
+            onCancel={() => {
+              setAddOpen(false);
+              setEditTarget(null);
+            }}
           />
         )}
       </Modal>
 
-      {/* Edit Modal */}
-      <Modal
-        open={!!editTarget}
-        onClose={() => setEditTarget(null)}
-        title="Edit Follow-up"
-        subtitle="Update this follow-up"
-        size="lg"
-      >
-        {editTarget && (
-          <FollowUpForm
-            initial={editTarget}
-            onSubmit={handleEdit}
-            onCancel={() => setEditTarget(null)}
-          />
-        )}
-      </Modal>
-
-      {/* Delete Confirm Modal */}
-      <Modal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        title="Delete Follow-up"
-        size="sm"
-      >
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Delete the follow-up{' '}
-            <span className="font-semibold text-foreground">&quot;{deleteTarget?.title}&quot;</span>
-            ? You can't undo this.
+      {/* Delete confirmation */}
+      <Modal open={!!deleteTargets} onClose={() => setDeleteTargets(null)} title="Delete follow-up" size="sm">
+        <div className="space-y-4 p-6">
+          <p className="text-sm text-foreground">
+            {deleteTargets?.length === 1 ? (
+              <>
+                Delete the follow-up for <b>{deleteTargets[0].contactName}</b>? The lead itself is kept; only its follow-up date is removed.
+              </>
+            ) : (
+              <>
+                Delete <b>{deleteTargets?.length}</b> follow-ups? The leads are kept; only their follow-up dates are removed.
+              </>
+            )}
           </p>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setDeleteTarget(null)} className="btn-secondary">
+          <p className="text-xs text-muted-foreground">This cannot be undone.</p>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setDeleteTargets(null)} className="btn-secondary text-sm">
               Cancel
             </button>
-            <button onClick={handleDelete} className="btn-danger">
-              Delete follow-up
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                const list = deleteTargets || [];
+                setDeleteTargets(null);
+                await act('Deleted', list, deleteFollowUp);
+              }}
+              className="btn-danger text-sm"
+            >
+              Delete
             </button>
           </div>
         </div>
       </Modal>
     </div>
+  );
+}
+
+/* ── Table row (a card on small screens) ───────────────────────────────── */
+function Row({
+  fu,
+  today,
+  checked,
+  busy,
+  onCheck,
+  onOpenLead,
+  onDone,
+  onReopen,
+  onTomorrow,
+  onEdit,
+  onDelete,
+}: {
+  fu: FollowUp;
+  today: string;
+  checked: boolean;
+  busy: boolean;
+  onCheck: () => void;
+  onOpenLead: (id: string) => void;
+  onDone: () => void;
+  onReopen: () => void;
+  onTomorrow: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const d = day(fu.dueDate);
+  const open = isOpen(fu);
+  const late = open && !!d && d < today;
+  const lateDays = late ? Math.round((Date.parse(today) - Date.parse(d)) / 86400000) : 0;
+  const phone = fu.leadPhone || fu.contactPhone || '';
+  const iconBtn = 'flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:opacity-40';
+
+  return (
+    <li
+      className={`grid grid-cols-[28px_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 px-3 py-3 lg:grid-cols-[28px_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,2fr)_150px] lg:items-center ${
+        checked ? 'bg-primary/5' : 'hover:bg-muted/40'
+      }`}
+    >
+      <input type="checkbox" checked={checked} onChange={onCheck} aria-label={`Select ${fu.contactName}`} className="mt-1 lg:mt-0" />
+
+      <div className="min-w-0">
+        {fu.leadId ? (
+          <button type="button" onClick={() => onOpenLead(fu.leadId!)} className="block max-w-full truncate text-sm font-semibold text-foreground hover:text-primary hover:underline">
+            {fu.contactName || 'Lead'}
+          </button>
+        ) : (
+          <span className="block truncate text-sm font-semibold text-foreground">{fu.contactName || '—'}</span>
+        )}
+        <span className="block truncate text-xs text-muted-foreground">
+          {phone ? (
+            <a href={`tel:${phone}`} className="hover:text-primary">
+              {phone}
+            </a>
+          ) : (
+            '—'
+          )}
+          {fu.propertyInterest ? ` · ${fu.propertyInterest}` : ''}
+        </span>
+      </div>
+
+      {/* on mobile the remaining cells flow under the name */}
+      <div className="col-start-2 flex flex-wrap items-center gap-1.5 lg:col-start-auto">
+        {fu.leadStatus ? (
+          <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] font-medium text-foreground">{fu.leadStatus}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+        {fu.priority === 'High' && <span className="rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">High</span>}
+      </div>
+
+      <div className="col-start-2 truncate text-xs text-muted-foreground lg:col-start-auto lg:text-sm lg:text-foreground">{fu.agent || '—'}</div>
+
+      <div className={`col-start-2 text-xs lg:col-start-auto ${late ? 'font-semibold text-red-500' : 'text-foreground'}`}>
+        <span className="inline-flex items-center gap-1">
+          <Clock size={11} />
+          {fmtDate(d)} {fmtTime(fu.dueTime)}
+        </span>
+        {late && <span className="ms-1 rounded bg-red-500/10 px-1 text-[10px]">{lateDays}d late</span>}
+        {fu.status === 'Completed' && <span className="ms-1 rounded bg-emerald-500/10 px-1 text-[10px] text-emerald-600">done</span>}
+      </div>
+
+      <p className="col-start-2 line-clamp-2 text-xs text-muted-foreground lg:col-start-auto" title={fu.notes || ''}>
+        {fu.notes || '—'}
+      </p>
+
+      <div className="col-start-2 flex items-center gap-0.5 lg:col-start-auto lg:justify-end">
+        {open ? (
+          <>
+            <button type="button" disabled={busy} onClick={onDone} title="Mark done" aria-label="Mark done" className={`${iconBtn} text-emerald-600 hover:bg-emerald-500/10`}>
+              <CheckCheck size={15} />
+            </button>
+            <button type="button" disabled={busy} onClick={onTomorrow} title="Move to tomorrow" aria-label="Move to tomorrow" className={`${iconBtn} text-muted-foreground hover:bg-muted hover:text-foreground`}>
+              <AlarmClock size={15} />
+            </button>
+          </>
+        ) : (
+          <button type="button" disabled={busy} onClick={onReopen} title="Reopen" aria-label="Reopen" className={`${iconBtn} text-muted-foreground hover:bg-muted hover:text-foreground`}>
+            <RotateCcw size={15} />
+          </button>
+        )}
+        <button type="button" onClick={onEdit} title="Edit" aria-label="Edit" className={`${iconBtn} text-muted-foreground hover:bg-muted hover:text-foreground`}>
+          <Pencil size={14} />
+        </button>
+        <button type="button" disabled={busy} onClick={onDelete} title="Delete" aria-label="Delete" className={`${iconBtn} text-muted-foreground hover:bg-red-500/10 hover:text-red-500`}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </li>
   );
 }

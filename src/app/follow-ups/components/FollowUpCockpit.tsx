@@ -17,8 +17,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
-import { followUpsService } from '@/lib/services/crmService';
+import { addDays, addFollowUpNote, cairoToday, completeFollowUp, rescheduleFollowUp } from './followUpOps';
 import type { FollowUp } from './mockFollowUps';
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -47,15 +46,6 @@ const SNOOZE_REASONS = [
   'Other',
 ];
 
-/** Cairo calendar day as YYYY-MM-DD. */
-function cairoToday(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
-}
-function addDays(day: string, n: number): string {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
 function dayDiff(a: string, b: string): number {
   return Math.round((new Date(`${a}T00:00:00Z`).getTime() - new Date(`${b}T00:00:00Z`).getTime()) / 86400000);
 }
@@ -163,59 +153,7 @@ function waLink(phone: string, text: string): string {
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 
-/* ── Writes ──────────────────────────────────────────────────────────────── */
-function appendNote(old: string | undefined, line: string): string {
-  const stamp = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Africa/Cairo',
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date());
-  return [old?.trim(), `[${stamp}] ${line}`].filter(Boolean).join('\n');
-}
-
-/** Moves a follow-up to a new date. Lead-linked rows go through the API so the lead's follow_up_due stays in sync. */
-async function rescheduleFollowUp(fu: FollowUp, dueDate: string, dueTime: string, reason: string) {
-  const notes = appendNote(fu.notes, `Snoozed to ${dueDate}${reason ? ` — ${reason}` : ''}`);
-  if (fu.leadId) {
-    const res = await fetch('/api/follow-ups', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: fu.title || `Follow up: ${fu.contactName}`,
-        contactName: fu.contactName,
-        contactType: fu.contactType,
-        contactPhone: fu.contactPhone,
-        contactEmail: fu.contactEmail,
-        type: fu.type,
-        status: 'Pending',
-        priority: fu.priority,
-        dueDate,
-        dueTime,
-        agent: fu.agent,
-        agentInitials: fu.agentInitials,
-        notes,
-        propertyInterest: fu.propertyInterest,
-        relationshipStatus: fu.relationshipStatus,
-        leadId: fu.leadId,
-      }),
-    });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || 'Could not reschedule');
-    return;
-  }
-  await followUpsService.update(fu.id, { ...fu, dueDate, dueTime, status: 'Pending', notes });
-}
-
-/** Closes a follow-up and clears the lead's follow-up date so it is not recreated by the sync. */
-async function completeFollowUp(fu: FollowUp) {
-  await followUpsService.updateStatus(fu.id, 'Completed', new Date().toISOString());
-  if (fu.leadId) {
-    try {
-      await createClient().from('leads').update({ follow_up_due: null }).eq('id', fu.leadId);
-    } catch {
-      // The follow-up is closed either way.
-    }
-  }
-}
+/* Writes live in followUpOps.ts (they keep the lead date and the follow-up row in sync). */
 
 /* ── Small UI pieces ─────────────────────────────────────────────────────── */
 const HEAT_META: Record<Heat, { label: string; cls: string; icon: React.ReactNode } | null> = {
@@ -435,14 +373,14 @@ export default function FollowUpCockpit({ items, onChanged, onOpenLead, onEdit }
           <span className="mx-1 h-4 w-px bg-border" />
           <button
             disabled={busy}
-            onClick={() => doSnooze(selectedItems, addDays(today, 1), '10:00', 'Bulk snooze')}
+            onClick={() => doSnooze(selectedItems, addDays(today, 1), '10:00', '')}
             className="btn-secondary !py-1.5 text-xs"
           >
             Snooze to tomorrow
           </button>
           <button
             disabled={busy}
-            onClick={() => doSnooze(selectedItems, addDays(today, 3), '10:00', 'Bulk snooze')}
+            onClick={() => doSnooze(selectedItems, addDays(today, 3), '10:00', '')}
             className="btn-secondary !py-1.5 text-xs"
           >
             +3 days
@@ -774,7 +712,7 @@ function Drawer({
     if (!note.trim() || saving) return;
     setSaving(true);
     try {
-      await followUpsService.update(fu.id, { ...fu, notes: appendNote(fu.notes, note.trim()) });
+      await addFollowUpNote(fu, note.trim());
       toast.success('Note saved');
       setNote('');
       await onNoteSaved();
