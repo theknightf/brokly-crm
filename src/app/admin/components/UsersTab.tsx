@@ -283,60 +283,160 @@ function UserModal({
   );
 }
 
+interface DeleteImpact {
+  erased: { callLogs: number; attendance: number; payroll: number; leave: number; evaluations: number };
+  detached: { leadsAssigned: number; leadsCreated: number; followUps: number; notes: number };
+}
+
 function DeleteConfirm({
+  id,
   name,
+  isActive,
   onConfirm,
+  onDeactivate,
   onClose,
 }: {
+  id: string;
   name: string;
+  isActive: boolean;
   onConfirm: () => Promise<void> | void;
+  onDeactivate: () => Promise<void> | void;
   onClose: () => void;
 }) {
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [busy, setBusy] = useState<'delete' | 'deactivate' | null>(null);
+  const [impact, setImpact] = useState<DeleteImpact | null>(null);
+  const [impactError, setImpactError] = useState(false);
+  const [typed, setTyped] = useState('');
 
-  const handleConfirmRemove = async () => {
-    setIsDeleting(true);
+  // Show what permanent deletion would erase before the owner confirms it.
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/admin/users/${id}/impact`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j) => alive && setImpact(j))
+      .catch(() => alive && setImpactError(true));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const run = async (kind: 'delete' | 'deactivate', fn: () => Promise<void> | void) => {
+    setBusy(kind);
     try {
-      await onConfirm();
+      await fn();
     } catch {
-      // error is handled inside onConfirm
+      // error is handled inside the callback
     } finally {
-      setIsDeleting(false);
+      setBusy(null);
     }
   };
+
+  const erasedRows: [string, number][] = impact
+    ? [
+        ['Call logs', impact.erased.callLogs],
+        ['Attendance records', impact.erased.attendance],
+        ['Payroll entries', impact.erased.payroll],
+        ['Leave requests', impact.erased.leave],
+        ['Evaluations', impact.erased.evaluations],
+      ].filter(([, n]) => (n as number) > 0) as [string, number][]
+    : [];
+  const canDelete = typed.trim().toLowerCase() === name.trim().toLowerCase();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-sm p-6 fade-in">
+      <div className="relative bg-card border border-border rounded-2xl shadow-modal w-full max-w-md p-6 fade-in max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
             <Trash2 size={18} className="text-destructive" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-foreground">Remove User</h3>
-            <p className="text-sm text-muted-foreground">This will deactivate the account.</p>
+            <h3 className="text-base font-semibold text-foreground">Remove user</h3>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{name}</span>
+            </p>
           </div>
         </div>
-        <p className="text-sm text-foreground mb-5">
-          Are you sure you want to remove <span className="font-semibold">&quot;{name}&quot;</span>?
-          They will lose access to Brokly.
-        </p>
-        <div className="mt-6 flex items-center justify-end gap-3">
+
+        {isActive && (
+          <div className="rounded-xl border border-border bg-muted/40 p-3 mb-4">
+            <p className="text-sm font-semibold text-foreground">Deactivate (recommended)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              They can no longer sign in, and all their history stays. You can turn the account back on anytime.
+            </p>
+            <button
+              type="button"
+              onClick={() => run('deactivate', onDeactivate)}
+              disabled={busy !== null}
+              className="mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground disabled:opacity-50"
+            >
+              {busy === 'deactivate' ? 'Deactivating…' : 'Deactivate account'}
+            </button>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+          <p className="text-sm font-semibold text-destructive">Delete permanently</p>
+          <p className="text-xs text-muted-foreground mt-0.5">The account is erased and cannot be recovered.</p>
+
+          {impact ? (
+            <div className="mt-2 space-y-2 text-xs">
+              {erasedRows.length > 0 ? (
+                <div>
+                  <p className="font-semibold text-foreground">Erased together with the account:</p>
+                  <ul className="mt-0.5 text-muted-foreground">
+                    {erasedRows.map(([label, n]) => (
+                      <li key={label}>
+                        • {label}: <span className="font-semibold text-foreground tabular-nums">{n.toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">Nothing is erased besides the account itself.</p>
+              )}
+              {(impact.detached.leadsAssigned > 0 || impact.detached.leadsCreated > 0) && (
+                <p className="text-muted-foreground">
+                  Kept but left without this user:{' '}
+                  <span className="font-semibold text-foreground tabular-nums">{impact.detached.leadsAssigned.toLocaleString()}</span> assigned leads
+                  become unassigned, {impact.detached.leadsCreated.toLocaleString()} created leads, {impact.detached.followUps.toLocaleString()} follow-ups,{' '}
+                  {impact.detached.notes.toLocaleString()} notes.
+                </p>
+              )}
+            </div>
+          ) : impactError ? (
+            <p className="mt-2 text-xs text-muted-foreground">Could not load the impact summary. Deleting still works.</p>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">Checking what would be erased…</p>
+          )}
+
+          <label className="block mt-3 text-xs text-muted-foreground">
+            Type <span className="font-semibold text-foreground">{name}</span> to confirm
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className="input-base mt-1 w-full"
+              autoComplete="off"
+              aria-label="Type the user name to confirm"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => run('delete', onConfirm)}
+            disabled={busy !== null || !canDelete}
+            className="mt-3 w-full px-4 py-2 rounded-xl text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-40 transition-colors shadow-sm"
+          >
+            {busy === 'delete' ? 'Deleting…' : 'Delete permanently'}
+          </button>
+        </div>
+
+        <div className="mt-4 flex justify-end">
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirmRemove}
-            disabled={isDeleting}
-            className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-rose-600 hover:bg-rose-500 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
-          >
-            {isDeleting ? "Removing..." : "Remove User"}
           </button>
         </div>
       </div>
@@ -1206,7 +1306,19 @@ export default function UsersTab() {
       )}
       {deleteState.open && (
         <DeleteConfirm
+          id={deleteState.id}
           name={deleteState.name}
+          isActive={users.find((u) => u.id === deleteState.id)?.isActive !== false}
+          onDeactivate={async () => {
+            try {
+              await usersService.update(deleteState.id, { isActive: false });
+              setUsers((prev) => prev.map((u) => (u.id === deleteState.id ? { ...u, isActive: false } : u)));
+              toast.success('User deactivated');
+            } catch {
+              toast.error('Failed to deactivate the user');
+            }
+            setDeleteState({ open: false, id: '', name: '' });
+          }}
           onConfirm={handleDelete}
           onClose={() => setDeleteState({ open: false, id: '', name: '' })}
         />

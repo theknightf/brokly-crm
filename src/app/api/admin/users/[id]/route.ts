@@ -29,6 +29,10 @@ export async function DELETE(
     .select('role')
     .eq('id', targetId)
     .maybeSingle();
+  // Only an owner may delete another owner.
+  if (target?.role === 'owner' && guard.actor.role !== 'owner') {
+    return NextResponse.json({ error: 'Only an owner can delete an owner account' }, { status: 403 });
+  }
   if (target?.role === 'owner') {
     const { count } = await supabase
       .from('user_profiles')
