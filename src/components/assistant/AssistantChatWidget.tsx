@@ -21,11 +21,16 @@ import {
   Square,
   Volume2,
   VolumeX,
+  Download,
+  ChevronLeft,
+  BarChart3,
+  ListChecks,
 } from 'lucide-react';
 import { useVoice } from './useVoice';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 
 // Starter prompts shown on the hub card and as quick chips under the conversation.
 const MISSIONS: { icon: React.ReactNode; label: string; prompt: string }[] = [
@@ -34,12 +39,20 @@ const MISSIONS: { icon: React.ReactNode; label: string; prompt: string }[] = [
   { icon: <PenLine size={14} />, label: 'رسالة واتساب لمتابعة زيارة موقع', prompt: 'اكتبلي رسالة واتساب ودية للعميل لمتابعة زيارة موقع' },
 ];
 
+// Extra shortcuts for owners/admins (the tools check the role again on the server).
+const ADMIN_MISSIONS: { icon: React.ReactNode; label: string; prompt: string }[] = [
+  { icon: <ListChecks size={14} />, label: 'محتاج انتباهي إيه؟', prompt: 'إيه اللي محتاج انتباهي دلوقتي؟' },
+  { icon: <BarChart3 size={14} />, label: 'تقرير مبيعات النهارده', prompt: 'هاتلي تقرير مبيعات النهارده' },
+  { icon: <BarChart3 size={14} />, label: 'أفضل مندوب الشهر ده', prompt: 'مين أفضل مندوب مبيعات الشهر ده؟' },
+];
+
 const timeOf = (d?: Date) =>
   d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
 export default function AssistantChatWidget() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const missions = isAdminRole((user as any)?.role) ? [...ADMIN_MISSIONS, ...MISSIONS] : MISSIONS;
   const [pendingAction, setPendingAction] = useState<any | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -201,6 +214,21 @@ export default function AssistantChatWidget() {
     ]);
   };
 
+  // CSV with a BOM so Excel shows Arabic names correctly.
+  const downloadCsv = (csv: string, filename: string) => {
+    try {
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      toast.error('تعذر تنزيل الملف');
+    }
+  };
+
   const clearChat = () => {
     setMessages([]);
     setPendingAction(null);
@@ -294,7 +322,7 @@ export default function AssistantChatWidget() {
 
                 <div className="space-y-2">
                   <p className="px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">اقتراحات سريعة</p>
-                  {MISSIONS.map((m) => (
+                  {missions.map((m) => (
                     <button
                       key={m.label}
                       type="button"
@@ -402,6 +430,138 @@ export default function AssistantChatWidget() {
                         );
                       }
 
+                      // Report: summary tiles + per-agent table + CSV download (opens in Excel)
+                      if (res.report) {
+                        const r = res.report;
+                        return (
+                          <div key={inv.toolCallId} className="w-full max-w-[96%] space-y-2.5 rounded-2xl border border-white/10 bg-zinc-900/70 p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p dir="auto" className="truncate text-sm font-bold text-zinc-100">{r.title}</p>
+                                <p className="text-[11px] text-zinc-500">{r.period}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => downloadCsv(r.csv, r.filename || 'report.csv')}
+                                className="flex min-h-[32px] flex-shrink-0 items-center gap-1 rounded-lg border border-lime-400/40 bg-lime-400/10 px-2 text-[11px] font-semibold text-lime-300 hover:bg-lime-400/20"
+                              >
+                                <Download size={12} /> CSV
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {(r.summary || []).map((s: any) => (
+                                <div key={s.label} className="rounded-lg bg-white/[0.04] px-2.5 py-1.5">
+                                  <p className="text-[10px] text-zinc-500">{s.label}</p>
+                                  <p className="text-sm font-bold tabular-nums text-zinc-100">{s.value}</p>
+                                </div>
+                              ))}
+                            </div>
+                            {r.rows?.length > 0 && (
+                              <div className="custom-scrollbar overflow-x-auto">
+                                <table className="w-full text-[11px]">
+                                  <thead>
+                                    <tr className="text-zinc-500">
+                                      {r.columns.map((c: string) => (
+                                        <th key={c} className="whitespace-nowrap px-1.5 py-1 text-start font-medium">{c}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {r.rows.map((row: any[], i: number) => (
+                                      <tr key={i} className="border-t border-white/5 text-zinc-300">
+                                        {row.map((cell, j) => (
+                                          <td key={j} className={`whitespace-nowrap px-1.5 py-1 ${j ? 'tabular-nums' : 'font-medium'}`}>{cell}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {r.stageDistribution?.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {r.stageDistribution.slice(0, 12).map((s: any) => (
+                                  <span key={s.stage} className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] text-zinc-400">
+                                    {s.stage} <b className="text-zinc-200">{s.count}</b>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // Owner insights: what needs attention, each with a one-tap follow-up question
+                      if (res.insights) {
+                        return (
+                          <div key={inv.toolCallId} className="w-full max-w-[92%] space-y-1.5 rounded-2xl border border-lime-400/20 bg-lime-400/5 p-3">
+                            <p className="text-xs font-bold text-lime-300">محتاج انتباهك</p>
+                            {res.insights.items.length === 0 && <p className="text-[12px] text-zinc-400">كل حاجة تمام حالياً ✅</p>}
+                            {res.insights.items.map((it: any) => (
+                              <button
+                                key={it.key}
+                                type="button"
+                                onClick={() => void append({ role: 'user', content: it.prompt })}
+                                className="flex w-full items-center justify-between gap-2 rounded-lg bg-zinc-900/70 px-3 py-2 text-start text-[12px] text-zinc-200 hover:bg-zinc-800"
+                              >
+                                <span dir="auto">{it.text}</span>
+                                <ChevronLeft size={14} className="flex-shrink-0 text-lime-400" />
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      }
+
+                      // Calls from the CRM: calls nobody described get a one-tap "log the result"
+                      if (res.calls && Array.isArray(res.calls)) {
+                        return (
+                          <div key={inv.toolCallId} className="w-full max-w-[92%] space-y-2">
+                            {res.calls.map((c: any) => (
+                              <div key={c.callId} className="space-y-1.5 rounded-2xl border border-white/10 bg-zinc-900/70 p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span dir="auto" className="truncate text-sm font-bold text-zinc-100">{c.customer?.name || c.customer?.phone || '—'}</span>
+                                  <span className="flex-shrink-0 text-[10px] text-zinc-500">{c.at}</span>
+                                </div>
+                                <p className="text-[11px] text-zinc-400">
+                                  {c.direction} · {c.durationSeconds || 0}s · {c.outcome || '—'}{c.agent ? ` · ${c.agent}` : ''}
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {c.needsReview && c.customer?.leadId && (
+                                    <button
+                                      type="button"
+                                      onClick={() => void append({ role: 'user', content: `عايز أسجّل نتيجة المكالمة مع ${c.customer.name} (callId ${c.callId}, leadId ${c.customer.leadId})` })}
+                                      className="min-h-[32px] rounded-lg bg-lime-400 px-3 text-[11px] font-bold text-zinc-950 hover:bg-lime-300"
+                                    >
+                                      سجّل النتيجة
+                                    </button>
+                                  )}
+                                  {c.customer?.leadId && (
+                                    <Link href={`/leads-management?lead=${c.customer.leadId}`} className="flex min-h-[32px] items-center rounded-lg border border-white/10 px-3 text-[11px] text-zinc-300 hover:border-lime-400/50">
+                                      عرض العميل
+                                    </Link>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+
+                      // Direct action confirmed by the backend
+                      if (typeof res.success === 'boolean' && (res.message || res.error)) {
+                        return (
+                          <div
+                            key={inv.toolCallId}
+                            dir="auto"
+                            className={`w-full max-w-[92%] rounded-xl border px-3 py-2 text-[12px] ${
+                              res.success ? 'border-lime-400/30 bg-lime-400/10 text-lime-200' : 'border-red-500/30 bg-red-500/10 text-red-200'
+                            }`}
+                          >
+                            {res.success ? `✅ ${res.message}` : `⚠️ ${res.error}`}
+                          </div>
+                        );
+                      }
+
                       return null;
                     })}
                   </div>
@@ -419,6 +579,14 @@ export default function AssistantChatWidget() {
                 <p dir="auto" className="text-[12px] font-medium leading-relaxed text-zinc-200">
                   {pendingAction.message}
                 </p>
+
+                {Array.isArray(pendingAction.details) && pendingAction.details.length > 0 && (
+                  <ul dir="auto" className="space-y-0.5 rounded-lg border border-white/10 bg-zinc-900/70 p-2 text-[11px] text-zinc-300">
+                    {pendingAction.details.map((d: string, i: number) => (
+                      <li key={i}>• {d}</li>
+                    ))}
+                  </ul>
+                )}
 
                 {pendingAction.text && (
                   <div dir="auto" className="rounded-lg border border-white/10 bg-zinc-900/70 p-2 font-mono text-[11px] text-zinc-400">
@@ -466,7 +634,7 @@ export default function AssistantChatWidget() {
           {/* Quick prompts while chatting */}
           {messages.length > 0 && (
             <div className="custom-scrollbar flex gap-2 overflow-x-auto border-t border-white/5 px-3 py-2">
-              {MISSIONS.map((m) => (
+              {missions.map((m) => (
                 <button
                   key={m.label}
                   type="button"

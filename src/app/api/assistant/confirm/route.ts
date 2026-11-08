@@ -2,170 +2,71 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getRequestSupabase } from '@/lib/supabase/requestAuth';
 import { ALL_REAL_STATUSES } from '@/app/leads-management/components/leadStages';
+import { MAX_BULK, executeAssistantAction, getActor, type AssistantAction } from '@/lib/assistant/actions';
 
 export const dynamic = 'force-dynamic';
 
+const status = z.enum(ALL_REAL_STATUSES as [string, ...string[]]);
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+// Only previews that need a human "Confirm" arrive here: notes, call logging and bulk changes.
+// (Older clients still send create_followup / update_lead_status, so those stay accepted.)
 const confirmSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('add_note'), leadId: z.string().uuid(), text: z.string().min(2).max(1000) }),
+  z.object({ action: z.literal('create_followup'), leadId: z.string().uuid(), dueDate: day, note: z.string().optional().default('') }),
+  z.object({ action: z.literal('update_lead_status'), leadId: z.string().uuid(), newStatus: status }),
   z.object({
-    action: z.literal('add_note'),
+    action: z.literal('log_call'),
     leadId: z.string().uuid(),
-    text: z.string().min(2).max(1000),
+    outcome: z.string().min(2).max(80),
+    direction: z.enum(['incoming', 'outgoing', 'missed']).optional().default('outgoing'),
+    durationSeconds: z.number().int().min(0).max(14400).optional().default(0),
+    notes: z.string().max(1000).optional(),
+    callLogId: z.string().uuid().optional(),
+    newStatus: status.optional(),
+    followUpDate: day.optional(),
   }),
-  z.object({
-    action: z.literal('create_followup'),
-    leadId: z.string().uuid(),
-    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    note: z.string().optional().default(''),
-  }),
-  z.object({
-    action: z.literal('update_lead_status'),
-    leadId: z.string().uuid(),
-    newStatus: z.enum(ALL_REAL_STATUSES as [string, ...string[]]),
-  }),
+  z.object({ action: z.literal('bulk_update_status'), leadIds: z.array(z.string().uuid()).min(1).max(MAX_BULK), newStatus: status }),
+  z.object({ action: z.literal('bulk_assign'), leadIds: z.array(z.string().uuid()).min(1).max(MAX_BULK), userId: z.string().uuid() }),
 ]);
 
 /**
  * POST /api/assistant/confirm
- * Executes a pending write tool action only after explicit agent confirmation in UI.
- * Validates session, inputs, and relies on user-scoped Supabase client for strict RLS.
+ * Runs a previewed assistant action after the person pressed Confirm. The caller's own session (cookie or Bearer token)
+ * is used, so row-level security and the owner/admin checks in executeAssistantAction apply. Every run is audited.
  */
 export async function POST(request: Request) {
   const { supabase, user } = await getRequestSupabase(request);
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const json = await request.json().catch(() => null);
   const parsed = confirmSchema.safeParse(json);
-
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid confirmation payload', details: parsed.error.format() }, { status: 400 });
   }
 
-  const payload = parsed.data;
-
-  // Verify user can access the target lead under RLS before writing
-  const { data: targetLead, error: leadAccessErr } = await supabase
-    .from('leads')
-    .select('id, name, phone, notes, crm_status')
-    .eq('id', payload.leadId)
-    .maybeSingle();
-
-  if (leadAccessErr || !targetLead) {
-    return NextResponse.json(
-      { error: 'Lead not found or permission denied.' },
-      { status: 403 }
-    );
-  }
+  const p = parsed.data;
+  const action: AssistantAction =
+    p.action === 'update_lead_status'
+      ? { action: 'update_customer_status', leadId: p.leadId, newStatus: p.newStatus }
+      : (p as AssistantAction);
 
   try {
-    if (payload.action === 'add_note') {
-      // Insert into lead_comments
-      const { error: insertErr } = await supabase.from('lead_comments').insert({
-        lead_id: payload.leadId,
-        user_id: user.id,
-        body: payload.text,
-      });
-
-      if (insertErr) {
-        throw new Error(insertErr.message);
-      }
-
-      // Also record in activity_log
-      await supabase.from('activity_log').insert({
-        user_id: user.id,
-        action_type: 'Comment Added',
-        entity_type: 'lead',
-        entity_id: payload.leadId,
-        detail: payload.text.slice(0, 80),
-      });
-
-      // Audit log in assistant_logs
+    const actor = await getActor(supabase, user.id);
+    const result = await executeAssistantAction(supabase, actor, action, { confirmed: true });
+    try {
       await supabase.from('assistant_logs').insert({
         user_id: user.id,
-        tool_name: 'add_note',
-        tool_args: { leadId: payload.leadId, text: payload.text },
+        tool_name: action.action,
+        tool_args: json,
         status: 'confirmed',
-        result_summary: `Added note for lead ${targetLead.name}`,
+        result_summary: result.message.slice(0, 300),
       });
-
-      return NextResponse.json({
-        success: true,
-        message: `تمت إضافة الملاحظة بنجاح للعميل "${targetLead.name}"`,
-      });
+    } catch {
+      /* the audit row above is the record of truth */
     }
-
-    if (payload.action === 'create_followup') {
-      const { error: fuErr } = await supabase.from('follow_ups').insert({
-        title: `Follow up: ${targetLead.name}`,
-        contact_name: targetLead.name,
-        contact_phone: targetLead.phone || '',
-        due_date: payload.dueDate,
-        due_time: '09:00',
-        notes: payload.note || '',
-        follow_up_status: 'Pending',
-        lead_id: payload.leadId,
-        created_by: user.id,
-      });
-
-      if (fuErr) throw new Error(fuErr.message);
-
-      // Audit log
-      await supabase.from('assistant_logs').insert({
-        user_id: user.id,
-        tool_name: 'create_followup',
-        tool_args: { leadId: payload.leadId, dueDate: payload.dueDate, note: payload.note },
-        status: 'confirmed',
-        result_summary: `Created follow-up for lead ${targetLead.name} on ${payload.dueDate}`,
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: `تمت جدولة المتابعة للعميل "${targetLead.name}" بنجاح في تاريخ ${payload.dueDate}`,
-      });
-    }
-
-    if (payload.action === 'update_lead_status') {
-      const { error: updateErr } = await supabase
-        .from('leads')
-        .update({
-          crm_status: payload.newStatus,
-          last_action_at: new Date().toISOString(),
-          last_action_by: user.id,
-        })
-        .eq('id', payload.leadId);
-
-      if (updateErr) throw new Error(updateErr.message);
-
-      await supabase.from('activity_log').insert({
-        user_id: user.id,
-        action_type: 'Lead Status Updated',
-        entity_type: 'lead',
-        entity_id: payload.leadId,
-        detail: `Status changed to ${payload.newStatus}`,
-      });
-
-      // Audit log
-      await supabase.from('assistant_logs').insert({
-        user_id: user.id,
-        tool_name: 'update_lead_status',
-        tool_args: { leadId: payload.leadId, newStatus: payload.newStatus },
-        status: 'confirmed',
-        result_summary: `Updated status of lead ${targetLead.name} to ${payload.newStatus}`,
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: `تم تحديث مرحلة العميل "${targetLead.name}" إلى "${payload.newStatus}"`,
-      });
-    }
-
-    return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
+    return NextResponse.json({ success: true, message: result.message });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err.message || 'Failed to execute confirmed action' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err?.message || 'Failed to execute confirmed action' }, { status: 500 });
   }
 }

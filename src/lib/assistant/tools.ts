@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { normalizeArabic, extractKeywords } from './arabicNormalizer';
-import { ALL_REAL_STATUSES } from '@/app/leads-management/components/leadStages';
+import { createOwnerTools } from './ownerTools';
 
 /**
  * Creates user-scoped assistant tools that query Supabase
@@ -281,78 +281,8 @@ export function createAssistantTools(supabase: any, userId: string) {
       },
     }),
 
-    // ─── 5. CREATE FOLLOW-UP (WRITE - REQUIRES CONFIRMATION) ────
-    create_followup: tool({
-      description: 'Prepares scheduling a follow-up for a lead. REQUIRES user confirmation before executing.',
-      parameters: z.object({
-        leadId: z.string().describe('The UUID of the lead'),
-        dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Due date formatted as YYYY-MM-DD'),
-        note: z.string().optional().describe('Follow-up instructions or note'),
-      }),
-      execute: async ({ leadId, dueDate, note }) => {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('id, name, phone')
-          .eq('id', leadId)
-          .maybeSingle();
 
-        const pendingAction = {
-          type: 'pending_action',
-          action: 'create_followup',
-          leadId,
-          leadName: lead?.name || 'Lead',
-          contactPhone: lead?.phone || '',
-          dueDate,
-          note: note || '',
-          message: `هل تود جدولة متابعة للعميل ${lead?.name || ''} بتاريخ ${dueDate}؟`,
-          confirmationRequired: true,
-        };
-
-        await logToolCall(
-          'create_followup',
-          { leadId, dueDate, note },
-          'pending_confirmation',
-          `Pending follow-up for ${lead?.name || leadId} on ${dueDate}`
-        );
-
-        return pendingAction;
-      },
-    }),
-
-    // ─── 6. UPDATE LEAD STATUS (WRITE - REQUIRES CONFIRMATION) ──
-    update_lead_status: tool({
-      description: 'Prepares updating a lead status. REQUIRES user confirmation before executing. Status must be an existing app stage.',
-      parameters: z.object({
-        leadId: z.string().describe('The UUID of the lead'),
-        newStatus: z.enum(ALL_REAL_STATUSES as [string, ...string[]]).describe('The new stage for the lead'),
-      }),
-      execute: async ({ leadId, newStatus }) => {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('id, name, crm_status')
-          .eq('id', leadId)
-          .maybeSingle();
-
-        const pendingAction = {
-          type: 'pending_action',
-          action: 'update_lead_status',
-          leadId,
-          leadName: lead?.name || 'Lead',
-          oldStatus: lead?.crm_status || 'Fresh Leads',
-          newStatus,
-          message: `هل تود تغيير مرحلة العميل ${lead?.name || ''} من "${lead?.crm_status || ''}" إلى "${newStatus}"؟`,
-          confirmationRequired: true,
-        };
-
-        await logToolCall(
-          'update_lead_status',
-          { leadId, newStatus },
-          'pending_confirmation',
-          `Pending status change for ${lead?.name || leadId} to ${newStatus}`
-        );
-
-        return pendingAction;
-      },
-    }),
+    // ─── OWNER-LEVEL TOOLS (search, reports, calls, status/assign, bulk with preview) ───
+    ...createOwnerTools(supabase, userId),
   };
 }
