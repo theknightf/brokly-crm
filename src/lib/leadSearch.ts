@@ -13,9 +13,9 @@ import { normalizePhone } from '@/lib/phone';
 /** Removes characters that are PostgREST filter syntax and escapes LIKE wildcards. */
 export function safeSearchTerm(raw: string): string {
   return raw
-    .replace(/[,()"'\]/g, ' ')
+    .replace(/[,()"'\\]/g, ' ')
     .replace(/[%*]/g, ' ')
-    .replace(/_/g, '\_')
+    .replace(/_/g, '\\_')
     .replace(/\s+/g, ' ')
     .trim();
 }
