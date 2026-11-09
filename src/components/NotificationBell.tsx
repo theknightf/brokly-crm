@@ -389,11 +389,8 @@ export default function NotificationBell() {
       };
       channel = client
         .channel('notif-bell')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'activity_log' },
-          refresh
-        )
+        // No realtime on activity_log: it gets a row for nearly every action, and each open tab cost the database
+        // one security check per row. The 30s poll below covers it.
         .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' }, refresh)
         .subscribe();
     } catch {
@@ -401,7 +398,7 @@ export default function NotificationBell() {
     }
     const poll = setInterval(() => {
       if (document.visibilityState !== 'hidden') load();
-    }, 60000);
+    }, 30000);
     return () => {
       clearInterval(poll);
       if (debounce) clearTimeout(debounce);
