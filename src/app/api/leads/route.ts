@@ -153,6 +153,22 @@ export async function PATCH(request: Request) {
     payload.agent_initials = assignedName.split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase();
   }
 
+  // Optional: the owner / admin can change the stage in the same step as the reassignment.
+  const newStatus = typeof body?.newStatus === 'string' ? body.newStatus.trim() : '';
+  if (newStatus) {
+    const { data: actor } = await (supabase as any).from('user_profiles').select('role').eq('id', user.id).maybeSingle();
+    if (!isAdminRole(actor?.role)) {
+      return NextResponse.json({ error: 'Only the owner or an admin can change the stage while reassigning' }, { status: 403 });
+    }
+    const { ALL_REAL_STATUSES } = await import('@/app/leads-management/components/leadStages');
+    if (!(ALL_REAL_STATUSES as string[]).includes(newStatus)) {
+      return NextResponse.json({ error: `Unknown stage "${newStatus}"` }, { status: 400 });
+    }
+    payload.crm_status = newStatus;
+    payload.last_action_at = new Date().toISOString();
+    payload.last_action_by = user.id;
+  }
+
   const { data, error } = await (supabase as any).from('leads').update(payload).eq('id', leadId).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
@@ -169,5 +185,9 @@ export async function PATCH(request: Request) {
     } catch {}
   }
 
-  return NextResponse.json({ lead: data, message: assignedTo ? `Assigned to ${assignedName || assignedTo}` : 'Unassigned' });
+  return NextResponse.json({
+    lead: data,
+    message:
+      (assignedTo ? `Assigned to ${assignedName || assignedTo}` : 'Unassigned') + (newStatus ? ` · stage → ${newStatus}` : ''),
+  });
 }

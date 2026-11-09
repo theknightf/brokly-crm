@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
+import { ALL_REAL_STATUSES } from '@/app/leads-management/components/leadStages';
 
 interface LeadProfile {
   lead: any;
@@ -73,6 +74,7 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
   const [error, setError] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [assignTo, setAssignTo] = useState('');
+  const [assignStage, setAssignStage] = useState(''); // '' = keep the current stage
   const [users, setUsers] = useState<any[]>([]);
   const [showAllCalls, setShowAllCalls] = useState(false);
   const [timelineCount, setTimelineCount] = useState(TIMELINE_STEP);
@@ -101,10 +103,11 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
     if (!assignTo) { toast.error('Select a sales rep'); return; }
     setAssigning(true);
     try {
-      const res = await fetch('/api/leads', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ leadId, assignedTo: assignTo }) });
+      const res = await fetch('/api/leads', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ leadId, assignedTo: assignTo, ...(assignStage ? { newStatus: assignStage } : {}) }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error||'Failed');
-      toast.success(j.message||'Assigned');
+      toast.success(j.message||'Assigned'); setAssignStage('');
+      setAssignStage('');
       load();
     } catch (e:any) { toast.error(e.message); } finally { setAssigning(false); }
   };
@@ -250,6 +253,13 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
                 <select id="assign-select" value={assignTo} onChange={e=>setAssignTo(e.target.value)} className="input-base text-sm [@media(pointer:coarse)]:h-11">
                   <option value="">Select rep…</option>
                   {users.map(u=><option key={u.id} value={u.id}>{u.full_name || u.email}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="assign-stage" className="mb-1 block text-xs font-semibold text-muted-foreground">Stage after assigning</label>
+                <select id="assign-stage" value={assignStage} onChange={e=>setAssignStage(e.target.value)} className="input-base text-sm [@media(pointer:coarse)]:h-11">
+                  <option value="">Keep current stage{stage ? ` (${stage})` : ''}</option>
+                  {ALL_REAL_STATUSES.filter((s) => s !== stage).map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <button onClick={handleAssign} disabled={assigning || !assignTo} className="btn-primary w-full min-h-[44px] text-sm disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
