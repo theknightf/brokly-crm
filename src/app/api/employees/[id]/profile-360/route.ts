@@ -115,10 +115,88 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     // Build timeline unified
     const timeline: any[] = [];
-    calls.forEach((c: any) => timeline.push({ at: c.created_at, type: 'call', label: `${c.channel || 'Call'}${c.outcome ? ` · ${c.outcome}` : ''}`, detail: c.contact_name || '' }));
+    calls.forEach((c: any) =>
+      timeline.push({
+        at: c.created_at,
+        type: 'call',
+        label: `${c.channel || 'Call'}${c.outcome ? ` · ${c.outcome}` : ''}${c.duration_seconds ? ` · ${fmtDur(c.duration_seconds)}` : ''}`,
+        detail: c.contact_name || '',
+        leadId: c.lead_id || (/^[0-9a-f-]{36}$/i.test(c.entity_id || '') ? c.entity_id : null),
+        direction: c.direction || null,
+      })
+    );
     attendance.forEach((a: any) => timeline.push({ at: a.check_in_time || a.attendance_date, type: 'attendance', label: a.check_out_time ? 'Attendance' : 'Checked in', detail: fmtDur(durationSeconds(a.check_in_time, a.check_out_time)) }));
     evaluations.forEach((e: any) => timeline.push({ at: e.date + 'T12:00:00', type: 'evaluation', label: `Dress Code ${e.dress_code_rating}/5`, detail: e.notes || (e.behavioral_flags || []).join(', ') }));
     timeline.sort((a, b) => (a.at > b.at ? -1 : 1));
+
+    // ── CRM activity with the SAME definitions as the leaderboards (calls, answered, status updates,
+    //    actions = written notes, meetings, deals), plus the written notes themselves, the pipeline
+    //    of this employee's leads and the overdue follow-ups (live rule: lead still carries a past date).
+    const TERMINAL = ['Done Deal', 'Not Interested', 'Cancellation', 'Duplicate Leads', 'Wrong Number', 'Closed Number', 'Low Budget'];
+    const cairoToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
+    const [lbRes, commentsRes, pipelineRes, overdueRes] = await Promise.all([
+      (supabase as any).rpc('period_leaderboard', { p_from: from, p_to: to }),
+      (supabase as any)
+        .from('lead_comments')
+        .select('id, lead_id, body, created_at')
+        .eq('user_id', employeeId)
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .order('created_at', { ascending: false })
+        .limit(400),
+      (supabase as any).from('leads').select('crm_status').eq('assigned_to', employeeId).limit(5000),
+      (supabase as any)
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('assigned_to', employeeId)
+        .lt('follow_up_due', cairoToday)
+        .not('crm_status', 'in', `(${TERMINAL.map((s) => `"${s}"`).join(',')})`),
+    ]);
+    const lb = ((lbRes?.data || []) as any[]).find((r) => r.user_id === employeeId) || null;
+
+    const { parseCommentBody } = await import('@/lib/leadNotes');
+    const written = ((commentsRes?.data || []) as any[])
+      .map((c) => ({ c, p: parseCommentBody(c.body) }))
+      .filter((x) => x.p.written);
+    const noteLeadIds = Array.from(new Set(written.map((x) => x.c.lead_id).filter(Boolean)));
+    const leadMeta = new Map<string, { name: string; status: string }>();
+    for (let i = 0; i < noteLeadIds.length; i += 100) {
+      const { data: ls } = await (supabase as any).from('leads').select('id, name, crm_status').in('id', noteLeadIds.slice(i, i + 100));
+      for (const l of ls || []) leadMeta.set(l.id, { name: l.name || '', status: l.crm_status || '' });
+    }
+    const notes = written.slice(0, 200).map(({ c, p }) => ({
+      id: c.id,
+      at: c.created_at,
+      leadId: c.lead_id,
+      leadName: leadMeta.get(c.lead_id)?.name || 'Lead',
+      leadStatus: leadMeta.get(c.lead_id)?.status || '',
+      text: p.text,
+      callOutcome: p.outcome || null,
+    }));
+    notes.forEach((n) => timeline.push({ at: n.at, type: 'note', label: n.leadName, detail: n.text, leadId: n.leadId }));
+    timeline.sort((a, b) => (a.at > b.at ? -1 : 1));
+
+    const pipelineMap = new Map<string, number>();
+    for (const l of (pipelineRes?.data || []) as any[]) {
+      const s = l.crm_status || 'Fresh Leads';
+      pipelineMap.set(s, (pipelineMap.get(s) || 0) + 1);
+    }
+    const pipeline = Array.from(pipelineMap.entries())
+      .map(([stage, count]) => ({ stage, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const crm = {
+      calls: lb?.calls ?? totalCalls,
+      answered: lb?.answered_calls ?? 0,
+      answeredLeads: lb?.answered_leads ?? 0,
+      statusUpdates: lb?.status_updates ?? 0,
+      actions: lb?.notes ?? notes.length,
+      meetings: lb?.meetings ?? 0,
+      deals: lb?.deals ?? 0,
+      leadsAdded: lb?.leads_added ?? 0,
+      assignedLeads: (pipelineRes?.data || []).length,
+      overdueFollowUps: overdueRes?.count || 0,
+    };
 
     // Score history (last 6 months from sales_performance if exists)
     let scoreHistory: any[] = [];
@@ -176,6 +254,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       followups,
       timeline: timeline.slice(0, 400),
       scoreHistory,
+      crm,
+      notes,
+      pipeline,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
