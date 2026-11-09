@@ -39,6 +39,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!leadRes.data) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
 
     const lead = leadRes.data;
+    // Who did the last action (the lead keeps last_action_at / last_action_by).
+    let lastActionByName: string | null = null;
+    if (lead.last_action_by) {
+      const { data: lab } = await db.from('user_profiles').select('full_name').eq('id', lead.last_action_by).maybeSingle();
+      lastActionByName = lab?.full_name || null;
+    }
     // Duplicate detection: same normalized phone/email
     let duplicates: any[] = [];
     try {
@@ -93,6 +99,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         notes: lead.notes,
         followUpDue: lead.follow_up_due,
         lastActivityAt: lead.last_activity_at,
+        lastActionAt: lead.last_action_at,
+        lastActionByName,
         createdAt: lead.created_at,
         updatedAt: lead.updated_at,
       },

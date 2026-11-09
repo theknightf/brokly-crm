@@ -56,6 +56,19 @@ const TIMELINE_BADGE: Record<string, string> = {
   rotation: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
 };
 
+/** "just now", "5 min ago", "3 h ago", "2 days ago". */
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '';
+  const min = Math.max(0, Math.round(ms / 60000));
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? '' : 's'} ago`;
+}
+
 function SectionTitle({ icon, children, aside }: { icon: React.ReactNode; children: React.ReactNode; aside?: React.ReactNode }) {
   return (
     <div className="p-4 border-b border-border flex items-center justify-between gap-3">
@@ -180,6 +193,23 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
             {initials}
           </div>
           <div className="min-w-0 flex-1">
+            {/* Last action first: the freshest thing to know before touching this lead */}
+            <p className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+              <span className="inline-flex items-center gap-1 rounded-full bg-lime-500/10 px-2.5 py-1 font-semibold text-lime-700 dark:text-lime-300">
+                <Clock size={12} aria-hidden /> Last action
+              </span>
+              {lead.lastActionAt ? (
+                <>
+                  <span className="font-semibold text-foreground">
+                    {new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(lead.lastActionAt))}
+                  </span>
+                  <span className="text-muted-foreground">({timeAgo(lead.lastActionAt)})</span>
+                  {lead.lastActionByName && <span className="text-muted-foreground">· by {lead.lastActionByName}</span>}
+                </>
+              ) : (
+                <span className="text-muted-foreground">No action recorded yet</span>
+              )}
+            </p>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <h1 id="lead-name" className="text-2xl font-extrabold tracking-tight text-foreground break-words">{lead.name}</h1>
               {stage && <StatusPill status={stage} large />}
