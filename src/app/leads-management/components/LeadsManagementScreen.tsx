@@ -688,7 +688,7 @@ export default function LeadsManagementScreen({
 
     const timer = setTimeout(() => {
       fetchLeads();
-    }, 150);
+    }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, currentPage, pageSize, sortKey, sortDir, fetchLeads]);
@@ -697,6 +697,7 @@ export default function LeadsManagementScreen({
   useEffect(() => {
     const supabase = createClient();
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let countsTimer: ReturnType<typeof setTimeout> | null = null;
     const channel = supabase
       .channel('web-leads-realtime-sync')
       .on(
@@ -749,13 +750,18 @@ export default function LeadsManagementScreen({
                     }
                   : prev
               );
-              void loadStatusCounts();
+              // Counts only change when a stage changes; batch bursts and skip hidden tabs.
+              const prevStatus = leadsRef.current.find((l) => l.id === row.id)?.status;
+              if (document.visibilityState === 'visible' && (!prevStatus || (normalizedStatus && normalizedStatus !== prevStatus))) {
+                if (countsTimer) clearTimeout(countsTimer);
+                countsTimer = setTimeout(() => void loadStatusCounts(), 2500);
+              }
             }
-          } else {
+          } else if (document.visibilityState === 'visible') {
             if (refreshTimer) clearTimeout(refreshTimer);
             refreshTimer = setTimeout(() => {
               fetchLeads();
-            }, 300);
+            }, 2000);
           }
         }
       )
@@ -763,6 +769,7 @@ export default function LeadsManagementScreen({
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
+      if (countsTimer) clearTimeout(countsTimer);
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
