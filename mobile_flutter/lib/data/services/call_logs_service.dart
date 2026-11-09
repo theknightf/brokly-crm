@@ -535,13 +535,17 @@ class CallLogsService {
   }
 
   /// Subscribe to call log additions
-  RealtimeChannel subscribeToChanges(void Function() onEvent) {
+  /// [userId] limits the stream to that user's own calls (filtered on the server before the RLS check).
+  RealtimeChannel subscribeToChanges(void Function() onEvent, {String? userId}) {
     return _client
         .channel('public:call_logs')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'call_logs',
+          filter: userId == null
+              ? null
+              : PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'user_id', value: userId),
           callback: (_) => onEvent(),
         )
         .subscribe();

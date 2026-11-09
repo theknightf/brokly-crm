@@ -406,12 +406,18 @@ class NotificationsService {
     final channelName =
         'mobile-notifications-${DateTime.now().millisecondsSinceEpoch}';
     final channel = _client.channel(channelName);
+    // Every listener below only cares about the current user's rows. Filtering on the server means the database
+    // no longer runs a security check for this phone on every change made by anybody.
+    final uid = _client.auth.currentUser?.id;
+    PostgresChangeFilter? mine(String column) =>
+        uid == null ? null : PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: column, value: uid);
 
     channel
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'leads',
+          filter: mine('assigned_to'),
           callback: (payload) {
             final currentUser = _client.auth.currentUser;
             final newRow = payload.newRecord;
@@ -445,6 +451,7 @@ class NotificationsService {
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'leads',
+          filter: mine('assigned_to'),
           callback: (payload) {
             final currentUser = _client.auth.currentUser;
             final newRow = payload.newRecord;
@@ -478,39 +485,12 @@ class NotificationsService {
             }
           },
         )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'activity_log',
-          callback: (payload) {
-            final currentUser = _client.auth.currentUser;
-            final newRow = payload.newRecord;
-            if (currentUser != null &&
-                newRow['user_id']?.toString() == currentUser.id &&
-                newRow['action_type']?.toString() == 'Lead Assigned') {
-              final leadId = newRow['entity_id']?.toString() ?? '';
-              final detail = newRow['detail']?.toString() ?? 'A lead was assigned to you';
-              onEvent(
-                AppNotificationModel(
-                  id: 'ass-lead-${leadId.isNotEmpty ? leadId : newRow['id']}',
-                  type: 'assignment',
-                  title: 'New Lead Assigned to You!',
-                  body: detail,
-                  leadId: leadId.isNotEmpty ? leadId : null,
-                  entityType: 'lead',
-                  entityId: leadId,
-                  createdAt: DateTime.now(),
-                ),
-              );
-            } else {
-              onEvent(null);
-            }
-          },
-        )
+        // activity_log is no longer published to Realtime; assignment alerts come from the leads listeners above.
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'follow_ups',
+          filter: mine('created_by'),
           callback: (payload) {
             final currentUser = _client.auth.currentUser;
             final newRow = payload.newRecord;
@@ -544,6 +524,7 @@ class NotificationsService {
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'follow_ups',
+          filter: mine('created_by'),
           callback: (_) => onEvent(null),
         )
         .subscribe();

@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/utils/stage_note_guard.dart';
 import '../data/models/call_log_model.dart';
 import '../data/services/call_logs_service.dart';
+import '../data/services/supabase_service.dart';
 
 class CallLogsProvider extends ChangeNotifier {
   final CallLogsService _service = CallLogsService();
@@ -24,10 +27,17 @@ class CallLogsProvider extends ChangeNotifier {
     _setupRealtime();
   }
 
-  void _setupRealtime() {
+  Timer? _refetchTimer;
+
+  Future<void> _setupRealtime() async {
+    // Owners/admins watch all calls; everyone else only their own (far cheaper for the database).
+    final admin = await StageNoteGuard.isAdmin();
+    final uid = SupabaseService().currentUser?.id;
     _subscription = _service.subscribeToChanges(() {
-      fetchCalls(silent: true);
-    });
+      // Coalesce a burst of events into one reload.
+      _refetchTimer?.cancel();
+      _refetchTimer = Timer(const Duration(seconds: 3), () => fetchCalls(silent: true));
+    }, userId: admin ? null : uid);
   }
 
   void setSearchQuery(String q) {
@@ -93,6 +103,7 @@ class CallLogsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _refetchTimer?.cancel();
     _subscription?.unsubscribe();
     super.dispose();
   }
