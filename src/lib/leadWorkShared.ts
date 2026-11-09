@@ -50,6 +50,11 @@ export interface NoteItem {
   createdAt: string;
   updatedAt: string;
   edited: boolean;
+  /** 'comment' = written in the lead's Notes section / call dialog (read-only here); 'note' = a call note from the drawer. */
+  kind?: 'comment' | 'note';
+  leadStatus?: string | null;
+  callOutcome?: string | null;
+  callSeconds?: number | null;
 }
 
 export interface ActionItem {

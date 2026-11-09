@@ -88,7 +88,8 @@ export default function Leaderboard() {
       const res = await fetch(`/api/admin/analytics?period=${period}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed');
       const json = await res.json();
-      setRows(json.users || []);
+      // Owners are not ranked.
+      setRows(((json.users || []) as Row[]).filter((r: any) => String(r.role || '').toLowerCase() !== 'owner'));
       setOnlineCount(json.online_count || 0);
     } catch {
       setError(true);

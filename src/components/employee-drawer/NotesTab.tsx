@@ -203,7 +203,8 @@ export default function NotesTab(p: Props) {
         <ol className="space-y-3">
           {p.notes.map((n) => {
             const call = n.callId ? p.calls.find((c) => c.id === n.callId) : null;
-            const mine = canChange(n, p.meId, p.isAdmin) && !n.id.startsWith('tmp-');
+            // Comments live in the lead's own Notes section: they are edited there, not from this list.
+            const mine = n.kind !== 'comment' && canChange(n, p.meId, p.isAdmin) && !n.id.startsWith('tmp-');
             const editing = editingId === n.id;
             return (
               <li
@@ -218,9 +219,26 @@ export default function NotesTab(p: Props) {
                       {n.edited && <span className="ms-2 italic">edited</span>}
                     </p>
                     {(n.leadName || call) && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {n.leadName || 'Lead'}
-                        {call ? ` · call ${fmtDateTime(call.createdAt)}` : n.callId ? ' · linked call' : ''}
+                      <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <a
+                          href={`/leads-management?lead=${n.leadId}`}
+                          className="max-w-[16rem] truncate font-medium text-foreground hover:text-primary hover:underline"
+                          title="Open the customer"
+                        >
+                          {n.leadName || 'Lead'}
+                        </a>
+                        {n.leadStatus && (
+                          <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                            {n.leadStatus}
+                          </span>
+                        )}
+                        {n.callOutcome && (
+                          <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                            Call · {n.callOutcome}
+                            {n.callSeconds ? ` · ${n.callSeconds}s` : ''}
+                          </span>
+                        )}
+                        {call ? <span>call {fmtDateTime(call.createdAt)}</span> : n.callId ? <span>linked call</span> : null}
                       </p>
                     )}
                   </div>

@@ -74,3 +74,20 @@ export function parseLeadNotes(notes?: string | null): ParsedNotes {
 export function mergeLeadNotes(parsed: ParsedNotes, editedHuman: string): string {
   return [editedHuman.trim(), ...parsed.rawLogLines].filter(Boolean).join('\n');
 }
+
+/**
+ * A lead comment as the apps write it: plain text, or "[Call • outcome • 40s] text" when it was typed while logging a call.
+ * Mirrors the SQL function is_written_comment(): automatic entries (device sync, "Call outcome logged") are not notes.
+ */
+export function parseCommentBody(body: string): { written: boolean; text: string; outcome?: string; seconds?: number } {
+  const b = String(body || '').trim();
+  if (!b) return { written: false, text: '' };
+  if (/^\[Device Call Sync/i.test(b)) return { written: false, text: '' };
+  const m = /^\[(Call|WhatsApp)\s*•\s*(.*?)\s*•\s*(\d+)s\]\s*([\s\S]*)$/i.exec(b);
+  if (m) {
+    const text = (m[4] || '').trim();
+    const written = !!text && text !== 'Call outcome logged';
+    return { written, text: written ? text : '', outcome: m[2], seconds: Number(m[3]) };
+  }
+  return { written: true, text: b };
+}
