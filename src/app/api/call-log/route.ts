@@ -328,6 +328,21 @@ export async function POST(request: Request) {
         // ignore — the call is already logged; the pipeline sync is best-effort
       }
 
+      // A note typed while logging the call is a written note: save it as a lead comment too (the app does the same),
+      // so it shows in the lead's Notes section and counts as an action. Placeholders and empty notes are not notes.
+      const typedNote = String(notes || '').trim();
+      if (typedNote && typedNote !== 'Call outcome logged' && typedNote !== 'Auto-synced from phone call log') {
+        try {
+          await supabase.from('lead_comments').insert({
+            lead_id: entity_id,
+            user_id: user.id,
+            body: `[Call • ${(outcome || 'Call').trim()} • ${Math.max(0, Math.round(Number(duration_seconds) || 0))}s] ${typedNote}`.slice(0, 1200),
+          });
+        } catch {
+          // the call itself is saved
+        }
+      }
+
       // Schedule follow-up / meeting row if requested
       if (body.next_follow_up_date) {
         try {
