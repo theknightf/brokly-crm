@@ -108,27 +108,34 @@ export default function UnifiedMasterDashboard() {
     } catch (e:any) { toast.error(e.message); } finally { setRotating(false); }
   };
 
-  if (loading) return (
-    <div className="space-y-6 p-4 md:p-6 -m-4 md:-m-6 animate-pulse" aria-busy="true" aria-label="Loading dashboard">
-      <div className="h-8 w-72 max-w-full rounded-lg bg-muted" />
-      <div className="h-12 w-full sm:w-96 rounded-full bg-muted" />
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {Array.from({ length: 14 }).map((_, i) => <div key={i} className="dash-card h-[112px]" />)}
+  if (error && !data) return <div className="text-center py-10"><p className="text-sm text-destructive mb-3">{error}</p><button onClick={() => load(false)} className="btn-secondary text-sm flex items-center gap-1 mx-auto"><RefreshCw size={14}/> Retry</button></div>;
+  // Not an owner/admin (nothing to load): render nothing, as before.
+  if (!loading && !data) return null;
+
+  // The big executive payload (data) loads in parallel with the cards, hourly chart, leaderboard and delay list below:
+  // those sections fetch their own data, so they are mounted immediately instead of waiting for it (it used to be a
+  // waterfall: skeleton -> unified-master -> THEN the other 8 requests started).
+  const executiveSkeleton = (
+    <div className="space-y-4 animate-pulse" aria-busy="true" aria-label="Loading dashboard">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="dash-card h-[104px]" />)}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="dash-card h-64 lg:col-span-2" />
-        <div className="dash-card h-64" />
-      </div>
+      <div className="dash-card h-64" />
     </div>
   );
-  if (error) return <div className="text-center py-10"><p className="text-sm text-destructive mb-3">{error}</p><button onClick={() => load(false)} className="btn-secondary text-sm flex items-center gap-1 mx-auto"><RefreshCw size={14}/> Retry</button></div>;
-  if (!data) return null;
 
   const filteredLeads = pipelineLeads;
 
   return (
     <div className="bg-background text-foreground min-h-dvh transition-colors duration-200 space-y-6 p-4 md:p-6 -m-4 md:-m-6">
       {/* Header — brand-aligned, uses design tokens */}
+      {!data ? (
+        <div className="space-y-3 animate-pulse" aria-hidden>
+          <div className="h-8 w-72 max-w-full rounded-lg bg-muted" />
+          <div className="h-12 w-full sm:w-96 rounded-full bg-muted" />
+        </div>
+      ) : (
+      <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-foreground font-extrabold text-2xl tracking-tight flex flex-wrap items-center gap-2.5">
@@ -168,6 +175,8 @@ export default function UnifiedMasterDashboard() {
           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${mode==='leads' ? 'bg-card text-primary' : 'bg-muted text-muted-foreground'}`}>{data.summary?.totalLeads ?? 0}</span>
         </button>
       </div>
+      </>
+      )}
 
       {/* Hierarchical Team & Agent Filter — persistent top-bar */}
       <DashboardTeamFilter onChange={(t,a)=>{ setFilterTeamId(t); setFilterAgentId(a); }} />
@@ -182,7 +191,7 @@ export default function UnifiedMasterDashboard() {
       </div>
       <DelayList />
 
-      {mode === 'sales' ? (
+      {!data ? executiveSkeleton : mode === 'sales' ? (
         <>
           {/* Executive Overview — Sales — dark surface #16181d */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
