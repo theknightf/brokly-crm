@@ -24,8 +24,24 @@ class FollowUpsService {
         }
       }
 
+      // A follow-up is live only while its lead still carries that date (the website uses the same rule).
+      final liveLeads = <String, Map<String, String>>{};
+      void rememberLeads(dynamic res) {
+        for (final e in res as List<dynamic>) {
+          final id = e['id']?.toString();
+          if (id == null) continue;
+          liveLeads[id] = {
+            'due': (e['follow_up_due']?.toString() ?? '').split('T').first,
+            'status': (e['crm_status']?.toString() ?? '').toLowerCase().trim(),
+          };
+        }
+      }
+
       if (authIds == null) {
         addRows(await _client.from('follow_ups').select('*').order('due_date', ascending: true));
+        try {
+          rememberLeads(await _client.from('leads').select('id, follow_up_due, crm_status').not('follow_up_due', 'is', null).limit(5000));
+        } catch (_) {}
       } else {
         // Rows created by the user (or their team), plus rows of their leads. The lead ids go in small batches:
         // one `lead_id IN (...)` with hundreds of ids made the request URL too long, so agents with many leads
@@ -41,10 +57,11 @@ class FollowUpsService {
         try {
           final leadsRes = await _client
               .from('leads')
-              .select('id')
+              .select('id, follow_up_due, crm_status')
               .or('assigned_to.in.($idsStr),created_by.in.($idsStr)')
               .not('follow_up_due', 'is', null)
               .limit(5000);
+          rememberLeads(leadsRes);
           leadIds = (leadsRes as List<dynamic>)
               .map((e) => e['id']?.toString())
               .whereType<String>()
@@ -62,6 +79,31 @@ class FollowUpsService {
           } catch (_) {}
         }
       }
+
+      // Drop stale rows: a pending follow-up of a lead that no longer has that date (the agent already worked it),
+      // or whose lead moved to a closed stage. One live row per lead. Counts then match the website and the leads list.
+      const closedStages = {
+        'done deal',
+        'won',
+        'lost',
+        'cancellation',
+        'not interested',
+        'duplicate leads',
+        'wrong number',
+        'closed number',
+        'low budget',
+      };
+      final liveSeen = <String>{};
+      followUps.removeWhere((f) {
+        final lid = f.leadId;
+        if (!f.isActive || lid == null) return false;
+        final lead = liveLeads[lid];
+        if (lead == null) return true;
+        final rowDue = f.dueDate.split('T').first;
+        if (lead['due'] != rowDue) return true;
+        if (closedStages.contains(lead['status'])) return true;
+        return !liveSeen.add(lid);
+      });
 
       // If follow_ups table is empty or missing rows for leads with follow_up_due, reconcile from leads
       final existingLeadIds = followUps.map((f) => f.leadId).whereType<String>().toSet();
@@ -202,8 +244,11 @@ class FollowUpsService {
     final targetLeadId = leadId ?? (id.startsWith('lead-') ? id.replaceFirst('lead-', '') : null);
     if (targetLeadId != null) {
       try {
+        // Clear the lead's follow-up date too: it is the source of truth, and the database would otherwise
+        // re-open the follow-up the next time the lead is edited.
         await _client.from('leads').update({
           'last_action_at': now,
+          'follow_up_due': null,
         }).eq('id', targetLeadId);
       } catch (_) {}
     }
