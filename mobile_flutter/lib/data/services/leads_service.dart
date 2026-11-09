@@ -231,13 +231,18 @@ class LeadsService {
   }
 
   /// Subscribe to Realtime lead changes
-  RealtimeChannel subscribeToChanges(void Function() onEvent) {
+  /// [assignedTo] limits the stream to that user's own leads. The server applies the filter BEFORE the row-level
+  /// security check, so every agent no longer costs one RLS evaluation per change made by anybody.
+  RealtimeChannel subscribeToChanges(void Function() onEvent, {String? assignedTo}) {
     return _client
         .channel('public:leads')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'leads',
+          filter: assignedTo == null
+              ? null
+              : PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'assigned_to', value: assignedTo),
           callback: (_) => onEvent(),
         )
         .subscribe();

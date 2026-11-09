@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants/lead_stages.dart';
 import '../core/memory/memory_guard.dart';
+import '../core/utils/stage_note_guard.dart';
 import '../core/utils/date_utils.dart';
 import '../data/models/last_call_info.dart';
 import '../data/models/lead_model.dart';
@@ -187,9 +188,12 @@ class LeadsProvider extends ChangeNotifier {
     });
   }
 
-  void _setupRealtime() {
+  Future<void> _setupRealtime() async {
     try {
       _subscription?.unsubscribe();
+      // Owners/admins watch everything; everyone else only their own leads (much cheaper for the database).
+      final admin = await StageNoteGuard.isAdmin();
+      final uid = SupabaseService().currentUser?.id;
       _subscription = _service.subscribeToChanges(() {
         // Every change by anyone used to trigger a full reload of all leads. Coalesce a burst of events
         // into one reload (longer on low-RAM phones) so the list is not rebuilt and re-parsed constantly.
@@ -198,7 +202,7 @@ class LeadsProvider extends ChangeNotifier {
           Duration(seconds: MemoryGuard.isLowRam ? 8 : 3),
           () => fetchLeads(silent: true),
         );
-      });
+      }, assignedTo: admin ? null : uid);
     } catch (_) {}
   }
 

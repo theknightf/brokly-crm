@@ -702,7 +702,13 @@ export default function LeadsManagementScreen({
       .channel('web-leads-realtime-sync')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'leads' },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads',
+          // Non-admins only get their own leads; the server filters before the (expensive) RLS check.
+          ...(profile?.role && !isAdminRole(profile.role) && user?.id ? { filter: `assigned_to=eq.${user.id}` } : {}),
+        },
         (payload) => {
           if (payload.eventType === 'UPDATE' && payload.new) {
             const row = payload.new as Record<string, any>;
@@ -773,7 +779,7 @@ export default function LeadsManagementScreen({
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id, profile?.role]);
 
   const totalPages = Math.ceil(total / pageSize);
 
