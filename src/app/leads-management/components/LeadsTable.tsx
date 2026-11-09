@@ -484,6 +484,11 @@ const LeadTableRow = React.memo(function LeadTableRow({
           <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100">
             {lead.lastActionAt ? timeAgo(lead.lastActionAt, lang) : <span className="font-normal text-zinc-500 dark:text-zinc-400">{t('leads.noAction')}</span>}
           </p>
+          {lead.lastActionAt && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+              {new Date(lead.lastActionAt).toLocaleString(localeOf(lang), { timeZone: 'Africa/Cairo', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
           <p className={`text-[11px] ${called ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>
             {called ? t('leads.called') : t('leads.notCalled')}
           </p>
