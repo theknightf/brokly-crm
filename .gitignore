@@ -56,3 +56,5 @@ key.properties
 **/key.properties
 *.jks
 *.keystore
+# Separate project kept locally, not part of Brokly
+gym-food-tracker/
