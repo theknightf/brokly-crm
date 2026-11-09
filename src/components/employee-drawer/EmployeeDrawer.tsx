@@ -4,12 +4,13 @@ import Modal from '@/components/ui/Modal';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import type { CallItem } from '@/lib/leadWorkShared';
+import ActivityTab from './ActivityTab';
 import CallsTab from './CallsTab';
 import NotesTab from './NotesTab';
 import ActionsTab from './ActionsTab';
 import { useEmployeeDrawerData } from './useEmployeeDrawerData';
 
-type TabKey = 'calls' | 'notes' | 'actions';
+type TabKey = 'activity' | 'calls' | 'notes' | 'actions';
 const TAB_STORAGE_KEY = 'brokly:emp-drawer-tab';
 
 export interface EmployeeDrawerProps {
@@ -35,11 +36,11 @@ const initials = (name: string) =>
 function readStoredTab(): TabKey {
   try {
     const v = window.localStorage.getItem(TAB_STORAGE_KEY);
-    if (v === 'calls' || v === 'notes' || v === 'actions') return v;
+    if (v === 'activity' || v === 'calls' || v === 'notes' || v === 'actions') return v;
   } catch {
     /* storage unavailable */
   }
-  return 'calls';
+  return 'activity';
 }
 
 /** Right-side drawer (left in RTL) with the employee's Calls, Notes and Actions. */
@@ -72,7 +73,7 @@ function DrawerBody({
   const isAdmin = isAdminRole(role);
   const isManager = isAdmin || role.trim().toLowerCase() === 'manager';
 
-  const [tab, setTab] = useState<TabKey>('calls');
+  const [tab, setTab] = useState<TabKey>('activity');
   const [linkedCallId, setLinkedCallId] = useState('');
   const d = useEmployeeDrawerData(open, employee.id, from, to);
 
@@ -97,11 +98,13 @@ function DrawerBody({
   };
 
   const counts: Record<TabKey, number> = {
+    activity: d.calls.length + d.notes.length,
     calls: summary.calls,
     notes: d.notes.length,
     actions: d.actions.upcoming.length + d.actions.history.length,
   };
   const TABS: { key: TabKey; label: string }[] = [
+    { key: 'activity', label: 'Activity' },
     { key: 'calls', label: 'Calls' },
     { key: 'notes', label: 'Notes' },
     { key: 'actions', label: 'Actions' },
@@ -175,6 +178,18 @@ function DrawerBody({
         aria-labelledby={`emp-tab-${tab}`}
         className="px-4 py-4 sm:px-6"
       >
+        {tab === 'activity' && (
+          <ActivityTab
+            calls={d.calls}
+            notes={d.notes}
+            loading={d.callsLoading || d.notesLoading}
+            error={d.callsError || d.notesError}
+            onRetry={() => {
+              void d.reloadCalls();
+              void d.loadNotes();
+            }}
+          />
+        )}
         {tab === 'calls' && (
           <CallsTab
             calls={d.calls}
