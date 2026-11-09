@@ -239,6 +239,12 @@ function MobileLeadCardInner({
                 {(lead.actionTakenToday ?? lead.contactedToday) ? t('leads.actionToday') : t('leads.noAction')}
               </span>
             </div>
+            {lead.lastActionAt && (
+              <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                {t('leads.colLastContact')}:{' '}
+                {new Date(lead.lastActionAt).toLocaleString(undefined, { timeZone: 'Africa/Cairo', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
         </button>
 

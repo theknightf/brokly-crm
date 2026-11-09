@@ -404,6 +404,11 @@ const LeadTableRow = React.memo(function LeadTableRow({
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
               {lead.source || (hasName ? '' : t('leads.noName'))}
             </p>
+            {!showLast && lead.lastActionAt && (
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate tabular-nums">
+                {new Date(lead.lastActionAt).toLocaleString(localeOf(lang), { timeZone: 'Africa/Cairo', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
         </div>
       </td>
