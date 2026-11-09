@@ -5,6 +5,7 @@ import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { summarizeLeads, type AssignmentBatchInput } from '@/lib/assignmentHistory';
 import { emitFollowUpsChanged } from '@/lib/followUpEvents';
 import { isAdminRole } from '@/lib/roles';
+import { applyLeadSearch } from '@/lib/leadSearch';
 
 export function getLocalTodayDateString(): string {
   const d = new Date();
@@ -513,12 +514,7 @@ async function applyLeadFilters(
     query = query.in('id', leadIds);
   }
 
-  const q = search.trim();
-  if (q) {
-    query = query.or(
-      `name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`
-    );
-  }
+  query = applyLeadSearch(query, search);
   if (status && !options.excludeStatus) query = query.eq('crm_status', status);
   if (source) query = query.eq('source', source);
   if (agent) {
@@ -745,12 +741,10 @@ export const leadsService = {
   async search(q: string, limit = 8) {
     const supabase = createClient();
     try {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('id, name, phone, email, property_type, project, unit')
-        .or(
-          `name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,project.ilike.%${q}%,unit.ilike.%${q}%`
-        )
+      const { data, error } = await applyLeadSearch(
+        supabase.from('leads').select('id, name, phone, email, property_type, project, unit'),
+        q
+      )
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) {
@@ -1564,7 +1558,7 @@ export const leadsService = {
             let retryQuery: any = supabase
               .from('leads')
               .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)', { count: 'exact' });
-            if (q) retryQuery = retryQuery.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,location.ilike.%${q}%`);
+            if (q) retryQuery = applyLeadSearch(retryQuery, q);
             if (status) retryQuery = retryQuery.eq('crm_status', status);
             if (source) retryQuery = retryQuery.eq('source', source);
             if (agent) retryQuery = retryQuery.eq('agent', agent);
