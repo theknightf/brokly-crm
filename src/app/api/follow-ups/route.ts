@@ -194,9 +194,11 @@ export async function GET() {
         lastActionAt: lead?.last_action_at || null,
         lastCallAt: (r.lead_id && lastCalls.get(r.lead_id)?.created_at) || null,
         lastCallOutcome: (r.lead_id && lastCalls.get(r.lead_id)?.outcome) || '',
-        agent: base.agent || owner || '',
+        // The responsible agent is the lead's CURRENT owner. The text stored on the follow-up row is a copy taken when it
+        // was created (often the owner who scheduled it), so it must not decide whose follow-up this is.
+        agent: owner || base.agent || '',
         agentInitials:
-          base.agentInitials ||
+          (owner ? '' : base.agentInitials) ||
           (owner || '')
             .split(' ')
             .map((p: string) => p[0])
