@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, PhoneOff, ThumbsUp, ThumbsDown, CalendarClock, CalendarCheck, AlertTriangle, Ban, X, Loader2, PhoneCall } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 import { leadsService, followUpsService } from '@/lib/services/crmService';
 import type { Lead } from './mockLeads';
 
@@ -137,6 +139,8 @@ function addDays(dateStr: string, days: number): string {
 export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: PostCallOutcomeModalProps) {
   const [mounted, setMounted] = useState(false);
   const [outcome, setOutcome] = useState<PostCallOutcome | null>(null);
+  const { profile } = useAuth();
+  const noteRequired = !isAdminRole(profile?.role); // sales cannot change a stage without a written note
   const [notes, setNotes] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
   const [followUpTime, setFollowUpTime] = useState('12:00');
@@ -432,7 +436,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
 
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-foreground">
-              Call Notes <span className="font-normal text-muted-foreground text-[11px]">(optional)</span>
+              Call Notes <span className="font-normal text-muted-foreground text-[11px]">{noteRequired ? '(required — the stage changes with it)' : '(optional)'}</span>
             </span>
             <textarea
               value={notes}
@@ -451,7 +455,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
           </button>
           <button
             onClick={handleSave}
-            disabled={!outcome || saving}
+            disabled={!outcome || saving || (noteRequired && !notes.trim())}
             className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_6px_20px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_10px_28px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2 min-w-[124px]"
             type="button"
           >

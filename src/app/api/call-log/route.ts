@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +114,7 @@ export async function POST(request: Request) {
   const dur = Math.max(0, Math.floor(Number(duration_seconds) || 0));
   const finalOutcome = (outcome || '').trim();
 
+
   const row: any = {
     user_id: user.id,
     entity_type: entity_type || 'lead',
@@ -173,6 +175,28 @@ export async function POST(request: Request) {
     'Low Budget': 'Lost',
     'Reschedule Meeting': 'Site Visit Scheduled',
   };
+
+
+  // Sales users cannot change a lead's stage without a written note (the database enforces it too). Refuse BEFORE the
+  // call is saved so nothing is half-done; owners and admins are exempt.
+  if (entity_type === 'lead' && entity_id && OUTCOME_TO_STATUS[finalOutcome]) {
+    try {
+      const { data: prof } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle();
+      if (!isAdminRole((prof as any)?.role)) {
+        const { data: cur } = await supabase.from('leads').select('crm_status').eq('id', entity_id).maybeSingle();
+        const typed = String(notes || '').trim();
+        const hasNote = !!typed && typed !== 'Call outcome logged' && typed !== 'Auto-synced from phone call log';
+        if (cur && (cur as any).crm_status !== OUTCOME_TO_STATUS[finalOutcome] && !hasNote) {
+          return NextResponse.json(
+            { error: 'Write a note about the call: the stage cannot change without one.', code: 'NOTE_REQUIRED' },
+            { status: 400 }
+          );
+        }
+      }
+    } catch {
+      // the database rule still applies
+    }
+  }
 
   try {
     let saved: any;
@@ -320,14 +344,6 @@ export async function POST(request: Request) {
         patch.crm_status = nextStatus;
         patch.lead_status = STATUS_TO_LEGACY[nextStatus] || 'New';
       }
-      // Contacted: the lead leaves the follow-up queue unless the agent scheduled a new date.
-      patch.follow_up_due = body.next_follow_up_date || null;
-      try {
-        await supabase.from('leads').update(patch).eq('id', entity_id);
-      } catch {
-        // ignore — the call is already logged; the pipeline sync is best-effort
-      }
-
       // A note typed while logging the call is a written note: save it as a lead comment too (the app does the same),
       // so it shows in the lead's Notes section and counts as an action. Placeholders and empty notes are not notes.
       const typedNote = String(notes || '').trim();
@@ -341,6 +357,14 @@ export async function POST(request: Request) {
         } catch {
           // the call itself is saved
         }
+      }
+
+      // Contacted: the lead leaves the follow-up queue unless the agent scheduled a new date.
+      patch.follow_up_due = body.next_follow_up_date || null;
+      try {
+        await supabase.from('leads').update(patch).eq('id', entity_id);
+      } catch {
+        // ignore — the call is already logged; the pipeline sync is best-effort
       }
 
       // Schedule follow-up / meeting row if requested

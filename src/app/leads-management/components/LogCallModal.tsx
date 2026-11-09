@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, CalendarClock, Loader2, PhoneCall, PhoneOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdminRole } from '@/lib/roles';
 import Modal from '@/components/ui/Modal';
 import { leadsService, followUpsService } from '@/lib/services/crmService';
 import type { Lead } from './mockLeads';
@@ -44,6 +46,8 @@ export default function LogCallModal({ lead, onClose, onDone, onCallLogged }: Lo
   const [direction, setDirection] = useState<'incoming' | 'outgoing'>('outgoing');
   const [outcome, setOutcome] = useState('Connected');
   const [durationMin, setDurationMin] = useState('');
+  const { profile } = useAuth();
+  const noteRequired = !isAdminRole(profile?.role); // sales cannot change a stage without a written note
   const [notes, setNotes] = useState('');
   const [followUp, setFollowUp] = useState('');
   const [saving, setSaving] = useState(false);
@@ -200,7 +204,7 @@ export default function LogCallModal({ lead, onClose, onDone, onCallLogged }: Lo
         )}
 
         <label className="flex flex-col gap-1">
-          <span className="label-base">Short note</span>
+          <span className="label-base">Short note{noteRequired ? ' (required)' : ''}</span>
           <textarea
             className="input-base min-h-20 resize-none"
             placeholder="What was discussed?"
@@ -226,7 +230,7 @@ export default function LogCallModal({ lead, onClose, onDone, onCallLogged }: Lo
           <button onClick={onClose} className="btn-secondary">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary">
+          <button onClick={handleSave} disabled={saving || (noteRequired && !notes.trim())} className="btn-primary">
             {saving && <Loader2 size={14} className="animate-spin" />}
             Save call
           </button>

@@ -57,7 +57,7 @@ import {
   pipelineIndex,
   ALL_REAL_STATUSES,
 } from './leadStages';
-import { leadsService, followUpsService } from '@/lib/services/crmService';
+import { leadsService, followUpsService, leadCommentsService } from '@/lib/services/crmService';
 import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -65,6 +65,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole } from '@/lib/roles';
 import LeadNotesSection from './LeadNotesSection';
+import StatusNoteModal from './StatusNoteModal';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
 import LeadTimeline from './LeadTimeline';
 import PostCallOutcomeModal from './PostCallOutcomeModal';
@@ -781,6 +782,14 @@ export default function LeadsManagementScreen({
     setCurrentPage(1);
   }, []);
 
+  // "Write a note first" dialog, as a promise: resolves with the note, or null when cancelled.
+  const [noteAsk, setNoteAsk] = useState<{ label: string; status: string; count: number; resolve: (n: string | null) => void } | null>(null);
+  const askNote = useCallback(
+    (label: string, status: string, count: number) =>
+      new Promise<string | null>((resolve) => setNoteAsk({ label, status, count, resolve })),
+    []
+  );
+
   const handleStatusChange = useCallback(async (id: string, newStatus: LeadStatus) => {
     if (statusPendingRef.current.has(id)) return;
     statusPendingRef.current.add(id);
@@ -796,6 +805,22 @@ export default function LeadsManagementScreen({
     if (existingLead && oldStatus === newStatus) {
       statusPendingRef.current.delete(id);
       return;
+    }
+
+    // Sales users cannot change a stage without a written note: ask first, save it as a lead comment, then change.
+    if (!isAdminRole(profile?.role)) {
+      const note = await askNote(existingLead?.name || 'Lead', newStatus, 1);
+      if (!note) {
+        statusPendingRef.current.delete(id);
+        return;
+      }
+      try {
+        await leadCommentsService.create(id, note, user?.id || '');
+      } catch (e: any) {
+        statusPendingRef.current.delete(id);
+        toast.error(e?.message || 'Could not save the note, so the stage was not changed.');
+        return;
+      }
     }
 
     const updatedLead: Lead = existingLead
@@ -890,11 +915,15 @@ export default function LeadsManagementScreen({
       setTotal(prevTotal);
       setViewLead(prevView);
       setStatusCounts(prevStatusCounts);
-      toast.error(err?.message || 'Failed to update status');
+      toast.error(
+        /NOTE_REQUIRED/.test(String(err?.message))
+          ? 'Write a note first: the stage cannot change without one.'
+          : err?.message || 'Failed to update status'
+      );
     } finally {
       statusPendingRef.current.delete(id);
     }
-  }, [user?.id, filters.status, loadStatusCounts]);
+  }, [user?.id, profile?.role, filters.status, loadStatusCounts]);
 
   const handleScheduleFollowUp = async () => {
     if (!viewLead) return;
@@ -1125,12 +1154,22 @@ export default function LeadsManagementScreen({
   const handleBulkStatusChange = async (newStatus: string) => {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
+    // Sales users: one written note, added to every selected lead BEFORE their stage changes.
+    let bulkNote = '';
+    if (!isAdminRole(profile?.role)) {
+      const n = await askNote('', newStatus, ids.length);
+      if (!n) return;
+      bulkNote = n;
+    }
     const okIds: string[] = [];
     let failed = 0;
     for (let i = 0; i < ids.length; i += 5) {
       const chunk = ids.slice(i, i + 5);
       const results = await Promise.allSettled(
-        chunk.map((id) => leadsService.updateStatus(id, newStatus))
+        chunk.map(async (id) => {
+          if (bulkNote) await leadCommentsService.create(id, bulkNote, user?.id || '');
+          return leadsService.updateStatus(id, newStatus);
+        })
       );
       results.forEach((r, k) => {
         if (r.status === 'fulfilled') okIds.push(chunk[k]);
@@ -1383,6 +1422,12 @@ export default function LeadsManagementScreen({
   const handleEditSave = async (updated: Lead) => {
     try {
       const original = editLead;
+      // Sales users cannot change the stage without a written note (the form edit included).
+      if (!isAdminRole(profile?.role) && original && updated.status && updated.status !== original.status) {
+        const note = await askNote(updated.name || 'Lead', String(updated.status), 1);
+        if (!note) return;
+        await leadCommentsService.create(updated.id, note, user?.id || '');
+      }
       const isAssigneesChanged =
         JSON.stringify(original?.assignedToIds || (original?.assignedTo ? [original.assignedTo] : [])) !==
         JSON.stringify(updated.assignedToIds || (updated.assignedTo ? [updated.assignedTo] : []));
@@ -1908,6 +1953,22 @@ export default function LeadsManagementScreen({
       </div>
 
       <AssignmentHistoryModal open={assignmentHistoryOpen} onClose={() => setAssignmentHistoryOpen(false)} />
+
+      {/* Sales users: a written note is required before any stage change */}
+      <StatusNoteModal
+        open={!!noteAsk}
+        leadLabel={noteAsk?.label || ''}
+        status={noteAsk?.status || ''}
+        count={noteAsk?.count || 1}
+        onCancel={() => {
+          noteAsk?.resolve(null);
+          setNoteAsk(null);
+        }}
+        onConfirm={(note) => {
+          noteAsk?.resolve(note);
+          setNoteAsk(null);
+        }}
+      />
 
       {/* Bulk action bar */}
       <BulkActionBar
