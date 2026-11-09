@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 244 246 243;
+  --surface: 255 255 255;
+  --surface2: 233 238 232;
+  --ink: 17 28 21;
+  --muted: 98 112 103;
+  --line: 216 224 217;
+  --accent: 21 128 61;
+  --onaccent: 255 255 255;
+  --danger: 200 50 50;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: 10 20 14;
+    --surface: 19 33 25;
+    --surface2: 29 47 36;
+    --ink: 236 243 237;
+    --muted: 140 160 148;
+    --line: 38 58 45;
+    --accent: 190 242 100;
+    --onaccent: 12 26 16;
+    --danger: 248 113 113;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

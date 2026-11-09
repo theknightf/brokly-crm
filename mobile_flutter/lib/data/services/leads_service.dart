@@ -213,7 +213,7 @@ class LeadsService {
       await _client.from('lead_comments').insert({
         'lead_id': id,
         'user_id': currentUserId,
-        'comment': note,
+        'body': note, // the column is "body"; "comment" made every quick note fail silently (never counted as an action)
       });
     } catch (_) {}
   }
