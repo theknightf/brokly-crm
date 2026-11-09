@@ -671,9 +671,9 @@ export default function LeadsTable({
   activeStage,
   onClearStage,
 }: LeadsTableProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t, lang } = useLanguage();
-  const canDelete = isAdminRole(user?.role);
+  const canDelete = isAdminRole(profile?.role);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
 

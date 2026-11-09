@@ -311,7 +311,7 @@ export default function LeadsManagementScreen({
   title,
   subtitle,
 }: LeadsManagementScreenProps = {}) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const filterOptions = useLeadFilterOptions();
@@ -985,7 +985,7 @@ export default function LeadsManagementScreen({
   };
 
   const handleDeleteLead = useCallback(async (id: string) => {
-    if (!isAdminRole(user?.role)) {
+    if (!isAdminRole(profile?.role)) {
       toast.error('Only owner and admin can delete leads.');
       return;
     }
@@ -1011,7 +1011,7 @@ export default function LeadsManagementScreen({
     } catch (err: any) {
       toast.error(err?.message || 'Failed to delete lead');
     }
-  }, [user?.role, loadStatusCounts]);
+  }, [profile?.role, loadStatusCounts]);
 
   const handleViewLead = useCallback((lead: Lead) => {
     setViewLead(lead);
@@ -1160,7 +1160,7 @@ export default function LeadsManagementScreen({
   };
 
   const handleBulkDelete = async () => {
-    if (!isAdminRole(user?.role)) {
+    if (!isAdminRole(profile?.role)) {
       toast.error('Only owner and admin can delete leads.');
       return;
     }
@@ -1757,7 +1757,7 @@ export default function LeadsManagementScreen({
             <ClipboardList size={15} />
             <span className="hidden sm:inline">Import History</span>
           </a>
-          {isAdminRole(user?.role) && (
+          {isAdminRole(profile?.role) && (
             <button
               type="button"
               onClick={() => setAssignmentHistoryOpen(true)}
@@ -1868,7 +1868,7 @@ export default function LeadsManagementScreen({
             onEdit={(lead) => setEditLead(lead)}
             onStatusChange={handleStatusChange}
             onDelete={handleDeleteLead}
-            isAdmin={isAdminRole(user?.role)}
+            isAdmin={isAdminRole(profile?.role)}
             onPostCall={handlePostCallTrigger}
           />
           </div>

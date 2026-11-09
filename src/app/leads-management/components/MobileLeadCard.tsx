@@ -104,7 +104,7 @@ function MobileLeadCardInner({
   onAddNote,
   onPostCall,
 }: MobileLeadCardProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useLanguage();
   const [statusOpen, setStatusOpen] = useState(false);
   const stageAnchorRef = useRef<HTMLButtonElement>(null);
@@ -202,7 +202,7 @@ function MobileLeadCardInner({
           <div className="min-w-0 pt-0.5">
             <p className="font-bold text-foreground group-hover:text-primary group-hover:underline cursor-pointer text-[15px] leading-tight truncate transition-colors flex items-center gap-1.5">
               <span className="truncate">{lead.name?.trim() || lead.phone || t('leads.noName')}</span>
-              {isAdminRole(user?.role) && lead.isDuplicate && (
+              {isAdminRole(profile?.role) && lead.isDuplicate && (
                 <span className="flex-shrink-0 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 text-[10px] font-semibold px-1.5 py-px">
                   {t('leads.duplicate')}
                 </span>
@@ -252,7 +252,7 @@ function MobileLeadCardInner({
             >
               <Pencil size={16} />
             </button>
-            {isAdminRole(user?.role) && (
+            {isAdminRole(profile?.role) && (
               <button
                 onClick={() => onDelete(lead.id)}
                 className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-muted/60 dark:bg-muted hover:bg-red-500/10 dark:hover:bg-red-500/20 text-muted-foreground hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center active:scale-95 transition-transform"

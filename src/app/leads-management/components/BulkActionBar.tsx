@@ -105,12 +105,12 @@ export default function BulkActionBar({
   onChangeStatus,
   onClear,
 }: BulkActionBarProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useLanguage();
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const statusBtnRef = useRef<HTMLButtonElement>(null);
-  const canDelete = isAdminRole(user?.role);
+  const canDelete = isAdminRole(profile?.role);
   const [open, setOpen] = useState<'none' | 'whatsapp' | 'team'>('none');
   const [composer, setComposer] = useState<'none' | 'email' | 'sms'>('none');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -134,7 +134,7 @@ export default function BulkActionBar({
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   // Owners and admins must choose the stage the leads will be in BEFORE assigning them.
-  const mustPickStage = isAdminRole(user?.role);
+  const mustPickStage = isAdminRole(profile?.role);
   const [assignStage, setAssignStage] = useState('');
   const [teamPending, setTeamPending] = useState<string | null>(null);
   const [teamStage, setTeamStage] = useState('');
