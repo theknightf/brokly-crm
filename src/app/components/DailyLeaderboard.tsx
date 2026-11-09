@@ -30,17 +30,34 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
   const topActions = Math.max(1, ...active.map((r) => r.totalActions || 0));
 
   useEffect(() => {
-    setLoading(true);
-    setError(false);
-    fetch(`/api/leaderboard/daily?date=${selectedDate}`, { cache: 'no-store' })
-      .then(async (r) => {
-        const j = await r.json().catch(() => null);
-        if (!r.ok || !j) throw new Error('leaderboard failed');
-        return j;
-      })
-      .then(j => setRows(Array.isArray(j.users) ? j.users : []))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+    let alive = true;
+    // `silent` refreshes keep the current rows on screen (no spinner, no error flash).
+    const load = (silent: boolean) => {
+      if (!silent) {
+        setLoading(true);
+        setError(false);
+      }
+      fetch(`/api/leaderboard/daily?date=${selectedDate}`, { cache: 'no-store' })
+        .then(async (r) => {
+          const j = await r.json().catch(() => null);
+          if (!r.ok || !j) throw new Error('leaderboard failed');
+          return j;
+        })
+        .then((j) => alive && setRows(Array.isArray(j.users) ? j.users : []))
+        .catch(() => alive && !silent && setError(true))
+        .finally(() => alive && !silent && setLoading(false));
+    };
+    load(false);
+    // Today's board keeps itself current: every minute, and when the tab is shown again.
+    const isToday = selectedDate === localToday();
+    const timer = isToday ? window.setInterval(() => document.visibilityState === 'visible' && load(true), 60_000) : undefined;
+    const onVisible = () => document.visibilityState === 'visible' && isToday && load(true);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      if (timer) window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [selectedDate]);
 
   return (
