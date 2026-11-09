@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/stage_note_guard.dart';
 import '../../../core/utils/tr.dart';
 import '../../../core/utils/whatsapp_utils.dart';
 import '../../../data/models/last_call_info.dart';
@@ -382,7 +383,13 @@ class LeadCard extends StatelessWidget {
                               context,
                               currentStatus: lead.status,
                               onSelectStatus: (newStatus) {
-                                provider.updateStatus(lead.id, newStatus);
+                                StageNoteGuard.run(
+                                  context,
+                                  leadId: lead.id,
+                                  leadName: lead.name,
+                                  newStage: newStatus,
+                                  apply: () => provider.updateStatus(lead.id, newStatus),
+                                );
                               },
                             );
                           },

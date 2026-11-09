@@ -193,6 +193,13 @@ class LeadsService {
     } catch (_) {}
   }
 
+  /// A written note on the lead (a lead comment). Not swallowed: the caller must know whether it was saved, because a
+  /// sales user's stage change is only allowed after it.
+  Future<void> addComment(String id, String body) async {
+    final uid = _client.auth.currentUser?.id;
+    await _client.from('lead_comments').insert({'lead_id': id, 'user_id': uid, 'body': body});
+  }
+
   /// Quick note / comment on lead
   Future<void> addNote(String id, String note) async {
     final currentUserId = _client.auth.currentUser?.id;

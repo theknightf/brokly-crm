@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/lead_stages.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_utils.dart';
+import '../../core/utils/stage_note_guard.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../data/models/dashboard_summary_model.dart';
 import '../../data/models/follow_up_model.dart';
@@ -1636,8 +1637,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: stageColor.text,
                     ),
                     onPressed: () async {
-                      await leadsProvider.updateStatus(lead.id, nextStage);
-                      _loadDashboard();
+                      final changed = await StageNoteGuard.run(
+                        context,
+                        leadId: lead.id,
+                        leadName: lead.name,
+                        newStage: nextStage,
+                        apply: () => leadsProvider.updateStatus(lead.id, nextStage),
+                      );
+                      if (changed) _loadDashboard();
                     },
                   ),
               ],

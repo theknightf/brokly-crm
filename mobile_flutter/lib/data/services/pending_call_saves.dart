@@ -132,7 +132,14 @@ class PendingCallSaves with WidgetsBindingObserver {
         _items.removeWhere((e) => e['id'] == item['id']);
         await _persist();
         savedAny = true;
-      } catch (_) {
+      } catch (e) {
+        // "NOTE_REQUIRED": the server refuses a stage change without a written note. Retrying can never succeed, so the
+        // save is dropped (the call itself is already stored) instead of blocking the queue.
+        if (e.toString().contains('NOTE_REQUIRED')) {
+          _items.removeWhere((x) => x['id'] == item['id']);
+          await _persist();
+          continue;
+        }
         failed = true;
         final attempts = ((item['attempts'] as num?)?.toInt() ?? 0) + 1;
         if (attempts >= _maxAttempts) {

@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/stage_note_guard.dart';
+import '../../../core/utils/tr.dart';
 import '../../../data/models/call_log_model.dart';
 import '../../../data/models/lead_model.dart';
 import '../../../data/services/call_logs_service.dart';
@@ -205,6 +207,8 @@ class _LogCallDialogState extends State<LogCallDialog> {
   late int _durationSeconds;
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
+  // Sales users cannot change the stage without a written note (owners and admins can). Strict until the role is known.
+  bool _noteRequired = true;
 
   // Follow-up / Meeting scheduling state
   DateTime? _scheduledDate;
@@ -355,6 +359,9 @@ class _LogCallDialogState extends State<LogCallDialog> {
 
     // Default follow-up date to tomorrow for follow-up/meeting outcomes
     _scheduledDate = DateTime.now().add(const Duration(days: 1));
+    StageNoteGuard.isAdmin().then((admin) {
+      if (mounted) setState(() => _noteRequired = !admin);
+    });
   }
 
   @override
@@ -944,8 +951,11 @@ class _LogCallDialogState extends State<LogCallDialog> {
             TextField(
               controller: _notesController,
               maxLines: 3,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                hintText: 'Write call summary, unit preferences, budget feedback…',
+                hintText: _noteRequired
+                    ? tr('Write what happened (required)…', 'اكتب إيه اللي حصل (إجباري)…')
+                    : 'Write call summary, unit preferences, budget feedback…',
                 filled: true,
                 fillColor: isDark ? const Color(0xFF1C212B) : const Color(0xFFF8FAFC),
                 border: OutlineInputBorder(
@@ -959,7 +969,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
             SizedBox(
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
+                onPressed: (_isSubmitting || (_noteRequired && _notesController.text.trim().isEmpty)) ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.neonLime,
                   foregroundColor: const Color(0xFF142407),

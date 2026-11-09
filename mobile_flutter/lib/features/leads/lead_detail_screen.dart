@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/note_formatter.dart';
+import '../../core/utils/stage_note_guard.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../data/models/call_log_model.dart';
 import '../../data/models/lead_model.dart';
@@ -864,10 +865,15 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                             context,
                                             currentStatus: lead.status,
                                             onSelectStatus: (newStatus) async {
-                                              await context
-                                                  .read<LeadsProvider>()
-                                                  .updateStatus(lead.id, newStatus);
-                                              _loadAll();
+                                              final provider = context.read<LeadsProvider>();
+                                              final changed = await StageNoteGuard.run(
+                                                context,
+                                                leadId: lead.id,
+                                                leadName: lead.name,
+                                                newStage: newStatus,
+                                                apply: () => provider.updateStatus(lead.id, newStatus),
+                                              );
+                                              if (changed) _loadAll();
                                             },
                                           );
                                         },

@@ -85,13 +85,7 @@ class AssistantService {
       throw Exception('معرف العميل غير موجود لتنفيذ الإجراء.');
     }
 
-    if (action.newStage != null && action.newStage!.isNotEmpty) {
-      await _supabase.from('leads').update({
-        'crm_status': action.newStage,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', leadId);
-    }
-
+    // The note first: a sales user's stage change is only accepted after a written note.
     if (action.noteText != null && action.noteText!.trim().isNotEmpty) {
       final user = _supabase.auth.currentUser;
       await _supabase.from('lead_comments').insert({
@@ -100,6 +94,13 @@ class AssistantService {
         'body': action.noteText!.trim(),
         'created_at': DateTime.now().toIso8601String(),
       });
+    }
+
+    if (action.newStage != null && action.newStage!.isNotEmpty) {
+      await _supabase.from('leads').update({
+        'crm_status': action.newStage,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', leadId);
     }
   }
 }

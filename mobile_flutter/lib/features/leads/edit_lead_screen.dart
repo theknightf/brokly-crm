@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/note_formatter.dart';
+import '../../core/utils/stage_note_guard.dart';
 import '../../core/utils/tr.dart';
 import '../../data/models/lead_model.dart';
 import '../../data/models/user_profile_model.dart';
@@ -145,6 +146,26 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
     final canEditSource = profile?.isAdmin == true || profile?.isTeamLeader == true;
 
     setState(() => _isSubmitting = true);
+
+    // Sales users cannot change a stage without a written note.
+    if (_status != widget.lead.status && profile?.isAdmin != true) {
+      final note = await StageNoteGuard.ask(context, leadName: widget.lead.name, stage: _status.toString());
+      if (note == null || note.trim().isEmpty) {
+        if (mounted) setState(() => _isSubmitting = false);
+        return;
+      }
+      try {
+        await LeadsService().addComment(widget.lead.id, note.trim());
+      } catch (_) {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('Could not save the note, so the stage was not changed.', 'تعذّر حفظ الملاحظة، فلم تتغير المرحلة.'))),
+          );
+        }
+        return;
+      }
+    }
 
     final updates = {
       'name': _nameController.text.trim(),
