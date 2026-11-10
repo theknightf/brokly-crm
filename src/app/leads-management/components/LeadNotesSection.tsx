@@ -44,6 +44,24 @@ function fmt(iso: string) {
   }
 }
 
+/** YYYY-MM-DD of an instant in Cairo time (the day a note belongs to). */
+function cairoDay(iso: string) {
+  try {
+    return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+/** Group heading for days before yesterday, e.g. "Mon, 3 Nov 2026". */
+function dayLabel(iso: string) {
+  try {
+    return new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
 function initials(name: string) {
   return (
     name
@@ -65,7 +83,7 @@ export default function LeadNotesSection({ leadId, leadNotes }: Props) {
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [filter, setFilter] = useState<'all' | Kind>('all');
-  const [openRecord, setOpenRecord] = useState(false);
+  const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -183,113 +201,170 @@ export default function LeadNotesSection({ leadId, leadNotes }: Props) {
       active ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-foreground'
     }`;
 
+  // Newest first, grouped by Cairo day: Pinned (the lead record note) · Today · Yesterday · older dates.
+  const groups = useMemo(() => {
+    const today = cairoDay(new Date().toISOString());
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yesterday = cairoDay(y.toISOString());
+    const out: { key: string; label: string; items: Entry[] }[] = [];
+    for (const e of shown) {
+      const day = e.kind === 'record' || !e.at ? 'pinned' : cairoDay(e.at);
+      const label = day === 'pinned' ? 'Pinned' : day === today ? 'Today' : day === yesterday ? 'Yesterday' : dayLabel(e.at);
+      const last = out[out.length - 1];
+      if (last && last.key === day) last.items.push(e);
+      else out.push({ key: day, label, items: [e] });
+    }
+    return out;
+  }, [shown]);
+
+  const toggle = (key: string) =>
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   return (
     <section aria-label="Notes" className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <MessageSquare size={14} className="text-muted-foreground" />
-        <h3 className="text-sm font-semibold text-foreground">Notes</h3>
-        <span className="text-xs text-muted-foreground">({counts.all})</span>
-        <div className="ms-auto flex gap-1.5" role="group" aria-label="Filter notes">
-          <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')} className={chip(filter === 'all')}>
-            All
-          </button>
-          <button type="button" aria-pressed={filter === 'note'} onClick={() => setFilter('note')} className={chip(filter === 'note')}>
-            Notes {counts.note + counts.record}
-          </button>
-          <button type="button" aria-pressed={filter === 'call'} onClick={() => setFilter('call')} className={chip(filter === 'call')}>
-            Calls {counts.call}
-          </button>
+      {/* Header + add box stay visible while the list scrolls (just below the drawer's sticky tab bar). */}
+      <div className="sticky top-[52px] [@media(pointer:coarse)]:top-[60px] z-[5] -mx-1 space-y-2.5 border-b border-border bg-card px-1 pb-2.5 pt-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <MessageSquare size={14} className="text-muted-foreground" aria-hidden />
+          <h3 className="text-sm font-semibold text-foreground">Notes</h3>
+          <span className="text-xs text-muted-foreground tabular-nums">({counts.all})</span>
+          <div className="ms-auto flex gap-1.5" role="group" aria-label="Filter notes">
+            <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')} className={chip(filter === 'all')}>
+              All
+            </button>
+            <button type="button" aria-pressed={filter === 'note'} onClick={() => setFilter('note')} className={chip(filter === 'note')}>
+              Notes {counts.note + counts.record}
+            </button>
+            <button type="button" aria-pressed={filter === 'call'} onClick={() => setFilter('call')} className={chip(filter === 'call')}>
+              Calls {counts.call}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* One box to add to the feed */}
-      <form onSubmit={submit} className="space-y-2">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
-          }}
-          rows={2}
-          placeholder="Add a note about this lead…"
-          aria-label="New note"
-          disabled={submitting}
-          className="input-base w-full resize-y text-sm"
-        />
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">Ctrl + Enter to save</span>
-          <button type="submit" disabled={submitting || !text.trim()} className="btn-primary flex items-center gap-1.5 !py-1.5 text-xs">
-            {submitting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+        <form onSubmit={submit} className="flex items-end gap-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
+            }}
+            rows={2}
+            placeholder="Add a note about this lead…  (Ctrl + Enter to save)"
+            aria-label="New note"
+            disabled={submitting}
+            dir="auto"
+            className="input-base min-w-0 flex-1 resize-y text-sm"
+          />
+          <button
+            type="submit"
+            disabled={submitting || !text.trim()}
+            className="btn-primary flex h-10 shrink-0 items-center gap-1.5 !py-1.5 text-xs"
+          >
+            {submitting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} className="rtl:-scale-x-100" />}
             Add note
           </button>
-        </div>
-      </form>
+        </form>
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-6">
-          <Loader2 size={20} className="animate-spin text-primary" />
+          <Loader2 size={20} className="animate-spin text-primary" aria-label="Loading notes" />
         </div>
       ) : shown.length === 0 ? (
-        <p className="rounded-xl bg-muted/40 px-3 py-4 text-center text-xs text-muted-foreground">
-          {entries.length === 0 ? 'No notes yet. Add the first one above.' : 'Nothing in this filter.'}
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <MessageSquare size={18} aria-hidden />
+          </span>
+          <p className="text-sm font-semibold text-foreground">{entries.length === 0 ? 'No notes yet' : 'Nothing in this filter'}</p>
+          <p className="max-w-xs text-xs text-muted-foreground">
+            {entries.length === 0
+              ? 'Write what happened with this lead in the box above. Notes typed while logging a call show up here too.'
+              : 'Choose All to see every note and call.'}
+          </p>
+        </div>
       ) : (
-        <ul className="space-y-2.5">
-          {shown.map((e) => {
-            const canDelete = e.kind === 'note' && (isAdmin || e.userId === user?.id);
-            const long = e.body.length > 240 || e.body.split('\n').length > 4;
-            const expanded = e.kind === 'record' ? openRecord : true;
-            return (
-              <li key={e.key} className={`rounded-xl px-3 py-2.5 ${e.kind === 'record' ? 'border border-dashed border-border bg-card' : 'bg-muted/40'}`}>
-                <div className="flex items-start gap-2.5">
-                  <div
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                      e.kind === 'call' ? 'bg-sky-500/15 text-sky-600' : e.kind === 'record' ? 'bg-amber-500/15 text-amber-600' : 'bg-primary/10 text-primary'
-                    }`}
-                  >
-                    {e.kind === 'call' ? <PhoneCall size={12} /> : e.kind === 'record' ? <Pin size={12} /> : initials(e.author)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span className="text-xs font-semibold text-foreground">{e.author}</span>
-                      {e.kind === 'call' && (
-                        <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
-                          {e.meta?.direction === 'incoming' ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
-                          Call{e.meta?.outcome ? ` · ${e.meta.outcome}` : ''}
-                          {e.meta?.seconds ? ` · ${e.meta.seconds}s` : ''}
-                        </span>
-                      )}
-                      {e.kind === 'record' && <span className="text-[10px] text-muted-foreground">pinned · from the lead record</span>}
-                      {e.at && <span className="text-[10px] text-muted-foreground">{fmt(e.at)}</span>}
-                    </div>
-                    <p
-                      className={`mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground ${e.kind === 'record' && !expanded ? 'line-clamp-3' : ''}`}
-                      dir="auto"
+        <div className="space-y-4">
+          {groups.map((g) => (
+            <div key={g.key}>
+              <p className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                {g.label}
+                <span className="h-px flex-1 bg-border" aria-hidden />
+              </p>
+              <ol className="space-y-2">
+                {g.items.map((e) => {
+                  const canDelete = e.kind === 'note' && (isAdmin || e.userId === user?.id);
+                  const long = e.body.length > 220 || e.body.split('\n').length > 3;
+                  const open = openKeys.has(e.key);
+                  return (
+                    <li
+                      key={e.key}
+                      className={`rounded-xl px-3 py-2.5 ${e.kind === 'record' ? 'border border-dashed border-amber-500/40 bg-amber-500/5' : 'bg-muted/40'}`}
                     >
-                      {e.body}
-                    </p>
-                    {e.kind === 'record' && long && (
-                      <button type="button" onClick={() => setOpenRecord((v) => !v)} className="mt-0.5 text-xs font-semibold text-primary hover:underline">
-                        {openRecord ? 'Show less' : 'Show all'}
-                      </button>
-                    )}
-                  </div>
-                  {canDelete && (
-                    <button
-                      type="button"
-                      onClick={() => remove(e.commentId!)}
-                      className="btn-ghost shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
-                      title="Delete note"
-                      aria-label="Delete note"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                      <div className="flex items-start gap-2.5">
+                        <div
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                            e.kind === 'call' ? 'bg-sky-500/15 text-sky-600' : e.kind === 'record' ? 'bg-amber-500/15 text-amber-600' : 'bg-primary/10 text-primary'
+                          }`}
+                          aria-hidden
+                        >
+                          {e.kind === 'call' ? <PhoneCall size={12} /> : e.kind === 'record' ? <Pin size={12} /> : initials(e.author)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="text-xs font-semibold text-foreground">{e.author}</span>
+                            {e.kind === 'call' && (
+                              <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                                {e.meta?.direction === 'incoming' ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
+                                Call{e.meta?.outcome ? ` · ${e.meta.outcome}` : ''}
+                                {e.meta?.seconds ? ` · ${e.meta.seconds}s` : ''}
+                              </span>
+                            )}
+                            {e.kind === 'record' && <span className="text-[10px] text-muted-foreground">from the lead record</span>}
+                            {e.at && (
+                              <time dateTime={e.at} className="ms-auto text-[10px] text-muted-foreground tabular-nums">
+                                {fmt(e.at)}
+                              </time>
+                            )}
+                          </div>
+                          <p className={`mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground ${long && !open ? 'line-clamp-3' : ''}`} dir="auto">
+                            {e.body}
+                          </p>
+                          {long && (
+                            <button
+                              type="button"
+                              onClick={() => toggle(e.key)}
+                              aria-expanded={open}
+                              className="mt-0.5 text-xs font-semibold text-primary hover:underline"
+                            >
+                              {open ? 'Show less' : 'Show more'}
+                            </button>
+                          )}
+                        </div>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => remove(e.commentId!)}
+                            className="btn-ghost shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+                            title="Delete note"
+                            aria-label="Delete note"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ))}
+        </div>
       )}
     </section>
   );
