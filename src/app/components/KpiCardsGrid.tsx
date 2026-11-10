@@ -36,11 +36,16 @@ export function fetchKpiCardsCached(teamId?: string, agentId?: string, force = f
 
 /** Deep-link for a status card — All Leads opens unfiltered, every other
  * stage opens Leads Management with that exact status pre-applied. */
-function hrefForStage(stage: string): string {
-  if (!stage || stage === 'All Leads') return '/leads-management';
-  const known = (ALL_STATUSES as string[]).includes(stage);
-  const value = known ? stage.trim().toLowerCase().replace(/[\s_]+/g, '-') : stage;
-  return `/leads-management?stage=${encodeURIComponent(value)}`;
+function hrefForStage(stage: string, agentName?: string): string {
+  const q = new URLSearchParams();
+  // The dashboard's agent filter travels with the card (same ?agent=<name> the Leads page already reads).
+  if (agentName) q.set('agent', agentName);
+  if (stage && stage !== 'All Leads') {
+    const known = (ALL_STATUSES as string[]).includes(stage);
+    q.set('stage', known ? stage.trim().toLowerCase().replace(/[\s_]+/g, '-') : stage);
+  }
+  const s = q.toString();
+  return s ? `/leads-management?${s}` : '/leads-management';
 }
 
 /** Accent per pipeline stage (visual only). Full class names so Tailwind keeps them. */
@@ -69,13 +74,18 @@ export function accentFor(stage: string) {
 export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; agentId?: string }) {
   const { user, loading: authLoading } = useAuth();
   const [cards, setCards] = useState<Card[]>([]);
+  const [agents, setAgents] = useState<{ id: string; full_name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const agentName = agentId ? agents.find((a) => a.id === agentId)?.full_name || '' : '';
 
   useEffect(() => {
     if (authLoading || !user) return;
     if (cards.length === 0) setLoading(true);
     fetchKpiCardsCached(teamId, agentId)
-      .then((j) => setCards(j?.cards || []))
+      .then((j) => {
+        setCards(j?.cards || []);
+        if (Array.isArray(j?.agents)) setAgents(j.agents);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [teamId, agentId, user?.id, authLoading]);
@@ -119,8 +129,8 @@ export default function KpiCardsGrid({ teamId, agentId }: { teamId?: string; age
         return (
           <Link
             key={c.stage}
-            href={hrefForStage(c.stage)}
-            title={`Open ${c.stage} in Leads Management`}
+            href={hrefForStage(c.stage, agentName)}
+            title={agentName ? `Open ${agentName}'s ${c.stage} in Leads Management` : `Open ${c.stage} in Leads Management`}
             className={`group dash-card dash-card-hover overflow-hidden p-4 ps-5 cursor-pointer active:scale-[0.98] ${
               featured ? 'bg-gradient-to-br from-lime-500/15 via-card to-card border-lime-500/40' : ''
             }`}

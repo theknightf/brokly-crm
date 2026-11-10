@@ -73,10 +73,27 @@ export async function GET(request: Request) {
 
   const db: any = supabase;
 
+  // A chosen agent (owner/admin filter) is counted the way the Leads list filters by agent, so the card number
+  // matches the rows it opens: the owner, co-assignees, and unowned leads whose agent text names them.
+  let agentOr: string | null = null;
+  if (agentId && assignedFilter === agentId) {
+    const [{ data: prof }, { data: la }] = await Promise.all([
+      db.from('user_profiles').select('full_name').eq('id', agentId).maybeSingle(),
+      db.from('lead_assignees').select('lead_id').eq('user_id', agentId),
+    ]);
+    const parts = [`assigned_to.eq.${agentId}`];
+    const name = String(prof?.full_name || '').replace(/[,()"'\\%_]/g, '').trim();
+    if (name) parts.push(`and(assigned_to.is.null,agent.ilike.%${name}%)`);
+    const extra = (la || []).map((r: any) => r.lead_id).slice(0, 150);
+    if (extra.length) parts.push(`id.in.(${extra.join(',')})`);
+    agentOr = parts.join(',');
+  }
+
   // Build single leads query + admin settings + team/agent metadata in parallel!
   const buildLeadsQuery = (withTeamCol: boolean) => {
     let q: any = db.from('leads').select('crm_status, lead_status, created_at');
-    if (assignedFilter) q = q.eq('assigned_to', assignedFilter);
+    if (agentOr) q = q.or(agentOr);
+    else if (assignedFilter) q = q.eq('assigned_to', assignedFilter);
     else if (teamMemberIds) {
       if (teamMemberIds.length === 0) return null;
       q = q.in('assigned_to', teamMemberIds);
