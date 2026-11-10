@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { notifyDuplicateOwnersServer } from '@/lib/duplicateNotify';
-import { checkAndRecordDuplicates } from '@/lib/duplicateCheck';
 import { normalizePhone as normalizePhoneKey } from '@/lib/phone';
 import * as XLSX from 'xlsx';
 
@@ -398,54 +396,27 @@ export async function POST(request: Request) {
   }
 
   /**
-   * Duplicate gate: rows whose normalized phone / e-mail already exist are NOT
-   * inserted. Each one is recorded in duplicate_leads for the original owner
-   * (server-side RPC, so it also works when this user cannot see that lead).
+   * Duplicates (same normalized phone) are imported like any row: the database moves them to the
+   * 'Duplicate Leads' stage and hides them from sales. Inserts use no RETURNING, so a duplicate the
+   * importer cannot read back never turns into an error.
    */
   const dupRows: { rowNumber: number; name: string; phone: string }[] = [];
   const insertNewRows = async (list: any[]) => {
     if (!list.length) return;
-    const fresh: any[] = [];
-    const RPC_CHUNK = 1000;
-    for (let i = 0; i < list.length; i += RPC_CHUNK) {
-      const part = list.slice(i, i + RPC_CHUNK);
-      const { duplicates } = await checkAndRecordDuplicates(supabase as any, part);
-      part.forEach((r, k) => {
-        if (duplicates[k]) {
-          dupRows.push({ rowNumber: r._rowNum || 0, name: r.name, phone: r.phone });
-          structuredErrorDetails.push({
-            rowNumber: r._rowNum || 0,
-            name: r.name,
-            phone: r.phone,
-            type: 'duplicate_routed',
-            reason: 'Lead already exists — sent to its owner for review',
-          });
-        } else {
-          fresh.push(r);
-        }
-      });
-    }
-    await insertChunks(fresh);
+    await insertChunks(list);
   };
 
   const insertChunks = async (toInsert: any[]) => {
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const rawChunk = toInsert.slice(i, i + chunkSize);
-      const chunk = rawChunk.map(({ _rowNum, ...dbRow }) => dbRow);
-      const { error, data } = await supabase
-        .from('leads')
-        .insert(chunk)
-        .select('id, is_duplicate, crm_status');
+      const chunk = rawChunk.map(({ _rowNum, ...dbRow }) => ({ ...dbRow, id: dbRow.id || crypto.randomUUID() }));
+      const { error } = await supabase.from('leads').insert(chunk);
       if (error) {
         for (let k = 0; k < chunk.length; k++) {
           const single = chunk[k];
           const rowNum = rawChunk[k]._rowNum || 0;
-          const { error: singleErr, data: singleData } = await supabase
-            .from('leads')
-            .insert(single)
-            .select('id, is_duplicate, crm_status')
-            .single();
+          const { error: singleErr } = await supabase.from('leads').insert(single);
           if (singleErr) {
             skipped += 1;
             errors.push(`Insert failed for ${single.phone}: ${singleErr.message}`);
@@ -458,12 +429,10 @@ export async function POST(request: Request) {
             });
           } else {
             imported += 1;
-            if (singleData?.is_duplicate) duplicateIds.push(singleData.id);
           }
         }
       } else {
         imported += chunk.length;
-        for (const r of (data || []) as any[]) if (r?.is_duplicate) duplicateIds.push(r.id);
       }
     }
   };
@@ -501,9 +470,6 @@ export async function POST(request: Request) {
   }
 
   const routedDuplicates = dupRows.length;
-
-  // Safety net for rows that slipped past the check (legacy DB trigger marked them).
-  if (duplicateIds.length) await notifyDuplicateOwnersServer(supabase as any, duplicateIds);
 
   const totalProcessed = rows.length;
   const totalFailedOrInvalid = invalid + errors.length;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,11 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // Sales users are never told a number already exists: a duplicate they add is saved and quietly
+  // moved to 'Duplicate Leads'. Only owners/admins get the hint.
+  const { data: me } = await (supabase as any).from('user_profiles').select('role').eq('id', user.id).maybeSingle();
+  if (!isAdminRole(me?.role)) return NextResponse.json({ exists: false });
 
   const body = await request.json().catch(() => null);
   const phone = String(body?.phone || '').slice(0, 50);

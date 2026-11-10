@@ -290,27 +290,30 @@ async function runAction(supabase: any, actor: Actor, a: AssistantAction): Promi
       const digits = normalizePhone(a.phone);
       if (!name) throw new Error('Name is required.');
       if (digits.length < 7) throw new Error('A valid phone number is required.');
-      const { data: dup } = await supabase.from('leads').select('id, name').eq('phone_normalized', digits).limit(1);
-      if (dup?.length) throw new Error(`A customer with this phone already exists: "${dup[0].name}" (${dup[0].id}).`);
+      // Owners/admins are told about an existing number. For sales a duplicate is saved like any lead:
+      // the database moves it to 'Duplicate Leads' and hides it from them (no message about it).
+      if (isAdminRole(actor.role)) {
+        const { data: dup } = await supabase.from('leads').select('id, name').eq('phone_normalized', digits).limit(1);
+        if (dup?.length) throw new Error(`A customer with this phone already exists: "${dup[0].name}" (${dup[0].id}).`);
+      }
       const assignee = a.assignToUserId || (isAdminRole(actor.role) ? null : actor.id);
-      const { data, error } = await supabase
-        .from('leads')
-        .insert({
-          name,
-          phone: a.phone.trim(),
-          crm_status: 'Fresh Leads',
-          source: a.source || '',
-          project: a.project || null,
-          notes: a.notes || null,
-          created_by: actor.id,
-          assigned_to: assignee,
-        })
-        .select('id, name');
+      const newId = crypto.randomUUID();
+      // No RETURNING: a sales user cannot read back a lead the database flagged as a duplicate.
+      const { error } = await supabase.from('leads').insert({
+        id: newId,
+        name,
+        phone: a.phone.trim(),
+        crm_status: 'Fresh Leads',
+        source: a.source || '',
+        project: a.project || null,
+        notes: a.notes || null,
+        created_by: actor.id,
+        assigned_to: assignee,
+      });
       if (error) throw new Error(error.message);
-      if (!data?.length) throw new Error('The customer was not created (permission denied).');
       return {
         message: `Customer "${name}" created (Fresh Leads).`,
-        entityId: data[0].id,
+        entityId: newId,
         label: name,
         after: { name, phone: a.phone.trim(), assigned_to: assignee },
       };

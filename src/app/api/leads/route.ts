@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
-import { notifyDuplicateOwnersServer } from '@/lib/duplicateNotify';
-import { checkAndRecordDuplicates } from '@/lib/duplicateCheck';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,18 +24,8 @@ export async function POST(request: Request) {
   if (!phone && !email) return NextResponse.json({ error: 'phone or email required' }, { status: 400 });
 
   const db: any = supabase as any;
-
-  try {
-    const { duplicates } = await checkAndRecordDuplicates(supabase as any, [body]);
-    if (duplicates[0]) {
-      return NextResponse.json(
-        { error: 'This lead already exists', code: 'DUPLICATE_LEAD' },
-        { status: 409 }
-      );
-    }
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Duplicate check failed' }, { status: 500 });
-  }
+  // Duplicates (same normalized phone) are saved like any lead; the database moves them to the
+  // 'Duplicate Leads' stage and hides them from sales. The caller gets the normal 201.
 
   const requestedStatus = body.stage || body.status || body.crm_status || 'Fresh Leads';
   const rawNotes = String(body.notes || '').trim();
@@ -62,12 +50,14 @@ export async function POST(request: Request) {
     created_by: user.id,
   };
 
-  const { data, error } = await db.from('leads').insert(row).select().single();
+  row.id = crypto.randomUUID();
+  // No RETURNING: a sales user cannot read back a lead the database flagged as a duplicate.
+  const { error } = await db.from('leads').insert(row);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
-
-  if (data?.is_duplicate) await notifyDuplicateOwnersServer(supabase as any, [data.id]);
+  const { data: visible } = await db.from('leads').select().eq('id', row.id).maybeSingle();
+  const data = visible || { ...row, created_at: new Date().toISOString() };
 
   return NextResponse.json({ lead: data, message: 'Lead created' }, { status: 201 });
 }
@@ -167,6 +157,26 @@ export async function PATCH(request: Request) {
     payload.crm_status = newStatus;
     payload.last_action_at = new Date().toISOString();
     payload.last_action_by = user.id;
+  }
+
+  // Assigning a duplicate (out of the 'Duplicate Leads' stage) by the owner/admin hands it to that user,
+  // even when it is assigned to the same person it already had (the DB trigger only sees a changed owner).
+  const { data: dupInfo } = await (supabase as any)
+    .from('leads').select('is_duplicate, crm_status').eq('id', leadId).maybeSingle();
+  if (assignedTo && dupInfo?.is_duplicate && (payload.crm_status || dupInfo.crm_status) !== 'Duplicate Leads') {
+    const { data: actorRole } = await (supabase as any).from('user_profiles').select('role').eq('id', user.id).maybeSingle();
+    if (isAdminRole(actorRole?.role)) payload.duplicate_released_to = assignedTo;
+  }
+
+  // Replace the assignee list first. Writing assigned_to alone adds the new person as a second assignee,
+  // and the lead_assignees sync then puts the OLDEST assignee back as the owner (the reassign is undone).
+  if (assignedTo) {
+    try {
+      await (supabase as any).from('lead_assignees').delete().eq('lead_id', leadId);
+      await (supabase as any).from('lead_assignees').insert({ lead_id: leadId, user_id: assignedTo, assigned_by: user.id });
+    } catch {
+      // the update below still sets the owner
+    }
   }
 
   const { data, error } = await (supabase as any).from('leads').update(payload).eq('id', leadId).select().single();

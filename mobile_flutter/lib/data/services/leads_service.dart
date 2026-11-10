@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/lead_model.dart';
 import 'supabase_service.dart';
@@ -96,70 +97,24 @@ class LeadsService {
     }
   }
 
-  /// Create lead and automatically route duplicates to Duplicate Center without blocking
+  /// Create a lead.
+  ///
+  /// Duplicates (same normalized phone) are saved like any lead: the database moves them to the
+  /// 'Duplicate Leads' stage and hides them from sales. So the insert has no RETURNING (a sales user
+  /// cannot read the row back, and RETURNING would turn that into an error), and the agent just sees
+  /// the normal "added" result.
   Future<LeadModel> create(LeadModel lead) async {
     final currentUserId = _client.auth.currentUser?.id;
-
-    String? matchedDupId;
-    String? matchedDupName;
-    try {
-      final normalizedPhone = lead.phone.replaceAll(RegExp(r'\D'), '');
-      if (normalizedPhone.length >= 8) {
-        final suffix = normalizedPhone.length >= 10
-            ? normalizedPhone.substring(normalizedPhone.length - 10)
-            : normalizedPhone;
-        final dup = await _client
-            .from('leads')
-            .select('id, name, phone')
-            .ilike('phone', '%$suffix%')
-            .order('created_at', ascending: true)
-            .limit(1)
-            .maybeSingle();
-        if (dup != null) {
-          final dupDigits = (dup['phone']?.toString() ?? '').replaceAll(RegExp(r'\D'), '');
-          final dupTail = dupDigits.length >= 10 ? dupDigits.substring(dupDigits.length - 10) : dupDigits;
-          if (dupTail == suffix) {
-            matchedDupId = dup['id']?.toString();
-            matchedDupName = dup['name']?.toString();
-          }
-        }
-      }
-      final emailNorm = (lead.email ?? '').trim().toLowerCase();
-      if (matchedDupId == null && emailNorm.isNotEmpty && emailNorm.contains('@')) {
-        final dup = await _client
-            .from('leads')
-            .select('id, name, email')
-            .ilike('email', emailNorm)
-            .order('created_at', ascending: true)
-            .limit(1)
-            .maybeSingle();
-        if (dup != null) {
-          matchedDupId = dup['id']?.toString();
-          matchedDupName = dup['name']?.toString();
-        }
-      }
-    } catch (_) {}
-
     final row = lead.toJson(currentUserId: currentUserId);
-    if (matchedDupId != null) {
-      row['crm_status'] = 'Duplicate Leads';
-      row['lead_status'] = 'Lost';
-      row['is_duplicate'] = true;
-      row['duplicate_of_lead_id'] = matchedDupId;
-      row['routed_to_duplicate_center_at'] = DateTime.now().toUtc().toIso8601String();
-      final existingNotes = (row['notes']?.toString() ?? '').trim();
-      final shortId = matchedDupId.length >= 8 ? matchedDupId.substring(0, 8) : matchedDupId;
-      final tag = '[Pending Review / Duplicate of #$shortId (${matchedDupName ?? 'Existing Lead'})]';
-      if (!existingNotes.contains('[Pending Review / Duplicate')) {
-        row['notes'] = existingNotes.isEmpty ? tag : '$existingNotes\n$tag';
-      }
-    }
+    row['id'] = _newUuid();
 
-    final res = await _client.from('leads').insert(row).select().single();
-    return LeadModel.fromJson(res);
+    await _client.from('leads').insert(row);
+    final visible = await _client.from('leads').select().eq('id', row['id']).maybeSingle();
+    return LeadModel.fromJson(visible ??
+        {...row, 'created_at': DateTime.now().toUtc().toIso8601String()});
   }
 
-  /// Update lead
+  /// Update lead (no RETURNING: changing the phone to an existing number hides the lead from sales).
   Future<LeadModel> update(String id, Map<String, dynamic> updates) async {
     final currentUserId = _client.auth.currentUser?.id;
     final row = Map<String, dynamic>.from(updates);
@@ -168,8 +123,19 @@ class LeadsService {
       row['last_action_by'] = currentUserId;
     }
 
-    final res = await _client.from('leads').update(row).eq('id', id).select().single();
-    return LeadModel.fromJson(res);
+    await _client.from('leads').update(row).eq('id', id);
+    final visible = await _client.from('leads').select().eq('id', id).maybeSingle();
+    return LeadModel.fromJson(visible ?? {...row, 'id': id});
+  }
+
+  /// Random UUID v4 for a new lead id (so the row can be written without RETURNING).
+  static String _newUuid() {
+    final r = Random.secure();
+    final b = List<int>.generate(16, (_) => r.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
   }
 
   /// Update lead pipeline status

@@ -768,9 +768,8 @@ export const leadsService = {
 
   async create(lead: any, userId: string) {
     const supabase = createClient();
-    // A duplicate is not created: it is recorded for the original owner to review.
-    const [isDuplicate] = await checkDuplicatesServer([lead]);
-    if (isDuplicate) throw new DuplicateLeadError();
+    // Duplicates (same normalized phone) are saved like any lead; the database moves them to the
+    // 'Duplicate Leads' stage and hides them from sales (RLS). The adder sees a normal success.
     // Auto-assignment when the admin rotation toggle is on.
     const rotation = await computeRotationAssignments([lead]);
     const rot = rotation.get(0);
@@ -782,17 +781,25 @@ export const leadsService = {
     }
 
     const rowPayload: any = leadToRow(lead, userId);
+    rowPayload.id = rowPayload.id || crypto.randomUUID();
 
-    const { data, error } = await supabase
-      .from('leads')
-      .insert(rowPayload)
-      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
-      .single();
+    // No RETURNING: a sales user cannot read back a lead the database flagged as a duplicate,
+    // and RETURNING would turn that into an error. Write first, then read it back if visible.
+    const { error } = await supabase.from('leads').insert(rowPayload);
     if (error) {
       throw error;
     }
     invalidateCache();
-    if (data?.is_duplicate) void notifyDuplicateOwners([data.id]);
+    const { data: visible } = await supabase
+      .from('leads')
+      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
+      .eq('id', rowPayload.id)
+      .maybeSingle();
+    if (!visible) {
+      // Hidden duplicate: show the normal "added" result and skip side effects (assignees, follow-ups).
+      return rowToLead({ ...rowPayload, created_at: new Date().toISOString() });
+    }
+    const data: any = visible;
     // Run side-effects in the background so UI responds immediately.
     const assigneeIds = Array.isArray(lead.assignedToIds) && lead.assignedToIds.length > 0
       ? lead.assignedToIds
@@ -849,10 +856,7 @@ export const leadsService = {
   async bulkInsert(rows: any[], userId: string) {
     if (!rows.length) return [];
     const supabase = createClient();
-    // Duplicates are not inserted: they are recorded for the original owner to review.
-    const dupFlags = await checkDuplicatesServer(rows);
-    rows = rows.filter((_, i) => !dupFlags[i]);
-    if (!rows.length) return [];
+    // Duplicates are saved too; the database moves them to 'Duplicate Leads' and hides them from sales.
     // Auto-assignment for unassigned imported rows when rotation is on.
     const rotation = await computeRotationAssignments(rows);
     const finalRows = rows.map((r, i) => {
@@ -866,18 +870,31 @@ export const leadsService = {
         agentInitials: agentInitials(rot.name),
       };
     });
-    const { data, error } = await supabase
-      .from('leads')
-      .insert(finalRows.map((r) => leadToRow(r, userId)))
-      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name), lead_assignees(id, user_id, assigned_at, user_profiles:user_profiles!lead_assignees_user_id_fkey(id, full_name))');
+    const payload = finalRows.map((r) => {
+      const row: any = leadToRow(r, userId);
+      row.id = row.id || crypto.randomUUID();
+      return row;
+    });
+    // No RETURNING (see create()): hidden duplicates must not turn the import into an error.
+    const { error } = await supabase.from('leads').insert(payload);
     if (error) {
       throw error;
     }
     invalidateCache();
-    {
-      const dupIds = (data || []).filter((l: any) => l.is_duplicate).map((l: any) => l.id);
-      if (dupIds.length) void notifyDuplicateOwners(dupIds);
+    const visibleById = new Map<string, any>();
+    for (let i = 0; i < payload.length; i += 100) {
+      const ids = payload.slice(i, i + 100).map((r: any) => r.id);
+      const { data: part } = await supabase
+        .from('leads')
+        .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name), lead_assignees(id, user_id, assigned_at, user_profiles:user_profiles!lead_assignees_user_id_fkey(id, full_name))')
+        .in('id', ids);
+      (part || []).forEach((r: any) => visibleById.set(r.id, r));
     }
+    // Side effects only for leads this user can see; hidden duplicates still count as imported.
+    const data = Array.from(visibleById.values());
+    const hidden = payload
+      .filter((r: any) => !visibleById.has(r.id))
+      .map((r: any) => ({ ...r, created_at: new Date().toISOString() }));
     // Notify assignees & sync follow-ups in the background so import finishes immediately.
     void (async () => {
       try {
@@ -894,7 +911,7 @@ export const leadsService = {
         emitFollowUpsChanged();
       } catch {}
     })();
-    return (data || []).map(rowToLead);
+    return [...data, ...hidden].map(rowToLead);
   },
 
   async update(id: string, lead: any) {
@@ -906,14 +923,17 @@ export const leadsService = {
     const actorId = scope.userId;
     const payload: any = { ...leadToRow(lead), last_action_at: new Date().toISOString() };
     if (actorId) payload.last_action_by = actorId;
-    const { data, error } = await supabase
-      .from('leads')
-      .update(payload)
-      .eq('id', id)
-      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
-      .single();
+    // No RETURNING: changing the phone to an existing number makes the lead a hidden duplicate for sales.
+    const { error } = await supabase.from('leads').update(payload).eq('id', id);
     if (error) throw error;
     invalidateCache();
+    const { data: visible } = await supabase
+      .from('leads')
+      .select('*, assigned_to_profile:user_profiles!leads_assigned_to_fkey(id, full_name)')
+      .eq('id', id)
+      .maybeSingle();
+    if (!visible) return rowToLead({ ...payload, id });
+    const data: any = visible;
     // Notify the new assignee when a lead is (re)assigned through the edit modal (non-blocking).
     if (Array.isArray(lead.assignedToIds)) {
       await leadsService.setAssignees(id, lead.assignedToIds, lead.assignedToNames || (lead.agent ? [lead.agent] : undefined));
@@ -942,13 +962,17 @@ export const leadsService = {
       last_action_at: new Date().toISOString(),
     };
     if (actorId) patch.last_action_by = actorId;
-    const { data, error } = await supabase.from('leads').update(patch).eq('id', id).select('*').single();
+    // No RETURNING: a lead moved to 'Duplicate Leads' is no longer readable by sales.
+    const { error } = await supabase.from('leads').update(patch).eq('id', id);
     if (error) {
       throw new Error(
         describeLeadWriteError(error, 'status update')
       );
     }
     invalidateCache();
+    const { data: visible } = await supabase.from('leads').select('*').eq('id', id).maybeSingle();
+    if (!visible) return rowToLead({ ...patch, id });
+    const data: any = visible;
     void Promise.allSettled([
       syncLeadFollowUpRow(id),
       followUpsService.syncFromLead(data),
