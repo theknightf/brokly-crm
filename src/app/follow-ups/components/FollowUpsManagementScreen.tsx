@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+
 import Modal from '@/components/ui/Modal';
 import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +28,7 @@ import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 import { followUpsService } from '@/lib/services/crmService';
 import FollowUpForm from './FollowUpForm';
 import FollowUpCockpit from './FollowUpCockpit';
+import FollowUpLeadDrawer from './FollowUpLeadDrawer';
 import { ALL_FOLLOW_UP_TYPES, type FollowUp, type FollowUpPriority, type FollowUpType } from './mockFollowUps';
 import {
   addDays,
@@ -109,7 +110,6 @@ function readUrl(): { tab: Tab; view: View; filters: Filters; openNew: boolean }
 
 export default function FollowUpsManagementScreen() {
   const { user, profile } = useAuth();
-  const router = useRouter();
   const isAdmin = isAdminRole((profile as any)?.role);
 
   const initial = useRef(readUrl());
@@ -229,7 +229,10 @@ export default function FollowUpsManagementScreen() {
   const stageOptions = useMemo(() => Array.from(new Set(items.map((f) => f.leadStatus).filter(Boolean) as string[])).sort(), [items]);
   const activeFilters = [filters.agent, filters.stage, filters.priority, filters.type, filters.from, filters.to].filter(Boolean).length;
 
-  const openLead = (leadId: string) => router.push(`/leads-management?lead=${leadId}`);
+  // The lead opens in a side drawer on this page; the list keeps its scroll position and filters.
+  const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null);
+  const openLead = (leadId: string) => setDrawerLeadId(leadId);
+  const closeDrawer = useCallback(() => setDrawerLeadId(null), []);
 
   /* ── actions ─────────────────────────────────────────────────────────── */
   const act = async (label: string, list: FollowUp[], op: (fu: FollowUp) => Promise<void>) => {
@@ -678,6 +681,8 @@ export default function FollowUpsManagementScreen() {
           </div>
         </div>
       </Modal>
+
+      {drawerLeadId && <FollowUpLeadDrawer leadId={drawerLeadId} onClose={closeDrawer} onChanged={load} />}
     </div>
   );
 }
