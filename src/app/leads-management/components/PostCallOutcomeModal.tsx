@@ -405,7 +405,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
               )}
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">Date</span>
+                  <span className="text-[11px] font-semibold text-muted-foreground">Next action date</span>
                   <input
                     type="date"
                     value={followUpDate}

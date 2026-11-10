@@ -481,7 +481,7 @@ export default function LeadProfileDrawer({
 
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Follow-up Due', value: viewLead.followUpDue || '—' },
+                  { label: 'Next action date', value: viewLead.followUpDue || '—' },
                   { label: 'Priority', value: viewLead.priority || '—' },
                   { label: 'Rating', value: viewLead.leadRating || '—' },
                   { label: 'Team', value: viewLead.team || '—' },
@@ -507,7 +507,7 @@ export default function LeadProfileDrawer({
               {/* Schedule follow-up — synced to dashboard + follow-up partition */}
               <div className="bg-zinc-500/10 border border-border rounded-xl px-4 py-3 space-y-2">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <CalendarClock size={12} /> Schedule follow-up
+                  <CalendarClock size={12} /> Next action date
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -515,14 +515,14 @@ export default function LeadProfileDrawer({
                     className="input-base h-9 text-sm"
                     value={scheduleDate}
                     onChange={(e) => setScheduleDate(e.target.value)}
-                    aria-label="Follow-up date"
+                    aria-label="Next action date"
                   />
                   <input
                     type="time"
                     className="input-base h-9 text-sm"
                     value={scheduleTime}
                     onChange={(e) => setScheduleTime(e.target.value)}
-                    aria-label="Follow-up time"
+                    aria-label="Next action time"
                   />
                 </div>
                 <textarea
@@ -539,7 +539,7 @@ export default function LeadProfileDrawer({
                   className="w-full h-9 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   {scheduleSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  {scheduleSaving ? 'Scheduling…' : 'Schedule follow-up'}
+                  {scheduleSaving ? 'Saving…' : 'Save next action date'}
                 </button>
                 {viewLead.followUpDue && (
                   <p className="text-[11px] text-muted-foreground">Current: {viewLead.followUpDue} · queue auto-syncs to dashboard</p>

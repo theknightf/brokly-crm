@@ -799,7 +799,7 @@ export default function LeadsManagementScreen({
     const dueTime = scheduleTime.trim() || '09:00';
     const notes = scheduleNotes.trim();
     if (!dueDate) {
-      toast.error('Pick a follow-up date');
+      toast.error('Pick a next action date');
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
@@ -1403,7 +1403,7 @@ export default function LeadsManagementScreen({
       'Total Price',
       'Down Payment',
       'Commission',
-      'Follow-up Due',
+      'Next action date',
       'Created At',
     ];
     try {

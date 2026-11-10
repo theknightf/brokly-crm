@@ -521,7 +521,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               </select>
             </div>
             <div>
-              <label className="label-base">Follow-up due</label>
+              <label className="label-base">Next action date</label>
               <input type="date" className="input-base" {...register('followUpDue')} />
             </div>
             <div className="sm:col-span-2">

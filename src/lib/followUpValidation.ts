@@ -37,12 +37,12 @@ export function validateFollowUpInput(input: FollowUpInput): FollowUpErrors {
   if (!contactName) errors.contactName = 'Contact name is required';
 
   if (!DATE_RE.test(dueDate)) {
-    errors.dueDate = 'Valid due date (YYYY-MM-DD) is required';
+    errors.dueDate = 'Valid next action date (YYYY-MM-DD) is required';
   } else {
     const [y, m, d] = dueDate.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
     if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
-      errors.dueDate = 'Due date is not a real calendar date';
+      errors.dueDate = 'Next action date is not a real calendar date';
     }
   }
 
@@ -62,7 +62,7 @@ export function validateFollowUpInput(input: FollowUpInput): FollowUpErrors {
     const now = new Date();
     // Allow ~15 min of clock skew / slow typing.
     if (due.getTime() < now.getTime() - 15 * 60 * 1000) {
-      errors.dueDate = 'Due date/time is in the past — pick a future slot';
+      errors.dueDate = 'Next action date/time is in the past — pick a future slot';
     }
   }
 

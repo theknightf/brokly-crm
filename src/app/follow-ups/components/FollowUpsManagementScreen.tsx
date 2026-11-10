@@ -324,7 +324,7 @@ export default function FollowUpsManagementScreen() {
               type="button"
               onClick={handleRepair}
               disabled={repairing}
-              title="Rebuild missing reminders for leads that have a follow-up date"
+              title="Rebuild missing reminders for leads that have a next action date"
               className="btn-secondary flex items-center gap-1.5 text-sm disabled:opacity-50"
             >
               {repairing ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
@@ -466,8 +466,8 @@ export default function FollowUpsManagementScreen() {
             value={filters.from}
             max={filters.to || undefined}
             onChange={(e) => setFilters((p) => ({ ...p, from: e.target.value }))}
-            aria-label="Due from"
-            title="Due from"
+            aria-label="Next action date from"
+            title="Next action date from"
           />
           <input
             type="date"
@@ -475,8 +475,8 @@ export default function FollowUpsManagementScreen() {
             value={filters.to}
             min={filters.from || undefined}
             onChange={(e) => setFilters((p) => ({ ...p, to: e.target.value }))}
-            aria-label="Due to"
-            title="Due to"
+            aria-label="Next action date to"
+            title="Next action date to"
           />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -491,8 +491,8 @@ export default function FollowUpsManagementScreen() {
               onChange={(e) => setFilters((p) => ({ ...p, sort: e.target.value as Sort }))}
               aria-label="Sort"
             >
-              <option value="due-asc">Due soonest</option>
-              <option value="due-desc">Due latest</option>
+              <option value="due-asc">Next action: soonest</option>
+              <option value="due-desc">Next action: latest</option>
               <option value="priority">Priority</option>
             </select>
           )}
@@ -588,7 +588,7 @@ export default function FollowUpsManagementScreen() {
                 <span>Customer</span>
                 <span>Stage</span>
                 <span>Agent</span>
-                <span>Due</span>
+                <span>Next action date</span>
                 <span>Notes</span>
                 <span className="text-end">Actions</span>
               </div>
@@ -653,11 +653,11 @@ export default function FollowUpsManagementScreen() {
           <p className="text-sm text-foreground">
             {deleteTargets?.length === 1 ? (
               <>
-                Delete the follow-up for <b>{deleteTargets[0].contactName}</b>? The lead itself is kept; only its follow-up date is removed.
+                Delete the follow-up for <b>{deleteTargets[0].contactName}</b>? The lead itself is kept; only its next action date is removed.
               </>
             ) : (
               <>
-                Delete <b>{deleteTargets?.length}</b> follow-ups? The leads are kept; only their follow-up dates are removed.
+                Delete <b>{deleteTargets?.length}</b> follow-ups? The leads are kept; only their next action dates are removed.
               </>
             )}
           </p>

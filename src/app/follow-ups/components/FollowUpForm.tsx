@@ -166,8 +166,8 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
     const e: Record<string, string> = {};
     if (!form.title.trim()) e.title = 'Title is required';
     if (!form.contactName.trim()) e.contactName = 'Contact name is required';
-    if (!form.dueDate) e.dueDate = 'Due date is required';
-    if (!form.dueTime) e.dueTime = 'Due time is required';
+    if (!form.dueDate) e.dueDate = 'Next action date is required';
+    if (!form.dueTime) e.dueTime = 'Next action time is required';
     return e;
   };
 
@@ -389,7 +389,7 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
           </select>
         </Field>
 
-        <Field label="Due Date *" error={errors.dueDate}>
+        <Field label="Next action date *" error={errors.dueDate}>
           <input
             className="input-base"
             type="date"
@@ -398,7 +398,7 @@ export default function FollowUpForm({ initial, onSubmit, onCancel }: FollowUpFo
           />
         </Field>
 
-        <Field label="Due Time *" error={errors.dueTime}>
+        <Field label="Next action time *" error={errors.dueTime}>
           <input
             className="input-base"
             type="time"

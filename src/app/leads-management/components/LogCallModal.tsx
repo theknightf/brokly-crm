@@ -216,7 +216,7 @@ export default function LogCallModal({ lead, onClose, onDone, onCallLogged }: Lo
         <label className="flex flex-col gap-1">
           <span className="label-base">
             <CalendarClock size={12} className="inline mr-1 text-muted-foreground" />
-            Next follow-up (optional)
+            Next action date (optional)
           </span>
           <input
             type="date"

@@ -95,7 +95,7 @@ export default function OverdueFollowUps() {
                 <div className="flex items-center gap-3 mt-0.5">
                   <span className="flex items-center gap-1 text-xs text-red-500 font-medium">
                     <Clock size={10} />
-                    Due {item.dueDate}
+                    Next action {item.dueDate}
                   </span>
                   {item.agent && (
                     <span className="text-xs text-muted-foreground">{item.agent}</span>
