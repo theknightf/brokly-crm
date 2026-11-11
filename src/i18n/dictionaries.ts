@@ -189,6 +189,9 @@ export const dictionaries: Dict = {
   'followups.title': { en: 'Follow-ups', ar: 'المتابعات' },
   'leads.title': { en: 'Leads', ar: 'العملاء المحتملون' },
   'leads.export': { en: 'Export', ar: 'تصدير' },
+  'leads.exportEmptyHint': { en: 'No leads selected: exports an empty sheet with the column names', ar: 'مفيش عملاء متحددين: هيصدّر شيت فاضي بأسماء الأعمدة' },
+  'leads.exportEmpty': { en: 'Empty sheet exported (column names only)', ar: 'اتصدّر شيت فاضي (أسماء الأعمدة بس)' },
+  'leads.exportSelected': { en: 'Export {n} selected lead(s) to CSV', ar: 'صدّر {n} عميل متحدد لملف CSV' },
 
   // Add Lead drawer form
   'leadForm.phone': { en: 'Phone number', ar: 'رقم التليفون' },

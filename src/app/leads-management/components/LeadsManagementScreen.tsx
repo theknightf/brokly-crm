@@ -1385,10 +1385,13 @@ export default function LeadsManagementScreen({
     }
   };
 
+  // Export only the leads the user ticked. With nothing ticked the file has the column names only (a blank sheet).
   const handleExport = async () => {
+    const ids = Array.from(selectedIds);
     const headers = [
       'Name',
       'Phone',
+      'Phone 2',
       'Email',
       'Location',
       'Source',
@@ -1407,25 +1410,17 @@ export default function LeadsManagementScreen({
       'Created At',
     ];
     try {
-      const res = await leadsService.getPage({
-        page: 1,
-        pageSize: 100000,
-        search: filters.search,
-        status: filters.status || undefined,
-        source: filters.source || undefined,
-        agent: filters.agent || undefined,
-        action: filters.action || undefined,
-        contacted: filters.contacted || undefined,
-        actionTaken: filters.actionTaken || undefined,
-        actionFrom: filters.actionFrom || undefined,
-        actionTo: filters.actionTo || undefined,
-        called: filters.called || undefined,
-        calledFrom: filters.calledFrom || undefined,
-        calledTo: filters.calledTo || undefined,
-      });
-      const rows = (res.data || []).map((l: any) => [
+      // Selected leads already on screen; any selected on another page are fetched one by one.
+      const onScreen = new Map(leadsRef.current.map((l) => [l.id, l]));
+      const picked: Lead[] = [];
+      for (const id of ids) {
+        const l = onScreen.get(id) || ((await leadsService.getById(id).catch(() => null)) as Lead | null);
+        if (l) picked.push(l);
+      }
+      const rows = picked.map((l: any) => [
         l.name,
         l.phone,
+        l.phone2 || '',
         l.email,
         l.location,
         l.source,
@@ -1443,15 +1438,17 @@ export default function LeadsManagementScreen({
         l.followUpDue,
         l.createdAt,
       ]);
-      const csv = [headers, ...rows].map((r) => r.map((v: any) => `"${v}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
+      const cell = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const csv = [headers, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+      // BOM so Excel shows Arabic names correctly.
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `leads-export-${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`${rows.length} leads exported to CSV`);
+      toast.success(rows.length ? `${rows.length} leads exported to CSV` : t('leads.exportEmpty'));
     } catch (err: any) {
       toast.error(err?.message || 'Failed to export leads');
     }
@@ -1625,10 +1622,13 @@ export default function LeadsManagementScreen({
           <button
             onClick={handleExport}
             className="btn-secondary flex items-center gap-1.5 text-sm"
-            title="Export to CSV"
+            title={selectedIds.size === 0 ? t('leads.exportEmptyHint') : t('leads.exportSelected', { n: selectedIds.size })}
           >
             <Download size={15} />
-            <span className="hidden sm:inline">{t('leads.export')}</span>
+            <span className="hidden sm:inline">
+              {t('leads.export')}
+              {selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+            </span>
           </button>
           <button
             onClick={() => setImportModalOpen(true)}
