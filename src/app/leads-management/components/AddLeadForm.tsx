@@ -46,6 +46,7 @@ import {
   caretAfterDigits,
 } from './leadPhone';
 import { parsePastedLead } from './leadPaste';
+import { SelectChevron, FieldLabel, IconWrap } from './leadFormUi';
 
 interface AddLeadFormData {
   name: string;
@@ -136,77 +137,6 @@ function useKeyboardInset(): number {
   }, []);
 
   return inset;
-}
-
-/** Small chevron used on select elements, anchored to the inline-end edge. */
-function SelectChevron() {
-  return (
-    <ChevronDown
-      size={14}
-      className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-    />
-  );
-}
-
-/** Presentational: label row with an optional "required"/"optional" tag and trailing action. */
-function FieldLabel({
-  htmlFor,
-  children,
-  required,
-  requiredText,
-  optionalText,
-  action,
-}: {
-  htmlFor?: string;
-  children: React.ReactNode;
-  required?: boolean;
-  requiredText?: string;
-  optionalText?: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 mb-2 min-h-[24px]">
-      <label htmlFor={htmlFor} className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-        <span>{children}</span>
-        {required && <span className="text-red-500" aria-hidden="true">*</span>}
-        {requiredText && (
-          <span className="text-[11px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">
-            {requiredText}
-          </span>
-        )}
-        {optionalText && (
-          <span className="text-xs font-normal text-muted-foreground">{optionalText}</span>
-        )}
-      </label>
-      {action}
-    </div>
-  );
-}
-
-/** Presentational: positions a leading icon inside an input wrapper. */
-function IconWrap({
-  icon,
-  children,
-  physicalLeft,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  /** Use for dir="ltr" inputs (e.g. phone) so the icon stays on the input's own left edge. */
-  physicalLeft?: boolean;
-}) {
-  return (
-    <div className="relative">
-      {children}
-      <span
-        className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none ${
-          physicalLeft ? 'left-3.5' : 'start-3.5'
-        }`}
-        aria-hidden="true"
-      >
-        {icon}
-      </span>
-    </div>
-  );
 }
 
 export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLeadFormProps) {
@@ -1040,8 +970,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 </section>
               )}
 
-              {/* Stage & follow-up */}
-              <section className="rounded-2xl border border-border/70 bg-card p-4 space-y-4 shadow-sm">
+              {/* Stage & follow-up (side by side on larger screens) */}
+              <section className="rounded-2xl border border-border/70 bg-card p-4 grid grid-cols-1 gap-4 sm:grid-cols-2 shadow-sm">
                 <div>
                   <FieldLabel htmlFor="add-status">{t('leadForm.status')}</FieldLabel>
                   <div className="relative">
@@ -1076,9 +1006,9 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 </div>
               </section>
 
-              {/* Location, developer & project */}
-              <section className="rounded-2xl border border-border/70 bg-card p-4 space-y-4 shadow-sm">
-                <div>
+              {/* Location, developer & project (developer and project side by side on larger screens) */}
+              <section className="rounded-2xl border border-border/70 bg-card p-4 grid grid-cols-1 gap-4 sm:grid-cols-2 shadow-sm">
+                <div className="sm:col-span-2">
                   <FieldLabel htmlFor="add-location" optionalText={t('leadForm.optional')}>
                     {t('leadForm.location')}
                   </FieldLabel>
@@ -1219,30 +1149,33 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
         }}
       >
         <p className="hidden sm:block text-xs text-muted-foreground mb-2">{t('leadForm.shortcutHint')}</p>
-        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
+        {/* One row on phones: "save & add another" (compact) + "save" taking the rest. Cancel = the X in the header. */}
+        <div className="flex items-center gap-2 sm:justify-between">
           <button
             type="button"
             onClick={onCancel}
-            className="btn-ghost min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl sm:flex-shrink-0"
+            className="btn-ghost hidden sm:inline-flex min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl sm:flex-shrink-0"
           >
             {t('leadForm.cancel')}
           </button>
 
-          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="flex flex-1 items-center gap-2 sm:flex-none">
             <button
               type="submit"
               onClick={() => {
                 submitModeRef.current = 'another';
               }}
               disabled={isSubmitting}
-              className="btn-secondary min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl inline-flex items-center justify-center gap-1.5"
+              aria-label={t('leadForm.saveAnother')}
+              title={t('leadForm.saveAnother')}
+              className="btn-secondary min-h-[48px] sm:min-h-[44px] px-3.5 sm:px-4 py-2 text-sm font-medium rounded-xl inline-flex shrink-0 items-center justify-center gap-1.5"
             >
               {isSubmitting && submitModeRef.current === 'another' ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Plus size={15} />
+                <Plus size={16} />
               )}
-              <span className="truncate">{t('leadForm.saveAnother')}</span>
+              <span className="hidden sm:inline truncate">{t('leadForm.saveAnother')}</span>
             </button>
 
             <button
@@ -1251,7 +1184,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 submitModeRef.current = 'single';
               }}
               disabled={isSubmitting}
-              className="btn-press min-h-[48px] px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm sm:text-base shadow-md hover:brightness-105 active:scale-95 transition-all inline-flex items-center justify-center gap-2"
+              className="btn-press min-h-[48px] flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm sm:text-base shadow-md hover:brightness-105 active:scale-95 transition-all inline-flex items-center justify-center gap-2"
             >
               {isSubmitting && submitModeRef.current === 'single' ? (
                 <>

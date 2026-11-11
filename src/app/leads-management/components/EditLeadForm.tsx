@@ -1,7 +1,23 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useForm } from 'react-hook-form';
-import { Loader2, Building2, RefreshCw, ChevronDown, UserCheck, Check, X } from 'lucide-react';
+import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
+import {
+  Loader2,
+  Building2,
+  RefreshCw,
+  ChevronDown,
+  Check,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Flag,
+  CalendarDays,
+  Users,
+  StickyNote,
+} from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { FIELD, SELECT, SelectChevron, FieldLabel, IconWrap, FormSection, ChipGroup, SectionTabs } from './leadFormUi';
 import { parseLeadNotes, mergeLeadNotes } from '@/lib/leadNotes';
 import {
   Lead,
@@ -88,6 +104,7 @@ const parseBudgetRange = (value: string) => {
 
 export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormProps) {
   const { profile, user } = useAuth();
+  const { t } = useLanguage();
   const canEditSource =
     isAdminRole(profile?.role || user?.role) ||
     profile?.role === 'manager' ||
@@ -360,499 +377,433 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
     onSubmit(updated);
   };
 
-  const selectClass = 'input-base appearance-none pr-8';
   const nameField = register('name');
+  const priority = watch('priority');
+  const leadRating = watch('leadRating');
+
+  const tabs = [
+    { id: 'edit-sec-contact', label: t('leadEdit.tabContact') },
+    { id: 'edit-sec-stage', label: t('leadEdit.tabStage') },
+    { id: 'edit-sec-team', label: t('leadEdit.tabTeam') },
+    { id: 'edit-sec-deal', label: t('leadEdit.tabDeal') },
+    { id: 'edit-sec-notes', label: t('leadEdit.tabNotes') },
+  ];
 
   return (
-    <form
-      onSubmit={handleSubmit(onFormSubmit)}
-      noValidate
-      className="flex min-h-0 flex-col bg-[#0B0E14] text-zinc-200 [color-scheme:dark] [&_.label-base]:text-xs [&_.label-base]:font-medium [&_.label-base]:text-zinc-300 [&_.input-base]:min-h-[44px] [&_.input-base]:rounded-lg [&_.input-base]:border-zinc-800 [&_.input-base]:bg-zinc-900/80 [&_.input-base]:text-base [&_.input-base]:text-zinc-100 [&_.input-base]:transition-colors [&_.input-base]:placeholder:text-zinc-500 [&_.input-base:focus]:border-lime-400/80 [&_.input-base:focus]:ring-1 [&_.input-base:focus]:ring-lime-400 sm:[&_.input-base]:min-h-0 sm:[&_.input-base]:text-sm [&_details]:border-white/10 [&_details]:bg-zinc-900/60 [&_details]:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] [&_summary]:bg-white/[0.03] [&_summary]:text-zinc-100 [&_summary_.bg-primary]:bg-lime-400 [&_summary_.bg-primary]:text-zinc-950 [&_.text-foreground]:text-zinc-100 [&_.text-muted-foreground]:text-zinc-400 [&_.border-border]:border-white/10"
-    >
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/5 bg-zinc-900/60 px-4 py-3 backdrop-blur-md sm:px-6">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-lime-400/10 text-sm font-bold text-lime-400 ring-1 ring-lime-400/30" aria-hidden="true">
-          {(lead.name || '?').trim().charAt(0).toUpperCase()}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-zinc-100">Updating profile for {lead.name || 'lead'}</p>
-          <p className="text-[11px] text-zinc-500">ID {String(lead.id || '').slice(0, 8)}</p>
-        </div>
-        <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-2.5 py-0.5 text-xs font-semibold text-lime-400">
-          {lead.status || 'Fresh Leads'}
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:space-y-6 sm:px-6 sm:py-5 max-h-[calc(100dvh-13rem)] sm:max-h-[70vh]">
-        <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
-          <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
-            <span className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-                1
-              </span>
-              <span className="text-sm font-semibold text-foreground">Contact Information</span>
-            </span>
-            <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit(onFormSubmit)} noValidate className="flex min-h-full flex-col">
+      <div className="flex-1 space-y-4 px-4 pb-6 sm:px-6">
+        <SectionTabs tabs={tabs} label={t('leadEdit.sections')} />
+
+        {/* ── Contact ── */}
+        <FormSection id="edit-sec-contact" icon={<User size={16} />} title={t('leadEdit.tabContact')}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="label-base">Full name</label>
-              <input
-                type="text"
-                className="input-base"
-                placeholder="Ahmed Hassan"
-                {...nameField}
-                ref={(el) => {
-                  nameField.ref(el);
-                  nameRef.current = el;
-                }}
-              />
+              <FieldLabel htmlFor="edit-name">{t('leadForm.name')}</FieldLabel>
+              <IconWrap icon={<User size={18} />}>
+                <input
+                  id="edit-name"
+                  type="text"
+                  autoComplete="name"
+                  className={`${FIELD} ps-11`}
+                  placeholder="Ahmed Hassan"
+                  {...nameField}
+                  ref={(el) => {
+                    nameField.ref(el);
+                    nameRef.current = el;
+                  }}
+                />
+              </IconWrap>
             </div>
             <div>
-              <label className="label-base">Phone number</label>
-              <input
-                type="tel"
-                className="input-base"
-                placeholder="+20 10 0000 0000"
-                {...register('phone')}
-              />
+              <FieldLabel htmlFor="edit-phone">{t('leadForm.phone')}</FieldLabel>
+              <IconWrap icon={<Phone size={18} />} physicalLeft>
+                <input
+                  id="edit-phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  className={`${FIELD} ps-11 font-mono-data tracking-wide`}
+                  placeholder="010 1234 5678"
+                  {...register('phone')}
+                />
+              </IconWrap>
             </div>
             <div>
-              <label className="label-base">Email address</label>
-              <input
-                type="email"
-                className="input-base"
-                placeholder="ahmed@email.com"
-                {...register('email')}
-              />
+              <FieldLabel htmlFor="edit-email" optionalText={t('leadForm.optional')}>{t('leadForm.email')}</FieldLabel>
+              <IconWrap icon={<Mail size={18} />}>
+                <input
+                  id="edit-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  className={`${FIELD} ps-11`}
+                  placeholder="ahmed@email.com"
+                  {...register('email')}
+                />
+              </IconWrap>
             </div>
-            <div>
-              <label className="label-base">City / Region</label>
-              <input
-                type="text"
-                className="input-base"
-                placeholder="Cairo"
-                list="edit-cities"
-                {...register('location')}
-              />
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="edit-location" optionalText={t('leadForm.optional')}>{t('leadForm.location')}</FieldLabel>
+              <IconWrap icon={<MapPin size={18} />}>
+                <input
+                  id="edit-location"
+                  type="text"
+                  autoComplete="address-level2"
+                  className={`${FIELD} ps-11`}
+                  placeholder="Cairo / New Cairo"
+                  list="edit-cities"
+                  {...register('location')}
+                />
+              </IconWrap>
               <datalist id="edit-cities">
                 {Array.from(
-                  new Set(
-                    projects
-                      .map((p) => p.developerName)
-                      .concat(projects.map((p) => p.name))
-                      .filter(Boolean)
-                  )
+                  new Set(projects.map((p) => p.developerName).concat(projects.map((p) => p.name)).filter(Boolean))
                 ).map((value) => (
                   <option key={value} value={value} />
                 ))}
               </datalist>
             </div>
-
           </div>
-        </details>
+        </FormSection>
 
-        <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
-          <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
-            <span className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-                2
-              </span>
-              <span className="text-sm font-semibold text-foreground">
-                Classification &amp; Assignment
-              </span>
-            </span>
-            <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* ── Stage, next action, priority, rating, source ── */}
+        <FormSection id="edit-sec-stage" icon={<Flag size={16} />} title={t('leadEdit.tabStage')}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="label-base">Lead status</label>
-              <select className={selectClass} {...register('status')}>
-                {ALL_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <FieldLabel htmlFor="edit-status">{t('leadForm.status')}</FieldLabel>
+              <div className="relative">
+                <select id="edit-status" className={SELECT} {...register('status')}>
+                  {ALL_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <SelectChevron />
+              </div>
             </div>
             <div>
-              <label className="label-base flex items-center justify-between">
-                <span>Source</span>
-                {!canEditSource && (
-                  <span className="text-[10px] text-muted-foreground font-normal">Read-only</span>
-                )}
-              </label>
+              <FieldLabel htmlFor="edit-followup" optionalText={t('leadForm.optional')}>{t('leadForm.followUp')}</FieldLabel>
+              <IconWrap icon={<CalendarDays size={18} />}>
+                <input id="edit-followup" type="date" className={`${FIELD} ps-11`} {...register('followUpDue')} />
+              </IconWrap>
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>{t('leadEdit.priority')}</FieldLabel>
+              <ChipGroup
+                label={t('leadEdit.priority')}
+                value={priority || 'Normal'}
+                onChange={(v) => setValue('priority', v, { shouldDirty: true })}
+                options={PRIORITIES.map((p) => ({ value: p, label: t(`leadEdit.priority${p}`) }))}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel>{t('leadEdit.rating')}</FieldLabel>
+              <ChipGroup
+                label={t('leadEdit.rating')}
+                value={leadRating || ''}
+                onChange={(v) => setValue('leadRating', v, { shouldDirty: true })}
+                options={RATINGS.map((r) => ({ value: r, label: r ? t(`leadEdit.rating${r}`) : t('leadEdit.ratingNone') }))}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel
+                htmlFor="edit-source"
+                action={
+                  !canEditSource ? (
+                    <span className="text-[11px] font-medium text-muted-foreground">{t('leadEdit.readOnly')}</span>
+                  ) : undefined
+                }
+              >
+                {t('leadForm.source')}
+              </FieldLabel>
               {canEditSource ? (
                 <div className="relative">
-                  <select className={selectClass} {...register('source')}>
+                  <select id="edit-source" className={SELECT} {...register('source')}>
                     {availableSources.map((s) => (
                       <option key={`edit-source-${s.id || s.name}`} value={s.name}>
                         {s.name}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown
-                    size={13}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-                  />
+                  <SelectChevron />
                 </div>
               ) : (
-                <div className="input-base bg-muted/50 text-muted-foreground flex items-center select-none cursor-not-allowed">
+                <div className={`${FIELD} flex cursor-not-allowed select-none items-center bg-muted/50 text-muted-foreground`}>
                   {lead.source || '—'}
                 </div>
               )}
             </div>
+          </div>
+        </FormSection>
+
+        {/* ── Assignment & team ── */}
+        <FormSection
+          id="edit-sec-team"
+          icon={<Users size={16} />}
+          title={t('leadEdit.tabTeam')}
+          hint={t('leadEdit.assignHint')}
+        >
+          <FieldLabel
+            action={<span className="text-xs font-medium text-muted-foreground">{t('leadForm.assignCount', { n: selectedUserIds.length })}</span>}
+          >
+            {t('leadForm.assignTo')}
+          </FieldLabel>
+          {users.length === 0 ? (
+            <p className="rounded-xl bg-muted/40 py-3 text-center text-xs text-muted-foreground">{t('leadEdit.noAgents')}</p>
+          ) : (
+            <div className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto overscroll-contain sm:grid-cols-2">
+              {users.map((u) => {
+                const on = selectedUserIds.includes(u.id);
+                const disabled = !on && selectedUserIds.length >= 2;
+                return (
+                  <button
+                    type="button"
+                    key={u.id}
+                    disabled={disabled}
+                    onClick={() => toggleUser(u.id)}
+                    aria-pressed={on}
+                    className={`flex min-h-[44px] items-center justify-between gap-2 rounded-xl border px-3 text-start text-sm transition-colors ${
+                      on
+                        ? 'border-primary/40 bg-primary/10 font-semibold text-primary'
+                        : disabled
+                          ? 'cursor-not-allowed border-border/50 text-muted-foreground opacity-40'
+                          : 'border-border/70 text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                          on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                        }`}
+                        aria-hidden
+                      >
+                        {(u.name || '?').trim().charAt(0).toUpperCase()}
+                      </span>
+                      <span className="truncate">{u.name}</span>
+                    </span>
+                    {on && <Check size={16} className="shrink-0" aria-hidden />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="label-base">Priority</label>
-              <select className={selectClass} {...register('priority')}>
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+              <FieldLabel htmlFor="edit-team" optionalText={t('leadForm.optional')}>{t('leadEdit.team')}</FieldLabel>
+              <div className="relative">
+                <select id="edit-team" className={SELECT} {...register('team')}>
+                  <option value="">{t('leadEdit.noTeam')}</option>
+                  {teams.map((tm) => (
+                    <option key={tm.id} value={tm.name}>
+                      {tm.name}
+                    </option>
+                  ))}
+                </select>
+                <SelectChevron />
+              </div>
             </div>
             <div>
-              <label className="label-base">Lead rating</label>
-              <select className={selectClass} {...register('leadRating')}>
-                {RATINGS.map((r) => (
-                  <option key={r} value={r}>
-                    {r || 'No rating'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-base">Next action date</label>
-              <input type="date" className="input-base" {...register('followUpDue')} />
+              <FieldLabel htmlFor="edit-cs" optionalText={t('leadForm.optional')}>{t('leadEdit.csAgent')}</FieldLabel>
+              <input id="edit-cs" type="text" className={FIELD} placeholder={t('leadEdit.csAgentPh')} {...register('csAgent')} />
             </div>
             <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="label-base !mb-0">
-                  Assign to users <span className="text-muted-foreground font-normal text-xs">(max 2 for co-assignment)</span>
-                </label>
-                <span className="text-xs text-muted-foreground font-medium">
-                  {selectedUserIds.length}/2 chosen
-                </span>
-              </div>
-
-              {selectedUserIds.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {selectedUserIds.map((id) => {
-                    const u = users.find((user) => user.id === id);
-                    return (
-                      <span
-                        key={id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20"
-                      >
-                        <UserCheck size={12} className="text-emerald-500" />
-                        {u?.name || 'Agent'}
-                        <button
-                          type="button"
-                          onClick={() => toggleUser(id)}
-                          className="hover:text-red-500 ml-0.5 text-muted-foreground"
-                          aria-label={`Remove ${u?.name || 'agent'}`}
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="max-h-36 overflow-y-auto border border-input rounded-xl p-1.5 space-y-1 bg-background">
-                {users.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-2 text-center">No agents found</p>
-                ) : (
-                  users.map((u) => {
-                    const isSelected = selectedUserIds.includes(u.id);
-                    const isDisabled = !isSelected && selectedUserIds.length >= 2;
-                    return (
-                      <button
-                        type="button"
-                        key={u.id}
-                        disabled={isDisabled}
-                        onClick={() => toggleUser(u.id)}
-                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
-                          isSelected
-                            ? 'bg-primary/15 text-primary font-semibold'
-                            : isDisabled
-                            ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-                            : 'hover:bg-muted text-foreground'
-                        }`}
-                      >
-                        <span className="truncate">{u.name}</span>
-                        {isSelected && <Check size={13} className="text-primary flex-shrink-0" />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="label-base">Agent</label>
-              <input
-                type="text"
-                list="edit-agents"
-                className="input-base"
-                placeholder="Agent name"
-                {...register('agent')}
-              />
+              <FieldLabel htmlFor="edit-agent" optionalText={t('leadForm.optional')}>{t('leadEdit.agentName')}</FieldLabel>
+              <input id="edit-agent" type="text" list="edit-agents" className={FIELD} {...register('agent')} />
               <datalist id="edit-agents">
                 {agents.map((a) => (
                   <option key={a} value={a} />
                 ))}
               </datalist>
-            </div>
-            <div>
-              <label className="label-base">Team</label>
-              <select className={selectClass} {...register('team')}>
-                <option value="">No team</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.name}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-base">CS agent</label>
-              <input
-                type="text"
-                className="input-base"
-                placeholder="CS agent name"
-                {...register('csAgent')}
-              />
+              <p className="mt-1 text-xs text-muted-foreground">{t('leadEdit.agentNameHint')}</p>
             </div>
           </div>
-        </details>
+        </FormSection>
 
-        <button
-          type="button"
-          onClick={() => setShowPlan((v) => !v)}
-          className="btn-press w-full flex items-center justify-between text-sm font-medium text-foreground bg-muted/50 hover:bg-muted rounded-xl px-4 py-3 transition-colors active:scale-[0.99]"
+        {/* ── Unit, payment plan and deal (collapsed until needed) ── */}
+        <FormSection
+          id="edit-sec-deal"
+          icon={<Building2 size={16} />}
+          title={t('leadEdit.tabDeal')}
+          hint={t('leadEdit.dealHint')}
         >
-          <span>Unit &amp; Payment Plan</span>
-          <span className="flex items-center gap-1 text-muted-foreground">
-            {showPlan ? 'Hide' : 'Show'}
-            <ChevronDown
-              size={15}
-              className={`transition-transform duration-300 ${showPlan ? 'rotate-180' : ''}`}
-            />
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setShowPlan((v) => !v)}
+            aria-expanded={showPlan}
+            className={`flex min-h-[48px] w-full items-center justify-between rounded-xl border px-4 text-sm font-semibold transition-colors ${
+              showPlan ? 'border-primary/40 bg-primary/5 text-foreground' : 'border-dashed border-border bg-muted/30 text-foreground hover:bg-muted/60'
+            }`}
+          >
+            <span>{showPlan ? t('leadEdit.hidePlan') : t('leadEdit.showPlan')}</span>
+            <ChevronDown size={18} className={`text-muted-foreground transition-transform ${showPlan ? 'rotate-180' : ''}`} />
+          </button>
 
-        {showPlan && (
-          <details open className="group rounded-2xl border border-border bg-card overflow-hidden">
-            <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 bg-muted/30">
-              <span className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-                  3
-                </span>
-                <span className="text-sm font-semibold text-foreground">Unit &amp; Payment Plan</span>
-              </span>
-              <ChevronDown size={15} className="text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="px-4 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label-base">Project</label>
-              <select
-                className={selectClass}
-                {...register('project')}
-                onChange={(e) => {
-                  setValue('project', e.target.value);
-                  setValue('unitId', '');
-                  const proj = projects.find((p) => p.name === e.target.value);
-                  if (proj) setValue('developer', proj.developerName || lead.developer || '');
-                }}
-              >
-                <option value="">No project</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.name}>
-                    {p.name}
-                  </option>
+          {showPlan && (
+            <div className="mt-4 space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel htmlFor="edit-project">{t('leadForm.project')}</FieldLabel>
+                  <div className="relative">
+                    <select
+                      id="edit-project"
+                      className={SELECT}
+                      {...register('project')}
+                      onChange={(e) => {
+                        setValue('project', e.target.value);
+                        setValue('unitId', '');
+                        const proj = projects.find((p) => p.name === e.target.value);
+                        if (proj) setValue('developer', proj.developerName || lead.developer || '');
+                      }}
+                    >
+                      <option value="">{t('leadEdit.noProject')}</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectChevron />
+                  </div>
+                </div>
+                <div>
+                  <FieldLabel htmlFor="edit-unit" action={loadingUnits ? <Loader2 size={14} className="animate-spin text-muted-foreground" /> : undefined}>
+                    {t('leadEdit.unit')}
+                  </FieldLabel>
+                  <div className="relative">
+                    <select
+                      id="edit-unit"
+                      className={SELECT}
+                      value={selectedUnitId}
+                      onChange={(e) => handleUnitSelect(e.target.value)}
+                      disabled={!selectedProject || projectUnits.length === 0}
+                    >
+                      <option value="">
+                        {!selectedProject
+                          ? t('leadEdit.pickProjectFirst')
+                          : projectUnits.length === 0
+                            ? t('leadEdit.noUnits')
+                            : t('leadEdit.pickUnit')}
+                      </option>
+                      {projectUnits.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} — {money(u.area)} m² — EGP {money(u.price).toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectChevron />
+                  </div>
+                  {selectedUnitId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const unit = projectUnits.find((u) => u.id === selectedUnitId);
+                        if (unit) handleUnitSelect(unit.id);
+                      }}
+                      className="mt-1.5 flex min-h-[32px] items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      <RefreshCw size={12} /> {t('leadEdit.refillFromUnit')}
+                    </button>
+                  )}
+                </div>
+
+                <MoneyField id="edit-total" label={t('leadEdit.totalPrice')} reg={register('totalPrice')} />
+                <MoneyField
+                  id="edit-down"
+                  label={t('leadEdit.downPayment')}
+                  reg={register('downPayment')}
+                  aside={<span className="text-xs font-semibold text-primary">{plan.downPct}%</span>}
+                />
+                <MoneyField id="edit-count" label={t('leadEdit.installmentCount')} reg={register('installmentCount')} plain />
+                <div>
+                  <FieldLabel htmlFor="edit-freq">{t('leadEdit.frequency')}</FieldLabel>
+                  <div className="relative">
+                    <select id="edit-freq" className={SELECT} {...register('installmentFrequency')}>
+                      <option value={12}>{t('leadEdit.freqMonthly')}</option>
+                      <option value={4}>{t('leadEdit.freqQuarterly')}</option>
+                      <option value={2}>{t('leadEdit.freqSemi')}</option>
+                      <option value={1}>{t('leadEdit.freqAnnual')}</option>
+                    </select>
+                    <SelectChevron />
+                  </div>
+                </div>
+                <MoneyField id="edit-reserve" label={t('leadEdit.reservationAmount')} reg={register('reservationAmount')} />
+                <MoneyField id="edit-maint" label={t('leadEdit.maintenance')} reg={register('maintenanceFees')} />
+                <div>
+                  <FieldLabel htmlFor="edit-paystart">{t('leadEdit.paymentStart')}</FieldLabel>
+                  <input id="edit-paystart" type="date" className={FIELD} {...register('paymentStartDate')} />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="edit-paystatus">{t('leadEdit.paymentStatus')}</FieldLabel>
+                  <div className="relative">
+                    <select id="edit-paystatus" className={SELECT} {...register('paymentStatus')}>
+                      {PAYMENT_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <SelectChevron />
+                  </div>
+                </div>
+              </div>
+
+              {/* Live plan summary */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { k: t('leadEdit.remaining'), v: `EGP ${formatNumber(Math.round(plan.remaining))}` },
+                  { k: t('leadEdit.installment'), v: `EGP ${formatNumber(Math.round(plan.installment))}` },
+                  { k: t('leadEdit.downPct'), v: `${plan.downPct}%` },
+                  {
+                    k: t('leadEdit.perYear'),
+                    v: money(installmentCount) > 0 ? String(Math.round((12 / money(installmentFrequency)) * 100) / 100) : '—',
+                  },
+                ].map((s) => (
+                  <div key={s.k} className="rounded-xl bg-muted/50 p-3">
+                    <p className="text-[11px] text-muted-foreground">{s.k}</p>
+                    <p className="text-sm font-bold tabular-nums text-foreground" dir="ltr">
+                      {s.v}
+                    </p>
+                  </div>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="label-base flex items-center gap-1.5">
-                Unit
-                {loadingUnits && (
-                  <Loader2 size={12} className="animate-spin text-muted-foreground" />
-                )}
-              </label>
-              <select
-                className={selectClass}
-                value={selectedUnitId}
-                onChange={(e) => handleUnitSelect(e.target.value)}
-                disabled={!selectedProject || projectUnits.length === 0}
-              >
-                <option value="">
-                  {!selectedProject
-                    ? 'Select a project first'
-                    : projectUnits.length === 0
-                      ? 'No units in this project'
-                      : 'Select a unit'}
-                </option>
-                {projectUnits.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} — {money(u.area)} m² — EGP {money(u.price).toLocaleString()}
-                  </option>
-                ))}
-              </select>
-              {selectedUnitId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const unit = projectUnits.find((u) => u.id === selectedUnitId);
-                    if (unit) handleUnitSelect(unit.id);
-                  }}
-                  className="mt-1.5 text-[11px] text-primary flex items-center gap-1 hover:underline"
-                >
-                  <RefreshCw size={10} /> Refill from unit
-                </button>
-              )}
-            </div>
-            <div>
-              <label className="label-base">Total price (EGP)</label>
-              <input type="number" min="0" className="input-base" {...register('totalPrice')} />
-            </div>
-            <div>
-              <label className="label-base">
-                Down payment (EGP)
-                <span className="ml-2 text-xs font-medium text-primary">{plan.downPct}%</span>
-              </label>
-              <input type="number" min="0" className="input-base" {...register('downPayment')} />
-            </div>
-            <div>
-              <label className="label-base">Installment count</label>
-              <input
-                type="number"
-                min="0"
-                className="input-base"
-                {...register('installmentCount')}
-              />
-            </div>
-            <div>
-              <label className="label-base">Installment frequency</label>
-              <select className={selectClass} {...register('installmentFrequency')}>
-                <option value={12}>Monthly</option>
-                <option value={4}>Quarterly</option>
-                <option value={2}>Semi-annual</option>
-                <option value={1}>Annual</option>
-              </select>
-            </div>
-            <div>
-              <label className="label-base">Reservation amount (EGP)</label>
-              <input
-                type="number"
-                min="0"
-                className="input-base"
-                {...register('reservationAmount')}
-              />
-            </div>
-            <div>
-              <label className="label-base">Maintenance fees (EGP)</label>
-              <input
-                type="number"
-                min="0"
-                className="input-base"
-                {...register('maintenanceFees')}
-              />
-            </div>
-            <div>
-              <label className="label-base">Payment start date</label>
-              <input type="date" className="input-base" {...register('paymentStartDate')} />
-            </div>
-            <div>
-              <label className="label-base">Payment status</label>
-              <select className={selectClass} {...register('paymentStatus')}>
-                {PAYMENT_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+              </div>
 
-          {/* Live plan summary */}
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Remaining</p>
-              <p className="text-sm font-semibold tabular-nums">
-                EGP {formatNumber(Math.round(plan.remaining))}
-              </p>
+              <div className="border-t border-border pt-4">
+                <p className="mb-3 text-sm font-bold text-foreground">{t('leadEdit.dealTitle')}</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <FieldLabel htmlFor="edit-resdate">{t('leadEdit.reservationDate')}</FieldLabel>
+                    <input id="edit-resdate" type="date" className={FIELD} {...register('reservationDate')} />
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="edit-closedate">{t('leadEdit.closingDate')}</FieldLabel>
+                    <input id="edit-closedate" type="date" className={FIELD} {...register('closingDate')} />
+                  </div>
+                  <MoneyField id="edit-final" label={t('leadEdit.finalPrice')} reg={register('finalPrice')} />
+                  <MoneyField id="edit-comm" label={t('leadEdit.commission')} reg={register('commission')} />
+                </div>
+              </div>
             </div>
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Installment</p>
-              <p className="text-sm font-semibold tabular-nums">
-                EGP {formatNumber(Math.round(plan.installment))}
-              </p>
-            </div>
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Down %</p>
-              <p className="text-sm font-semibold tabular-nums">{plan.downPct}%</p>
-            </div>
-            <div className="bg-muted/50 rounded-xl p-3">
-              <p className="text-[11px] text-muted-foreground">Per year</p>
-              <p className="text-sm font-semibold tabular-nums">
-                {money(installmentCount) > 0
-                  ? `${Math.round((12 / money(installmentFrequency)) * 100) / 100} installments`
-                  : '—'}
-              </p>
-            </div>
-          </div>
-          </details>
-        )}
+          )}
+        </FormSection>
 
-        {/* Section 4: Reservation / Deal */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              4
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Reservation / Done Deal</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label-base">Reservation date</label>
-              <input type="date" className="input-base" {...register('reservationDate')} />
-            </div>
-            <div>
-              <label className="label-base">Closing date</label>
-              <input type="date" className="input-base" {...register('closingDate')} />
-            </div>
-            <div>
-              <label className="label-base">Final price (EGP)</label>
-              <input type="number" min="0" className="input-base" {...register('finalPrice')} />
-            </div>
-            <div>
-              <label className="label-base">Commission (EGP)</label>
-              <input type="number" min="0" className="input-base" {...register('commission')} />
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-border" />
-
-        {/* Section 5: Notes */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-              5
-            </div>
-            <h3 className="text-sm font-semibold text-foreground">Notes</h3>
-          </div>
+        {/* ── Notes ── */}
+        <FormSection id="edit-sec-notes" icon={<StickyNote size={16} />} title={t('leadEdit.tabNotes')}>
           <textarea
-            rows={3}
-            className="input-base w-full"
-            placeholder="Notes about this lead…"
+            id="edit-notes"
+            rows={4}
+            dir="auto"
+            className="input-base w-full resize-y border-border/80 text-base sm:text-sm"
+            placeholder={t('leadEdit.notesPh')}
             {...register('notes')}
           />
           {parsedNotes.log.length > 0 && (
             <details className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-2" open={parsedNotes.log.length <= 3}>
-              <summary className="cursor-pointer text-xs font-semibold text-foreground">
-                Call log ({parsedNotes.log.length}) <span className="font-normal text-muted-foreground">· recorded automatically, kept when you save</span>
+              <summary className="min-h-[36px] cursor-pointer py-1.5 text-xs font-semibold text-foreground">
+                {t('leadEdit.callLog', { n: parsedNotes.log.length })}{' '}
+                <span className="font-normal text-muted-foreground">· {t('leadEdit.callLogKept')}</span>
               </summary>
               <ul className="mt-2 space-y-1.5">
                 {parsedNotes.log.map((e, i) => (
@@ -869,22 +820,58 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
               </ul>
             </details>
           )}
-        </div>
+        </FormSection>
       </div>
 
-      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t border-white/5 bg-[#0B0E14]/95 backdrop-blur-md px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4">
-        <button type="button" onClick={onCancel} className="min-h-[44px] w-full rounded-lg px-4 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 sm:w-auto">
-          Cancel
+      {/* Sticky actions: one row on phones (Save takes the width), right-aligned on larger screens. */}
+      <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-border bg-card/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:justify-end sm:px-6">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-ghost min-h-[48px] rounded-xl px-4 text-sm font-medium sm:min-h-[44px]"
+        >
+          {t('leadForm.cancel')}
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-lime-400 px-6 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-lime-500/10 transition-all hover:bg-lime-300 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-300 disabled:opacity-60 sm:w-auto"
+          className="btn-press inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:brightness-105 active:scale-95 disabled:opacity-60 sm:min-h-[44px] sm:flex-none"
         >
-          {isSubmitting && <Loader2 size={14} className="animate-spin" />}
-          Save changes
+          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={2.5} />}
+          {t('leadEdit.save')}
         </button>
       </div>
     </form>
+  );
+}
+
+/** Number field for amounts: numeric keypad on phones, value kept as a number by react-hook-form. */
+function MoneyField({
+  id,
+  label,
+  reg,
+  aside,
+  plain,
+}: {
+  id: string;
+  label: string;
+  reg: UseFormRegisterReturn;
+  aside?: React.ReactNode;
+  plain?: boolean;
+}) {
+  return (
+    <div>
+      <FieldLabel htmlFor={id} action={aside}>
+        {label}
+      </FieldLabel>
+      <div className="relative">
+        <input id={id} type="number" min="0" inputMode="decimal" dir="ltr" className={`${FIELD} ${plain ? '' : 'pr-14'} tabular-nums`} {...reg} />
+        {!plain && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground" aria-hidden>
+            EGP
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

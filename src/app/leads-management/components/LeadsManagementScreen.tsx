@@ -1831,7 +1831,7 @@ export default function LeadsManagementScreen({
         onClose={() => setAddModalOpen(false)}
         title={t('leadForm.title')}
         subtitle={t('leadForm.subtitle')}
-        size="md"
+        size="lg"
         variant="drawer"
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
@@ -1948,9 +1948,10 @@ export default function LeadsManagementScreen({
         <Modal
           open={!!editLead}
           onClose={() => setEditLead(null)}
-          title="Edit lead"
-          subtitle={`Editing details for ${editLead.name}`}
-          size="xl"
+          title={t('leadEdit.title')}
+          subtitle={t('leadEdit.subtitle', { name: editLead.name || '' })}
+          size="lg"
+          variant="drawer"
         >
           <EditLeadForm
             lead={editLead}
