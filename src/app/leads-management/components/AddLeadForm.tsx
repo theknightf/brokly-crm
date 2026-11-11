@@ -47,6 +47,7 @@ import {
 } from './leadPhone';
 import { parsePastedLead } from './leadPaste';
 import { SelectChevron, FieldLabel, IconWrap } from './leadFormUi';
+import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 
 interface AddLeadFormData {
   name: string;
@@ -155,6 +156,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     { id: string; name: string; developerId: string; status: string }[]
   >([]);
   const [showDetails, setShowDetails] = useState(false);
+  const [showAllStages, setShowAllStages] = useState(false);
   const [referralEnabled, setReferralEnabled] = useState(Boolean(initialData?.referredTo));
   const [dupState, setDupState] = useState<{ checking: boolean; existing: DuplicateMatch | null }>({
     checking: false,
@@ -864,6 +866,61 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
               <p className="mt-1.5 text-sm text-red-500 font-medium">{errors.source.message}</p>
             )}
           </div>
+
+          {/* 4. Stage — one tap. Sales stages first; outcomes (No Answer, Not Interested…) behind "More". */}
+          <div>
+            <FieldLabel
+              action={
+                <button
+                  type="button"
+                  onClick={() => setShowAllStages((v) => !v)}
+                  aria-expanded={showAllStages}
+                  className="min-h-[36px] px-2 -me-2 text-sm font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  {showAllStages ? t('leadForm.fewerStages') : t('leadForm.moreStages')}
+                  <ChevronDown size={14} className={`transition-transform ${showAllStages ? 'rotate-180' : ''}`} />
+                </button>
+              }
+            >
+              {t('leadForm.status')}
+            </FieldLabel>
+            <Controller
+              name="status"
+              control={control}
+              render={({ field }) => {
+                const list = showAllStages || OUTCOME_STAGES.includes(field.value)
+                  ? [...PIPELINE_STAGES, ...OUTCOME_STAGES]
+                  : PIPELINE_STAGES;
+                return (
+                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('leadForm.status')}>
+                    {list.map((s) => {
+                      const on = field.value === s;
+                      const outcome = OUTCOME_STAGES.includes(s);
+                      return (
+                        <button
+                          key={`chip-stage-${s}`}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => field.onChange(s)}
+                          className={`min-h-[44px] px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 select-none ${
+                            on
+                              ? 'bg-primary text-primary-foreground font-semibold shadow-sm ring-2 ring-primary/30'
+                              : outcome
+                                ? 'border border-dashed border-border text-muted-foreground hover:bg-muted hover:text-foreground'
+                                : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60'
+                          }`}
+                        >
+                          {on && <Check size={14} className="stroke-[2.5]" />}
+                          <span>{s}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              }}
+            />
+          </div>
         </section>
 
         {/* ── Toggle "More Details" (Collapsed by default) ── */}
@@ -970,27 +1027,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 </section>
               )}
 
-              {/* Stage & follow-up (side by side on larger screens) */}
-              <section className="rounded-2xl border border-border/70 bg-card p-4 grid grid-cols-1 gap-4 sm:grid-cols-2 shadow-sm">
-                <div>
-                  <FieldLabel htmlFor="add-status">{t('leadForm.status')}</FieldLabel>
-                  <div className="relative">
-                    <select
-                      id="add-status"
-                      autoComplete="off"
-                      className={`${inputBase} appearance-none pe-9`}
-                      {...register('status')}
-                    >
-                      {ALL_STATUSES.map((s) => (
-                        <option key={`add-status-${s}`} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                    <SelectChevron />
-                  </div>
-                </div>
-
+              {/* Next action date (the stage is picked in the main section above) */}
+              <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
                 <div>
                   <FieldLabel htmlFor="add-followup" optionalText={t('leadForm.optional')}>
                     {t('leadForm.followUp')}
