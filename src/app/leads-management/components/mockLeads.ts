@@ -77,6 +77,8 @@ export interface Lead {
   id: string;
   name?: string;
   phone: string;
+  /** Optional second number (any country). */
+  phone2?: string;
   email?: string;
   propertyType?: PropertyType;
   budgetMin?: number;

@@ -4,10 +4,12 @@
 // and returns mapped rows ready for preview + insertion.
 
 import { ALL_STATUSES, LeadStatus } from '@/app/leads-management/components/mockLeads';
+import { storablePhone } from '@/lib/phone';
 
 export type ImportField =
   | 'name'
   | 'phone'
+  | 'phone2'
   | 'status'
   | 'source'
   | 'email'
@@ -63,6 +65,22 @@ const FIELD_ALIASES: Record<ImportField, string[]> = {
     'تليفون',
     'هاتف',
     'رقم',
+  ],
+  phone2: [
+    'phone 2',
+    'phone2',
+    'second phone',
+    'other phone',
+    'mobile 2',
+    'mobile2',
+    'alternative phone',
+    'alt phone',
+    'رقم 2',
+    'رقم تاني',
+    'رقم ثاني',
+    'رقم اخر',
+    'موبايل 2',
+    'تليفون 2',
   ],
   status: ['status', 'stage', 'lead status', 'المرحلة', 'حالة', 'الحالة', 'ستاتوس'],
   source: ['source', 'lead source', 'channel', 'المصدر', 'مصدر', 'طريقة'],
@@ -135,6 +153,47 @@ const FIELD_ALIASES: Record<ImportField, string[]> = {
   ],
 };
 
+/**
+ * Column names of the downloadable template, in order. Each one is also an accepted header (English;
+ * Arabic headers listed in FIELD_ALIASES work too). Name and Phone are required. Source and stage are
+ * chosen once for the whole file in the import window, so they are not columns.
+ */
+export const TEMPLATE_COLUMNS = [
+  'Name',
+  'Phone',
+  'Phone 2',
+  'Email',
+  'Project',
+  'Developer',
+  'Unit',
+  'Location',
+  'Budget',
+  'Assigned To',
+  'Interest Level',
+  'Date',
+  'Notes',
+] as const;
+
+const TEMPLATE_EXAMPLES: string[][] = [
+  ['Ahmed Hassan', '01012345678', '', 'ahmed@mail.com', 'Palm Hills', 'Palm Hills Developments', '', 'New Cairo', '3000000-5000000', '', 'Hot', '2026-11-11', 'Wants 3 bedrooms'],
+  ['Omar Saeed', '+971 50 123 4567', '01112345678', '', '', '', '', 'Dubai', '5000000', '', 'Warm', '', 'Lives abroad; second number is in Egypt'],
+];
+
+/** Downloads the CSV template (UTF-8 with BOM so Excel shows Arabic correctly). Browser only. */
+export function downloadLeadsTemplate() {
+  const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const lines = [TEMPLATE_COLUMNS.join(','), ...TEMPLATE_EXAMPLES.map((r) => r.map(esc).join(','))];
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'brokly-leads-template.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 const SOURCE_FALLBACK = 'Other';
 const DEFAULT_STATUS: LeadStatus = 'Fresh Leads';
 
@@ -155,7 +214,8 @@ export function detectField(header: string): ImportField | undefined {
       return field as ImportField;
     }
   }
-  // Loose "contains" fallback for very common stems.
+  // Loose "contains" fallback for very common stems. A phone header with "2 / second / other" is the second number.
+  if (/mobile|phone|tel|موبايل|هاتف|رقم/.test(key) && /\b2\b|second|other|alt|تاني|ثاني|اخر|آخر/.test(key)) return 'phone2';
   if (/mobile|phone|tel|موبايل|هاتف/.test(key)) return 'phone';
   if (/status|stage|المرحلة|الحالة/.test(key)) return 'status';
   if (/name|الاسم/.test(key)) return 'name';
@@ -220,6 +280,7 @@ export interface ParsedRow {
   rowNumber: number;
   name?: string;
   phone?: string;
+  phone2?: string;
   status?: string;
   source?: string;
   email?: string;
@@ -294,7 +355,9 @@ function detectAutoMapping(headers: string[]): Record<number, ImportField> {
   const mapping: Record<number, ImportField> = {};
   const used = new Set<ImportField>();
   headers.forEach((h, i) => {
-    const field = detectField(h);
+    let field = detectField(h);
+    // A second phone-like column ("Phone" + "Mobile") becomes the second number.
+    if (field === 'phone' && used.has('phone') && !used.has('phone2')) field = 'phone2';
     if (field && !used.has(field)) {
       mapping[i] = field;
       used.add(field);
@@ -401,14 +464,18 @@ export async function parseLeadFile(
 
   const rows: ParsedRow[] = rawRows.map((obj, idx) => {
     const phoneRaw = String(getMapped(obj, headers, mapping, 'phone'));
-    const normalizedPhone = normalizeEgyptianPhone(phoneRaw);
+    // Egyptian mobiles → 01xxxxxxxxx; international (+ / 00) → +<code><number>; 7–15 digits otherwise.
+    const normalizedPhone = storablePhone(phoneRaw);
+    const phone2Raw = cellToStr(getMapped(obj, headers, mapping, 'phone2'));
+    const normalizedPhone2 = phone2Raw ? storablePhone(phone2Raw) : '';
     const statusRaw = String(getMapped(obj, headers, mapping, 'status'));
     const statusNorm = normalizeStatus(statusRaw);
     const reasons: string[] = [];
 
     const hasPhoneValue = phoneRaw.replace(/\D/g, '').length > 0;
     if (!hasPhoneValue) reasons.push('Missing phone number');
-    else if (!normalizedPhone) reasons.push('Invalid Egyptian mobile format');
+    else if (!normalizedPhone) reasons.push('Invalid phone number');
+    if (phone2Raw && !normalizedPhone2) reasons.push(`Invalid second phone number (${phone2Raw.slice(0, 20)})`);
 
     if (statusRaw && !statusNorm)
       reasons.push(`Unknown status "${String(statusRaw).slice(0, 40)}"`);
@@ -456,6 +523,7 @@ export async function parseLeadFile(
       rowNumber: idx + 2,
       name: nameVal || undefined,
       phone: normalizedPhone,
+      phone2: normalizedPhone2 || undefined,
       status: statusNorm || statusRaw || DEFAULT_STATUS,
       source: cellToStr(getMapped(obj, headers, mapping, 'source')) || SOURCE_FALLBACK,
       email: cellToStr(getMapped(obj, headers, mapping, 'email')) || undefined,

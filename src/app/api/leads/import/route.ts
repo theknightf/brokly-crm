@@ -369,6 +369,7 @@ export async function POST(request: Request) {
     const insertPayload: any = {
       name,
       phone: phoneRaw,
+      phone2: String(row.phone2 || '').trim() || null,
       email: row.email || null,
       source: resolvedSource,
       lead_source_id: resolvedSourceId,

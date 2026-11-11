@@ -9,9 +9,14 @@ const DEFAULT_TEMPLATE = 'مساء الخير مع حضرتك {username} من ش
  */
 export function sanitizeEgyptPhone(phone?: string | null): string {
   if (!phone) return '';
-  let digits = String(phone).replace(/\D/g, '');
+  const raw = String(phone).trim();
+  let digits = raw.replace(/\D/g, '');
   if (!digits) return '';
-  // Remove leading zeros (local format)
+  // International: written with "+" or "00" → already has its country code (+971…, 00966…).
+  if (raw.startsWith('+') || digits.startsWith('00')) {
+    return digits.replace(/^00/, '');
+  }
+  // Local format: remove leading zeros
   digits = digits.replace(/^0+/, '');
   // If already starts with 20 (Egypt), keep; otherwise prepend 20
   if (!digits.startsWith('20')) {

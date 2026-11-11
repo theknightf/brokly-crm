@@ -33,6 +33,7 @@ export async function POST(request: Request) {
   const row: any = {
     name,
     phone,
+    phone2: String(body.phone2 || '').trim() || null,
     email: email || null,
     property_type: body.propertyType || body.property_type || '',
     budget_min: body.budgetMin ?? body.budget_min ?? 0,

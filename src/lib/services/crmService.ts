@@ -1676,6 +1676,7 @@ function rowToLead(row: any) {
     id: row.id,
     name: row.name,
     phone: row.phone,
+    phone2: row.phone2 || '',
     email: row.email,
     propertyType: row.property_type,
     budgetMin: Number(row.budget_min),
@@ -1849,6 +1850,8 @@ function leadToRow(lead: any, userId?: string) {
     closing_date: lead.closingDate || null,
     final_price: lead.finalPrice ?? 0,
     commission: Number(lead.commission ?? 0),
+    // Only written when the caller sends it, so partial updates never blank the second number.
+    ...('phone2' in lead ? { phone2: String(lead.phone2 || '').trim() || null } : {}),
   };
   if (lead.createdAt) {
     const iso = String(lead.createdAt);
@@ -3783,6 +3786,7 @@ function rowToCustomer(row: any) {
     id: row.id,
     name: row.name,
     phone: row.phone,
+    phone2: row.phone2 || '',
     email: row.email,
     propertyType: row.property_type,
     budgetMin: Number(row.budget_min),

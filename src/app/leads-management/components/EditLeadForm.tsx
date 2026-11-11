@@ -17,6 +17,7 @@ import {
   StickyNote,
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { storablePhone } from '@/lib/phone';
 import { FIELD, SELECT, SelectChevron, FieldLabel, IconWrap, FormSection, ChipGroup, SectionTabs } from './leadFormUi';
 import { parseLeadNotes, mergeLeadNotes } from '@/lib/leadNotes';
 import {
@@ -36,6 +37,7 @@ import { unitsService, leadSourcesService } from '@/lib/services/crmService';
 interface EditLeadFormData {
   name: string;
   phone: string;
+  phone2: string;
   email: string;
   location: string;
   propertyType: PropertyType;
@@ -183,6 +185,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
     defaultValues: {
       name: lead.name || '',
       phone: lead.phone || '',
+      phone2: lead.phone2 || '',
       email: lead.email || '',
       location: lead.location || '',
       propertyType: (lead.propertyType as PropertyType) || '2BHK Apartment',
@@ -317,7 +320,8 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
     const updated: Lead & { leadSourceId?: string | null } = {
       ...lead,
       name: data.name,
-      phone: data.phone,
+      phone: storablePhone(data.phone) || data.phone,
+      phone2: storablePhone(data.phone2 || '') || '',
       email: data.email,
       location: data.location,
       propertyType: data.propertyType,
@@ -440,6 +444,21 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
                   className={`${FIELD} ps-11`}
                   placeholder="ahmed@email.com"
                   {...register('email')}
+                />
+              </IconWrap>
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="edit-phone2" optionalText={t('leadForm.optional')}>{t('leadForm.phone2')}</FieldLabel>
+              <IconWrap icon={<Phone size={18} />} physicalLeft>
+                <input
+                  id="edit-phone2"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  className={`${FIELD} ps-11 font-mono-data tracking-wide`}
+                  placeholder="+971 50 123 4567"
+                  {...register('phone2')}
                 />
               </IconWrap>
             </div>

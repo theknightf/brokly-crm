@@ -253,6 +253,9 @@ export const dictionaries: Dict = {
   'leadForm.created': { en: 'Lead created', ar: 'العميل اتضاف' },
   'leadForm.viewLead': { en: 'View lead', ar: 'اعرض العميل' },
 
+  'leadForm.phone2': { en: 'Second phone', ar: 'رقم تاني' },
+  'leadForm.phone2Ph': { en: 'Another number (any country, e.g. +971 50 123 4567)', ar: 'رقم تاني (أي دولة، مثلًا ‎+971 50 123 4567)' },
+  'leadForm.addPhone2': { en: 'Add another number', ar: 'ضيف رقم تاني' },
   'leadForm.moreStages': { en: 'More', ar: 'المزيد' },
   'leadForm.fewerStages': { en: 'Less', ar: 'أقل' },
   'stageMenu.title': { en: 'Change stage', ar: 'غيّر المرحلة' },

@@ -4,7 +4,7 @@ import { Upload, FileSpreadsheet, Loader2, Check, Plus, ChevronDown, X, Users, R
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import { teamsService, adminSettingsService } from '@/lib/services/crmService';
-import { parseLeadFile, type ParsedRow } from '@/lib/leadsImport';
+import { parseLeadFile, downloadLeadsTemplate, type ParsedRow } from '@/lib/leadsImport';
 import { ALL_STATUSES } from '@/lib/ui';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 
@@ -437,6 +437,19 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           >
             View Import History →
           </a>
+        </div>
+        {/* Template: the column names the importer understands, with example rows (Egyptian + international). */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3.5 py-2.5 text-xs">
+          <span className="text-muted-foreground">
+            Not sure about the columns? Use the template — ما تعرفش أسماء الأعمدة؟ نزّل النموذج
+          </span>
+          <button
+            type="button"
+            onClick={downloadLeadsTemplate}
+            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-primary px-3 font-semibold text-primary-foreground hover:brightness-105"
+          >
+            <FileSpreadsheet size={14} /> Download template (CSV)
+          </button>
         </div>
         {/* File picker */}
         <input

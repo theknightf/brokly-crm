@@ -47,11 +47,13 @@ import {
 } from './leadPhone';
 import { parsePastedLead } from './leadPaste';
 import { SelectChevron, FieldLabel, IconWrap } from './leadFormUi';
+import { storablePhone } from '@/lib/phone';
 import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 
 interface AddLeadFormData {
   name: string;
   phone: string;
+  phone2: string;
   email: string;
   location: string;
   propertyType: PropertyType;
@@ -157,6 +159,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
   >([]);
   const [showDetails, setShowDetails] = useState(false);
   const [showAllStages, setShowAllStages] = useState(false);
+  const [showPhone2, setShowPhone2] = useState(false);
   const [referralEnabled, setReferralEnabled] = useState(Boolean(initialData?.referredTo));
   const [dupState, setDupState] = useState<{ checking: boolean; existing: DuplicateMatch | null }>({
     checking: false,
@@ -177,6 +180,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     (src?: string, st?: string): AddLeadFormData => ({
       name: initialData?.name || '',
       phone: initialData?.phone || '',
+      phone2: initialData?.phone2 || '',
       email: initialData?.email || '',
       location: initialData?.location || '',
       propertyType: (initialData?.propertyType as PropertyType) || '2BHK Apartment',
@@ -418,7 +422,8 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       sourceList.find((s) => s.id === (data.source as any)) ||
       null;
     const leadSourceId = matchedSource?.id || null;
-    const cleanPhone = phoneToStore(data.phone);
+    // Egyptian → 01xxxxxxxxx, international → +<code><number> (same as the importer).
+    const cleanPhone = storablePhone(data.phone) || phoneToStore(data.phone);
     // Name is optional — falls back to phone number as requested
     const fallbackName = cleanPhone || 'New Lead';
     const cleanName = (data.name || '').trim() || fallbackName;
@@ -427,6 +432,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       id: `lead-${String(leadCounter++).padStart(3, '0')}`,
       name: cleanName,
       phone: cleanPhone,
+      phone2: storablePhone(data.phone2 || '') || '',
       email: (data.email || '').trim(),
       location: data.location || '',
       propertyType: data.propertyType,
@@ -474,6 +480,7 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     reset({
       name: '',
       phone: '',
+      phone2: '',
       email: '',
       location: '',
       propertyType: data.propertyType,
@@ -744,6 +751,38 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
                 <p className="mt-1.5 text-sm text-red-500 font-medium">{errors.email.message}</p>
               )}
             </div>
+
+            {/* Optional second number (any country: +971…, 00966…, 010…) */}
+            {showPhone2 ? (
+              <div className="mt-3">
+                <IconWrap icon={<Phone size={18} />} physicalLeft>
+                  <input
+                    id="add-phone2"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    dir="ltr"
+                    aria-label={t('leadForm.phone2')}
+                    placeholder={t('leadForm.phone2Ph')}
+                    className={`${inputBase} ps-11 ${errors.phone2 ? 'border-red-400' : ''}`}
+                    {...register('phone2', {
+                      validate: (v) => !String(v || '').trim() || !!storablePhone(v) || t('leadForm.phoneInvalid'),
+                    })}
+                  />
+                </IconWrap>
+                {errors.phone2 && (
+                  <p className="mt-1.5 text-sm text-red-500 font-medium">{errors.phone2.message}</p>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowPhone2(true)}
+                className="mt-2 min-h-[36px] text-sm font-semibold text-primary hover:underline inline-flex items-center gap-1"
+              >
+                <Plus size={14} /> {t('leadForm.addPhone2')}
+              </button>
+            )}
 
             {/* Inline "already exists" hint: soft, never blocks, never names the owner */}
             {existsState === 'exists' ? (

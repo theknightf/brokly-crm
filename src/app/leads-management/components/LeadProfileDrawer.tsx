@@ -454,6 +454,15 @@ export default function LeadProfileDrawer({
                       ? `tel:${viewLead.phone.replace(/[^\d+]/g, '')}`
                       : undefined,
                   },
+                  ...(viewLead.phone2
+                    ? [
+                        {
+                          label: 'Phone 2',
+                          value: viewLead.phone2,
+                          href: `tel:${viewLead.phone2.replace(/[^\d+]/g, '')}`,
+                        },
+                      ]
+                    : []),
                   { label: 'Email', value: viewLead.email || '—' },
                   { label: 'Source', value: viewLead.source || '—' },
                   { label: 'Project', value: viewLead.project || viewLead.developer || '—' },
