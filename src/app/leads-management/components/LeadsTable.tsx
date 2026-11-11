@@ -31,6 +31,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
 import ViewportPopover from '@/components/ui/ViewportPopover';
+import StageMenuList from './StageMenuList';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -154,47 +155,14 @@ function StageSelector({
           aria-label="Select stage"
           className="stage-dropdown-panel"
         >
-        <div className="py-1">
-          <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Pipeline
-          </p>
-          {PIPELINE_STAGES.map((s) => (
-            <button
-              key={`status-opt-${leadId}-${s}`}
-              role="option"
-              aria-selected={s === currentStatus}
-              onClick={() => {
-                onStatusChange(leadId, s as LeadStatus);
-                setOpen(false);
-              }}
-              className={`w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
-                s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
-              }`}
-            >
-              <StatusBadge status={s} showDot />
-            </button>
-          ))}
-          <div className="my-1 border-t border-border/60" />
-          <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Outcomes
-          </p>
-          {OUTCOME_STAGES.map((s) => (
-            <button
-              key={`status-opt-${leadId}-${s}`}
-              role="option"
-              aria-selected={s === currentStatus}
-              onClick={() => {
-                onStatusChange(leadId, s as LeadStatus);
-                setOpen(false);
-              }}
-              className={`w-full text-start px-3.5 py-2.5 text-sm hover:bg-muted transition-colors min-h-[44px] flex items-center whitespace-normal break-words box-border ${
-                s === currentStatus ? 'bg-secondary/70 font-semibold' : ''
-              }`}
-            >
-              <StatusBadge status={s} showDot />
-            </button>
-          ))}
-        </div>
+          <StageMenuList
+            current={currentStatus}
+            keyPrefix={`status-opt-${leadId}`}
+            onPick={(s) => {
+              setOpen(false);
+              if (s) onStatusChange(leadId, s);
+            }}
+          />
         </ViewportPopover>
       )}
     </>

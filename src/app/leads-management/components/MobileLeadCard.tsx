@@ -25,6 +25,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
 import CalledBadge from './CalledBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
+import StageMenuList from './StageMenuList';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
@@ -278,13 +279,16 @@ function MobileLeadCardInner({
           ref={stageAnchorRef}
           type="button"
           onClick={() => setStatusOpen((o) => !o)}
-          className="inline-flex items-center gap-1.5 min-h-[44px] h-11 px-3.5 rounded-full text-xs font-bold border active:scale-[0.98] transition-transform bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 max-w-full box-border"
+          className="inline-flex items-center gap-1.5 min-h-[44px] h-11 ps-2 pe-3 rounded-full border border-border bg-card active:scale-[0.98] transition-transform max-w-full box-border hover:bg-muted"
           aria-label={`Stage: ${lead.status || 'Fresh Leads'}`}
           aria-expanded={statusOpen}
           aria-haspopup="listbox"
         >
-          <span className="truncate max-w-[220px]">{lead.status || 'Fresh Leads'}</span>
-          <ChevronDown size={13} className="flex-shrink-0" />
+          {/* The stage's own color (not always green), so the card shows where the lead really is. */}
+          <span className="min-w-0 max-w-[220px] truncate">
+            <StatusBadge status={lead.status || 'Fresh Leads'} showDot />
+          </span>
+          <ChevronDown size={14} className="flex-shrink-0 text-muted-foreground" />
         </button>
         {statusOpen && (
           <ViewportPopover
@@ -298,47 +302,14 @@ function MobileLeadCardInner({
             aria-label="Select stage"
             className="stage-dropdown-panel"
           >
-            <div className="py-1">
-              <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Pipeline Stages
-              </p>
-              {PIPELINE_STAGES.map((s) => (
-                <button
-                  key={`mob-pipe-${lead.id}-${s}`}
-                  role="option"
-                  aria-selected={s === lead.status}
-                  onClick={() => {
-                    onStatusChange(lead.id, s as LeadStatus);
-                    setStatusOpen(false);
-                  }}
-                  className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
-                    s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
-                  }`}
-                >
-                  <StatusBadge status={s} showDot />
-                </button>
-              ))}
-              <div className="my-1 border-t border-border/60" />
-              <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Outcome Stages
-              </p>
-              {OUTCOME_STAGES.map((s) => (
-                <button
-                  key={`mob-out-${lead.id}-${s}`}
-                  role="option"
-                  aria-selected={s === lead.status}
-                  onClick={() => {
-                    onStatusChange(lead.id, s as LeadStatus);
-                    setStatusOpen(false);
-                  }}
-                  className={`w-full text-left px-3.5 py-3 text-sm hover:bg-muted transition-colors flex items-center min-h-[48px] whitespace-normal break-words box-border touch-manipulation ${
-                    s === lead.status ? 'bg-emerald-50 dark:bg-emerald-900/30 font-semibold' : ''
-                  }`}
-                >
-                  <StatusBadge status={s} showDot />
-                </button>
-              ))}
-            </div>
+            <StageMenuList
+              current={lead.status || 'Fresh Leads'}
+              keyPrefix={`mob-stage-${lead.id}`}
+              onPick={(s) => {
+                setStatusOpen(false);
+                if (s) onStatusChange(lead.id, s);
+              }}
+            />
           </ViewportPopover>
         )}
 

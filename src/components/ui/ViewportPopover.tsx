@@ -208,7 +208,9 @@ export default function ViewportPopover({
           onClick={onClose}
           aria-hidden="true"
         />
+        {/* ref: taps inside the sheet must not count as "outside" (that closed it before an option's click ran). */}
         <div
+          ref={contentRef}
           className="absolute inset-x-0 bottom-0 bg-card rounded-t-2xl shadow-modal flex flex-col overflow-hidden slide-up-enter box-border"
           style={{
             maxHeight: 'min(82dvh, calc(100vh - 64px))',

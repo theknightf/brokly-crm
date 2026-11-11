@@ -253,6 +253,10 @@ export const dictionaries: Dict = {
   'leadForm.created': { en: 'Lead created', ar: 'العميل اتضاف' },
   'leadForm.viewLead': { en: 'View lead', ar: 'اعرض العميل' },
 
+  'stageMenu.title': { en: 'Change stage', ar: 'غيّر المرحلة' },
+  'stageMenu.pipeline': { en: 'Pipeline', ar: 'مراحل البيع' },
+  'stageMenu.outcomes': { en: 'Outcomes', ar: 'النتايج' },
+
   'leadEdit.title': { en: 'Edit lead', ar: 'تعديل العميل' },
   'leadEdit.subtitle': { en: 'Editing {name}', ar: 'بتعدّل {name}' },
   'leadEdit.sections': { en: 'Form sections', ar: 'أقسام الفورم' },
