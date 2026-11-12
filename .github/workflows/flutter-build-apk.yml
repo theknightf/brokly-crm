@@ -26,6 +26,9 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Pinned: an unpinned 'stable' moved to a Flutter that deprecates package:flutter/material.dart,
+          # which makes `flutter analyze` fail the whole build. Bump on purpose, together with the code.
+          flutter-version: '3.47.2'
           channel: 'stable'
           cache: true
 
