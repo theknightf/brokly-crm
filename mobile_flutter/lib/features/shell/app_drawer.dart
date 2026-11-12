@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../state/auth_provider.dart';
+import 'shell_destinations.dart';
 
 class AppDrawer extends StatelessWidget {
   final int selectedIndex;
@@ -80,189 +81,44 @@ class AppDrawer extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                 children: [
-                  // ── PIPELINE SECTION ──────────────────────────────────
-                  _buildSectionHeader('PIPELINE', isDark),
                   _buildDrawerItem(
-                    icon: LucideIcons.layoutGrid,
-                    label: 'Workspace',
-                    isSelected: selectedIndex == 0,
+                    icon: LucideIcons.house,
+                    label: 'Home',
+                    isSelected: selectedIndex == Pg.home,
                     onTap: () {
-                      onSelectTab(0);
+                      onSelectTab(Pg.home);
                       Navigator.pop(context);
                     },
                     isDark: isDark,
                   ),
                   _buildDrawerItem(
-                    icon: LucideIcons.users,
-                    label: 'Leads',
-                    isSelected: selectedIndex == 1,
+                    icon: LucideIcons.calendarCheck2,
+                    label: 'Attendance',
+                    isSelected: selectedIndex == Pg.attendance,
                     onTap: () {
-                      onSelectTab(1);
+                      onSelectTab(Pg.attendance);
                       Navigator.pop(context);
                     },
                     isDark: isDark,
                   ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.userCheck,
-                    label: 'Customers',
-                    isSelected: selectedIndex == 5,
-                    onTap: () {
-                      onSelectTab(5);
-                      Navigator.pop(context);
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.calendarClock,
-                    label: 'Follow-ups',
-                    isSelected: selectedIndex == 3,
-                    onTap: () {
-                      onSelectTab(3);
-                      Navigator.pop(context);
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.bookmarkCheck,
-                    label: 'Reservations',
-                    isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Reservations management active')),
-                      );
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.badgeDollarSign,
-                    label: 'Deals',
-                    isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Deals pipeline active')),
-                      );
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.phone,
-                    label: 'Call Logs',
-                    isSelected: selectedIndex == 4,
-                    onTap: () {
-                      onSelectTab(4);
-                      Navigator.pop(context);
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.calendar,
-                    label: 'Calendar',
-                    isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Calendar events synced')),
-                      );
-                    },
-                    isDark: isDark,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // ── MANAGEMENT SECTION ────────────────────────────────
-                  _buildSectionHeader('MANAGEMENT', isDark),
-
-                  // Unit Calculator (active neon-green highlight capsule)
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.neonLime,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.neonLime.withAlpha(100),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
+                  for (final section in drawerSections) ...[
+                    if (section.entries.any((e) => e.visible(profile))) ...[
+                      const SizedBox(height: 12),
+                      _buildSectionHeader(section.title, isDark),
+                      for (final e in section.entries.where((e) => e.visible(profile)))
+                        _buildDrawerItem(
+                          icon: e.icon,
+                          label: e.label,
+                          isSelected: selectedIndex == e.page,
+                          onTap: () {
+                            onSelectTab(e.page);
+                            Navigator.pop(context);
+                          },
+                          isDark: isDark,
                         ),
-                      ],
-                    ),
-                    child: ListTile(
-                      dense: true,
-                      leading: const Icon(
-                        LucideIcons.calculator,
-                        size: 19,
-                        color: Color(0xFF142407),
-                      ),
-                      title: const Text(
-                        'Unit Calculator',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF142407),
-                        ),
-                      ),
-                      trailing: const Icon(
-                        LucideIcons.sparkles,
-                        size: 16,
-                        color: Color(0xFF142407),
-                      ),
-                      onTap: () {
-                        onSelectTab(7);
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ),
-
-                  _buildDrawerItem(
-                    icon: LucideIcons.mapPin,
-                    label: 'Locations',
-                    isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Cairo Locations Directory')),
-                      );
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.building2,
-                    label: 'Projects',
-                    isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Real Estate Projects Catalog')),
-                      );
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.chartColumn,
-                    label: 'Reports',
-                    isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Analytics & Performance Reports')),
-                      );
-                    },
-                    isDark: isDark,
-                  ),
-                  _buildDrawerItem(
-                    icon: LucideIcons.home,
-                    label: 'Units',
-                    isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Inventory Units Listing')),
-                      );
-                    },
-                    isDark: isDark,
-                  ),
+                      if (section.title == 'MANAGEMENT') _buildCalculatorItem(isDark),
+                    ],
+                  ],
                 ],
               ),
             ),
@@ -327,6 +183,29 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalculatorItem(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.neonLime,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: AppColors.neonLime.withAlpha(100), blurRadius: 10, offset: const Offset(0, 2))],
+      ),
+      child: Builder(
+        builder: (context) => ListTile(
+          dense: true,
+          leading: const Icon(LucideIcons.calculator, size: 19, color: Color(0xFF142407)),
+          title: const Text('Unit Calculator', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF142407))),
+          trailing: const Icon(LucideIcons.sparkles, size: 16, color: Color(0xFF142407)),
+          onTap: () {
+            onSelectTab(Pg.calculator);
+            Navigator.pop(context);
+          },
         ),
       ),
     );

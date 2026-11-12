@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables, prefer_const_declarations
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_utils.dart';
 import '../../core/utils/whatsapp_utils.dart';
+import '../../core/widgets/premium.dart';
 import '../../data/models/call_log_model.dart';
 import '../../data/models/lead_model.dart';
 import '../../data/services/call_logs_service.dart';
@@ -40,17 +42,19 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
   bool _isLoading = true;
   String _activeLedgerTab = 'all'; // 'all' | 'calls' | 'notes' | 'files'
 
-  // Stitch Color Palette
-  static const Color _bgLowest = Color(0xFF0B0E14);
-  static const Color _cardLow = Color(0xFF191C22);
-  static const Color _cardContainer = Color(0xFF1D2026);
-  static const Color _surfaceHigh = Color(0xFF272A31);
-  static const Color _surfaceHighest = Color(0xFF32353C);
-  static const Color _neonPrimary = Color(0xFFCCFF80);
+  // Theme-aware palette (dark keeps the original Stitch look; light follows AppColors surfaces).
+  bool _dark = true;
+  Color get _bgLowest => _dark ? Color(0xFF0B0E14) : Color(0xFFF8FAFC);
+  Color get _cardLow => _dark ? Color(0xFF161920) : Colors.white;
+  Color get _cardContainer => _dark ? Color(0xFF1D2026) : Color(0xFFF1F5F9);
+  Color get _surfaceHigh => _dark ? Color(0xFF272A31) : Color(0xFFE2E8F0);
+  Color get _surfaceHighest => _dark ? Color(0xFF32353C) : Color(0xFFCBD5E1);
+  Color get _neonPrimary => _dark ? Color(0xFFCCFF80) : Color(0xFF4D7C0F);
+  Color get _outlineVariant => _dark ? Color(0xFF282D38) : Color(0xFFE2E8F0);
+  Color get _onSurface => _dark ? Color(0xFFE1E2EB) : Color(0xFF0F172A);
+  Color get _onSurfaceVariant => _dark ? Color(0xFFA8B0BF) : Color(0xFF64748B);
   static const Color _neonContainer = Color(0xFFA3E635);
-  static const Color _outlineVariant = Color(0xFF424936);
-  static const Color _onSurface = Color(0xFFE1E2EB);
-  static const Color _onSurfaceVariant = Color(0xFFC2CAB0);
+  static const Color _onNeon = Color(0xFF142407);
   static const Color _whatsAppGreen = Color(0xFF25D366);
 
   @override
@@ -61,8 +65,16 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
   Future<void> _loadAll() async {
     setState(() => _isLoading = true);
-    final leadData = await _leadsService.getById(widget.leadId);
-    final callData = await _callLogsService.getAll(entityId: widget.leadId);
+    LeadModel? leadData;
+    List<CallLogModel> callData = [];
+    try {
+      leadData = await _leadsService.getById(widget.leadId);
+      callData = await _callLogsService.getAll(entityId: widget.leadId);
+    } catch (_) {
+      // Keep whatever is already on screen; the not-found state offers Retry.
+      leadData ??= _lead;
+      if (callData.isEmpty) callData = _calls;
+    }
 
     List<Map<String, dynamic>> fetchedComments = [];
     try {
@@ -122,18 +134,18 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
   Future<void> _scheduleFollowUp() async {
     if (_lead == null) return;
     final now = DateTime.now();
-    final initial = _lead!.followUpDateTime ?? now.add(const Duration(days: 1));
+    final initial = _lead!.followUpDateTime ?? now.add(Duration(days: 1));
     final pickedDate = await showDatePicker(
       context: context,
-      initialDate: initial.isBefore(now) ? now.add(const Duration(days: 1)) : initial,
+      initialDate: initial.isBefore(now) ? now.add(Duration(days: 1)) : initial,
       firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
+      lastDate: now.add(Duration(days: 365)),
     );
     if (pickedDate == null || !mounted) return;
 
     final pickedTime = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(hour: 11, minute: 0),
+      initialTime: TimeOfDay(hour: 11, minute: 0),
     );
     if (!mounted) return;
 
@@ -168,7 +180,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Follow-up scheduled for $dateStr at $timeStr'),
-          backgroundColor: const Color(0xFF65A30D),
+          backgroundColor: Color(0xFF65A30D),
         ),
       );
     }
@@ -199,7 +211,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                 ? 'Synced $synced call(s) from device call log'
                 : 'Device call log is up to date',
           ),
-          backgroundColor: const Color(0xFF65A30D),
+          backgroundColor: Color(0xFF65A30D),
         ),
       );
     }
@@ -267,12 +279,19 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
+    _dark = Theme.of(context).brightness == Brightness.dark;
+
+    // Skeleton only on the very first load; refreshes keep the content (and scroll position).
+    if (_isLoading && _lead == null) {
+      return Scaffold(
         backgroundColor: _bgLowest,
-        body: Center(
-          child: CircularProgressIndicator(color: _neonPrimary),
+        appBar: AppBar(
+          backgroundColor: _bgLowest,
+          elevation: 0,
+          iconTheme: IconThemeData(color: _onSurface),
+          title: Text('Lead Profile', style: TextStyle(color: _onSurface, fontSize: 16, fontWeight: FontWeight.w800)),
         ),
+        body: SkeletonList(count: 4, height: 150),
       );
     }
 
@@ -281,10 +300,16 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
         backgroundColor: _bgLowest,
         appBar: AppBar(
           backgroundColor: _bgLowest,
-          title: const Text('Lead Profile'),
+          elevation: 0,
+          iconTheme: IconThemeData(color: _onSurface),
+          title: Text('Lead Profile', style: TextStyle(color: _onSurface, fontSize: 16, fontWeight: FontWeight.w800)),
         ),
-        body: const Center(
-          child: Text('Lead not found', style: TextStyle(color: _onSurface)),
+        body: EmptyState(
+          icon: LucideIcons.userX,
+          title: 'Lead not found',
+          message: 'It may have been deleted or you may not have access. Check your connection and try again.',
+          actionLabel: 'Retry',
+          onAction: _loadAll,
         ),
       );
     }
@@ -308,7 +333,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
     final auth = context.watch<AuthProvider>();
     final currentAgentName =
-        lead.assignedToName ?? lead.agent ?? auth.profile?.fullName ?? 'Faris Mansoor';
+        lead.assignedToName ?? lead.agent ?? auth.profile?.fullName ?? 'Unassigned';
 
     return Scaffold(
       backgroundColor: _bgLowest,
@@ -317,10 +342,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
           children: [
             // Top Bar / Navigation Context
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: _bgLowest.withAlpha(242),
-                border: const Border(
+                border: Border(
                   bottom: BorderSide(color: _outlineVariant, width: 0.8),
                 ),
               ),
@@ -333,21 +358,21 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                         onTap: () => Navigator.pop(context),
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
-                          width: 38,
-                          height: 38,
+                          width: 44,
+                          height: 44,
                           decoration: BoxDecoration(
                             color: _cardLow,
                             shape: BoxShape.circle,
                             border: Border.all(color: _outlineVariant),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             LucideIcons.arrowLeft,
                             size: 18,
                             color: _onSurface,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -355,7 +380,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             children: [
                               Text(
                                 '#LEAD-$shortId',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: _neonPrimary,
                                   fontSize: 11.5,
                                   fontFamily: 'monospace',
@@ -363,18 +388,18 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                   letterSpacing: 0.6,
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              SizedBox(width: 6),
                               Container(
                                 width: 6,
                                 height: 6,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   color: _neonPrimary,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                             ],
                           ),
-                          const Text(
+                          Text(
                             'ملف العميل • Lead Profile',
                             style: TextStyle(
                               color: _onSurfaceVariant,
@@ -389,13 +414,13 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: _cardContainer,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: _outlineVariant),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
                             Icon(LucideIcons.shieldCheck, size: 13, color: _neonPrimary),
                             SizedBox(width: 4),
@@ -410,14 +435,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 6),
                       InkWell(
                         onTap: () {
                           Clipboard.setData(
                             ClipboardData(text: '${lead.name} - ${lead.phone}'),
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text('Lead contact copied to clipboard'),
                               duration: Duration(seconds: 2),
                             ),
@@ -432,14 +457,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(color: _outlineVariant),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             LucideIcons.share2,
                             size: 16,
                             color: _onSurfaceVariant,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 6),
                       PopupMenuButton<String>(
                         color: _cardLow,
                         icon: Container(
@@ -450,7 +475,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(color: _outlineVariant),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             LucideIcons.ellipsisVertical,
                             size: 16,
                             color: _onSurfaceVariant,
@@ -482,14 +507,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const UnitCalculatorScreen(),
+                                builder: (_) => UnitCalculatorScreen(),
                               ),
                             );
                           } else if (value == 'delete') {
                             _confirmDelete();
                           }
                         },
-                        itemBuilder: (_) => const [
+                        itemBuilder: (_) => [
                           PopupMenuItem(
                             value: 'edit',
                             child: Text('Edit Lead Profile', style: TextStyle(color: _onSurface)),
@@ -524,14 +549,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                 color: _neonPrimary,
                 onRefresh: _loadAll,
                 child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+                  physics: AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(14, 14, 14, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // 1. Lead Identity & Executive Summary Card
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: _cardLow,
                           borderRadius: BorderRadius.circular(16),
@@ -540,7 +565,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             BoxShadow(
                               color: Colors.black.withAlpha(110),
                               blurRadius: 18,
-                              offset: const Offset(0, 6),
+                              offset: Offset(0, 6),
                             ),
                           ],
                         ),
@@ -575,7 +600,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                             child: Center(
                                               child: Text(
                                                 initials,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   color: _neonPrimary,
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.w800,
@@ -598,7 +623,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(width: 12),
+                                      SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -612,14 +637,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                                   lead.name.isNotEmpty
                                                       ? lead.name
                                                       : lead.phone,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     color: _onSurface,
                                                     fontSize: 16.5,
                                                     fontWeight: FontWeight.w800,
                                                   ),
                                                 ),
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(
+                                                  padding: EdgeInsets.symmetric(
                                                     horizontal: 7,
                                                     vertical: 2,
                                                   ),
@@ -635,7 +660,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                                             lead.priority == 'Urgent'
                                                         ? 'VIP HNW'
                                                         : lead.priority.toUpperCase(),
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       color: _neonPrimary,
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.w800,
@@ -643,27 +668,28 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                                     ),
                                                   ),
                                                 ),
+                                                StatusPill(lead.status),
                                               ],
                                             ),
-                                            const SizedBox(height: 4),
+                                            SizedBox(height: 4),
                                             Row(
                                               children: [
-                                                const Icon(
+                                                Icon(
                                                   LucideIcons.mapPin,
                                                   size: 12,
                                                   color: _neonPrimary,
                                                 ),
-                                                const SizedBox(width: 4),
+                                                SizedBox(width: 4),
                                                 Expanded(
                                                   child: Text(
                                                     lead.location?.isNotEmpty == true
                                                         ? lead.location!
                                                         : (lead.project?.isNotEmpty == true
                                                             ? lead.project!
-                                                            : 'New Cairo, Egypt'),
+                                                            : 'Location not set'),
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       color: _onSurfaceVariant,
                                                       fontSize: 11.5,
                                                     ),
@@ -682,14 +708,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                   children: [
                                     Text(
                                       '$score/100',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: _neonPrimary,
                                         fontSize: 12.5,
                                         fontFamily: 'monospace',
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),
-                                    const Text(
+                                    Text(
                                       'LEAD SCORE',
                                       style: TextStyle(
                                         color: _onSurfaceVariant,
@@ -702,11 +728,11 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: 14),
 
                             // Contact Ribbon & Direct CTA
                             Container(
-                              padding: const EdgeInsets.symmetric(
+                              padding: EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 10,
                               ),
@@ -729,13 +755,13 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                             borderRadius: BorderRadius.circular(8),
                                             border: Border.all(color: _outlineVariant),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             LucideIcons.phone,
                                             size: 16,
                                             color: _neonPrimary,
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
+                                        SizedBox(width: 10),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -744,14 +770,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                                 lead.phone,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   color: _onSurface,
                                                   fontSize: 13.5,
                                                   fontFamily: 'monospace',
                                                   fontWeight: FontWeight.w700,
                                                 ),
                                               ),
-                                              const Text(
+                                              Text(
                                                 'Primary Mobile • Verified',
                                                 style: TextStyle(
                                                   color: _onSurfaceVariant,
@@ -771,8 +797,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                         onTap: () => _openWhatsApp(),
                                         borderRadius: BorderRadius.circular(20),
                                         child: Container(
-                                          width: 38,
-                                          height: 38,
+                                          width: 44,
+                                          height: 44,
                                           decoration: BoxDecoration(
                                             color: _whatsAppGreen.withAlpha(38),
                                             shape: BoxShape.circle,
@@ -780,21 +806,21 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                               color: _whatsAppGreen.withAlpha(110),
                                             ),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             LucideIcons.messageCircle,
                                             size: 18,
                                             color: _whatsAppGreen,
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      SizedBox(width: 8),
                                       // Direct Dial Action
                                       InkWell(
                                         onTap: _makeCall,
                                         borderRadius: BorderRadius.circular(20),
                                         child: Container(
-                                          width: 38,
-                                          height: 38,
+                                          width: 44,
+                                          height: 44,
                                           decoration: BoxDecoration(
                                             color: _neonContainer,
                                             shape: BoxShape.circle,
@@ -805,10 +831,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                               ),
                                             ],
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             LucideIcons.phoneCall,
                                             size: 18,
-                                            color: _bgLowest,
+                                            color: _onNeon,
                                           ),
                                         ),
                                       ),
@@ -817,12 +843,12 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: 14),
 
                             // Sales Stage Stepper Visualizer (مرحلة البيع)
                             Container(
-                              padding: const EdgeInsets.only(top: 12),
-                              decoration: const BoxDecoration(
+                              padding: EdgeInsets.only(top: 12),
+                              decoration: BoxDecoration(
                                 border: Border(
                                   top: BorderSide(color: _outlineVariant, width: 0.8),
                                 ),
@@ -832,7 +858,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Row(
+                                      Row(
                                         children: [
                                           Icon(
                                             LucideIcons.activity,
@@ -872,7 +898,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                         },
                                         borderRadius: BorderRadius.circular(14),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(
+                                          padding: EdgeInsets.symmetric(
                                             horizontal: 9,
                                             vertical: 4,
                                           ),
@@ -888,14 +914,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                             children: [
                                               Text(
                                                 '${lead.status} (${_stageSubtitleAr(lead.status)})',
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   color: _neonPrimary,
                                                   fontSize: 10.5,
                                                   fontWeight: FontWeight.w800,
                                                 ),
                                               ),
-                                              const SizedBox(width: 4),
-                                              const Icon(
+                                              SizedBox(width: 4),
+                                              Icon(
                                                 LucideIcons.chevronDown,
                                                 size: 12,
                                                 color: _neonPrimary,
@@ -906,29 +932,29 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 10),
+                                  SizedBox(height: 10),
                                   Row(
                                     children: [
                                       _buildStageStep(0, 'Fresh', stepIdx),
-                                      const SizedBox(width: 6),
+                                      SizedBox(width: 6),
                                       _buildStageStep(1, 'Contacted', stepIdx),
-                                      const SizedBox(width: 6),
+                                      SizedBox(width: 6),
                                       _buildStageStep(2, 'Meeting', stepIdx),
-                                      const SizedBox(width: 6),
+                                      SizedBox(width: 6),
                                       _buildStageStep(3, 'Negotiate', stepIdx),
-                                      const SizedBox(width: 6),
+                                      SizedBox(width: 6),
                                       _buildStageStep(4, 'Won', stepIdx),
                                     ],
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: 14),
 
                             // Metadata Roster (Director / Source / Added Date)
                             Container(
-                              padding: const EdgeInsets.only(top: 12),
-                              decoration: const BoxDecoration(
+                              padding: EdgeInsets.only(top: 12),
+                              decoration: BoxDecoration(
                                 border: Border(
                                   top: BorderSide(color: _outlineVariant, width: 0.8),
                                 ),
@@ -943,7 +969,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                       'SOURCE',
                                       lead.source?.isNotEmpty == true
                                           ? lead.source!
-                                          : 'Meta VIP Ad',
+                                          : 'Not specified',
                                     ),
                                   ),
                                   Expanded(
@@ -955,13 +981,70 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 ],
                               ),
                             ),
+                            SizedBox(height: 12),
+                            // Next follow-up (turns red when overdue)
+                            InkWell(
+                              onTap: _scheduleFollowUp,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                constraints: BoxConstraints(minHeight: 48),
+                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppDateUtils.isOverdue(lead.followUpDue)
+                                      ? Color(0xFFEF4444).withAlpha(25)
+                                      : _cardContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppDateUtils.isOverdue(lead.followUpDue)
+                                        ? Color(0xFFEF4444).withAlpha(90)
+                                        : _outlineVariant,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      LucideIcons.calendarClock,
+                                      size: 16,
+                                      color: AppDateUtils.isOverdue(lead.followUpDue)
+                                          ? Color(0xFFEF4444)
+                                          : _neonPrimary,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        lead.followUpDue != null
+                                            ? 'Next follow-up: ${AppDateUtils.formatFollowUpShort(lead.followUpDue)}'
+                                            : 'No follow-up scheduled',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: AppDateUtils.isOverdue(lead.followUpDue)
+                                              ? Color(0xFFEF4444)
+                                              : _onSurface,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      lead.followUpDue != null ? 'Reschedule' : 'Schedule',
+                                      style: TextStyle(
+                                        color: _neonPrimary,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       // 2. Quick Dispatch Actions (4-Button Grid)
-                      const Row(
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
@@ -983,11 +1066,11 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       GridView.count(
                         crossAxisCount: 2,
                         shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
+                        physics: NeverScrollableScrollPhysics(),
                         mainAxisSpacing: 8,
                         crossAxisSpacing: 8,
                         childAspectRatio: 2.4,
@@ -1025,11 +1108,11 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       // 3. Target Property & Budget Matrix
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: _cardLow,
                           borderRadius: BorderRadius.circular(16),
@@ -1038,7 +1121,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Row(
+                            Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Row(
@@ -1068,13 +1151,13 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            const Divider(color: _outlineVariant, height: 1),
-                            const SizedBox(height: 12),
+                            SizedBox(height: 10),
+                            Divider(color: _outlineVariant, height: 1),
+                            SizedBox(height: 12),
 
                             // Property Card Banner
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: _bgLowest,
                                 borderRadius: BorderRadius.circular(12),
@@ -1086,7 +1169,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                     width: 68,
                                     height: 68,
                                     decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
+                                      gradient: LinearGradient(
                                         colors: [Color(0xFF1F2937), Color(0xFF0F172A)],
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
@@ -1097,7 +1180,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                     child: Stack(
                                       alignment: Alignment.center,
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           LucideIcons.building,
                                           size: 28,
                                           color: _neonPrimary,
@@ -1107,7 +1190,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                           left: 4,
                                           right: 4,
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(
+                                            padding: EdgeInsets.symmetric(
                                               horizontal: 3,
                                               vertical: 1,
                                             ),
@@ -1118,11 +1201,11 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                             child: Text(
                                               lead.developer?.isNotEmpty == true
                                                   ? lead.developer!
-                                                  : 'Prime Tier',
+                                                  : 'Developer',
                                               textAlign: TextAlign.center,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 color: _neonPrimary,
                                                 fontSize: 8.5,
                                                 fontFamily: 'monospace',
@@ -1134,7 +1217,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1142,7 +1225,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            const Text(
+                                            Text(
                                               'PRIME INTEREST',
                                               style: TextStyle(
                                                 color: _neonPrimary,
@@ -1152,7 +1235,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                               ),
                                             ),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(
+                                              padding: EdgeInsets.symmetric(
                                                 horizontal: 6,
                                                 vertical: 2,
                                               ),
@@ -1163,8 +1246,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                               child: Text(
                                                 lead.propertyType?.isNotEmpty == true
                                                     ? lead.propertyType!
-                                                    : 'Villa 3BR+M',
-                                                style: const TextStyle(
+                                                    : 'Type not set',
+                                                style: TextStyle(
                                                   color: _onSurfaceVariant,
                                                   fontSize: 9.5,
                                                   fontFamily: 'monospace',
@@ -1173,56 +1256,56 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 4),
+                                        SizedBox(height: 4),
                                         Text(
                                           lead.project?.isNotEmpty == true
                                               ? lead.project!
-                                              : 'Palm Residence Luxury Suites',
+                                              : 'No project selected',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: _onSurface,
                                             fontSize: 13.5,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
                                         Text(
-                                          'Developer: ${lead.developer?.isNotEmpty == true ? lead.developer! : "Tier-1 Real Estate"}',
-                                          style: const TextStyle(
+                                          'Developer: ${lead.developer?.isNotEmpty == true ? lead.developer! : "Not specified"}',
+                                          style: TextStyle(
                                             color: _onSurfaceVariant,
                                             fontSize: 11,
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            const Icon(
+                                            Icon(
                                               LucideIcons.bedDouble,
                                               size: 12,
                                               color: _neonPrimary,
                                             ),
-                                            const SizedBox(width: 4),
+                                            SizedBox(width: 4),
                                             Text(
                                               lead.unit?.isNotEmpty == true
                                                   ? lead.unit!
-                                                  : '3 BR',
-                                              style: const TextStyle(
+                                                  : '—',
+                                              style: TextStyle(
                                                 color: _onSurfaceVariant,
                                                 fontSize: 11,
                                               ),
                                             ),
-                                            const SizedBox(width: 10),
-                                            const Icon(
+                                            SizedBox(width: 10),
+                                            Icon(
                                               LucideIcons.maximize2,
                                               size: 11,
                                               color: _neonPrimary,
                                             ),
-                                            const SizedBox(width: 4),
+                                            SizedBox(width: 4),
                                             Text(
                                               lead.unitArea > 0
                                                   ? '${lead.unitArea.toInt()} m²'
-                                                  : '240 m²',
-                                              style: const TextStyle(
+                                                  : '—',
+                                              style: TextStyle(
                                                 color: _onSurfaceVariant,
                                                 fontSize: 11,
                                               ),
@@ -1235,14 +1318,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            SizedBox(height: 10),
 
                             // Financial Matrix KPI Grid
                             Row(
                               children: [
                                 Expanded(
                                   child: Container(
-                                    padding: const EdgeInsets.all(12),
+                                    padding: EdgeInsets.all(12),
                                     decoration: BoxDecoration(
                                       color: _bgLowest,
                                       borderRadius: BorderRadius.circular(12),
@@ -1251,7 +1334,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Row(
+                                        Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
@@ -1271,30 +1354,30 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 4),
+                                        SizedBox(height: 4),
                                         Text(
                                           (lead.budgetMax != null || lead.budgetMin != null)
                                               ? CurrencyFormatter.formatCompact(
                                                   lead.budgetMax ?? lead.budgetMin,
                                                 )
-                                              : '7.50M ج.م',
-                                          style: const TextStyle(
+                                              : 'Not set',
+                                          style: TextStyle(
                                             color: _neonPrimary,
                                             fontSize: 17,
                                             fontWeight: FontWeight.w800,
                                           ),
                                         ),
-                                        const SizedBox(height: 2),
+                                        SizedBox(height: 2),
                                         Text(
                                           (lead.budgetMin != null || lead.budgetMax != null)
                                               ? CurrencyFormatter.formatRange(
                                                   lead.budgetMin,
                                                   lead.budgetMax,
                                                 )
-                                              : 'Flexible Allocation',
+                                              : 'Budget range not set',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: _onSurfaceVariant,
                                             fontSize: 10.5,
                                             fontFamily: 'monospace',
@@ -1304,20 +1387,20 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 Expanded(
                                   child: InkWell(
                                     onTap: () {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => const UnitCalculatorScreen(),
+                                          builder: (_) => UnitCalculatorScreen(),
                                         ),
                                       );
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Container(
-                                      padding: const EdgeInsets.all(12),
+                                      padding: EdgeInsets.all(12),
                                       decoration: BoxDecoration(
                                         color: _bgLowest,
                                         borderRadius: BorderRadius.circular(12),
@@ -1326,7 +1409,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Row(
+                                          Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
                                               Text(
@@ -1346,19 +1429,19 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 4),
+                                          SizedBox(height: 4),
                                           Text(
                                             lead.installmentCount > 0
                                                 ? '${lead.installmentCount} Installments'
-                                                : '7 Yrs Installments',
-                                            style: const TextStyle(
+                                                : 'Plan not set',
+                                            style: TextStyle(
                                               color: _onSurface,
                                               fontSize: 13.5,
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          const Row(
+                                          SizedBox(height: 4),
+                                          Row(
                                             children: [
                                               Icon(
                                                 LucideIcons.calculator,
@@ -1390,11 +1473,11 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       // 4. 360° Activity Ledger (سجل التفاعلات والتواصل الشامل)
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: _cardLow,
                           borderRadius: BorderRadius.circular(16),
@@ -1406,7 +1489,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Column(
+                                Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
@@ -1441,12 +1524,12 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                           },
                                         );
                                       },
-                                      icon: const Icon(
+                                      icon: Icon(
                                         LucideIcons.plus,
                                         size: 13,
                                         color: _neonPrimary,
                                       ),
-                                      label: const Text(
+                                      label: Text(
                                         'Note',
                                         style: TextStyle(
                                           color: _neonPrimary,
@@ -1457,12 +1540,12 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                     ),
                                     TextButton.icon(
                                       onPressed: _syncDeviceCalls,
-                                      icon: const Icon(
+                                      icon: Icon(
                                         LucideIcons.refreshCw,
                                         size: 13,
                                         color: _neonPrimary,
                                       ),
-                                      label: const Text(
+                                      label: Text(
                                         'Sync',
                                         style: TextStyle(
                                           color: _neonPrimary,
@@ -1475,7 +1558,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: 12),
 
                             // Segmented Interactive Filter Tabs
                             SingleChildScrollView(
@@ -1486,18 +1569,18 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                     'all',
                                     'All Activity ($totalActivityCount)',
                                   ),
-                                  const SizedBox(width: 6),
+                                  SizedBox(width: 6),
                                   _buildLedgerTabChip(
                                     'calls',
                                     'Call Logs (${_calls.length})',
                                     showDot: _calls.isNotEmpty,
                                   ),
-                                  const SizedBox(width: 6),
+                                  SizedBox(width: 6),
                                   _buildLedgerTabChip(
                                     'notes',
                                     'Notes (${noteLines.length})',
                                   ),
-                                  const SizedBox(width: 6),
+                                  SizedBox(width: 6),
                                   _buildLedgerTabChip(
                                     'files',
                                     'Files & KYC',
@@ -1505,13 +1588,37 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: 16),
 
                             // Timeline Content
-                            ..._buildTimelineWidgets(
-                              lead: lead,
-                              noteLines: noteLines,
-                              currentAgentName: currentAgentName,
+                            Stack(
+                              children: [
+                                if (_activeLedgerTab != 'files')
+                                  Positioned(
+                                    left: 11,
+                                    top: 14,
+                                    bottom: 14,
+                                    width: 2,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: _outlineVariant,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ),
+                                AnimatedSwitcher(
+                                  duration: Duration(milliseconds: 200),
+                                  child: Column(
+                                    key: ValueKey(_activeLedgerTab),
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: _buildTimelineWidgets(
+                                      lead: lead,
+                                      noteLines: noteLines,
+                                      currentAgentName: currentAgentName,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -1524,17 +1631,17 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
             // 5. Sticky Bottom Outreach & Execution Bar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: _bgLowest.withAlpha(245),
-                border: const Border(
+                border: Border(
                   top: BorderSide(color: _outlineVariant),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withAlpha(180),
                     blurRadius: 20,
-                    offset: const Offset(0, -6),
+                    offset: Offset(0, -6),
                   ),
                 ],
               ),
@@ -1553,7 +1660,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                           borderRadius: BorderRadius.circular(28),
                           border: Border.all(color: _outlineVariant),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(LucideIcons.phone, size: 18, color: _neonPrimary),
@@ -1584,7 +1691,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   // Primary Kinetic Action: Update Stage & Schedule Callback
                   Expanded(
                     flex: 14,
@@ -1606,10 +1713,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             ),
                           ],
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(LucideIcons.calendarClock, size: 18, color: _bgLowest),
+                            Icon(LucideIcons.calendarClock, size: 18, color: _onNeon),
                             SizedBox(width: 8),
                             Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -1618,7 +1725,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 Text(
                                   'Update & Callback',
                                   style: TextStyle(
-                                    color: _bgLowest,
+                                    color: _onNeon,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -1626,7 +1733,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                 Text(
                                   'تحديث المرحلة وموعد',
                                   style: TextStyle(
-                                    color: _bgLowest,
+                                    color: _onNeon,
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -1668,7 +1775,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                   : null,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
@@ -1690,19 +1797,19 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: _onSurfaceVariant,
             fontSize: 9.5,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.4,
           ),
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: 2),
         Text(
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             color: _onSurface,
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -1723,7 +1830,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
           color: _cardContainer,
           borderRadius: BorderRadius.circular(14),
@@ -1741,7 +1848,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               ),
               child: Icon(icon, size: 17, color: accentColor),
             ),
-            const SizedBox(width: 9),
+            SizedBox(width: 9),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1751,7 +1858,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: _onSurface,
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -1761,7 +1868,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     subtitleAr,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: _onSurfaceVariant,
                       fontSize: 10.5,
                     ),
@@ -1781,7 +1888,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       onTap: () => setState(() => _activeLedgerTab = key),
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           color: selected ? _neonContainer : _cardContainer,
           borderRadius: BorderRadius.circular(20),
@@ -1795,18 +1902,18 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
             Text(
               label,
               style: TextStyle(
-                color: selected ? _bgLowest : _onSurfaceVariant,
+                color: selected ? _onNeon : _onSurfaceVariant,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w800,
               ),
             ),
             if (showDot) ...[
-              const SizedBox(width: 5),
+              SizedBox(width: 5),
               Container(
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: selected ? _bgLowest : _neonPrimary,
+                  color: selected ? _onNeon : _neonPrimary,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -1827,7 +1934,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     if (_activeLedgerTab == 'files') {
       items.add(
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: _cardContainer,
             borderRadius: BorderRadius.circular(12),
@@ -1839,7 +1946,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Row(
+                  Row(
                     children: [
                       Icon(LucideIcons.fileText, size: 16, color: _neonPrimary),
                       SizedBox(width: 8),
@@ -1855,7 +1962,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                   ),
                   TextButton(
                     onPressed: () => _openWhatsApp(isBrochure: true),
-                    child: const Text(
+                    child: Text(
                       'Send via WA →',
                       style: TextStyle(
                         color: _whatsAppGreen,
@@ -1866,10 +1973,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
-                'Project: ${lead.project ?? "Residential Portfolio"} • Ready for WhatsApp dispatch or Unit Calculator breakdown.',
-                style: const TextStyle(color: _onSurfaceVariant, fontSize: 12),
+                'Project: ${lead.project ?? "not set"} • Ready for WhatsApp dispatch or Unit Calculator breakdown.',
+                style: TextStyle(color: _onSurfaceVariant, fontSize: 12),
               ),
             ],
           ),
@@ -1890,14 +1997,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
         items.add(
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(bottom: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 24,
                   height: 24,
-                  margin: const EdgeInsets.only(top: 2),
+                  margin: EdgeInsets.only(top: 2),
                   decoration: BoxDecoration(
                     color: _bgLowest,
                     shape: BoxShape.circle,
@@ -1911,10 +2018,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     color: markerColor,
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _cardContainer,
                       borderRadius: BorderRadius.circular(12),
@@ -1942,9 +2049,9 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
+                                  SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
+                                    padding: EdgeInsets.symmetric(
                                       horizontal: 6,
                                       vertical: 2,
                                     ),
@@ -1967,7 +2074,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             ),
                             Text(
                               tsLabel,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: _onSurfaceVariant,
                                 fontSize: 10,
                                 fontFamily: 'monospace',
@@ -1976,20 +2083,20 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                           ],
                         ),
                         if (call.notes != null && call.notes!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
+                          SizedBox(height: 6),
                           Text(
                             call.notes!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: _onSurface,
                               fontSize: 12.5,
                               height: 1.35,
                             ),
                           ),
                         ],
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         // Call Metadata Bar
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: _bgLowest,
                             borderRadius: BorderRadius.circular(8),
@@ -2005,10 +2112,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                                     size: 13,
                                     color: markerColor,
                                   ),
-                                  const SizedBox(width: 6),
+                                  SizedBox(width: 6),
                                   Text(
                                     'Status: ${call.outcome} (${call.direction.toUpperCase()})',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: _onSurfaceVariant,
                                       fontSize: 10.5,
                                       fontFamily: 'monospace',
@@ -2044,29 +2151,29 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       for (final line in noteLines) {
         items.add(
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(bottom: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 24,
                   height: 24,
-                  margin: const EdgeInsets.only(top: 2),
+                  margin: EdgeInsets.only(top: 2),
                   decoration: BoxDecoration(
                     color: _bgLowest,
                     shape: BoxShape.circle,
                     border: Border.all(color: _neonPrimary, width: 2),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     LucideIcons.fileText,
                     size: 11,
                     color: _neonPrimary,
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _cardContainer,
                       borderRadius: BorderRadius.circular(12),
@@ -2075,7 +2182,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
@@ -2096,10 +2203,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 5),
+                        SizedBox(height: 5),
                         Text(
                           line,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: _onSurface,
                             fontSize: 12.5,
                             height: 1.4,
@@ -2125,22 +2232,22 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
             Container(
               width: 24,
               height: 24,
-              margin: const EdgeInsets.only(top: 2),
+              margin: EdgeInsets.only(top: 2),
               decoration: BoxDecoration(
                 color: _bgLowest,
                 shape: BoxShape.circle,
                 border: Border.all(color: _neonPrimary, width: 2),
               ),
-              child: const Icon(
+              child: Icon(
                 LucideIcons.gitCommitHorizontal,
                 size: 11,
                 color: _neonPrimary,
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _cardContainer,
                   borderRadius: BorderRadius.circular(12),
@@ -2152,7 +2259,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Stage Status Active',
                           style: TextStyle(
                             color: _onSurface,
@@ -2162,7 +2269,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                         ),
                         Text(
                           AppDateUtils.formatDate(lead.lastActionAt ?? lead.createdAt),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: _onSurfaceVariant,
                             fontSize: 10,
                             fontFamily: 'monospace',
@@ -2170,10 +2277,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       'Current pipeline stage: ${lead.status} (${_stageSubtitleAr(lead.status)}) • Assigned to $currentAgentName.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: _onSurfaceVariant,
                         fontSize: 12,
                       ),
@@ -2189,7 +2296,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
     if (items.isEmpty) {
       items.add(
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(vertical: 20),
           child: Center(
             child: Text(
@@ -2209,15 +2316,15 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _cardLow,
-        title: const Text('Delete Lead', style: TextStyle(color: _onSurface)),
+        title: Text('Delete Lead', style: TextStyle(color: _onSurface)),
         content: Text(
           'Are you sure you want to delete ${_lead?.name}?',
-          style: const TextStyle(color: _onSurfaceVariant),
+          style: TextStyle(color: _onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: _onSurfaceVariant)),
+            child: Text('Cancel', style: TextStyle(color: _onSurfaceVariant)),
           ),
           TextButton(
             onPressed: () async {
@@ -2225,7 +2332,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               await context.read<LeadsProvider>().deleteLead(widget.leadId);
               if (mounted) Navigator.pop(context);
             },
-            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
+            child: Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
           ),
         ],
       ),

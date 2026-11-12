@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/whatsapp_utils.dart';
+import '../../../core/widgets/premium.dart';
 import '../../../data/models/lead_model.dart';
 import '../../../state/leads_provider.dart';
 import '../edit_lead_screen.dart';
@@ -12,15 +13,26 @@ import 'log_call_dialog.dart';
 import 'quick_note_dialog.dart';
 import 'status_change_sheet.dart';
 
+enum _CardMenu { brochure, replied, noAnswer, edit, delete }
+
+/// Lead summary card. Hierarchy: identity (name, phone) -> stage + urgency ->
+/// quiet meta (project, budget, owner, source, follow-up) -> primary actions.
 class LeadCard extends StatelessWidget {
   final LeadModel lead;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry margin;
 
   const LeadCard({
     super.key,
     required this.lead,
     required this.onTap,
+    this.margin = const EdgeInsets.only(bottom: 12),
   });
+
+  static const Color _onNeon = Color(0xFF142407);
+  static const Color _amber = Color(0xFFF59E0B);
+  static const Color _red = Color(0xFFEF4444);
+  static const Color _wa = Color(0xFF25D366);
 
   Future<void> _makeCall(BuildContext context) async {
     await LogCallDialog.dialAndTrack(context, lead: lead);
@@ -38,9 +50,9 @@ class LeadCard extends StatelessWidget {
 
   void _logInteractionChip(BuildContext context, String responseType) {
     context.read<LeadsProvider>().addNote(
-      lead.id,
-      'Interaction recorded: $responseType',
-    );
+          lead.id,
+          'Interaction recorded: $responseType',
+        );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Marked as "$responseType" for ${lead.name}'),
@@ -49,593 +61,268 @@ class LeadCard extends StatelessWidget {
     );
   }
 
+  String get _initials {
+    final parts = lead.name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).take(2);
+    final s = parts.map((e) => e[0].toUpperCase()).join();
+    return s.isEmpty ? '#' : s;
+  }
+
+  void _changeStatus(BuildContext context) {
+    final provider = context.read<LeadsProvider>();
+    StatusChangeSheet.show(
+      context,
+      currentStatus: lead.status,
+      onSelectStatus: (newStatus) {
+        provider.updateStatus(lead.id, newStatus);
+      },
+    );
+  }
+
+  void _addNote(BuildContext context) {
+    final provider = context.read<LeadsProvider>();
+    QuickNoteDialog.show(
+      context,
+      leadName: lead.name,
+      onSaveNote: (note) => provider.addNote(lead.id, note),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Surf.dark(context);
+    final text = Surf.text(context);
+    final sub = Surf.subtext(context);
     final statusColors = AppColors.getStatusColors(lead.status, isDark: isDark);
-    final provider = context.read<LeadsProvider>();
 
+    final hasBudget = lead.budgetMax != null || lead.budgetMin != null;
     final isHighNet = (lead.budgetMax ?? 0) >= 4000000 || (lead.budgetMin ?? 0) >= 3000000;
-    final isActionToday = lead.actionTakenToday || AppDateUtils.isDueToday(lead.followUpDue);
-    final isVerified = lead.phone.isNotEmpty;
+    final overdue = AppDateUtils.isOverdue(lead.followUpDue);
+    final dueToday = lead.actionTakenToday || AppDateUtils.isDueToday(lead.followUpDue);
+    final projectLine = [
+      if (lead.project?.isNotEmpty == true) lead.project!,
+      if (lead.propertyType?.isNotEmpty == true) lead.propertyType!,
+    ].join(' · ');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161920) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? const Color(0xFF282D38) : AppColors.lightBorder,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 80 : 15),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+    return RepaintBoundary(
+      child: PremiumCard(
+        margin: margin,
+        padding: const EdgeInsets.fromLTRB(14, 14, 6, 10),
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Ambient Linear Accent Border Top (from Stitch Luxury Leads Hub)
-            Container(
-              height: 3,
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.neonLime,
-                    Color(0xFF65A30D),
-                    Colors.transparent,
-                  ],
-                  stops: [0.0, 0.45, 1.0],
+            // Identity row
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: statusColors.bg,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    _initials,
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: statusColors.text),
+                  ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lead.name.isNotEmpty ? lead.name : 'Unknown Contact',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: text, letterSpacing: -0.1),
+                      ),
+                      if (lead.phone.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            lead.phone,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: sub,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                _buildMenu(context, sub),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Stage + urgency
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  InkWell(
+                    onTap: () => _changeStatus(context),
+                    borderRadius: BorderRadius.circular(999),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 32),
+                      child: Container(
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: statusColors.bg,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: statusColors.text.withAlpha(70)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              lead.status,
+                              style: TextStyle(color: statusColors.text, fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(LucideIcons.chevronDown, size: 12, color: statusColors.text),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (overdue)
+                    const StatusPill('Overdue', color: _red, icon: LucideIcons.clock)
+                  else if (dueToday)
+                    const StatusPill('Action Today', color: _amber, icon: LucideIcons.clock),
+                  if (isHighNet) const StatusPill('High Net', color: _amber),
+                ],
               ),
             ),
 
-            InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            // Quiet secondary meta
+            if (projectLine.isNotEmpty || hasBudget) ...[
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Row(
                   children: [
-                    // ── 1. Top Identity Row: Avatar with pulse, Name, Verified & High Net Tags, Edit/Delete
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Avatar Icon with Pulse Dot
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E222B) : const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: isDark ? const Color(0xFF2C3240) : const Color(0xFFE2E8F0),
-                                ),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  LucideIcons.user,
-                                  size: 20,
-                                  color: AppColors.neonLime,
-                                ),
-                              ),
-                            ),
-                            // Active Pulse Dot
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.neonLime,
-                                  border: Border.all(
-                                    color: isDark ? const Color(0xFF161920) : Colors.white,
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.neonLime.withAlpha(180),
-                                      blurRadius: 6,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 10),
-
-                        // Name, Verified Pill, High Net / VIP Tag
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      lead.name.isNotEmpty ? lead.name : 'Unknown Contact',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  if (isVerified)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981).withAlpha(25),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: const Color(0xFF10B981).withAlpha(80),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'Verified',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF10B981),
-                                        ),
-                                      ),
-                                    ),
-                                  if (isHighNet) ...[
-                                    const SizedBox(width: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF59E0B).withAlpha(25),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: const Color(0xFFF59E0B).withAlpha(80),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'High Net',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFFF59E0B),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-
-                              // Project / Unit text
-                              if (lead.project?.isNotEmpty == true || lead.propertyType?.isNotEmpty == true)
-                                Row(
-                                  children: [
-                                    const Icon(LucideIcons.building, size: 12, color: AppColors.neonLime),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        lead.project?.isNotEmpty == true
-                                            ? '${lead.project} ${lead.propertyType != null ? "(${lead.propertyType})" : ""}'
-                                            : (lead.propertyType ?? ''),
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w500,
-                                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              const SizedBox(height: 3),
-
-                              // Price + Action Today status line
-                              Row(
-                                children: [
-                                  if (lead.budgetMax != null || lead.budgetMin != null)
-                                    Text(
-                                      CurrencyFormatter.formatRange(lead.budgetMin, lead.budgetMax),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.neonLime,
-                                      ),
-                                    ),
-                                  if (isActionToday) ...[
-                                    if (lead.budgetMax != null || lead.budgetMin != null)
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                                        child: Text(
-                                          '•',
-                                          style: TextStyle(
-                                            color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
-                                          ),
-                                        ),
-                                      ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF59E0B).withAlpha(20),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(LucideIcons.clock, size: 10, color: Color(0xFFF59E0B)),
-                                          SizedBox(width: 3),
-                                          Text(
-                                            'Action Today',
-                                            style: TextStyle(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: Color(0xFFF59E0B),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Action Icons (Edit & Delete)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => EditLeadScreen(lead: lead)),
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.all(5),
-                                child: Icon(
-                                  LucideIcons.pencil,
-                                  size: 15,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ),
-                            InkWell(
-                              onTap: () => _showDeleteDialog(context, provider),
-                              borderRadius: BorderRadius.circular(8),
-                              child: const Padding(
-                                padding: EdgeInsets.all(5),
-                                child: Icon(
-                                  LucideIcons.trash2,
-                                  size: 15,
-                                  color: Color(0xFFEF4444),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // ── 2. Middle Attribution & Pipeline Badges
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        // Status Selector Badge
-                        GestureDetector(
-                          onTap: () {
-                            StatusChangeSheet.show(
-                              context,
-                              currentStatus: lead.status,
-                              onSelectStatus: (newStatus) {
-                                provider.updateStatus(lead.id, newStatus);
-                              },
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: statusColors.bg,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: statusColors.text.withAlpha(80)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  lead.status,
-                                  style: TextStyle(
-                                    color: statusColors.text,
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(LucideIcons.chevronDown, size: 11, color: statusColors.text),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Lead Source / Campaign attribution
-                        if (lead.source?.isNotEmpty == true)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E222B) : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isDark ? const Color(0xFF2C3240) : const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(LucideIcons.globe, size: 10, color: Color(0xFF38BDF8)),
-                                const SizedBox(width: 4),
-                                Text(
-                                  lead.source!,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // Broker attribution tag
-                        if (lead.assignedToName?.isNotEmpty == true)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E222B) : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isDark ? const Color(0xFF2C3240) : const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            child: Text(
-                              'Broker: ${lead.assignedToName}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── 3. Primary Action Buttons (Tactile Gradient Call & WhatsApp)
-                    Row(
-                      children: [
-                        // Call Now Button
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => _makeCall(context),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [AppColors.neonLime, Color(0xFF65A30D)],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.neonLime.withAlpha(90),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(LucideIcons.phoneCall, size: 14, color: Color(0xFF142407)),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Call Now',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF142407),
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-
-                        // WhatsApp Button
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => _openWhatsApp(context),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF10B981), Color(0xFF25D366)],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF25D366).withAlpha(70),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(LucideIcons.messageCircle, size: 14, color: Colors.white),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'WhatsApp',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // ── 4. Disposition Logging Bar (Sent Brochure, Replied, No Answer)
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E222B).withAlpha(180) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF282D38) : const Color(0xFFE2E8F0),
+                    if (hasBudget) ...[
+                      Text(
+                        CurrencyFormatter.formatRange(lead.budgetMin, lead.budgetMax),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: text),
+                      ),
+                      if (projectLine.isNotEmpty) Text('  ·  ', style: TextStyle(fontSize: 12, color: sub)),
+                    ],
+                    if (projectLine.isNotEmpty)
+                      Expanded(
+                        child: Text(
+                          projectLine,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, color: sub),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          _buildDispositionButton(
-                            context,
-                            label: 'Sent Brochure',
-                            icon: LucideIcons.fileText,
-                            color: const Color(0xFF38BDF8),
-                            isDark: isDark,
-                          ),
-                          _buildDispositionButton(
-                            context,
-                            label: 'Replied',
-                            icon: LucideIcons.thumbsUp,
-                            color: const Color(0xFF10B981),
-                            isDark: isDark,
-                          ),
-                          _buildDispositionButton(
-                            context,
-                            label: 'No Answer',
-                            icon: LucideIcons.phoneOff,
-                            color: const Color(0xFFEF4444),
-                            isDark: isDark,
-                          ),
-                        ],
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    LucideIcons.calendarClock,
+                    size: 13,
+                    color: overdue ? _red : sub,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    lead.followUpDue != null
+                        ? 'Next: ${AppDateUtils.formatFollowUpShort(lead.followUpDue)}'
+                        : 'No follow-up scheduled',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: overdue ? FontWeight.w700 : FontWeight.w500,
+                      color: overdue ? _red : sub,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (lead.assignedToName?.isNotEmpty == true) ...[
+                    Icon(LucideIcons.user, size: 12, color: sub),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        lead.assignedToName!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: sub),
                       ),
                     ),
-                    const SizedBox(height: 10),
-
-                    // ── 5. Footer: Next Follow-up & Quick Note
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(LucideIcons.calendarClock, size: 13, color: AppColors.neonLime),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Next: ',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            ),
-                            if (lead.followUpDue != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppDateUtils.isOverdue(lead.followUpDue)
-                                      ? const Color(0xFFEF4444).withAlpha(25)
-                                      : (isDark ? const Color(0xFF1E222B) : const Color(0xFFF1F5F9)),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: AppDateUtils.isOverdue(lead.followUpDue)
-                                        ? const Color(0xFFEF4444).withAlpha(70)
-                                        : (isDark ? const Color(0xFF2C3240) : const Color(0xFFE2E8F0)),
-                                  ),
-                                ),
-                                child: Text(
-                                  AppDateUtils.formatFollowUpShort(lead.followUpDue),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppDateUtils.isOverdue(lead.followUpDue)
-                                        ? const Color(0xFFEF4444)
-                                        : (isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155)),
-                                  ),
-                                ),
-                              )
-                            else
-                              Text(
-                                'Not scheduled',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                                ),
-                              ),
-                          ],
-                        ),
-
-                        // Add Note Button
-                        InkWell(
-                          onTap: () {
-                            QuickNoteDialog.show(
-                              context,
-                              leadName: lead.name,
-                              onSaveNote: (note) => provider.addNote(lead.id, note),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: const Row(
-                            children: [
-                              Icon(LucideIcons.plusSquare, size: 13, color: AppColors.neonLime),
-                              SizedBox(width: 4),
-                              Text(
-                                'Add Note',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.neonLime,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                  ],
+                ],
+              ),
+            ),
+            if (lead.source?.isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, right: 8),
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.globe, size: 12, color: sub),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        lead.source!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: sub),
+                      ),
                     ),
                   ],
                 ),
               ),
+            const SizedBox(height: 10),
+
+            // Primary actions (48dp)
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    label: 'Call',
+                    icon: LucideIcons.phoneCall,
+                    background: AppColors.neonLime,
+                    foreground: _onNeon,
+                    onTap: () => _makeCall(context),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ActionButton(
+                    label: 'WhatsApp',
+                    icon: LucideIcons.messageCircle,
+                    background: _wa.withAlpha(isDark ? 38 : 28),
+                    foreground: isDark ? _wa : const Color(0xFF15803D),
+                    onTap: () => _openWhatsApp(context),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: IconButton(
+                    tooltip: 'Add note',
+                    onPressed: () => _addNote(context),
+                    icon: Icon(LucideIcons.notebookPen, size: 19, color: Surf.accent(context)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -643,59 +330,128 @@ class LeadCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDispositionButton(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-  }) {
-    return Expanded(
+  Widget _buildMenu(BuildContext context, Color sub) {
+    return PopupMenuButton<_CardMenu>(
+      tooltip: 'More actions',
+      padding: EdgeInsets.zero,
+      iconSize: 20,
+      icon: Icon(LucideIcons.ellipsisVertical, size: 20, color: sub),
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      onSelected: (v) {
+        switch (v) {
+          case _CardMenu.brochure:
+            _logInteractionChip(context, 'Sent Brochure');
+          case _CardMenu.replied:
+            _logInteractionChip(context, 'Replied');
+          case _CardMenu.noAnswer:
+            _logInteractionChip(context, 'No Answer');
+          case _CardMenu.edit:
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => EditLeadScreen(lead: lead)),
+            );
+          case _CardMenu.delete:
+            _showDeleteDialog(context);
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: _CardMenu.brochure,
+          child: _MenuRow(LucideIcons.fileText, 'Sent Brochure', Color(0xFF38BDF8)),
+        ),
+        PopupMenuItem(
+          value: _CardMenu.replied,
+          child: _MenuRow(LucideIcons.thumbsUp, 'Replied', Color(0xFF10B981)),
+        ),
+        PopupMenuItem(
+          value: _CardMenu.noAnswer,
+          child: _MenuRow(LucideIcons.phoneOff, 'No Answer', Color(0xFFF59E0B)),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: _CardMenu.edit,
+          child: _MenuRow(LucideIcons.pencil, 'Edit lead', null),
+        ),
+        PopupMenuItem(
+          value: _CardMenu.delete,
+          child: _MenuRow(LucideIcons.trash2, 'Delete lead', Color(0xFFEF4444)),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showDeleteDialog(BuildContext context) async {
+    final provider = context.read<LeadsProvider>();
+    final ok = await confirmAction(
+      context,
+      title: 'Delete Lead',
+      message: 'Are you sure you want to delete ${lead.name}?',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (ok) provider.deleteLead(lead.id);
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+  const _MenuRow(this.icon, this.label, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color ?? Surf.subtext(context)),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color)),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.background,
+    required this.foreground,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: () => _logInteractionChip(context, label),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          alignment: Alignment.center,
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          height: 48,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 11, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              Icon(icon, size: 16, color: foreground),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: foreground),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showDeleteDialog(BuildContext context, LeadsProvider provider) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Lead'),
-        content: Text('Are you sure you want to delete ${lead.name}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              provider.deleteLead(lead.id);
-            },
-            child: const Text('Delete', style: TextStyle(color: Color(0xFFEF4444))),
-          ),
-        ],
       ),
     );
   }
