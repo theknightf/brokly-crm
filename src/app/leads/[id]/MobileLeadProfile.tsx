@@ -102,201 +102,244 @@ export default function MobileLeadProfile({ leadId }: { leadId: string }) {
   const assigned =
     lead && lead.assignedToNames && lead.assignedToNames.length > 0 ? lead.assignedToNames.join(' & ') : lead?.assignedToName || '';
 
+  const initials =
+    (lead?.name || '')
+      .trim()
+      .split(/\s+/)
+      .map((p) => p[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || '';
+
+  /** One row of a grouped list: label on one side, value on the other. */
+  const Row = ({ label, value, href, ltr }: { label: string; value?: string | null; href?: string; ltr?: boolean }) =>
+    value && String(value).trim() ? (
+      <div className="flex min-h-[48px] items-center justify-between gap-3 px-4 py-2">
+        <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
+        {href ? (
+          <a href={href} dir={ltr ? 'ltr' : 'auto'} className="min-w-0 truncate text-end text-sm font-semibold text-primary">
+            {value}
+          </a>
+        ) : (
+          <span dir={ltr ? 'ltr' : 'auto'} className="min-w-0 truncate text-end text-sm font-medium text-foreground" title={String(value)}>
+            {value}
+          </span>
+        )}
+      </div>
+    ) : null;
+
+  const Group = ({ title, children }: { title: string; children: React.ReactNode }) => {
+    const items = React.Children.toArray(children).filter(Boolean);
+    if (!items.length) return null;
+    return (
+      <section aria-label={title}>
+        <h2 className="mb-1.5 px-1 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">{title}</h2>
+        <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">{items}</div>
+      </section>
+    );
+  };
+
   return (
     // Full width inside the page padding (AppLayout uses px-6 on phones).
     <div className="-mx-6 min-h-[70dvh] bg-background sm:hidden">
-      {/* Sticky header: stays while switching tabs */}
+      {/* Sticky header: who, stage, call / WhatsApp, tabs — stays while switching tabs */}
       <header className="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur-md">
-        <div className="flex items-center gap-2 px-3 pt-3">
+        <div className="flex items-center gap-3 px-3 pt-3">
           <button
             type="button"
             onClick={() => (window.history.length > 1 ? router.back() : router.push('/leads-management'))}
             aria-label="Back"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+            className="-ms-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
           >
             <ArrowLeft size={20} className="rtl:rotate-180" />
           </button>
-          <div className="min-w-0 flex-1">
-            {lead ? (
-              <>
-                <h1 className="truncate text-base font-bold text-foreground" dir="auto">
+          {lead ? (
+            <>
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime-500/15 text-sm font-bold text-lime-700 dark:text-lime-300"
+                aria-hidden
+              >
+                {initials || <Phone size={16} />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-base font-bold leading-tight text-foreground" dir="auto">
                   {lead.name || lead.phone || 'Lead'}
                 </h1>
-                <div className="mt-0.5">
+                <div className="mt-1 flex items-center gap-2">
                   <StatusPill status={lead.status || 'Fresh Leads'} />
                 </div>
-              </>
-            ) : (
-              <div className="space-y-1.5" aria-hidden>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 items-center gap-3" aria-hidden>
+              <span className="h-11 w-11 animate-pulse rounded-full bg-muted" />
+              <div className="flex-1 space-y-1.5">
                 <div className="h-4 w-40 animate-pulse rounded bg-muted" />
                 <div className="h-4 w-24 animate-pulse rounded-full bg-muted" />
               </div>
-            )}
-          </div>
-          {lead?.phone && (
-            <>
-              <a
-                href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`}
-                aria-label="Call"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime-500/15 text-lime-700 dark:text-lime-300"
-              >
-                <Phone size={18} />
-              </a>
-              <a
-                href={getWhatsAppLinkForLead(lead.phone, lead.name)}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="WhatsApp"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-              >
-                <MessageCircle size={18} />
-              </a>
-            </>
+            </div>
           )}
         </div>
-        <nav className="mt-2 flex px-2" role="tablist" aria-label="Lead sections">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={`-mb-px flex min-h-[44px] flex-1 items-center justify-center gap-1.5 border-b-2 text-sm font-semibold ${
-                tab === t.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'
-              }`}
-            >
-              {t.icon}
-              {t.label}
-              {t.key === 'notes' && noteCount != null && (
-                <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">{noteCount}</span>
-              )}
-            </button>
-          ))}
+
+        {/* Call / WhatsApp: big and labelled */}
+        <div className="grid grid-cols-2 gap-2 px-3 pt-3">
+          <a
+            href={lead?.phone ? `tel:${lead.phone.replace(/[^\d+]/g, '')}` : undefined}
+            aria-disabled={!lead?.phone}
+            className={`flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-primary-foreground active:scale-[0.98] ${
+              lead?.phone ? '' : 'pointer-events-none opacity-40'
+            }`}
+          >
+            <Phone size={17} /> Call
+          </a>
+          <a
+            href={lead?.phone ? getWhatsAppLinkForLead(lead.phone, lead.name) : undefined}
+            target="_blank"
+            rel="noreferrer"
+            aria-disabled={!lead?.phone}
+            className={`flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm font-bold text-foreground active:scale-[0.98] ${
+              lead?.phone ? '' : 'pointer-events-none opacity-40'
+            }`}
+          >
+            <MessageCircle size={17} className="text-[#25D366]" /> WhatsApp
+          </a>
+        </div>
+
+        {/* Tabs as a segmented control */}
+        <nav className="px-3 py-3" aria-label="Lead sections">
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted/60 p-1" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  tab === t.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+                }`}
+              >
+                {t.icon}
+                {t.label}
+                {t.key === 'notes' && noteCount != null && (
+                  <span className="rounded-full bg-primary/15 px-1.5 text-[11px] tabular-nums text-primary">{noteCount}</span>
+                )}
+              </button>
+            ))}
+          </div>
         </nav>
       </header>
 
       <div className="px-4 py-4">
         {/* ── Info ── */}
-        <div hidden={tab !== 'info'} className="space-y-4">
+        <div hidden={tab !== 'info'} className="space-y-5">
           {!lead ? (
             <div className="space-y-3" aria-busy="true" aria-label="Loading">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-20 animate-pulse rounded-2xl bg-muted" />
+                <div key={i} className="h-24 animate-pulse rounded-2xl bg-muted" />
               ))}
             </div>
           ) : (
             <>
-              <section aria-label="Dates" className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-                  <p className="text-[11px] text-muted-foreground">Created</p>
-                  <p className="text-sm font-semibold tabular-nums text-foreground">{fmtDate(lead.createdAtIso || lead.createdAt)}</p>
-                  <p className="text-[11px] tabular-nums text-muted-foreground">{fmtTime(lead.createdAtIso)}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-                  <p className="text-[11px] text-muted-foreground">Assigned</p>
-                  <p className="text-sm font-semibold tabular-nums text-foreground">{fmtDate(lead.assignedAt)}</p>
-                  <p className="text-[11px] tabular-nums text-muted-foreground">{fmtTime(lead.assignedAt)}</p>
-                </div>
-              </section>
-
-              {/* Next action date: native date picker, saved right away, red when overdue */}
+              {/* Next action: the one thing to act on, first */}
               <section
                 aria-label="Next action date"
-                className={`rounded-2xl border p-3.5 ${overdue ? 'border-red-500/50 bg-red-500/5' : 'border-border bg-card'}`}
+                className={`rounded-2xl border p-4 ${
+                  overdue ? 'border-red-500/50 bg-red-500/10' : lead.followUpDue ? 'border-primary/30 bg-primary/5' : 'border-dashed border-border bg-card'
+                }`}
               >
-                <div className="mb-2 flex items-center gap-1.5">
-                  <CalendarClock size={15} className={overdue ? 'text-red-500' : 'text-primary'} />
-                  <p className="text-sm font-semibold text-foreground">Next action date</p>
-                  <span className={`ms-auto text-xs font-semibold ${overdue ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                    {lead.followUpDue ? `${overdue ? 'Overdue · ' : ''}${fmtNextAction(lead.followUpDue)}` : 'Not set'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={due}
-                    min={cairoDay()}
-                    onChange={(e) => setDue(e.target.value)}
-                    aria-label="Next action date"
-                    className={`input-base h-12 min-h-[48px] flex-1 text-base ${overdue ? 'border-red-400' : ''}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void saveDue(due || null)}
-                    disabled={savingDue || due === (lead.followUpDue ? String(lead.followUpDue).slice(0, 10) : '')}
-                    className="flex h-12 min-w-[48px] items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-40"
-                  >
-                    {savingDue ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                    Save
-                  </button>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className={`flex items-center gap-1.5 text-xs font-semibold ${overdue ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                      <CalendarClock size={14} /> {overdue ? 'Next action · overdue' : 'Next action'}
+                    </p>
+                    <p className={`mt-1 text-2xl font-extrabold tabular-nums ${overdue ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                      {lead.followUpDue ? fmtNextAction(lead.followUpDue) : 'Not set'}
+                    </p>
+                    {lead.followUpDue && <p className="text-xs tabular-nums text-muted-foreground">{fmtDate(lead.followUpDue)}</p>}
+                  </div>
                   {lead.followUpDue && (
                     <button
                       type="button"
                       onClick={() => void saveDue(null)}
                       disabled={savingDue}
                       aria-label="Clear next action date"
-                      className="flex h-12 w-12 items-center justify-center rounded-xl border border-border text-muted-foreground"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground"
                     >
                       <X size={16} />
                     </button>
                   )}
                 </div>
-              </section>
-
-              {/* Details (what the lead page showed before) */}
-              <section aria-label="Details" className="space-y-2">
-                <h2 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Details</h2>
-                {lead.phone && (
-                  <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-muted-foreground">Phone</p>
-                      <a href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`} dir="ltr" className="block truncate text-sm font-semibold text-primary">
-                        {lead.phone}
-                      </a>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="Copy phone number"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(lead.phone);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 1500);
-                        } catch {
-                          /* clipboard unavailable */
-                        }
-                      }}
-                      className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground"
-                    >
-                      {copied ? <Check size={16} className="text-primary" /> : <Copy size={16} />}
-                    </button>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    ['Phone 2', lead.phone2],
-                    ['Email', lead.email],
-                    ['Assigned to', assigned || 'Unassigned'],
-                    ['Source', lead.source],
-                    ['Project', lead.project || lead.developer],
-                    ['Location', lead.location],
-                    ['Priority', lead.priority],
-                    ['Rating', lead.leadRating],
-                    ['Team', lead.team],
-                    ['Budget', lead.budgetMin || lead.budgetMax ? `${(lead.budgetMin || 0).toLocaleString()}–${(lead.budgetMax || 0).toLocaleString()}` : ''],
-                  ]
-                    .filter(([, v]) => v && String(v).trim())
-                    .map(([k, v]) => (
-                      <div key={String(k)} className="min-w-0 rounded-xl border border-border bg-card px-3 py-2">
-                        <p className="text-[11px] text-muted-foreground">{k}</p>
-                        <p className="truncate text-sm font-medium text-foreground" dir="auto" title={String(v)}>
-                          {String(v)}
-                        </p>
-                      </div>
-                    ))}
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={due}
+                    min={cairoDay()}
+                    onChange={(e) => setDue(e.target.value)}
+                    aria-label="Next action date"
+                    className="input-base h-12 min-h-[48px] flex-1 text-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void saveDue(due || null)}
+                    disabled={savingDue || due === (lead.followUpDue ? String(lead.followUpDue).slice(0, 10) : '')}
+                    className="flex h-12 items-center justify-center gap-1.5 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-40"
+                  >
+                    {savingDue ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                    Save
+                  </button>
                 </div>
               </section>
+
+              <Group title="Contact">
+                {lead.phone && (
+                  <div className="flex min-h-[48px] items-center justify-between gap-3 ps-4 pe-1.5">
+                    <span className="text-sm text-muted-foreground">Phone</span>
+                    <span className="flex min-w-0 items-center gap-1">
+                      <a href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`} dir="ltr" className="truncate text-sm font-semibold text-primary">
+                        {lead.phone}
+                      </a>
+                      <button
+                        type="button"
+                        aria-label="Copy phone number"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(lead.phone);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1500);
+                          } catch {
+                            /* clipboard unavailable */
+                          }
+                        }}
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground"
+                      >
+                        {copied ? <Check size={16} className="text-primary" /> : <Copy size={16} />}
+                      </button>
+                    </span>
+                  </div>
+                )}
+                <Row label="Phone 2" value={lead.phone2} href={lead.phone2 ? `tel:${lead.phone2.replace(/[^\d+]/g, '')}` : undefined} ltr />
+                <Row label="Email" value={lead.email} href={lead.email ? `mailto:${lead.email}` : undefined} ltr />
+                <Row label="Location" value={lead.location} />
+              </Group>
+
+              <Group title="Lead">
+                <Row label="Assigned to" value={assigned || 'Unassigned'} />
+                <Row label="Source" value={lead.source} />
+                <Row label="Project" value={lead.project || lead.developer} />
+                <Row
+                  label="Budget"
+                  value={lead.budgetMin || lead.budgetMax ? `${(lead.budgetMin || 0).toLocaleString()} – ${(lead.budgetMax || 0).toLocaleString()} EGP` : ''}
+                />
+                <Row label="Priority" value={lead.priority && lead.priority !== 'Normal' ? lead.priority : ''} />
+                <Row label="Rating" value={lead.leadRating} />
+                <Row label="Team" value={lead.team} />
+              </Group>
+
+              <Group title="Dates">
+                <Row label="Created" value={lead.createdAtIso || lead.createdAt ? `${fmtDate(lead.createdAtIso || lead.createdAt)}${fmtTime(lead.createdAtIso) ? ` · ${fmtTime(lead.createdAtIso)}` : ''}` : ''} />
+                <Row label="Assigned" value={lead.assignedAt ? `${fmtDate(lead.assignedAt)} · ${fmtTime(lead.assignedAt)}` : ''} />
+              </Group>
             </>
           )}
         </div>

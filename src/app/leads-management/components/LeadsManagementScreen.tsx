@@ -23,6 +23,7 @@ import LeadBoard from './LeadBoard';
 import LeadsFilters, { useLeadFilterOptions, activityOf } from './LeadsFilters';
 import LeadsToolbar, { LeadsFilterDrawer } from './LeadsToolbar';
 import LeadsStatusStrip from './LeadsStatusStrip';
+import MobileLeadsHeader from './MobileLeadsHeader';
 import AddLeadForm from './AddLeadForm';
 import EditLeadForm from './EditLeadForm';
 import BulkActionBar from './BulkActionBar';
@@ -1619,9 +1620,32 @@ export default function LeadsManagementScreen({
   };
 
   return (
-    <div className="page-aurora min-h-[calc(100dvh-8rem)] space-y-5 sm:space-y-3 rounded-[2rem] p-3 sm:p-4 pb-24 sm:pb-4 flex flex-col">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 sm:px-4 sm:py-2.5 shadow-sm backdrop-blur-xl">
+    <div className="page-aurora min-h-[calc(100dvh-8rem)] space-y-3 rounded-[2rem] p-3 sm:p-4 pb-24 sm:pb-4 flex flex-col">
+      {/* Phone header (search, filters, stage chips). Desktop keeps the header, toolbar and strip below. */}
+      <MobileLeadsHeader
+        title={title || t('leads.title')}
+        total={total}
+        filters={filters}
+        statusCounts={statusCounts}
+        activeFilterCount={drawerFilterCount + (filters.agent ? 1 : 0)}
+        selectedCount={selectedIds.size}
+        onSearch={(q) => {
+          setFilters((f) => ({ ...f, search: q }));
+          setCurrentPage(1);
+        }}
+        onStage={(status) => {
+          setFilters((f) => ({ ...f, status }));
+          setCurrentPage(1);
+        }}
+        onOpenFilters={() => setShowFilters(true)}
+        onClearFilters={clearFilters}
+        onAdd={() => setAddModalOpen(true)}
+        onImport={() => setImportModalOpen(true)}
+        onExport={handleExport}
+      />
+
+      {/* Page header (desktop) */}
+      <div className="hidden sm:flex sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 sm:px-4 sm:py-2.5 shadow-sm backdrop-blur-xl">
         <div className="animate-rise-in min-w-0 sm:flex sm:items-baseline sm:gap-3">
           <h1 className="page-title sm:text-xl">{title || t('leads.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5 sm:mt-0 truncate">
@@ -1688,6 +1712,8 @@ export default function LeadsManagementScreen({
         </div>
       </div>
 
+      {/* Desktop toolbar + stage strip (the phone header above replaces them below 640px) */}
+      <div className="hidden sm:block">
       <LeadsToolbar
         filters={filters}
         onChange={(f) => {
@@ -1708,7 +1734,9 @@ export default function LeadsManagementScreen({
         }}
         onClearAll={clearFilters}
       />
+      </div>
 
+      <div className="hidden sm:block">
       <LeadsStatusStrip
         filters={filters}
         statusCounts={statusCounts}
@@ -1718,6 +1746,7 @@ export default function LeadsManagementScreen({
           setCurrentPage(1);
         }}
       />
+      </div>
 
       <LeadsFilterDrawer
         open={showFilters}
@@ -1755,6 +1784,25 @@ export default function LeadsManagementScreen({
                 setCurrentPage(1);
               }}
             />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-foreground">{t('leads.agent')}</span>
+            <select
+              className="input-base h-12 min-h-[48px] w-full text-base"
+              value={filters.agent || ''}
+              onChange={(e) => {
+                setFilters({ ...filters, agent: e.target.value });
+                setCurrentPage(1);
+              }}
+            >
+              <option value="">{t('leads.allAgents')}</option>
+              {filterOptions.agentOptions.map((a) => (
+                <option key={`m-agent-${a}`} value={a}>
+                  {a}
+                </option>
+              ))}
+              {filters.agent && !filterOptions.agentOptions.includes(filters.agent) && <option value={filters.agent}>{filters.agent}</option>}
+            </select>
           </label>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-foreground">Priority</span>
