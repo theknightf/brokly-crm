@@ -390,11 +390,6 @@ export default function LeadProfileDrawer({
                 <MessageCircle size={15} aria-hidden /> WhatsApp
               </a>
             )}
-            {onLogCall && (
-              <button type="button" onClick={() => onLogCall(viewLead)} className={`${quickBtn} bg-sky-500/15 text-sky-700 hover:bg-sky-500/25 dark:text-sky-300`}>
-                <ClipboardList size={15} aria-hidden /> Log call
-              </button>
-            )}
             {onSiteVisit && (
               <button type="button" onClick={() => onSiteVisit(viewLead)} className={`${quickBtn} bg-muted text-foreground hover:bg-muted/80`} title="Start a GPS-verified site visit">
                 <MapPin size={15} aria-hidden /> Site visit
