@@ -32,6 +32,8 @@ import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import StageMenuList from './StageMenuList';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -753,6 +755,32 @@ export default function LeadsTable({
 
   const visibleLeads = leads.slice(0, renderLimit);
 
+  // Phone cards only: the latest note (time + one-line preview) of the visible leads, one call per batch.
+  // Desktop never runs this (isMobile is false there).
+  const isMobile = useIsMobile();
+  const [lastNotes, setLastNotes] = useState<Record<string, { at: string; preview: string }>>({});
+  const visibleIdsKey = isMobile ? visibleLeads.map((l) => l.id).join(',') : '';
+  useEffect(() => {
+    if (!isMobile || !visibleIdsKey) return;
+    const ids = visibleIdsKey.split(',').filter((id) => !(id in lastNotes));
+    if (!ids.length) return;
+    let alive = true;
+    void (async () => {
+      const { data, error } = await (createClient() as any).rpc('lead_last_notes', { p_ids: ids });
+      if (!alive || error) return;
+      setLastNotes((prev) => {
+        const next = { ...prev };
+        for (const id of ids) next[id] = next[id] || { at: '', preview: '' };
+        for (const r of data || []) next[r.lead_id] = { at: r.last_note_at, preview: r.preview || '' };
+        return next;
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile, visibleIdsKey]);
+
   // Stable callbacks to avoid breaking React.memo on 500 rows
   const handleDeletePrompt = useCallback((id: string) => {
     setDeletingId(id);
@@ -840,6 +868,7 @@ export default function LeadsTable({
               onOpenLogCall={onOpenLogCall}
               onAddNote={onAddNote}
               onPostCall={onPostCall}
+              lastNote={lastNotes[lead.id] || null}
             />
           ))
         )}

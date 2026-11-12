@@ -63,6 +63,9 @@ export interface FilterState {
   called: '' | 'called' | 'not-called';
   calledFrom: string;
   calledTo: string;
+  /** Phone filters: next action date before today on an open lead; priority. */
+  overdue?: boolean;
+  priority?: string;
 }
 
 /**
@@ -201,6 +204,8 @@ export default function LeadsManagementScreen({
         called: urlCalled,
         calledFrom: p.get('calledFrom') || '',
         calledTo: p.get('calledTo') || '',
+        overdue: p.get('overdue') === '1',
+        priority: p.get('priority') || '',
       };
     }
   });
@@ -351,6 +356,8 @@ export default function LeadsManagementScreen({
         called: activeFilters.called || undefined,
         calledFrom: activeFilters.calledFrom || undefined,
         calledTo: activeFilters.calledTo || undefined,
+        overdue: activeFilters.overdue || undefined,
+        priority: activeFilters.priority || undefined,
         recentlyCalledIds: Array.from(recentlyCalledRef.current),
       });
       if (counts && typeof counts === 'object') {
@@ -499,6 +506,8 @@ export default function LeadsManagementScreen({
         called: activeFilters.called || undefined,
         calledFrom: activeFilters.calledFrom || undefined,
         calledTo: activeFilters.calledTo || undefined,
+        overdue: activeFilters.overdue || undefined,
+        priority: activeFilters.priority || undefined,
         sortKey: sortKeyRef.current,
         sortDir: sortDirRef.current,
         // Exclude leads that were optimistically removed after call logging
@@ -1484,6 +1493,8 @@ export default function LeadsManagementScreen({
       called: '',
       calledFrom: '',
       calledTo: '',
+      overdue: false,
+      priority: '',
     });
     setCurrentPage(1);
   };
@@ -1596,6 +1607,8 @@ export default function LeadsManagementScreen({
     filters.propertyType,
     filters.action,
     activityOf(filters),
+    filters.overdue,
+    filters.priority,
   ].filter(Boolean).length;
 
   const formatDisplayBudget = (lead: Lead) => {
@@ -1712,6 +1725,56 @@ export default function LeadsManagementScreen({
         onClear={clearFilters}
         count={drawerFilterCount}
       >
+        {/* Phone only (sm:hidden): sort, overdue follow-ups and priority. Desktop keeps its table-header sort. */}
+        <div className="sm:hidden space-y-4 mb-4 border-b border-border pb-4">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-foreground">Sort by</span>
+            <select
+              className="input-base h-12 min-h-[48px] w-full text-base"
+              value={`${String(sortKey)}:${sortDir}`}
+              onChange={(e) => {
+                const [k, d] = e.target.value.split(':');
+                setSortKey(k as keyof Lead);
+                setSortDir(d as 'asc' | 'desc');
+                setCurrentPage(1);
+              }}
+            >
+              <option value="createdAt:desc">Newest first</option>
+              <option value="followUpDue:asc">Next action date (overdue first)</option>
+              <option value="lastActionAt:desc">Last activity</option>
+            </select>
+          </label>
+          <label className="flex min-h-[48px] items-center justify-between gap-3 rounded-xl border border-border px-3">
+            <span className="text-sm font-semibold text-foreground">Overdue follow-ups only</span>
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-primary"
+              checked={!!filters.overdue}
+              onChange={(e) => {
+                setFilters({ ...filters, overdue: e.target.checked });
+                setCurrentPage(1);
+              }}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-semibold text-foreground">Priority</span>
+            <select
+              className="input-base h-12 min-h-[48px] w-full text-base"
+              value={filters.priority || ''}
+              onChange={(e) => {
+                setFilters({ ...filters, priority: e.target.value });
+                setCurrentPage(1);
+              }}
+            >
+              <option value="">All priorities</option>
+              {['Normal', 'Medium', 'High', 'Urgent'].map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <LeadsFilters
           filters={filters}
           options={filterOptions}

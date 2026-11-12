@@ -39,6 +39,12 @@ interface Props {
   /** Preview mode: "+ Add note" and "View all notes" go to the full Notes tab. */
   onAdd?: () => void;
   onViewAll?: () => void;
+  /** 'bottom' (phone lead page): the add box is fixed at the bottom, above the keyboard. Default 'top'. */
+  composer?: 'top' | 'bottom';
+  /** Where the sticky header sticks (below a page's own sticky header). Default 'top-0'. */
+  stickyTopClass?: string;
+  /** Show this many entries, then "Show older notes". Default: all. */
+  pageSize?: number;
 }
 
 const AUTO_SYNC_TEXT = 'Auto-synced from phone call log';
@@ -97,7 +103,20 @@ function initials(name: string) {
   );
 }
 
-export default function LeadNotesSection({ leadId, leadNotes, preview = false, onCount, autoFocus = false, onAdd, onViewAll }: Props) {
+export default function LeadNotesSection({
+  leadId,
+  leadNotes,
+  preview = false,
+  onCount,
+  autoFocus = false,
+  onAdd,
+  onViewAll,
+  composer = 'top',
+  stickyTopClass = 'top-0',
+  pageSize,
+}: Props) {
+  const [limit, setLimit] = useState(pageSize || 0);
+  const keyboardInset = useKeyboardInset(composer === 'bottom');
   const { user, profile } = useAuth();
   const isAdmin = isAdminRole(profile?.role);
   const [comments, setComments] = useState<any[]>([]);
@@ -307,10 +326,64 @@ export default function LeadNotesSection({ leadId, leadNotes, preview = false, o
     );
   }
 
+  const bottom = composer === 'bottom';
+  const composerForm = (
+    <form onSubmit={submit} className="flex items-end gap-2">
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
+        }}
+        rows={bottom ? 1 : 2}
+        autoFocus={autoFocus}
+        placeholder={bottom ? 'Add a note…' : 'Add a note about this lead…  (Ctrl + Enter to save)'}
+        aria-label="New note"
+        disabled={submitting}
+        dir="auto"
+        className={`input-base min-w-0 flex-1 resize-y ${bottom ? 'min-h-[44px] text-base' : 'text-sm'}`}
+      />
+      <button
+        type="submit"
+        disabled={submitting || !text.trim()}
+        className={`btn-primary flex shrink-0 items-center gap-1.5 !py-1.5 text-xs ${bottom ? 'h-11 min-w-[44px] justify-center' : 'h-10'}`}
+      >
+        {submitting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} className="rtl:-scale-x-100" />}
+        {bottom ? <span className="sr-only">Add note</span> : 'Add note'}
+      </button>
+    </form>
+  );
+  const visibleGroups = pageSize ? groups.reduce<{ left: number; out: typeof groups }>(
+    (acc, g) => {
+      if (acc.left <= 0) return acc;
+      const items = g.items.slice(0, acc.left);
+      acc.out.push({ ...g, items });
+      acc.left -= items.length;
+      return acc;
+    },
+    { left: limit, out: [] }
+  ).out : groups;
+
   return (
-    <section aria-label="Notes" className="space-y-3">
-      {/* Header + add box stay visible while the list scrolls (the drawer's tabs sit above the scroll area). */}
-      <div className="sticky top-0 z-[5] -mx-1 space-y-2.5 border-b border-border bg-card px-1 pb-2.5 pt-1">
+    <section aria-label="Notes" className={`space-y-3 ${bottom ? 'pb-24' : ''}`}>
+      {/* Phone page: the add box sits at the bottom, above the keyboard and the bottom bar. */}
+      {bottom && (
+        <div
+          className="fixed inset-x-0 z-30 border-t border-border bg-card/95 px-3 pt-2 backdrop-blur-md"
+          style={{
+            bottom: keyboardInset > 0 ? `${keyboardInset}px` : 'calc(64px + env(safe-area-inset-bottom))',
+            paddingBottom: '8px',
+          }}
+        >
+          {composerForm}
+        </div>
+      )}
+      {/* Header (+ add box on desktop) stays visible while the list scrolls. */}
+      <div
+        className={`z-[5] -mx-1 space-y-2.5 border-b border-border bg-card px-1 pb-2.5 pt-1 ${
+          stickyTopClass === 'none' ? '' : `sticky ${stickyTopClass}`
+        }`}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <MessageSquare size={14} className="text-muted-foreground" aria-hidden />
           <h3 className="text-sm font-semibold text-foreground">Notes</h3>
@@ -333,30 +406,7 @@ export default function LeadNotesSection({ leadId, leadNotes, preview = false, o
           </div>
         </div>
 
-        <form onSubmit={submit} className="flex items-end gap-2">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
-            }}
-            rows={2}
-            autoFocus={autoFocus}
-            placeholder="Add a note about this lead…  (Ctrl + Enter to save)"
-            aria-label="New note"
-            disabled={submitting}
-            dir="auto"
-            className="input-base min-w-0 flex-1 resize-y text-sm"
-          />
-          <button
-            type="submit"
-            disabled={submitting || !text.trim()}
-            className="btn-primary flex h-10 shrink-0 items-center gap-1.5 !py-1.5 text-xs"
-          >
-            {submitting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} className="rtl:-scale-x-100" />}
-            Add note
-          </button>
-        </form>
+        {!bottom && composerForm}
       </div>
 
       {loading ? (
@@ -371,13 +421,13 @@ export default function LeadNotesSection({ leadId, leadNotes, preview = false, o
           <p className="text-sm font-semibold text-foreground">{entries.length === 0 ? 'No notes yet' : 'Nothing in this filter'}</p>
           <p className="max-w-xs text-xs text-muted-foreground">
             {entries.length === 0
-              ? 'Write what happened with this lead in the box above. Notes typed while logging a call show up here too.'
+              ? `Write what happened with this lead in the box ${bottom ? 'below' : 'above'}. Notes typed while logging a call show up here too.`
               : 'Choose All to see every note and call.'}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map((g) => (
+          {visibleGroups.map((g) => (
             <div key={g.key}>
               <p className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 {g.label}
@@ -451,8 +501,35 @@ export default function LeadNotesSection({ leadId, leadNotes, preview = false, o
               </ol>
             </div>
           ))}
+          {pageSize && shown.length > limit && (
+            <button
+              type="button"
+              onClick={() => setLimit((n) => n + pageSize)}
+              className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted"
+            >
+              Show older notes ({shown.length - limit})
+            </button>
+          )}
         </div>
       )}
     </section>
   );
+}
+
+/** Height of the on-screen keyboard (Visual Viewport API), so a bottom bar can sit right above it. */
+function useKeyboardInset(enabled: boolean): number {
+  const [inset, setInset] = useState(0);
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const update = () => setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [enabled]);
+  return inset;
 }

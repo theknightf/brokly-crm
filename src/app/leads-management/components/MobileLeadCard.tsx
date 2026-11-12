@@ -17,6 +17,7 @@ import {
   Zap,
   Loader2,
   User,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Lead, LeadStatus } from './mockLeads';
@@ -30,6 +31,8 @@ import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useRouter } from 'next/navigation';
+import { fmtAgo, fmtDate, fmtNextAction, isOverdue as isLeadOverdue } from '@/lib/cairoDate';
 
 interface MobileLeadCardProps {
   lead: Lead;
@@ -42,6 +45,8 @@ interface MobileLeadCardProps {
   onOpenLogCall?: (lead: Lead) => void;
   onAddNote?: (lead: Lead) => void;
   onPostCall?: (lead: Lead) => void;
+  /** Latest written note (time + one-line preview), fetched once per page by the list. */
+  lastNote?: { at: string; preview: string } | null;
 }
 
 function formatEgyBudget(min?: number, max?: number) {
@@ -104,9 +109,12 @@ function MobileLeadCardInner({
   onOpenLogCall,
   onAddNote,
   onPostCall,
+  lastNote,
 }: MobileLeadCardProps) {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
+  const router = useRouter();
+  const nextOverdue = isLeadOverdue(lead.followUpDue, lead.status);
   const [statusOpen, setStatusOpen] = useState(false);
   const stageAnchorRef = useRef<HTMLButtonElement>(null);
   const initials = getInitials(lead.name || '', lead.id?.toString().slice(0, 2));
@@ -187,7 +195,8 @@ function MobileLeadCardInner({
         </label>
         {/* Left: avatar + name (or phone) */}
         <button
-          onClick={() => onView(lead)}
+          // Phone: the card opens the full lead page (Info / Notes / Activity).
+          onClick={() => router.push(`/leads/${lead.id}`)}
           className="flex items-start gap-3 min-w-0 flex-1 text-start group cursor-pointer"
           aria-label={`${t('leads.open')}: ${lead.name || lead.phone || t('leads.noName')}`}
         >
@@ -240,10 +249,29 @@ function MobileLeadCardInner({
                 {(lead.actionTakenToday ?? lead.contactedToday) ? t('leads.actionToday') : t('leads.noAction')}
               </span>
             </div>
-            {lead.lastActionAt && (
-              <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
-                {t('leads.colLastContact')}:{' '}
-                {new Date(lead.lastActionAt).toLocaleString(undefined, { timeZone: 'Africa/Cairo', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            {/* Dates: next action (red when overdue), last note, assign date */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] tabular-nums">
+              {lead.followUpDue && (
+                <span
+                  className={`inline-flex items-center gap-1 font-semibold ${
+                    nextOverdue ? 'text-red-600 dark:text-red-400' : 'text-foreground'
+                  }`}
+                >
+                  <CalendarClock size={12} aria-hidden />
+                  {nextOverdue ? 'Overdue · ' : ''}
+                  {fmtNextAction(lead.followUpDue)}
+                </span>
+              )}
+              {lastNote?.at && (
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <MessageSquare size={11} aria-hidden /> {fmtAgo(lastNote.at)}
+                </span>
+              )}
+              {lead.assignedAt && <span className="text-muted-foreground/80">Assigned {fmtDate(lead.assignedAt)}</span>}
+            </div>
+            {lastNote?.preview && (
+              <p className="mt-1 truncate text-xs text-muted-foreground" dir="auto">
+                “{lastNote.preview}”
               </p>
             )}
           </div>
@@ -467,7 +495,8 @@ function MobileLeadCardInner({
 const MobileLeadCard = React.memo(MobileLeadCardInner, (prev, next) => {
   return (
     prev.lead === next.lead &&
-    prev.selected === next.selected
+    prev.selected === next.selected &&
+    prev.lastNote?.at === next.lastNote?.at
   );
 });
 

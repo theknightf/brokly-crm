@@ -414,6 +414,9 @@ export interface LeadQueryFilters {
   calledTo?: string;
   recentlyCalledIds?: string[];
   assignedTo?: string;
+  /** Next action date before today (Cairo) on a lead that is still open. */
+  overdue?: boolean;
+  priority?: string;
 }
 
 async function applyLeadFilters(
@@ -440,6 +443,8 @@ async function applyLeadFilters(
     calledTo = '',
     recentlyCalledIds = [],
     assignedTo = '',
+    overdue = false,
+    priority = '',
   } = params || {};
 
   let actionTaken: '' | 'today' | 'no-action' = rawActionTaken;
@@ -515,6 +520,14 @@ async function applyLeadFilters(
   }
 
   query = applyLeadSearch(query, search);
+  if (priority) query = query.eq('priority', priority);
+  if (overdue) {
+    // Same rule as everywhere else: a next action date before today (Cairo) on an open lead.
+    const todayCairo = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    query = query
+      .lt('follow_up_due', todayCairo)
+      .not('crm_status', 'in', '("Done Deal","Won","Lost","Cancellation","Not Interested","Duplicate Leads","Wrong Number","Closed Number","Low Budget")');
+  }
   if (status && !options.excludeStatus) query = query.eq('crm_status', status);
   if (source) query = query.eq('source', source);
   if (agent) {
@@ -1276,7 +1289,7 @@ export const leadsService = {
     // anything else (activity/call date filters, recently-called exclusions…) takes the paged path below.
     const needsPagedPath = Boolean(
       params.action || params.actionTaken || params.contacted || params.actionFrom || params.actionTo ||
-        params.called || params.calledFrom || params.calledTo || params.assignedTo ||
+        params.called || params.calledFrom || params.calledTo || params.assignedTo || params.overdue || params.priority ||
         (params.recentlyCalledIds && params.recentlyCalledIds.length)
     );
     if (!needsPagedPath) {
@@ -1492,6 +1505,8 @@ export const leadsService = {
     called?: '' | 'called' | 'not-called';
     calledFrom?: string;
     calledTo?: string;
+    overdue?: boolean;
+    priority?: string;
   }) {
     const supabase = createClient();
     const {
@@ -1531,6 +1546,7 @@ export const leadsService = {
       status: 'crm_status',
       followUpDue: 'follow_up_due',
       createdAt: 'created_at',
+      lastActionAt: 'last_action_at',
     };
     const column = columnMap[sortKey] || 'created_at';
 
@@ -1558,7 +1574,7 @@ export const leadsService = {
       const to = from + pageSize - 1;
 
       const { data, error, count } = await query
-        .order(column, { ascending: sortDir !== 'desc' })
+        .order(column, { ascending: sortDir !== 'desc', ...(column === 'last_action_at' ? { nullsFirst: false } : {}) })
         .range(from, to);
 
       if (error) {
@@ -1597,7 +1613,7 @@ export const leadsService = {
             } else if ((actionTaken === 'no-action' || contacted === 'not-today') && s.size) {
               retryQuery = retryQuery.not('id', 'in', `(${[...s].map((id) => `"${id}"`).join(',')})`);
             }
-            const r2: any = await retryQuery.order(column, { ascending: sortDir !== 'desc' }).range(from, to);
+            const r2: any = await retryQuery.order(column, { ascending: sortDir !== 'desc', ...(column === 'last_action_at' ? { nullsFirst: false } : {}) }).range(from, to);
             if (r2.error) throw new Error(r2.error.message || 'Failed to load leads');
             return {
               data: (r2.data || []).map((row: any) => {
