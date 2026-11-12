@@ -1,6 +1,6 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Loader2, MessageSquare, PhoneCall, Pin, Send, Trash2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Loader2, MessageSquare, PhoneCall, Pin, Plus, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { leadCommentsService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +30,15 @@ interface Props {
   leadId: string;
   /** The free-text note stored on the lead record (leads.notes), if any. */
   leadNotes?: string;
+  /** Compact card: the 2 latest notes, "+ Add note" and "View all" (used on the drawer's Overview tab). */
+  preview?: boolean;
+  /** Reports how many notes the lead has (for the "Notes N" tab badge). */
+  onCount?: (n: number) => void;
+  /** Focus the add box when the section opens. */
+  autoFocus?: boolean;
+  /** Preview mode: "+ Add note" and "View all notes" go to the full Notes tab. */
+  onAdd?: () => void;
+  onViewAll?: () => void;
 }
 
 const AUTO_SYNC_TEXT = 'Auto-synced from phone call log';
@@ -42,6 +51,20 @@ function fmt(iso: string) {
   } catch {
     return iso;
   }
+}
+
+/** "5m ago", "3h ago", "2d ago", else a short date. */
+function relTime(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return '';
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return fmt(iso);
 }
 
 /** YYYY-MM-DD of an instant in Cairo time (the day a note belongs to). */
@@ -74,7 +97,7 @@ function initials(name: string) {
   );
 }
 
-export default function LeadNotesSection({ leadId, leadNotes }: Props) {
+export default function LeadNotesSection({ leadId, leadNotes, preview = false, onCount, autoFocus = false, onAdd, onViewAll }: Props) {
   const { user, profile } = useAuth();
   const isAdmin = isAdminRole(profile?.role);
   const [comments, setComments] = useState<any[]>([]);
@@ -226,10 +249,66 @@ export default function LeadNotesSection({ leadId, leadNotes }: Props) {
       return next;
     });
 
+  useEffect(() => {
+    if (!loading) onCount?.(counts.all);
+  }, [loading, counts.all, onCount]);
+
+  // ── Compact card for the drawer's Overview: latest 2 entries, add, view all ──
+  if (preview) {
+    const latest = entries.filter((e) => e.kind !== 'record').slice(0, 2);
+    return (
+      <section aria-label="Latest notes" className="rounded-2xl border border-border bg-muted/30 p-3.5">
+        <div className="mb-2.5 flex items-center gap-2">
+          <MessageSquare size={14} className="text-primary" aria-hidden />
+          <h3 className="text-sm font-semibold text-foreground">Latest notes</h3>
+          <span className="text-xs text-muted-foreground tabular-nums">({counts.all})</span>
+          <button
+            type="button"
+            onClick={onAdd}
+            className="ms-auto inline-flex min-h-[36px] items-center gap-1 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:brightness-105 active:scale-95"
+          >
+            <Plus size={14} aria-hidden /> Add note
+          </button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-3">
+            <Loader2 size={18} className="animate-spin text-primary" aria-label="Loading notes" />
+          </div>
+        ) : latest.length === 0 ? (
+          <p className="py-2 text-xs text-muted-foreground">No notes yet. Add the first one.</p>
+        ) : (
+          <ul className="space-y-2">
+            {latest.map((e) => (
+              <li key={e.key} className="rounded-xl bg-card px-3 py-2">
+                <div className="flex items-center gap-2 text-[11px]">
+                  {e.kind === 'call' && <PhoneCall size={11} className="shrink-0 text-sky-500" aria-hidden />}
+                  <span className="truncate font-semibold text-foreground">{e.author}</span>
+                  {e.at && <span className="ms-auto shrink-0 text-muted-foreground">{relTime(e.at)}</span>}
+                </div>
+                <p className="mt-0.5 line-clamp-2 whitespace-pre-wrap break-words text-sm text-foreground" dir="auto">
+                  {e.body}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {counts.all > 0 && (
+          <button
+            type="button"
+            onClick={onViewAll}
+            className="mt-2 min-h-[32px] text-xs font-semibold text-primary hover:underline"
+          >
+            View all notes →
+          </button>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section aria-label="Notes" className="space-y-3">
-      {/* Header + add box stay visible while the list scrolls (just below the drawer's sticky tab bar). */}
-      <div className="sticky top-[52px] [@media(pointer:coarse)]:top-[60px] z-[5] -mx-1 space-y-2.5 border-b border-border bg-card px-1 pb-2.5 pt-1">
+      {/* Header + add box stay visible while the list scrolls (the drawer's tabs sit above the scroll area). */}
+      <div className="sticky top-0 z-[5] -mx-1 space-y-2.5 border-b border-border bg-card px-1 pb-2.5 pt-1">
         <div className="flex flex-wrap items-center gap-2">
           <MessageSquare size={14} className="text-muted-foreground" aria-hidden />
           <h3 className="text-sm font-semibold text-foreground">Notes</h3>
@@ -255,6 +334,7 @@ export default function LeadNotesSection({ leadId, leadNotes }: Props) {
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
             }}
             rows={2}
+            autoFocus={autoFocus}
             placeholder="Add a note about this lead…  (Ctrl + Enter to save)"
             aria-label="New note"
             disabled={submitting}
