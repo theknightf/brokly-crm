@@ -34,7 +34,6 @@ class LeadsProvider extends ChangeNotifier {
   StreamSubscription<AuthState>? _authSub;
   String? _activeUserId;
 
-  List<LeadModel> get allLeads => _allLeads;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String get searchQuery => _searchQuery;

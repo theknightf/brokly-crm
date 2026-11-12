@@ -10,16 +10,12 @@ import '../../state/call_logs_provider.dart';
 import '../../state/leads_provider.dart';
 import '../assistant/assistant_chat_screen.dart';
 import '../attendance/attendance_screen.dart';
-import '../calculator/unit_calculator_screen.dart';
-import '../call_logs/call_logs_screen.dart';
-import '../customers/customers_screen.dart';
 import '../dashboard/dashboard_screen.dart';
-import '../follow_ups/follow_ups_screen.dart';
 import '../leads/add_lead_screen.dart';
-import '../leads/leads_screen.dart';
-import '../settings/settings_screen.dart';
+import '../reports/reports_screen.dart';
 import 'app_drawer.dart';
 import 'app_top_bar.dart';
+import 'shell_destinations.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -29,20 +25,12 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  // Tab index:
-  // 0: Home (Dashboard)
-  // 1: Leads
-  // 2: Attendance
-  // 3: Follow-ups
-  // 4: Call Logs (drawer access)
-  // 5: Customers (drawer access)
-  // 6: Settings (drawer access)
-  // 7: Unit Calculator (drawer & quick toolbox access)
-  int _currentIndex = 0;
+  // Page ids live in shell_destinations.dart (Pg). Screens are built lazily on first visit
+  // and kept alive afterwards, so opening the app does not fire 20 data loads at once.
+  int _currentIndex = Pg.home;
+  final Set<int> _visited = {Pg.home};
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Tabs opened so far; only these are built and kept alive.
-  final Set<int> _visited = {0};
   VoidCallback? _unregisterTrim;
   VoidCallback? _unregisterSaved;
   VoidCallback? _unregisterCallSync;
@@ -83,27 +71,38 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
-  String get _currentTitle {
-    switch (_currentIndex) {
-      case 0:
-        return 'Home';
-      case 1:
-        return 'Leads';
-      case 2:
-        return 'Attendance';
-      case 3:
-        return 'Follow-ups';
-      case 4:
-        return 'Call Logs';
-      case 5:
-        return 'Customers';
-      case 6:
-        return 'Settings';
-      case 7:
-        return 'Unit Calculator';
-      default:
-        return 'Brokly CRM';
+  String get _currentTitle => titleForPage(_currentIndex);
+
+  void _goTo(int page) {
+    setState(() {
+      _currentIndex = page;
+      _visited.add(page);
+    });
+  }
+
+  /// Reports count chips -> Leads filtered by agent / stage.
+  void _openLeads({String? agentName, String? stage}) {
+    final leads = context.read<LeadsProvider>();
+    if (stage != null && stage.isNotEmpty) leads.setStatusFilter(stage);
+    _goTo(Pg.leads);
+  }
+
+  Widget _buildPage(int page) {
+    switch (page) {
+      case Pg.home:
+        return DashboardScreen(onNavigateTab: _goTo);
+      case Pg.attendance:
+        return const AttendanceScreen();
+      case Pg.reports:
+        return ReportsScreen(
+          onOpenLeads: _openLeads,
+          onOpenRoute: (key) {
+            final target = pageForReportRoute(key);
+            if (target != null) _goTo(target);
+          },
+        );
     }
+    return buildSimplePage(page) ?? const SizedBox.shrink();
   }
 
   void _onBottomNavTapped(int index) {
@@ -111,31 +110,13 @@ class _MainShellState extends State<MainShell> {
       // Menu tab opens Drawer
       _scaffoldKey.currentState?.openDrawer();
     } else {
-      setState(() => _currentIndex = index);
+      _goTo(index);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Screens are built on first visit instead of all 8 up front (IndexedStack builds every child), so a
-    // phone that only ever opens Home + Leads never pays for Attendance, Calculator, Settings...
-    _visited.add(_currentIndex);
-    final screenBuilders = <Widget Function()>[
-      () => DashboardScreen(onNavigateTab: (index) => setState(() => _currentIndex = index)),
-      () => const LeadsScreen(),
-      () => const AttendanceScreen(),
-      () => const FollowUpsScreen(),
-      () => const CallLogsScreen(),
-      () => const CustomersScreen(),
-      () => const SettingsScreen(),
-      () => const UnitCalculatorScreen(showAppBar: false),
-    ];
-    final screens = <Widget>[
-      for (var i = 0; i < screenBuilders.length; i++)
-        _visited.contains(i) ? screenBuilders[i]() : const SizedBox.shrink(),
-    ];
 
     // Determine bottom nav active index (0..3, or none if accessing auxiliary drawer pages)
     final bottomNavActiveIndex = _currentIndex <= 3 ? _currentIndex : -1;
@@ -148,11 +129,14 @@ class _MainShellState extends State<MainShell> {
       ),
       drawer: AppDrawer(
         selectedIndex: _currentIndex,
-        onSelectTab: (index) => setState(() => _currentIndex = index),
+        onSelectTab: _goTo,
       ),
       body: IndexedStack(
         index: _currentIndex,
-        children: screens,
+        children: List.generate(
+          Pg.importHistory + 1,
+          (i) => _visited.contains(i) ? _buildPage(i) : const SizedBox.shrink(),
+        ),
       ),
       bottomNavigationBar: SafeArea(
         bottom: true,
