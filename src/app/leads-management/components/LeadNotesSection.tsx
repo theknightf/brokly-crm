@@ -190,6 +190,8 @@ export default function LeadNotesSection({ leadId, leadNotes, preview = false, o
     }),
     [entries]
   );
+  // Newest dated entry (the lead-record note has no date).
+  const lastNoteAt = entries.find((e) => e.kind !== 'record' && e.at)?.at || '';
   const shown = entries.filter((e) => filter === 'all' || e.kind === filter || (filter === 'note' && e.kind === 'record'));
 
   const submit = async (e?: React.FormEvent) => {
@@ -313,6 +315,11 @@ export default function LeadNotesSection({ leadId, leadNotes, preview = false, o
           <MessageSquare size={14} className="text-muted-foreground" aria-hidden />
           <h3 className="text-sm font-semibold text-foreground">Notes</h3>
           <span className="text-xs text-muted-foreground tabular-nums">({counts.all})</span>
+          {lastNoteAt && (
+            <span className="w-full text-[11px] text-muted-foreground sm:w-auto">
+              Last note: <time dateTime={lastNoteAt}>{fmt(lastNoteAt)}</time> · {relTime(lastNoteAt)}
+            </span>
+          )}
           <div className="ms-auto flex gap-1.5" role="group" aria-label="Filter notes">
             <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')} className={chip(filter === 'all')}>
               All

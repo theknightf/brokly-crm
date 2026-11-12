@@ -79,6 +79,10 @@ export interface Lead {
   phone: string;
   /** Optional second number (any country). */
   phone2?: string;
+  /** When the lead was last given to its current owner (leads.assigned_at). */
+  assignedAt?: string | null;
+  /** Full creation timestamp (createdAt is the date only). */
+  createdAtIso?: string | null;
   email?: string;
   propertyType?: PropertyType;
   budgetMin?: number;

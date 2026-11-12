@@ -34,7 +34,7 @@ import { leadsService, followUpsService } from '@/lib/services/crmService';
 import type { Lead, LeadStatus } from './mockLeads';
 import LeadNotesSection from './LeadNotesSection';
 import RecommendedUnitsSection from './RecommendedUnitsSection';
-import LeadTimeline from './LeadTimeline';
+import LeadEventsTimeline from './LeadEventsTimeline';
 
 /**
  * The lead profile drawer (stage, actions, details, next action date, payment plan, calls, timeline, notes).
@@ -323,6 +323,13 @@ export default function LeadProfileDrawer({
     ...(viewLead.referredTo ? [{ label: 'Referred to', value: viewLead.referredToName || 'Second user' }] : []),
     ...(viewLead.referredBy ? [{ label: 'Referred by', value: viewLead.referredByName || 'Recorded user' }] : []),
   ];
+  // Overdue = the next action date is before today (Cairo) and the lead is still open.
+  const todayCairo = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+  const nextActionOverdue =
+    !!viewLead.followUpDue &&
+    viewLead.followUpDue.slice(0, 10) < todayCairo &&
+    !CLOSED_STAGES.has(String(viewLead.status || '').toLowerCase());
+
   const filled = details.filter((d) => d.value && String(d.value).trim());
   const empty = details.filter((d) => !d.value || !String(d.value).trim());
 
@@ -399,7 +406,7 @@ export default function LeadProfileDrawer({
           <div className="mt-3 flex gap-1 px-4 sm:px-5" role="tablist" aria-label="Lead sections">
             {(
               [
-                ['overview', 'Overview', ClipboardList],
+                ['overview', 'Info', ClipboardList],
                 ['notes', noteCount != null ? `Notes ${noteCount}` : 'Notes', MessageSquare],
                 ['activity', 'Activity', Activity],
               ] as const
@@ -485,19 +492,34 @@ export default function LeadProfileDrawer({
                 )}
               </div>
 
-              {/* Notes preview — reachable without scrolling */}
-              <LeadNotesSection
-                key={`preview-${viewLead.id}`}
-                leadId={viewLead.id}
-                leadNotes={viewLead.notes}
-                preview
-                onCount={setNoteCount}
-                onAdd={() => {
-                  setFocusNoteBox(true);
-                  setViewTab('notes');
-                }}
-                onViewAll={() => setViewTab('notes')}
-              />
+              {/* Key dates (Cairo time) */}
+              <section aria-label="Dates" className="grid grid-cols-3 gap-2">
+                <div className="min-w-0 rounded-xl border border-border bg-muted/30 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Created</p>
+                  <p className="text-sm font-medium tabular-nums text-foreground">{cairoDate(viewLead.createdAtIso || viewLead.createdAt)}</p>
+                  <p className="text-[11px] tabular-nums text-muted-foreground">{cairoTime(viewLead.createdAtIso)}</p>
+                </div>
+                <div className="min-w-0 rounded-xl border border-border bg-muted/30 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Assigned</p>
+                  <p className="text-sm font-medium tabular-nums text-foreground">{cairoDate(viewLead.assignedAt)}</p>
+                  <p className="text-[11px] tabular-nums text-muted-foreground">{cairoTime(viewLead.assignedAt)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('drawer-next-action')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  className={`min-w-0 rounded-xl border px-3 py-2 text-start ${
+                    nextActionOverdue ? 'border-red-500/50 bg-red-500/10' : 'border-border bg-muted/30'
+                  }`}
+                  title="Change the next action date"
+                >
+                  <p className={`text-[11px] ${nextActionOverdue ? 'font-semibold text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                    Next action{nextActionOverdue ? ' · overdue' : ''}
+                  </p>
+                  <p className={`text-sm font-medium tabular-nums ${nextActionOverdue ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
+                    {viewLead.followUpDue ? cairoDate(`${viewLead.followUpDue.slice(0, 10)}T12:00:00Z`) : '—'}
+                  </p>
+                </button>
+              </section>
 
               {/* Contact & details */}
               <section aria-label="Contact and details" className="space-y-2">
@@ -551,11 +573,20 @@ export default function LeadProfileDrawer({
                 )}
               </section>
 
-              {/* Next action date */}
-              <section aria-label="Next action date" className="space-y-2 rounded-2xl border border-border bg-muted/30 p-3.5">
+              {/* Next action date (editable; red when overdue) */}
+              <section
+                id="drawer-next-action"
+                aria-label="Next action date"
+                className={`space-y-2 rounded-2xl border p-3.5 ${nextActionOverdue ? 'border-red-500/50 bg-red-500/5' : 'border-border bg-muted/30'}`}
+              >
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <CalendarClock size={13} className="text-primary" /> Next action date
-                  {viewLead.followUpDue && <span className="ms-auto font-normal text-muted-foreground">Current: {viewLead.followUpDue}</span>}
+                  <CalendarClock size={13} className={nextActionOverdue ? 'text-red-500' : 'text-primary'} /> Next action date
+                  {viewLead.followUpDue && (
+                    <span className={`ms-auto font-normal ${nextActionOverdue ? 'font-semibold text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                      {nextActionOverdue ? 'Overdue · ' : 'Current: '}
+                      {cairoDate(`${viewLead.followUpDue.slice(0, 10)}T12:00:00Z`)}
+                    </span>
+                  )}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <input type="date" className="input-base h-10 text-sm" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} aria-label="Next action date" />
@@ -580,6 +611,30 @@ export default function LeadProfileDrawer({
                 </button>
               </section>
 
+              {viewLead.phone && onWhatsAppAction && (
+                <div className="rounded-2xl border border-border bg-muted/30 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <MessageCircle size={12} /> WhatsApp result
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { label: 'WA Sent', icon: <CheckCircle2 size={13} />, cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300', outcome: 'WhatsApp Sent' },
+                      { label: 'Replied', icon: <ThumbsUp size={13} />, cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300', outcome: 'Customer Replied' },
+                      { label: 'No reply', icon: <UserX size={13} />, cls: 'bg-zinc-500/10 text-muted-foreground', outcome: 'No Reply' },
+                      { label: 'WA follow-up', icon: <CalendarClock size={13} />, cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300', outcome: 'WhatsApp Follow-up' },
+                    ].map((a) => (
+                      <button
+                        key={a.outcome}
+                        onClick={() => onWhatsAppAction(viewLead, a.outcome)}
+                        className={`flex h-10 items-center gap-2 rounded-lg px-3 text-start text-sm font-medium transition-all active:scale-[0.98] ${a.cls}`}
+                      >
+                        {a.icon}
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Less used: deal & payment, units — collapsed */}
               {(onDeal || onPayPlan) && (
                 <section className="rounded-2xl border border-border">
@@ -663,33 +718,16 @@ export default function LeadProfileDrawer({
           )}
 
           {viewTab === 'activity' && (
-            <div className="space-y-4">
-              {viewLead.phone && onWhatsAppAction && (
-                <div className="rounded-2xl border border-border bg-muted/30 p-3">
-                  <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <MessageCircle size={12} /> WhatsApp result
-                  </p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { label: 'WA Sent', icon: <CheckCircle2 size={13} />, cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300', outcome: 'WhatsApp Sent' },
-                      { label: 'Replied', icon: <ThumbsUp size={13} />, cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300', outcome: 'Customer Replied' },
-                      { label: 'No reply', icon: <UserX size={13} />, cls: 'bg-zinc-500/10 text-muted-foreground', outcome: 'No Reply' },
-                      { label: 'WA follow-up', icon: <CalendarClock size={13} />, cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300', outcome: 'WhatsApp Follow-up' },
-                    ].map((a) => (
-                      <button
-                        key={a.outcome}
-                        onClick={() => onWhatsAppAction(viewLead, a.outcome)}
-                        className={`flex h-10 items-center gap-2 rounded-lg px-3 text-start text-sm font-medium transition-all active:scale-[0.98] ${a.cls}`}
-                      >
-                        {a.icon}
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
-              <LeadTimeline leadId={viewLead.id} />
+            <div className="space-y-5">
+              <LeadEventsTimeline
+                key={`events-${viewLead.id}`}
+                leadId={viewLead.id}
+                onOpenNote={() => setViewTab('notes')}
+              />
+              <div className="space-y-2">
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Calls</h3>
+                <LeadCallHistory leadId={viewLead.id} refreshKey={callHistoryKey} />
+              </div>
             </div>
           )}
         </div>
@@ -715,6 +753,26 @@ export default function LeadProfileDrawer({
     </div>,
     document.body
   );
+}
+
+const CLOSED_STAGES = new Set([
+  'done deal', 'won', 'lost', 'cancellation', 'not interested', 'duplicate leads', 'wrong number', 'closed number', 'low budget',
+]);
+
+/** "12 Nov 2026" in Cairo time ('—' when empty). */
+function cairoDate(v?: string | null) {
+  if (!v) return '—';
+  const d = new Date(v.length <= 10 ? `${v}T12:00:00Z` : v);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', { timeZone: 'Africa/Cairo', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** "14:05" in Cairo time ('' when only a date is known). */
+function cairoTime(v?: string | null) {
+  if (!v || v.length <= 10) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' });
 }
 
 /** Status options grouped by meaning (colored dots come from StatusBadge). */
