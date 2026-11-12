@@ -11,6 +11,11 @@ class LeadsService {
   /// Fetch leads with assigned user profile join ordered by created_at DESC
   Future<List<LeadModel>> getAll({String? search, String? statusFilter, String? assignedToFilter}) async {
     final authIds = await _usersService.getAuthorizedUserIds();
+    // An empty list means the profile could not be read (session not ready / network). Treat it as a failed load,
+    // not as "this user has no leads", so the screens show an error and the provider retries.
+    if (authIds != null && authIds.isEmpty) {
+      throw Exception('Could not load your profile. Check the connection and try again.');
+    }
 
     // If an explicit filter for another agent was requested but caller isn't authorized, deny
     if (authIds != null && assignedToFilter != null && assignedToFilter.isNotEmpty) {

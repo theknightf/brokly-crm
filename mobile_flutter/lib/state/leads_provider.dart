@@ -69,6 +69,10 @@ class LeadsProvider extends ChangeNotifier {
     return count;
   }
 
+  /// Every loaded lead, ignoring the Leads tab's filters (stage, search, project…). Screens that are not the Leads
+  /// list (e.g. Follow-ups) must use this, or a filter left on the Leads tab silently empties them.
+  List<LeadModel> get allLeads => _allLeads;
+
   /// Leads matching all non-stage filter criteria (search, project, propertyType, source, activity, assignee).
   /// Used to compute dynamic stage counts on stage filter chips!
   List<LeadModel> get baseFilteredLeads {
@@ -355,6 +359,8 @@ class LeadsProvider extends ChangeNotifier {
     try {
       _allLeads = await _service.getAll();
       _isLoading = false;
+      _error = null;
+      _retryCount = 0;
       notifyListeners();
       unawaited(_loadAnsweredLeadIds());
       unawaited(refreshLastCalls());
@@ -362,8 +368,18 @@ class LeadsProvider extends ChangeNotifier {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
+      // A load that fails at app start (session or profile not ready yet, weak network) is retried a few times,
+      // instead of leaving every screen empty until the user pulls to refresh.
+      if (_retryCount < 3) {
+        _retryCount++;
+        _retryTimer?.cancel();
+        _retryTimer = Timer(Duration(seconds: 4 * _retryCount), () => fetchLeads(silent: true));
+      }
     }
   }
+
+  int _retryCount = 0;
+  Timer? _retryTimer;
 
   // ── Last call per lead (the line on the lead card) ──
   Map<String, LastCallInfo> _lastCalls = {};
@@ -492,6 +508,7 @@ class LeadsProvider extends ChangeNotifier {
   @override
   void dispose() {
     _refetchTimer?.cancel();
+    _retryTimer?.cancel();
     _authSub?.cancel();
     _subscription?.unsubscribe();
     super.dispose();

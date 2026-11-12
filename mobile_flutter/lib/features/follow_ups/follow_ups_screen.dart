@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/utils/tr.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../data/models/lead_model.dart';
 import '../../state/leads_provider.dart';
@@ -21,6 +22,7 @@ class FollowUpsScreen extends StatefulWidget {
 class _FollowUpsScreenState extends State<FollowUpsScreen> {
   // 0: Late (Overdue), 1: Today, 2: Coming, 3: All
   int _activeSegment = 0;
+  bool _segmentPicked = false;
   String _activeChip = 'all'; // 'all', 're-engagement', 'vip', 'hot'
   String _searchQuery = '';
 
@@ -85,7 +87,8 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<LeadsProvider>();
-    final allLeads = provider.leads;
+    // Unfiltered: a stage/search/project filter left on the Leads tab must not empty this screen.
+    final allLeads = provider.allLeads;
 
     // Filter leads with follow-up timestamps
     final followUpLeads = allLeads.where((l) {
@@ -124,6 +127,19 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
       final d = l.followUpDateTime?.toLocal();
       return d != null && d.isAfter(todayEnd);
     }).toList();
+
+    // Open on a tab that has something: "Late" when there are overdue ones, else "Today", else "Coming", else "All".
+    // Only once, so a tab the user picks is never switched under them.
+    if (!_segmentPicked && followUpLeads.isNotEmpty) {
+      _segmentPicked = true;
+      _activeSegment = overdueLeads.isNotEmpty
+          ? 0
+          : todayLeads.isNotEmpty
+              ? 1
+              : comingLeads.isNotEmpty
+                  ? 2
+                  : 3;
+    }
 
     // Segment filtering
     List<LeadModel> displayed;
@@ -445,44 +461,31 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
 
             // ── 6. Follow-up Cards List ───────────────────────────
             Expanded(
-              child: displayed.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            LucideIcons.calendarCheck,
-                            size: 44,
-                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No follow-ups in this queue',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'All scheduled tasks in this section are clear.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
+              child: RefreshIndicator(
+                onRefresh: () => provider.fetchLeads(silent: true),
+                child: displayed.isEmpty
+                    ? _buildEmptyState(
+                        context,
+                        isDark,
+                        loading: provider.isLoading && allLeads.isEmpty,
+                        failed: provider.error != null && allLeads.isEmpty,
+                        otherTabsHaveItems: followUpLeads.isNotEmpty,
+                        onRetry: () => provider.fetchLeads(),
+                        onShowAll: () => setState(() {
+                          _activeSegment = 3;
+                          _activeChip = 'all';
+                        }),
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                        itemCount: displayed.length,
+                        itemBuilder: (context, index) {
+                          final lead = displayed[index];
+                          return _buildFollowUpQueueCard(context, lead, isDark);
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                      itemCount: displayed.length,
-                      itemBuilder: (context, index) {
-                        final lead = displayed[index];
-                        return _buildFollowUpQueueCard(context, lead, isDark);
-                      },
-                    ),
+              ),
             ),
           ],
         ),
@@ -646,6 +649,90 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
   }
 
   // ── Sub-widget: Follow-up Queue Card (Harmonized Action Suite)
+  /// Empty area under the tabs. Tells apart "still loading", "could not load" (with Retry) and "nothing in this
+  /// tab while other tabs have follow-ups" (with Show all), so a blank screen never looks like "no follow-ups".
+  Widget _buildEmptyState(
+    BuildContext context,
+    bool isDark, {
+    required bool loading,
+    required bool failed,
+    required bool otherTabsHaveItems,
+    required VoidCallback onRetry,
+    required VoidCallback onShowAll,
+  }) {
+    final muted = isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B);
+    final strong = isDark ? AppColors.darkForeground : AppColors.lightForeground;
+
+    Widget body;
+    if (loading) {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 12),
+          Text(tr('Loading follow-ups…', 'بنحمّل المتابعات…'), style: TextStyle(fontSize: 13, color: muted)),
+        ],
+      );
+    } else if (failed) {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 40, color: muted),
+          const SizedBox(height: 12),
+          Text(
+            tr('Could not load follow-ups', 'مش قادرين نحمّل المتابعات'),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: strong),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            tr('Check the connection and try again.', 'اتأكد من النت وجرّب تاني.'),
+            style: TextStyle(fontSize: 12, color: muted),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(LucideIcons.refreshCw, size: 16),
+            label: Text(tr('Retry', 'حاول تاني')),
+          ),
+        ],
+      );
+    } else {
+      body = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.calendarCheck, size: 44, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+          const SizedBox(height: 12),
+          Text(
+            tr('No follow-ups in this tab', 'مفيش متابعات في التاب ده'),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: strong),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            otherTabsHaveItems
+                ? tr('Other tabs have follow-ups.', 'في متابعات في تابات تانية.')
+                : tr('All scheduled follow-ups are clear.', 'مفيش متابعات متسجلة.'),
+            style: TextStyle(fontSize: 12, color: muted),
+          ),
+          if (otherTabsHaveItems) ...[
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: onShowAll, child: Text(tr('Show all', 'اعرض الكل'))),
+          ],
+        ],
+      );
+    }
+
+    // Scrollable so pull-to-refresh works on the empty state too.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(child: Padding(padding: const EdgeInsets.all(24), child: body)),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFollowUpQueueCard(BuildContext context, LeadModel lead, bool isDark) {
     final initials = lead.name.trim().isNotEmpty
         ? (lead.name.trim().split(' ').length > 1
