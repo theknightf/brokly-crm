@@ -26,6 +26,7 @@ import {
   ArrowLeft,
   ArrowRight,
   X,
+  Printer,
 } from 'lucide-react';
 import { reportsService } from '@/lib/services/crmService';
 import { createClient } from '@/lib/supabase/client';
@@ -356,6 +357,7 @@ const CATEGORY_CARDS: {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
   target: ReportCardTarget;
 }[] = [
+  { key: 'weeklyAgents', title: 'Weekly agent report', desc: 'Printable: actions per day, stages, overdue follow-ups and hot leads for every agent', icon: Printer, target: '/reports/weekly' },
   { key: 'myPerformance', title: 'My performance', desc: 'Your leads, wins and conversion at a glance', icon: UserCheck, target: 'overview' },
   { key: 'teamPerformance', title: 'Team performance', desc: 'How every agent and team is doing', icon: Users, target: 'team' },
   { key: 'leadStages', title: 'Lead stages', desc: 'See how many leads are New, Pending, Interested and Won', icon: GitBranch, target: 'leads' },
