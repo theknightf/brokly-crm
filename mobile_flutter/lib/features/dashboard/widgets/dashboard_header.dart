@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../state/attendance_provider.dart';
 import '../../../state/auth_provider.dart';
-import 'dash_kit.dart';
 
 /// Greeting + attendance chip. Only rebuilds when name / check-in changes.
 class DashboardHeader extends StatelessWidget {
@@ -12,9 +12,9 @@ class DashboardHeader extends StatelessWidget {
 
   static String _greeting() {
     final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return tr('Good morning', 'صباح الخير');
+    if (h < 17) return tr('Good afternoon', 'مساء الخير');
+    return tr('Good evening', 'مساء الخير');
   }
 
   @override
@@ -24,7 +24,7 @@ class DashboardHeader extends StatelessWidget {
       if (p != null && p.fullName.trim().isNotEmpty) {
         return p.fullName.trim().split(' ').first;
       }
-      return a.user?.email?.split('@').first ?? 'Agent';
+      return a.user?.email?.split('@').first ?? tr('Agent', 'البروكر');
     });
     final checkedIn =
         context.select<AttendanceProvider, bool>((a) => a.isCheckedIn);
@@ -59,7 +59,7 @@ class DashboardHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Semantics(
           button: true,
-          label: checkedIn ? 'Checked in' : 'Check in',
+          label: checkedIn ? tr('Checked in', 'مسجل حضور') : tr('Check in', 'تسجيل حضور'),
           child: InkWell(
             onTap: onAttendanceTap,
             borderRadius: BorderRadius.circular(24),
@@ -88,12 +88,12 @@ class DashboardHeader extends StatelessWidget {
                       height: 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: checkedIn ? accent : DashColors.slate,
+                        color: checkedIn ? accent : Surf.subtext(context),
                       ),
                     ),
                     const SizedBox(width: 7),
                     Text(
-                      checkedIn ? 'Checked In' : 'Check In',
+                      checkedIn ? tr('Checked In', 'مسجل حضور') : tr('Check In', 'تسجيل حضور'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,

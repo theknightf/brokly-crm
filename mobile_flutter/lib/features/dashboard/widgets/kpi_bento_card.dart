@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 
 class KpiBentoCard extends StatelessWidget {
   final String title;
@@ -19,16 +19,17 @@ class KpiBentoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = color ?? AppColors.primary;
+    final isDark = context.isDark;
+    final p = context.palette;
+    final primaryColor = color ?? p.accent;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : Colors.white,
+        color: p.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          color: p.border,
         ),
       ),
       child: Column(
@@ -43,7 +44,7 @@ class KpiBentoCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                  color: p.subtext,
                 ),
               ),
               Container(
@@ -65,7 +66,7 @@ class KpiBentoCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
-              color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+              color: p.text,
             ),
           ),
           if (subtitle != null) ...[
@@ -74,7 +75,7 @@ class KpiBentoCard extends StatelessWidget {
               subtitle!,
               style: TextStyle(
                 fontSize: 11,
-                color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                color: p.subtext,
               ),
             ),
           ],

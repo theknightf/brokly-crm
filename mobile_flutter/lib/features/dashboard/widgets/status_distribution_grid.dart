@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 
 class StatusDistributionGrid extends StatelessWidget {
   final Map<String, int> statusCounts;
@@ -24,25 +25,27 @@ class StatusDistributionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
+    final p = context.palette;
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: primaryStatuses.map((st) {
         final count = statusCounts[st] ?? 0;
-        final colors = AppColors.getStatusColors(st, isDark: isDark);
+        final colors = AppColors.stageTone(st, isDark: isDark);
 
         return InkWell(
           onTap: () => onStatusTap?.call(st),
           borderRadius: BorderRadius.circular(10),
           child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : Colors.white,
+              color: p.card,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                color: p.border,
               ),
             ),
             child: Row(
@@ -52,7 +55,7 @@ class StatusDistributionGrid extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: colors.text,
+                    color: colors.dot,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -62,7 +65,7 @@ class StatusDistributionGrid extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                    color: p.text,
                   ),
                 ),
                 const SizedBox(width: 8),

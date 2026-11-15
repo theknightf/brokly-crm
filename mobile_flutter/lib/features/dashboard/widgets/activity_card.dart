@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
 import 'dash_kit.dart';
 
@@ -32,9 +34,9 @@ class ActivityCard extends StatelessWidget {
 
     return DashCard(
       icon: LucideIcons.activity,
-      title: 'Daily Activity & SLA',
-      trailing: StatusPill('Rank #$rank - $online online',
-          color: DashColors.green),
+      title: tr('Daily Activity & SLA', 'النشاط اليومي والالتزام'),
+      trailing: StatusPill(tr('Rank #$rank - $online online', 'الترتيب #$rank - $online أونلاين'),
+          color: context.palette.success),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -44,30 +46,30 @@ class ActivityCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _Mini(
-                    title: 'Calls logged',
+                    title: tr('Calls logged', 'المكالمات المسجلة'),
                     value: CountUp(callsToday,
                         suffix: ' / $target',
                         style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                             color: accent)),
-                    sub: '$callsThisMonth this month',
+                    sub: tr('$callsThisMonth this month', '$callsThisMonth الشهر ده'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _Mini(
-                    title: 'SLA score',
+                    title: tr('SLA score', 'نسبة الالتزام'),
                     value: CountUp(slaScorePct,
                         decimals: 1,
                         suffix: '%',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
-                            color: DashColors.blue)),
+                            color: context.palette.info)),
                     sub: overdueFollowUps == 0
-                        ? 'All due items on track'
-                        : '$overdueFollowUps overdue follow-ups',
+                        ? tr('All due items on track', 'كل المطلوب ماشي في ميعاده')
+                        : tr('$overdueFollowUps overdue follow-ups', '$overdueFollowUps متابعات متأخرة'),
                   ),
                 ),
               ],
@@ -77,7 +79,7 @@ class ActivityCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Daily call quota',
+                child: Text(tr('Daily call quota', 'هدف المكالمات اليومي'),
                     style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,

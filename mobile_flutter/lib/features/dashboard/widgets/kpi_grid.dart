@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
 import 'dash_kit.dart';
 
@@ -47,23 +48,23 @@ class KpiGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final lateFu = overdueFollowUps > 0;
     final items = [
-      _Kpi('Total Leads', totalLeads, '+$newLeadsThisMonth this month',
+      _Kpi(tr('Total Leads', 'إجمالي العملاء'), totalLeads, tr('+$newLeadsThisMonth this month', '+$newLeadsThisMonth الشهر ده'),
           Surf.accent(context), LucideIcons.users, 1),
       _Kpi(
-          'Follow-ups',
+          tr('Follow-ups', 'المتابعات'),
           activeFollowUps,
-          lateFu ? '$overdueFollowUps late' : 'On track',
-          lateFu ? AppColors.alertRed : DashColors.green,
+          lateFu ? tr('$overdueFollowUps late', '$overdueFollowUps متأخرة') : tr('On track', 'تمام'),
+          lateFu ? context.palette.danger : context.palette.success,
           LucideIcons.calendarClock,
           3),
-      _Kpi('Site Visits', siteVisits, '$scheduledVisits scheduled',
-          DashColors.blue, LucideIcons.mapPin, 4),
-      _Kpi('Deals Won', wonDeals,
-          '${conversionRate.toStringAsFixed(0)}% conversion', DashColors.green,
+      _Kpi(tr('Site Visits', 'المعاينات'), siteVisits, tr('$scheduledVisits scheduled', '$scheduledVisits متحددة'),
+          context.palette.info, LucideIcons.mapPin, 4),
+      _Kpi(tr('Deals Won', 'صفقات مقفولة'), wonDeals,
+          tr('${conversionRate.toStringAsFixed(0)}% conversion', 'تحويل ${conversionRate.toStringAsFixed(0)}%'), context.palette.success,
           LucideIcons.trophy, 5),
       // Leads (and calls) that actually picked up: "تم الرد"
-      _Kpi('Answered / تم الرد', answeredLeads, '$answeredCalls calls',
-          DashColors.blue, LucideIcons.phoneCall, 1),
+      _Kpi(tr('Answered', 'تم الرد'), answeredLeads, tr('$answeredCalls calls', '$answeredCalls مكالمة'),
+          context.palette.info, LucideIcons.phoneCall, 1),
     ];
 
     Widget tile(_Kpi k) => Expanded(

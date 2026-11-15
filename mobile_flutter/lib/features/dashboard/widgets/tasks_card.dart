@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../data/models/dashboard_summary_model.dart';
 import 'dash_kit.dart';
@@ -25,8 +26,8 @@ class TasksCard extends StatelessWidget {
 
     return DashCard(
       icon: LucideIcons.listChecks,
-      title: "Today's Action Tasks",
-      trailing: StatusPill('Done $done/${tasks.length}', color: accent),
+      title: tr("Today's Action Tasks", 'مهام النهارده'),
+      trailing: StatusPill(tr('Done $done/${tasks.length}', 'خلصت $done/${tasks.length}'), color: accent),
       child: tasks.isEmpty
           ? Container(
               padding: const EdgeInsets.all(14),
@@ -40,7 +41,7 @@ class TasksCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'All assigned tasks and due follow-ups for today are complete!',
+                      tr('All assigned tasks and due follow-ups for today are complete!', 'كل مهام ومتابعات النهارده خلصت!'),
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -83,11 +84,10 @@ class _TaskRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Surf.accent(context);
-    final dark = Surf.dark(context);
     final done = item.isCompleted;
     final pColor = item.priority == 'High'
-        ? AppColors.alertRed
-        : (item.priority == 'Medium' ? AppColors.amber : DashColors.green);
+        ? context.palette.danger
+        : (item.priority == 'Medium' ? context.palette.warning : context.palette.success);
     final leadId = item.leadId;
 
     return AnimatedContainer(
@@ -118,12 +118,12 @@ class _TaskRow extends StatelessWidget {
                       color: done ? accent : Colors.transparent,
                       borderRadius: BorderRadius.circular(7),
                       border: Border.all(
-                          color: done ? accent : DashColors.slate, width: 1.8),
+                          color: done ? accent : context.palette.subtext, width: 1.8),
                     ),
                     child: done
                         ? Icon(LucideIcons.check,
                             size: 15,
-                            color: dark ? DashColors.onLime : Colors.white)
+                            color: context.palette.onAccent)
                         : null,
                   ),
                 ),

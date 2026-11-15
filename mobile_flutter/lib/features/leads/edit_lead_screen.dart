@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/premium.dart';
 import '../../core/utils/note_formatter.dart';
 import '../../core/utils/stage_note_guard.dart';
 import '../../core/utils/tr.dart';
@@ -159,9 +161,7 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
       } catch (_) {
         if (mounted) {
           setState(() => _isSubmitting = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(tr('Could not save the note, so the stage was not changed.', 'تعذّر حفظ الملاحظة، فلم تتغير المرحلة.'))),
-          );
+          showAppSnack(context, tr('Could not save the note, so the stage was not changed.', 'تعذّر حفظ الملاحظة، فلم تتغير المرحلة.'), error: true);
         }
         return;
       }
@@ -190,184 +190,168 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
     try {
       await LeadsService().update(widget.lead.id, updates);
       if (mounted) {
+        tapFeedback();
+        showAppSnack(context, tr('Lead updated', 'اتحفظت التعديلات'));
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lead updated successfully'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
-        );
+        showAppSnack(context, e.toString().replaceAll('Exception: ', ''), error: true);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final profile = context.watch<AuthProvider>().profile;
+    final canEditSource = profile?.isAdmin == true || profile?.isTeamLeader == true;
+    const gap = SizedBox(height: AppSpacing.md);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Lead')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      appBar: AppBar(
+        title: Text(tr('Edit lead', 'تعديل العميل')),
+        leading: IconButton(tooltip: tr('Close', 'إغلاق'), icon: const Icon(LucideIcons.x), onPressed: () => Navigator.maybePop(context)),
+      ),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 120),
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Customer Full Name *',
-                  prefixIcon: Icon(LucideIcons.user, size: 18),
+              _Card(title: tr('Contact', 'بيانات التواصل'), children: [
+                TextFormField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  autofillHints: const [AutofillHints.name],
+                  decoration: InputDecoration(labelText: '${tr('Name', 'الاسم')} *', prefixIcon: const Icon(LucideIcons.user, size: 18)),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? tr('Name is required', 'الاسم مطلوب') : null,
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number *',
-                  prefixIcon: Icon(LucideIcons.phone, size: 18),
+                gap,
+                TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  textDirection: TextDirection.ltr,
+                  decoration: InputDecoration(labelText: '${tr('Phone', 'التليفون')} *', prefixIcon: const Icon(LucideIcons.phone, size: 18)),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? tr('Phone is required', 'التليفون مطلوب') : null,
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Phone is required' : null,
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email Address',
-                  prefixIcon: Icon(LucideIcons.mail, size: 18),
+                gap,
+                TextFormField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textDirection: TextDirection.ltr,
+                  decoration: InputDecoration(labelText: tr('Email', 'الإيميل'), prefixIcon: const Icon(LucideIcons.mail, size: 18)),
                 ),
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _projectController,
-                decoration: const InputDecoration(
-                  labelText: 'Project / Compound',
-                  prefixIcon: Icon(LucideIcons.building2, size: 18),
+                gap,
+                TextFormField(
+                  controller: _locationController,
+                  decoration: InputDecoration(labelText: tr('Location', 'المنطقة'), prefixIcon: const Icon(LucideIcons.mapPin, size: 18)),
                 ),
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: _propertyTypes.contains(_propertyType) ? _propertyType : null,
-                decoration: const InputDecoration(
-                  labelText: 'Property Type',
-                  prefixIcon: Icon(LucideIcons.home, size: 18),
+              ]),
+              _Card(title: tr('Lead', 'العميل'), children: [
+                DropdownButtonFormField<String>(
+                  initialValue: _assignedToId,
+                  isExpanded: true,
+                  decoration: InputDecoration(labelText: tr('Assigned to', 'مسؤول عنه'), prefixIcon: const Icon(LucideIcons.userCheck, size: 18)),
+                  items: [
+                    DropdownMenuItem(value: null, child: Text(tr('Nobody yet', 'لسه محدش'))),
+                    ..._assignableUsers.map((u) => DropdownMenuItem(value: u.id, child: Text(u.fullName))),
+                  ],
+                  onChanged: (v) => setState(() => _assignedToId = v),
                 ),
-                items: _propertyTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                onChanged: (v) => setState(() => _propertyType = v),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
+                gap,
+                if (canEditSource)
+                  DropdownButtonFormField<String>(
+                    initialValue: _sources.contains(_source) ? _source : null,
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: tr('Source', 'المصدر'), prefixIcon: const Icon(LucideIcons.compass, size: 18)),
+                    items: _sources.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                    onChanged: (v) => setState(() => _source = v),
+                  )
+                else
+                  InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: tr('Source (read-only)', 'المصدر (للعرض بس)'),
+                      prefixIcon: const Icon(LucideIcons.compass, size: 18),
+                      enabled: false,
+                    ),
+                    child: Text(_source?.isNotEmpty == true ? _source! : '—', style: TextStyle(color: p.subtext)),
+                  ),
+              ]),
+              _Card(title: tr('Property', 'الوحدة'), children: [
+                TextFormField(
+                  controller: _projectController,
+                  decoration: InputDecoration(labelText: tr('Project', 'المشروع'), prefixIcon: const Icon(LucideIcons.building2, size: 18)),
+                ),
+                gap,
+                DropdownButtonFormField<String>(
+                  initialValue: _propertyTypes.contains(_propertyType) ? _propertyType : null,
+                  isExpanded: true,
+                  decoration: InputDecoration(labelText: tr('Property type', 'نوع الوحدة'), prefixIcon: const Icon(LucideIcons.house, size: 18)),
+                  items: _propertyTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                  onChanged: (v) => setState(() => _propertyType = v),
+                ),
+                gap,
+                Row(children: [
                   Expanded(
                     child: TextFormField(
                       controller: _budgetMinController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Min Budget',
-                        prefixIcon: Icon(LucideIcons.coins, size: 18),
-                      ),
+                      decoration: InputDecoration(labelText: tr('Min budget', 'أقل ميزانية')),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: TextFormField(
                       controller: _budgetMaxController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Max Budget',
-                        prefixIcon: Icon(LucideIcons.coins, size: 18),
-                      ),
+                      decoration: InputDecoration(labelText: tr('Max budget', 'أعلى ميزانية')),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Builder(
-                builder: (context) {
-                  final profile = context.watch<AuthProvider>().profile;
-                  final canEditSource = profile?.isAdmin == true || profile?.isTeamLeader == true;
-                  if (!canEditSource) {
-                    return InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Source (Read-only)',
-                        prefixIcon: Icon(LucideIcons.compass, size: 18),
-                        enabled: false,
-                      ),
-                      child: Text(
-                        _source?.isNotEmpty == true ? _source! : '—',
-                        style: TextStyle(color: Theme.of(context).disabledColor),
-                      ),
-                    );
-                  }
-                  return DropdownButtonFormField<String>(
-                    initialValue: _sources.contains(_source) ? _source : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Source',
-                      prefixIcon: Icon(LucideIcons.compass, size: 18),
-                    ),
-                    items: _sources.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                    onChanged: (v) => setState(() => _source = v),
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                initialValue: _assignedToId,
-                decoration: const InputDecoration(
-                  labelText: 'Assign to Agent',
-                  prefixIcon: Icon(LucideIcons.userCheck, size: 18),
+                ]),
+              ]),
+              _Card(title: tr('Notes', 'ملاحظات'), children: [
+                TextFormField(
+                  controller: _notesController,
+                  minLines: 3,
+                  maxLines: 6,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(hintText: tr('Your note', 'ملاحظتك'), alignLabelWithHint: true),
                 ),
-                items: [
-                  const DropdownMenuItem(value: null, child: Text('Unassigned')),
-                  ..._assignableUsers.map(
-                    (u) => DropdownMenuItem(value: u.id, child: Text(u.fullName)),
-                  ),
-                ],
-                onChanged: (v) => setState(() => _assignedToId = v),
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _notesController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  labelText: tr('Note', 'ملاحظة'),
-                  alignLabelWithHint: true,
-                ),
-              ),
-              if (_parsedNotes.log.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                _CallLog(entries: _parsedNotes.log),
-              ],
-              const SizedBox(height: 28),
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('Save Changes'),
-              ),
+                if (_parsedNotes.log.isNotEmpty) ...[gap, _CallLog(entries: _parsedNotes.log)],
+              ]),
             ],
           ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.md),
+          decoration: BoxDecoration(color: p.card, border: Border(top: BorderSide(color: p.border))),
+          child: AppButton(tr('Save changes', 'حفظ التعديلات'), icon: LucideIcons.check, loading: _isSubmitting, expand: true, onPressed: _submit),
         ),
       ),
     );
   }
 }
+
+class _Card extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+  const _Card({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) => PremiumCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.md),
+          ...children,
+        ]),
+      );
+}
+
 
 /// The calls the app recorded on this lead, one readable row each (newest first).
 class _CallLog extends StatelessWidget {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../data/models/follow_up_model.dart';
@@ -25,7 +26,7 @@ class PriorityFollowUpCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Surf.dark(context);
     final overdue = followUp.isOverdue;
-    final tone = overdue ? AppColors.alertRed : AppColors.amber;
+    final tone = overdue ? context.palette.danger : context.palette.warning;
     final interest = (followUp.propertyInterest?.trim().isNotEmpty ?? false)
         ? followUp.propertyInterest!.trim()
         : ((followUp.notes?.trim().isNotEmpty ?? false)
@@ -37,7 +38,7 @@ class PriorityFollowUpCard extends StatelessWidget {
 
     return PremiumCard(
       margin: EdgeInsets.zero,
-      tint: dark ? const Color(0xFF171316) : const Color(0xFFFFFBEB),
+      tint: Color.alphaBlend(tone.withAlpha(dark ? 20 : 14), context.palette.card),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,10 +117,10 @@ class PriorityFollowUpCard extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: onCall,
                     icon: const Icon(LucideIcons.phoneCall, size: 16),
-                    label: const Text('Call now'),
+                    label: Text(tr('Call now', 'اتصل دلوقتي')),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.neonLime,
-                      foregroundColor: DashColors.onLime,
+                      backgroundColor: context.palette.accent,
+                      foregroundColor: context.palette.onAccent,
                       textStyle: const TextStyle(
                           fontSize: 13.5, fontWeight: FontWeight.w800),
                       shape: RoundedRectangleBorder(
@@ -138,8 +139,8 @@ class PriorityFollowUpCard extends StatelessWidget {
                     icon: const Icon(LucideIcons.messageCircle, size: 16),
                     label: const Text('WhatsApp'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: DashColors.whatsapp,
-                      side: const BorderSide(color: DashColors.whatsapp),
+                      foregroundColor: context.palette.whatsapp,
+                      side: BorderSide(color: context.palette.whatsapp),
                       textStyle: const TextStyle(
                           fontSize: 13.5, fontWeight: FontWeight.w700),
                       shape: RoundedRectangleBorder(
@@ -153,7 +154,7 @@ class PriorityFollowUpCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 child: IconButton(
-                  tooltip: 'Mark Done',
+                  tooltip: tr('Mark Done', 'تم'),
                   onPressed: onDone,
                   style: IconButton.styleFrom(
                     backgroundColor: Surf.card(context),

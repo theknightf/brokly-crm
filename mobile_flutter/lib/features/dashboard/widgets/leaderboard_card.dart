@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../data/models/dashboard_summary_model.dart';
 import 'dash_kit.dart';
@@ -37,25 +38,25 @@ class _LeaderboardCardState extends State<LeaderboardCard> {
 
     return DashCard(
       icon: LucideIcons.award,
-      iconColor: AppColors.amber,
-      title: 'Action Leaderboard',
+      iconColor: context.palette.warning,
+      title: tr('Action Leaderboard', 'ترتيب النشاط'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Align(
             alignment: Alignment.centerLeft,
             child: DashSegmented(
-              labels: const ['Dials', 'Site Tours'],
+              labels: [tr('Dials', 'مكالمات'), tr('Site Tours', 'معاينات')],
               selected: _tab,
               onChanged: (i) => setState(() => _tab = i),
             ),
           ),
           const SizedBox(height: 12),
           if (top.isEmpty)
-            const EmptyState(
+            EmptyState(
               icon: LucideIcons.award,
-              title: 'No leaderboard records yet',
-              message: 'Activity will appear here as your team logs calls and tours.',
+              title: tr('No leaderboard records yet', 'لسه مفيش ترتيب'),
+              message: tr('Activity will appear here as your team logs calls and tours.', 'النشاط هيظهر هنا لما الفريق يسجل مكالمات ومعاينات.'),
             )
           else
             for (var i = 0; i < top.length; i++)
@@ -65,7 +66,7 @@ class _LeaderboardCardState extends State<LeaderboardCard> {
                   entry: top[i],
                   index: i,
                   value: _metric(top[i]),
-                  unit: _tab == 0 ? 'Dials' : 'Tours',
+                  unit: _tab == 0 ? tr('Dials', 'مكالمات') : tr('Tours', 'معاينات'),
                   fraction: _metric(top[i]) / leader,
                 ),
               ),
@@ -102,14 +103,14 @@ class _Row extends StatelessWidget {
             : index == 2
                 ? _LeaderboardCardState._bronze
                 : null;
-    final name = me ? '${entry.fullName} (You)' : entry.fullName;
+    final name = me ? '${entry.fullName} (${tr('You', 'إنت')})' : entry.fullName;
 
     return Container(
       constraints: const BoxConstraints(minHeight: 64),
       padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
       decoration: BoxDecoration(
         color: me
-            ? (dark ? const Color(0xFF16250F) : AppColors.secondary)
+            ? context.palette.accentSoft
             : DashColors.inset(context),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
@@ -149,7 +150,7 @@ class _Row extends StatelessWidget {
                     fontSize: 11.5,
                     fontWeight: FontWeight.w800,
                     color: me
-                        ? (dark ? DashColors.onLime : Colors.white)
+                        ? context.palette.onAccent
                         : Colors.white,
                   ),
                 ),
@@ -162,12 +163,10 @@ class _Row extends StatelessWidget {
                     width: 10,
                     height: 10,
                     decoration: BoxDecoration(
-                      color: DashColors.green,
+                      color: context.palette.success,
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: dark
-                              ? AppColors.darkBackground
-                              : Colors.white,
+                          color: context.palette.card,
                           width: 1.5),
                     ),
                   ),
@@ -191,7 +190,7 @@ class _Row extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text('${entry.leadsCount} leads - ${entry.score} pts',
+                Text(tr('${entry.leadsCount} leads - ${entry.score} pts', '${entry.leadsCount} عميل - ${entry.score} نقطة'),
                     style: TextStyle(
                         fontSize: 11.5, color: Surf.subtext(context))),
                 const SizedBox(height: 6),

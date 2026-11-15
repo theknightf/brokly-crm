@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/premium.dart';
 
 /// Shared constants and tiny building blocks for the dashboard widgets.
@@ -15,7 +15,7 @@ class DashColors {
 
   /// Sunken inner surface (inside a card).
   static Color inset(BuildContext c) =>
-      Surf.dark(c) ? AppColors.darkBackground : AppColors.lightMuted;
+      c.palette.muted;
 }
 
 const List<FontFeature> kTabular = [FontFeature.tabularFigures()];
@@ -212,7 +212,6 @@ class DashSegmented extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Surf.accent(context);
-    final dark = Surf.dark(context);
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
@@ -242,7 +241,7 @@ class DashSegmented extends StatelessWidget {
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: i == selected
-                        ? (dark ? DashColors.onLime : Colors.white)
+                        ? context.palette.onAccent
                         : Surf.subtext(context),
                   ),
                 ),

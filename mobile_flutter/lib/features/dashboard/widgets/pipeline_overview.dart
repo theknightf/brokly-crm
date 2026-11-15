@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/lead_stages.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../state/leads_provider.dart';
 import 'dash_kit.dart';
@@ -72,8 +73,8 @@ class PipelineOverview extends StatelessWidget {
 
     return DashCard(
       icon: LucideIcons.chartNoAxesColumn,
-      title: 'Pipeline overview',
-      subtitle: 'Tap a stage to filter the leads below',
+      title: tr('Pipeline overview', 'نظرة على المراحل'),
+      subtitle: tr('Tap a stage to filter the leads below', 'دوس على مرحلة عشان تفلتر العملاء تحت'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -94,7 +95,7 @@ class PipelineOverview extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Text('Total leads',
+                  child: Text(tr('Total leads', 'إجمالي العملاء'),
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -202,7 +203,7 @@ class _StageTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Surf.dark(context);
-    final sc = AppColors.getStatusColors(stage, isDark: dark);
+    final sc = AppColors.stageTone(stage, isDark: dark);
     final empty = count == 0;
     return Semantics(
       button: true,

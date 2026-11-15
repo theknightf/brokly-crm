@@ -3,6 +3,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/lead_stages.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../data/models/lead_model.dart';
 import '../../../state/leads_provider.dart';
@@ -133,8 +135,8 @@ class _LeadsByStageSectionState extends State<LeadsByStageSection> {
 
     return DashCard(
       icon: LucideIcons.layers,
-      title: 'Leads by Pipeline Stage',
-      subtitle: '${filtered.length} leads shown - ${stages.length} stages',
+      title: tr('Leads by Pipeline Stage', 'العملاء حسب المرحلة'),
+      subtitle: tr('${filtered.length} leads shown - ${stages.length} stages', '${filtered.length} عميل ظاهر - ${stages.length} مراحل'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -156,14 +158,14 @@ class _LeadsByStageSectionState extends State<LeadsByStageSection> {
                     onChanged: p.setSearchQuery,
                     style: TextStyle(fontSize: 13.5, color: Surf.text(context)),
                     decoration: InputDecoration(
-                      hintText: 'Search name, phone, project',
+                      hintText: tr('Search name, phone, project', 'دور بالاسم أو الرقم أو المشروع'),
                       hintStyle:
                           TextStyle(fontSize: 13, color: Surf.subtext(context)),
                       prefixIcon: Icon(LucideIcons.search,
                           size: 16, color: Surf.subtext(context)),
                       suffixIcon: p.searchQuery.isNotEmpty
                           ? IconButton(
-                              tooltip: 'Clear search',
+                              tooltip: tr('Clear search', 'مسح البحث'),
                               icon: const Icon(LucideIcons.x, size: 16),
                               onPressed: () {
                                 _search.clear();
@@ -194,19 +196,19 @@ class _LeadsByStageSectionState extends State<LeadsByStageSection> {
                   width: 48,
                   height: 48,
                   child: IconButton(
-                    tooltip: 'Reset filters',
+                    tooltip: tr('Reset filters', 'مسح الفلاتر'),
                     onPressed: () {
                       _search.clear();
                       p.clearFilters();
                     },
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.alertRed.withAlpha(22),
-                      side: BorderSide(color: AppColors.alertRed.withAlpha(90)),
+                      backgroundColor: context.palette.danger.withAlpha(22),
+                      side: BorderSide(color: context.palette.danger.withAlpha(90)),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                     ),
-                    icon: const Icon(LucideIcons.rotateCcw,
-                        size: 16, color: AppColors.alertRed),
+                    icon: Icon(LucideIcons.rotateCcw,
+                        size: 16, color: context.palette.danger),
                   ),
                 ),
               ],
@@ -287,14 +289,17 @@ class _ModeSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Surf.dark(context);
     final accent = Surf.accent(context);
     const icons = [
       LucideIcons.columns3,
       LucideIcons.layoutGrid,
       LucideIcons.list
     ];
-    const tips = ['Swipable stage cards', 'Stacked stage cards', 'Lead list'];
+    final tips = [
+      tr('Swipable stage cards', 'كروت مراحل بالسحب'),
+      tr('Stacked stage cards', 'كروت مراحل تحت بعض'),
+      tr('Lead list', 'قايمة العملاء'),
+    ];
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
@@ -322,7 +327,7 @@ class _ModeSwitch extends StatelessWidget {
                   child: Icon(icons[i],
                       size: 16,
                       color: i == mode
-                          ? (dark ? DashColors.onLime : Colors.white)
+                          ? context.palette.onAccent
                           : Surf.subtext(context)),
                 ),
               ),
@@ -394,7 +399,7 @@ class _StageChip extends StatelessWidget {
     final sc = isAll
         ? (bg: accent.withAlpha(25), text: accent)
         : AppColors.getStatusColors(label, isDark: dark);
-    final fgOn = dark ? DashColors.onLime : Colors.white;
+    final fgOn = context.palette.onAccent;
     return Semantics(
       button: true,
       selected: selected,
@@ -485,18 +490,18 @@ class _ActivityChip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
               color: active
-                  ? DashColors.blue.withAlpha(Surf.dark(context) ? 45 : 25)
+                  ? context.palette.info.withAlpha(Surf.dark(context) ? 45 : 25)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                  color: active ? DashColors.blue : Surf.border(context)),
+                  color: active ? context.palette.info : Surf.border(context)),
             ),
             child: Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                color: active ? DashColors.blue : Surf.subtext(context),
+                color: active ? context.palette.info : Surf.subtext(context),
               ),
             ),
           ),
@@ -595,7 +600,7 @@ class _StageCard extends StatelessWidget {
     final empty = Padding(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
       child: Center(
-        child: Text('No leads currently in $stage',
+        child: Text(tr('No leads currently in $stage', 'مفيش عملاء دلوقتي في $stage'),
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: Surf.subtext(context))),
       ),
@@ -795,12 +800,12 @@ class _LeadRow extends StatelessWidget {
           Divider(height: 1, color: Surf.border(context)),
           Row(
             children: [
-              action(LucideIcons.phoneCall, 'Call', Surf.accent(context),
+              action(LucideIcons.phoneCall, tr('Call', 'اتصال'), Surf.accent(context),
                   onCall),
-              action(LucideIcons.messageCircle, 'WhatsApp',
-                  DashColors.whatsapp, onWhatsApp),
+              action(LucideIcons.messageCircle, tr('WhatsApp', 'واتساب'),
+                  context.palette.whatsapp, onWhatsApp),
               if (next != null)
-                action(LucideIcons.arrowRightCircle, 'Advance',
+                action(LucideIcons.arrowRightCircle, tr('Advance', 'المرحلة الجاية'),
                     stageColors.text, () => onAdvance(next)),
             ],
           ),
@@ -845,7 +850,7 @@ class _FlatList extends StatelessWidget {
                   foregroundColor: Surf.accent(context)),
               icon: const Icon(LucideIcons.arrowRight, size: 15),
               label: Text(
-                'View all ${leads.length} filtered leads',
+                tr('View all ${leads.length} filtered leads', 'عرض كل الـ ${leads.length} عميل'),
                 style: const TextStyle(
                     fontSize: 12.5, fontWeight: FontWeight.w700),
               ),
@@ -871,9 +876,9 @@ class _EmptyFiltered extends StatelessWidget {
       ),
       child: EmptyState(
         icon: LucideIcons.searchX,
-        title: 'No leads match the selected stage or filters',
-        message: 'Try selecting another stage chip or clearing active filters.',
-        actionLabel: hasFilters ? 'Reset all filters' : null,
+        title: tr('No leads match the selected stage or filters', 'مفيش عملاء بالمرحلة أو الفلاتر دي'),
+        message: tr('Try selecting another stage chip or clearing active filters.', 'جرب مرحلة تانية أو امسح الفلاتر.'),
+        actionLabel: hasFilters ? tr('Reset all filters', 'مسح كل الفلاتر') : null,
         onAction: hasFilters ? onReset : null,
       ),
     );

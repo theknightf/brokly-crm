@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 
 class StagePipelineGrid extends StatelessWidget {
   final Map<String, int> statusCounts;
@@ -116,7 +117,8 @@ class StagePipelineGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
+    final p = context.palette;
     final total = totalLeads > 0 ? totalLeads : 1;
 
     return GridView.builder(
@@ -133,8 +135,9 @@ class StagePipelineGrid extends StatelessWidget {
         final stage = pipelineStages[index];
         final name = stage['name'] as String;
         final icon = stage['icon'] as IconData;
-        final color = stage['color'] as Color;
-        final bg = stage['bg'] as Color;
+        final tone = AppColors.stageTone(name, isDark: isDark);
+        final color = tone.text;
+        final bg = tone.bg;
         final isHighlight = stage['highlight'] == true;
 
         final count = statusCounts[name] ?? 0;
@@ -148,37 +151,23 @@ class StagePipelineGrid extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF141820) : Colors.white,
+                color: p.card,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isHighlight
-                      ? AppColors.neonLime.withAlpha(120)
-                      : (isDark ? const Color(0xFF272C38) : AppColors.lightBorder),
+                      ? p.accent.withAlpha(120)
+                      : p.border,
                   width: isHighlight ? 1.5 : 1,
                 ),
                 boxShadow: isHighlight
                     ? [
                         BoxShadow(
-                          color: AppColors.neonLime.withAlpha(40),
+                          color: p.accent.withAlpha(40),
                           blurRadius: 14,
                           spreadRadius: 1,
                         ),
                       ]
-                    : (isDark
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(70),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(10),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]),
+                    : p.cardShadow,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,7 +182,7 @@ class StagePipelineGrid extends StatelessWidget {
                         height: 36,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isDark ? bg : color.withAlpha(30),
+                          color: bg,
                         ),
                         child: Center(
                           child: Icon(icon, size: 18, color: color),
@@ -203,13 +192,13 @@ class StagePipelineGrid extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: count > 0 && isHighlight
-                              ? AppColors.neonLime.withAlpha(40)
-                              : (isDark ? const Color(0xFF222733) : const Color(0xFFF1F5F9)),
+                              ? p.accent.withAlpha(40)
+                              : p.muted,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: count > 0 && isHighlight
-                                ? AppColors.neonLime.withAlpha(80)
-                                : (isDark ? const Color(0xFF2E3545) : const Color(0xFFE2E8F0)),
+                                ? p.accent.withAlpha(80)
+                                : p.border,
                           ),
                         ),
                         child: Text(
@@ -218,8 +207,8 @@ class StagePipelineGrid extends StatelessWidget {
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             color: count > 0 && isHighlight
-                                ? AppColors.neonLime
-                                : (isDark ? AppColors.darkForeground : AppColors.lightForeground),
+                                ? p.accent
+                                : p.text,
                           ),
                         ),
                       ),
@@ -232,7 +221,7 @@ class StagePipelineGrid extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                      color: p.text,
                     ),
                   ),
 
@@ -246,18 +235,18 @@ class StagePipelineGrid extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFFCAD0DD) : AppColors.lightForeground,
+                            color: p.subtext,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Text(
+                      Text(
                         '↗',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w300,
-                          color: AppColors.mutedText,
+                          color: p.subtext,
                           height: 1,
                         ),
                       ),

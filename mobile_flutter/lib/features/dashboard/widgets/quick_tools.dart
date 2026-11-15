@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tr.dart';
 import '../../../core/widgets/premium.dart';
-import 'dash_kit.dart';
 
 class _Tool {
   final String label;
@@ -30,12 +30,12 @@ class QuickTools extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tools = [
-      _Tool('Add Lead', LucideIcons.userPlus, Surf.accent(context), onAddLead),
-      _Tool('Unit Calculator', LucideIcons.calculator, DashColors.blue,
+      _Tool(tr('Add Lead', 'إضافة عميل'), LucideIcons.userPlus, Surf.accent(context), onAddLead),
+      _Tool(tr('Unit Calculator', 'حاسبة الوحدات'), LucideIcons.calculator, context.palette.info,
           onCalculator),
-      _Tool('Follow-ups', LucideIcons.calendarClock, AppColors.amber,
+      _Tool(tr('Follow-ups', 'المتابعات'), LucideIcons.calendarClock, context.palette.warning,
           onFollowUps),
-      _Tool('Call Logs', LucideIcons.phoneCall, DashColors.green, onCallLogs),
+      _Tool(tr('Call Logs', 'سجل المكالمات'), LucideIcons.phoneCall, context.palette.success, onCallLogs),
     ];
     Widget tile(_Tool t) => Expanded(
           child: PremiumCard(
@@ -75,7 +75,7 @@ class QuickTools extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'Broker Quick Tools'),
+        SectionHeader(title: tr('Broker Quick Tools', 'أدوات البروكر السريعة')),
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
