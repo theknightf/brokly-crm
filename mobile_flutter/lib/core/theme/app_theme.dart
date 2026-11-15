@@ -144,7 +144,7 @@ class AppTheme {
       scaffoldBackgroundColor: p.background,
       canvasColor: p.background,
       dividerColor: p.border,
-      splashFactory: InkSparkle.splashFactory,
+      splashFactory: InkRipple.splashFactory, // light on low-end phones (InkSparkle runs a shader on every tap)
       materialTapTargetSize: MaterialTapTargetSize.padded,
       visualDensity: VisualDensity.standard,
       extensions: [p],
