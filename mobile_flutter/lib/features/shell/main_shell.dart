@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/memory/memory_guard.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/tr.dart';
 import '../../data/services/device_call_sync_service.dart';
 import '../../data/services/pending_call_saves.dart';
 import '../../state/call_logs_provider.dart';
@@ -15,6 +17,7 @@ import '../leads/add_lead_screen.dart';
 import '../reports/reports_screen.dart';
 import 'app_drawer.dart';
 import 'app_top_bar.dart';
+import 'more_sheet.dart';
 import 'shell_destinations.dart';
 
 class MainShell extends StatefulWidget {
@@ -105,21 +108,22 @@ class _MainShellState extends State<MainShell> {
     return buildSimplePage(page) ?? const SizedBox.shrink();
   }
 
-  void _onBottomNavTapped(int index) {
-    if (index == 4) {
-      // Menu tab opens Drawer
-      _scaffoldKey.currentState?.openDrawer();
-    } else {
-      _goTo(index);
+  /// Bottom bar: Home, Leads, Follow-ups, Attendance, More (max 5, the top tasks first).
+  static const _tabs = [Pg.home, Pg.leads, Pg.followUps, Pg.attendance];
+
+  Future<void> _onBottomNavTapped(int index) async {
+    if (index < _tabs.length) {
+      _goTo(_tabs[index]);
+      return;
     }
+    final page = await showMoreSheet(context, currentPage: _currentIndex);
+    if (page != null && mounted) _goTo(page);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Determine bottom nav active index (0..3, or none if accessing auxiliary drawer pages)
-    final bottomNavActiveIndex = _currentIndex <= 3 ? _currentIndex : -1;
+    final p = context.palette;
+    final tabIndex = _tabs.indexOf(_currentIndex);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -138,182 +142,44 @@ class _MainShellState extends State<MainShell> {
           (i) => _visited.contains(i) ? _buildPage(i) : const SizedBox.shrink(),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        bottom: true,
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkCard : Colors.white,
-            border: Border(
-              top: BorderSide(
-                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildBottomNavItem(
-                index: 0,
-                icon: LucideIcons.home,
-                label: 'Home',
-                isActive: bottomNavActiveIndex == 0,
-                isDark: isDark,
-              ),
-              _buildBottomNavItem(
-                index: 1,
-                icon: LucideIcons.users,
-                label: 'Leads',
-                isActive: bottomNavActiveIndex == 1,
-                isDark: isDark,
-              ),
-              _buildBottomNavItem(
-                index: 2,
-                icon: LucideIcons.calendarCheck2,
-                label: 'Attendance',
-                isActive: bottomNavActiveIndex == 2,
-                isDark: isDark,
-              ),
-              _buildBottomNavItem(
-                index: 3,
-                icon: LucideIcons.calendarClock,
-                label: 'Follow-ups',
-                isActive: bottomNavActiveIndex == 3,
-                isDark: isDark,
-              ),
-              _buildBottomNavItem(
-                index: 4,
-                icon: LucideIcons.menu,
-                label: 'Menu',
-                isActive: false,
-                isDark: isDark,
-              ),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: _currentIndex == 1
-          ? FloatingActionButton(
-              backgroundColor: AppColors.neonLime,
-              foregroundColor: const Color(0xFF142407),
-              elevation: 4,
-              child: const Icon(LucideIcons.plus, size: 22),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddLeadScreen()),
-                );
-              },
-            )
-          : FloatingActionButton.extended(
-              backgroundColor: const Color(0xFF0C1017),
-              foregroundColor: Colors.white,
-              elevation: 6,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-                side: BorderSide(color: AppColors.neonLime.withAlpha(140), width: 1.2),
-              ),
-              icon: Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.neonLime, AppColors.primary],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(LucideIcons.sparkles, size: 13, color: Color(0xFF142407)),
-                ),
-              ),
-              label: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Brokly AI',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    'مساعد المبيعات',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.neonLime,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              onPressed: () => AssistantChatScreen.showAsModal(context),
-            ),
-    );
-  }
-
-  Widget _buildBottomNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required bool isDark,
-  }) {
-    const activeColor = AppColors.neonLime;
-    final inactiveColor = isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onBottomNavTapped(index),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // Top Glow Indicator
-            if (isActive)
-              Container(
-                height: 3,
-                width: 36,
-                decoration: BoxDecoration(
-                  color: activeColor,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(3),
-                    bottomRight: Radius.circular(3),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: activeColor.withAlpha(180),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-              ),
-            // Icon & Label Column
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 4),
-                Icon(
-                  icon,
-                  size: 20,
-                  color: isActive ? activeColor : inactiveColor,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                    color: isActive ? activeColor : inactiveColor,
-                  ),
-                ),
-              ],
-            ),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
+        child: NavigationBar(
+          // A page reached from "More" highlights the More tab.
+          selectedIndex: tabIndex >= 0 ? tabIndex : _tabs.length,
+          onDestinationSelected: _onBottomNavTapped,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: [
+            NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),
+            NavigationDestination(icon: const Icon(LucideIcons.users), label: pageLabel(Pg.leads)),
+            NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: pageLabel(Pg.followUps)),
+            NavigationDestination(icon: const Icon(LucideIcons.calendarCheck2), label: pageLabel(Pg.attendance)),
+            NavigationDestination(icon: const Icon(LucideIcons.layoutGrid), label: tr('More', 'المزيد')),
           ],
         ),
       ),
+      // Leads: add a lead. Follow-ups has its own "Add follow-up" button. Elsewhere: the AI assistant.
+      floatingActionButton: switch (_currentIndex) {
+        Pg.leads => FloatingActionButton(
+            tooltip: tr('Add lead', 'عميل جديد'),
+            child: const Icon(LucideIcons.plus),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddLeadScreen())),
+          ),
+        Pg.followUps => null,
+        _ => FloatingActionButton.extended(
+            heroTag: 'assistant',
+            backgroundColor: p.card,
+            foregroundColor: p.text,
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              side: BorderSide(color: p.accent.withAlpha(140)),
+            ),
+            icon: Icon(LucideIcons.sparkles, size: 18, color: p.accent),
+            label: Text(tr('Brokly AI', 'مساعد Brokly')),
+            onPressed: () => AssistantChatScreen.showAsModal(context),
+          ),
+      },
     );
   }
 }

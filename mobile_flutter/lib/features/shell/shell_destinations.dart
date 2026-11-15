@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../core/utils/tr.dart';
 import '../../data/models/user_profile_model.dart';
 import '../admin/admin_claim_conflicts_screen.dart';
 import '../admin/admin_console_screen.dart';
@@ -126,7 +127,7 @@ const _titles = <int, String>{
   Pg.importHistory: 'Import History',
 };
 
-String titleForPage(int page) => _titles[page] ?? 'Brokly CRM';
+String titleForPage(int page) => pageLabel(page);
 
 /// Screens without arguments. Home, Reports and Leads-dependent ones are built in MainShell.
 Widget? buildSimplePage(int page) {
@@ -194,3 +195,39 @@ int? pageForReportRoute(String key) {
   }
   return null;
 }
+
+const _titlesAr = <int, String>{
+  Pg.home: 'الرئيسية',
+  Pg.leads: 'العملاء',
+  Pg.attendance: 'الحضور',
+  Pg.followUps: 'المتابعات',
+  Pg.callLogs: 'سجل المكالمات',
+  Pg.customers: 'العملاء الفعليين',
+  Pg.settings: 'الإعدادات',
+  Pg.calculator: 'حاسبة الوحدات',
+  Pg.reservations: 'الحجوزات',
+  Pg.deals: 'الصفقات',
+  Pg.calendar: 'التقويم',
+  Pg.locations: 'المناطق',
+  Pg.projects: 'المشاريع',
+  Pg.reports: 'التقارير',
+  Pg.units: 'الوحدات',
+  Pg.workspace: 'مساحة العمل',
+  Pg.expenses: 'المصروفات',
+  Pg.teams: 'الفرق',
+  Pg.admin: 'الإدارة',
+  Pg.claimConflicts: 'تعارض المطالبات',
+  Pg.duplicates: 'المكررات',
+  Pg.duplicateCenter: 'العملاء المكررين',
+  Pg.importHistory: 'سجل الاستيراد',
+};
+
+/// Page name in the device language (Arabic or English).
+String pageLabel(int page, [String? fallback]) => tr(_titles[page] ?? fallback ?? 'Brokly CRM', _titlesAr[page] ?? fallback ?? 'Brokly CRM');
+
+String sectionLabel(String title) => switch (title) {
+      'PIPELINE' => tr('PIPELINE', 'المبيعات'),
+      'MANAGEMENT' => tr('MANAGEMENT', 'الإدارة'),
+      'SYSTEM' => tr('SYSTEM', 'النظام'),
+      _ => title,
+    };
