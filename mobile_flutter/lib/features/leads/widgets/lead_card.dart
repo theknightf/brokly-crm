@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/stage_note_guard.dart';
@@ -32,10 +34,6 @@ class LeadCard extends StatelessWidget {
     this.margin = const EdgeInsets.only(bottom: 12),
   });
 
-  static const Color _onNeon = Color(0xFF142407);
-  static const Color _amber = Color(0xFFF59E0B);
-  static const Color _red = Color(0xFFEF4444);
-  static const Color _wa = Color(0xFF25D366);
 
   Future<void> _makeCall(BuildContext context) async {
     await LogCallDialog.dialAndTrack(context, lead: lead);
@@ -108,281 +106,132 @@ class LeadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Surf.dark(context);
-    final text = Surf.text(context);
-    final sub = Surf.subtext(context);
-    final statusColors = AppColors.getStatusColors(lead.status, isDark: isDark);
-
-    final hasBudget = lead.budgetMax != null || lead.budgetMin != null;
-    final isHighNet = (lead.budgetMax ?? 0) >= 4000000 || (lead.budgetMin ?? 0) >= 3000000;
+    final p = context.palette;
+    final t = Theme.of(context).textTheme;
     final overdue = AppDateUtils.isOverdue(lead.followUpDue);
-    final dueToday = lead.actionTakenToday || AppDateUtils.isDueToday(lead.followUpDue);
-    final projectLine = [
+    final dueToday = AppDateUtils.isDueToday(lead.followUpDue);
+    final hasDue = lead.followUpDue?.isNotEmpty == true;
+    final dueColor = overdue ? p.danger : (dueToday ? p.accent : p.subtext);
+    final tone = AppColors.stageTone(lead.status, isDark: Surf.dark(context));
+    final meta = [
       if (lead.project?.isNotEmpty == true) lead.project!,
-      if (lead.propertyType?.isNotEmpty == true) lead.propertyType!,
+      if (lead.budgetMax != null || lead.budgetMin != null) CurrencyFormatter.formatRange(lead.budgetMin, lead.budgetMax),
+      if (lead.assignedToName?.isNotEmpty == true) lead.assignedToName!,
     ].join(' · ');
 
     return RepaintBoundary(
       child: PremiumCard(
         margin: margin,
-        padding: const EdgeInsets.fromLTRB(14, 14, 6, 10),
+        padding: EdgeInsets.zero,
         onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Identity row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
+        borderColor: overdue ? p.danger.withAlpha(90) : null,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.md, AppSpacing.xs, 0),
+            child: Row(children: [
+              // Avatar tinted with the stage colour; green dot = worked on today.
+              Stack(clipBehavior: Clip.none, children: [
                 Container(
                   width: 44,
                   height: 44,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: statusColors.bg,
-                    borderRadius: BorderRadius.circular(14),
+                  decoration: BoxDecoration(color: tone.bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
+                  child: Text(_initials, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: tone.text)),
+                ),
+                if (lead.actionTakenToday)
+                  PositionedDirectional(
+                    end: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(color: p.success, shape: BoxShape.circle, border: Border.all(color: p.card, width: 2)),
+                    ),
                   ),
+              ]),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(lead.name.isNotEmpty ? lead.name : tr('No name', 'بدون اسم'), maxLines: 1, overflow: TextOverflow.ellipsis, style: t.titleMedium),
+                  if (lead.phone.isNotEmpty)
+                    Text(lead.phone,
+                        maxLines: 1,
+                        textDirection: TextDirection.ltr,
+                        style: t.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+                ]),
+              ),
+              _buildMenu(context, p.subtext),
+            ]),
+          ),
+          // Stage (tap to change) + next action
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0),
+            child: Wrap(spacing: AppSpacing.sm, runSpacing: AppSpacing.sm, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Semantics(
+                button: true,
+                label: tr('Change stage', 'غيّر المرحلة'),
+                child: InkWell(
+                  onTap: () => _changeStatus(context),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 36),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      StatusPill(lead.status, large: true),
+                      Icon(LucideIcons.chevronDown, size: 14, color: p.subtext),
+                    ]),
+                  ),
+                ),
+              ),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(overdue ? LucideIcons.alarmClock : LucideIcons.calendarClock, size: 14, color: dueColor),
+                const SizedBox(width: 4),
+                Text(
+                  hasDue
+                      ? (overdue ? '${tr('Late', 'متأخر')} · ' : '') + AppDateUtils.formatFollowUpShort(lead.followUpDue)
+                      : tr('No next action', 'مفيش إجراء جاي'),
+                  style: t.labelMedium?.copyWith(color: dueColor, fontWeight: overdue || dueToday ? FontWeight.w700 : FontWeight.w500),
+                ),
+              ]),
+              if (context.select<LeadsProvider, bool>((pr) => pr.isAnswered(lead.id))) StatusPill(tr('Answered', 'تم الرد'), color: p.info),
+            ]),
+          ),
+          if (meta.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
+              child: Text(meta, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall),
+            ),
+          // Last call, visible without opening the lead.
+          Builder(builder: (context) {
+            final last = context.select<LeadsProvider, LastCallInfo?>((pr) => pr.lastCallFor(lead.id));
+            if (last == null) return const SizedBox.shrink();
+            final missed = last.direction == 'missed';
+            final c = missed ? p.danger : p.subtext;
+            final dur = last.durationSeconds > 0 ? ' · ${AppDateUtils.formatDuration(last.durationSeconds)}' : '';
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 6, AppSpacing.lg, 0),
+              child: Row(children: [
+                Icon(missed ? LucideIcons.phoneMissed : (last.direction == 'incoming' ? LucideIcons.phoneIncoming : LucideIcons.phoneOutgoing), size: 12, color: c),
+                const SizedBox(width: 6),
+                Expanded(
                   child: Text(
-                    _initials,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: statusColors.text),
+                    '${last.outcome}$dur · ${_ago(last.at)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.bodySmall?.copyWith(color: c, fontWeight: FontWeight.w600),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        lead.name.isNotEmpty ? lead.name : 'Unknown Contact',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: text, letterSpacing: -0.1),
-                      ),
-                      if (lead.phone.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            lead.phone,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: sub,
-                              fontFeatures: const [FontFeature.tabularFigures()],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                _buildMenu(context, sub),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Stage + urgency
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  InkWell(
-                    onTap: () => _changeStatus(context),
-                    borderRadius: BorderRadius.circular(999),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 32),
-                      child: Container(
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: statusColors.bg,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: statusColors.text.withAlpha(70)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              lead.status,
-                              style: TextStyle(color: statusColors.text, fontSize: 12, fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(LucideIcons.chevronDown, size: 12, color: statusColors.text),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (overdue)
-                    const StatusPill('Overdue', color: _red, icon: LucideIcons.clock)
-                  else if (dueToday)
-                    const StatusPill('Action Today', color: _amber, icon: LucideIcons.clock),
-                  if (isHighNet) const StatusPill('High Net', color: _amber),
-                  // Lead has picked up at least one call.
-                  if (context.select<LeadsProvider, bool>((p) => p.isAnswered(lead.id)))
-                    const StatusPill('تم الرد', color: Color(0xFF3B82F6)),
-                ],
-              ),
-            ),
-
-            // Quiet secondary meta
-            if (projectLine.isNotEmpty || hasBudget) ...[
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Row(
-                  children: [
-                    if (hasBudget) ...[
-                      Text(
-                        CurrencyFormatter.formatRange(lead.budgetMin, lead.budgetMax),
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: text),
-                      ),
-                      if (projectLine.isNotEmpty) Text('  ·  ', style: TextStyle(fontSize: 12, color: sub)),
-                    ],
-                    if (projectLine.isNotEmpty)
-                      Expanded(
-                        child: Text(
-                          projectLine,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: sub),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Row(
-                children: [
-                  Icon(
-                    LucideIcons.calendarClock,
-                    size: 13,
-                    color: overdue ? _red : sub,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    lead.followUpDue != null
-                        ? 'Next: ${AppDateUtils.formatFollowUpShort(lead.followUpDue)}'
-                        : 'No follow-up scheduled',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: overdue ? FontWeight.w700 : FontWeight.w500,
-                      color: overdue ? _red : sub,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (lead.assignedToName?.isNotEmpty == true) ...[
-                    Icon(LucideIcons.user, size: 12, color: sub),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        lead.assignedToName!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: sub),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (lead.source?.isNotEmpty == true)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, right: 8),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.globe, size: 12, color: sub),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        lead.source!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: sub),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            // Last call logged for this lead, visible without opening the lead.
-            Builder(
-              builder: (context) {
-                final last = context.select<LeadsProvider, LastCallInfo?>((p) => p.lastCallFor(lead.id));
-                if (last == null) return const SizedBox.shrink();
-                final missed = last.direction == 'missed';
-                final color = missed ? _red : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569));
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6, right: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        missed
-                            ? LucideIcons.phoneMissed
-                            : (last.direction == 'incoming' ? LucideIcons.phoneIncoming : LucideIcons.phoneOutgoing),
-                        size: 12,
-                        color: color,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          '${tr('Last call', 'آخر مكالمة')}: ${last.outcome}'
-                          '${last.durationSeconds > 0 ? ' • ${AppDateUtils.formatDuration(last.durationSeconds)}' : ''}'
-                          ' • ${_ago(last.at)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
-                        ),
-                      ),
-                      if (last.isAuto) const StatusPill('AUTO', color: Color(0xFF3B82F6)),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-
-            // Primary actions (48dp)
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionButton(
-                    label: 'Call',
-                    icon: LucideIcons.phoneCall,
-                    background: AppColors.neonLime,
-                    foreground: _onNeon,
-                    onTap: () => _makeCall(context),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _ActionButton(
-                    label: 'WhatsApp',
-                    icon: LucideIcons.messageCircle,
-                    background: _wa.withAlpha(isDark ? 38 : 28),
-                    foreground: isDark ? _wa : const Color(0xFF15803D),
-                    onTap: () => _openWhatsApp(context),
-                  ),
-                ),
-                const SizedBox(width: 2),
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: IconButton(
-                    tooltip: 'Add note',
-                    onPressed: () => _addNote(context),
-                    icon: Icon(LucideIcons.notebookPen, size: 19, color: Surf.accent(context)),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ]),
+            );
+          }),
+          const SizedBox(height: AppSpacing.sm),
+          Divider(height: 1, color: p.border),
+          // One-tap actions
+          Row(children: [
+            Expanded(child: QuickAction(icon: LucideIcons.phone, label: tr('Call', 'اتصال'), color: p.accent, onTap: () => _makeCall(context))),
+            Expanded(child: QuickAction(icon: LucideIcons.messageCircle, label: 'WhatsApp', color: p.whatsapp, onTap: () => _openWhatsApp(context))),
+            Expanded(child: QuickAction(icon: LucideIcons.notebookPen, label: tr('Note', 'نوتة'), onTap: () => _addNote(context))),
+          ]),
+        ]),
       ),
     );
   }
@@ -450,6 +299,7 @@ class LeadCard extends StatelessWidget {
   }
 }
 
+
 class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -464,52 +314,6 @@ class _MenuRow extends StatelessWidget {
         const SizedBox(width: 10),
         Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color)),
       ],
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color background;
-  final Color foreground;
-  final VoidCallback onTap;
-
-  const _ActionButton({
-    required this.label,
-    required this.icon,
-    required this.background,
-    required this.foreground,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          height: 48,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: foreground),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: foreground),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

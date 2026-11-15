@@ -5,6 +5,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/lead_stages.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/tr.dart';
 import '../../core/widgets/premium.dart';
 import '../../data/models/lead_model.dart';
 import '../../state/leads_provider.dart';
@@ -13,7 +15,7 @@ import 'widgets/lead_card.dart';
 import 'widgets/lead_kanban_board.dart';
 import 'widgets/leads_filter_sheet.dart';
 
-const Color _onNeon = Color(0xFF142407);
+
 
 const List<({String name, Color? color})> _quickActivityTags = [
   (name: 'All Leads', color: null),
@@ -48,9 +50,8 @@ class _LeadsScreenState extends State<LeadsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Surf.dark(context);
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0D10) : const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -99,7 +100,7 @@ class _LeadsHeader extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      'Leads',
+                      tr('Leads', 'العملاء'),
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: text),
                     ),
                     const SizedBox(width: 8),
@@ -126,7 +127,7 @@ class _LeadsHeader extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  isAll ? 'All pipeline stages' : data.stage,
+                  isAll ? tr('All stages', 'كل المراحل') : data.stage,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: sub),
@@ -191,10 +192,10 @@ class _ViewModeButton extends StatelessWidget {
           width: 44,
           height: 42,
           decoration: BoxDecoration(
-            color: active ? AppColors.neonLime : Colors.transparent,
+            color: active ? Surf.accent(context) : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
           ),
-          child: Icon(icon, size: 18, color: active ? _onNeon : Surf.subtext(context)),
+          child: Icon(icon, size: 18, color: active ? context.palette.onAccent : Surf.subtext(context)),
         ),
       ),
     );
@@ -330,19 +331,19 @@ class _LeadsSearchBarState extends State<_LeadsSearchBar> {
                 constraints: const BoxConstraints(minWidth: 48),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: hasFilters ? AppColors.neonLime : Surf.card(context),
+                  color: hasFilters ? Surf.accent(context) : Surf.card(context),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: hasFilters ? AppColors.neonLime : Surf.border(context)),
+                  border: Border.all(color: hasFilters ? Surf.accent(context) : Surf.border(context)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(LucideIcons.slidersHorizontal, size: 18, color: hasFilters ? _onNeon : sub),
+                    Icon(LucideIcons.slidersHorizontal, size: 18, color: hasFilters ? context.palette.onAccent : sub),
                     if (hasFilters) ...[
                       const SizedBox(width: 6),
                       Text(
                         '$filterCount',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _onNeon),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: context.palette.onAccent),
                       ),
                     ],
                   ],
@@ -419,7 +420,7 @@ class _StageChip extends StatelessWidget {
     final colors = isAll
         ? (text: Surf.text(context), bg: Surf.muted(context))
         : AppColors.getStatusColors(stage, isDark: isDark);
-    final fg = selected ? _onNeon : Surf.text(context);
+    final fg = selected ? context.palette.onAccent : Surf.text(context);
 
     return InkWell(
       onTap: onTap,
@@ -430,16 +431,16 @@ class _StageChip extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 40),
         padding: const EdgeInsets.only(left: 11, right: 6),
         decoration: BoxDecoration(
-          color: selected ? AppColors.neonLime : Surf.card(context),
+          color: selected ? Surf.accent(context) : Surf.card(context),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? AppColors.neonLime : colors.text.withAlpha(isDark ? 80 : 60),
+            color: selected ? Surf.accent(context) : colors.text.withAlpha(isDark ? 80 : 60),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LeadStages.iconFor(stage), size: 14, color: selected ? _onNeon : colors.text),
+            Icon(LeadStages.iconFor(stage), size: 14, color: selected ? context.palette.onAccent : colors.text),
             const SizedBox(width: 6),
             Text(
               stage,
@@ -451,7 +452,7 @@ class _StageChip extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 24),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: selected ? _onNeon.withAlpha(30) : colors.bg,
+                color: selected ? context.palette.onAccent.withAlpha(30) : colors.bg,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
@@ -461,7 +462,7 @@ class _StageChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: selected ? _onNeon : colors.text,
+                  color: selected ? context.palette.onAccent : colors.text,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
@@ -609,7 +610,7 @@ class _ActiveFiltersBar extends StatelessWidget {
                     style: TextButton.styleFrom(
                       minimumSize: const Size(48, 48),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      foregroundColor: AppColors.alertRed,
+                      foregroundColor: context.palette.danger,
                     ),
                     child: const Text('Clear all', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
                   ),
@@ -740,7 +741,7 @@ class _LeadsBody extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () => provider.fetchLeads(),
-      color: AppColors.neonLime,
+      color: Surf.accent(context),
       backgroundColor: Surf.card(context),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),
