@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/currency_formatter.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/tr.dart';
 import '../../core/utils/whatsapp_utils.dart';
+import '../../core/widgets/premium.dart';
 import '../../data/models/lead_model.dart';
+import '../../data/services/follow_ups_service.dart';
 import '../../state/leads_provider.dart';
 import '../leads/lead_detail_screen.dart';
 import '../leads/widgets/log_call_dialog.dart';
 import '../leads/widgets/quick_note_dialog.dart';
 
+/// Follow-up Center: every lead with a next-action date, grouped Overdue / Today / Upcoming.
+/// Swipe right = done (with undo), swipe left = reschedule, long-press = more. "Add follow-up" is always visible.
+/// Source of truth is the lead's `follow_up_due` (same rule as the website).
 class FollowUpsScreen extends StatefulWidget {
   const FollowUpsScreen({super.key});
 
@@ -19,1106 +24,651 @@ class FollowUpsScreen extends StatefulWidget {
   State<FollowUpsScreen> createState() => _FollowUpsScreenState();
 }
 
-class _FollowUpsScreenState extends State<FollowUpsScreen> {
-  // 0: Late (Overdue), 1: Today, 2: Coming, 3: All
-  int _activeSegment = 0;
-  bool _segmentPicked = false;
-  String _activeChip = 'all'; // 'all', 're-engagement', 'vip', 'hot'
-  String _searchQuery = '';
+enum _Bucket { overdue, today, upcoming, all }
 
-  Future<void> _makeCall(BuildContext context, LeadModel lead) async {
-    await LogCallDialog.dialAndTrack(context, lead: lead);
+enum _Filter { all, hot, priority }
+
+/// Same closed stages as the website: a lead in one of them has no live follow-up.
+const _closedStages = {
+  'done deal', 'won', 'lost', 'cancellation', 'not interested', 'duplicate leads', 'wrong number', 'closed number', 'low budget',
+};
+const _hotStages = {'meeting', 'interested', 'following up', 'follow up after meeting', 'reservation'};
+
+bool _isOpen(LeadModel l) => !_closedStages.contains(l.status.toLowerCase().trim());
+
+DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
+
+class _FollowUpsScreenState extends State<FollowUpsScreen> {
+  _Bucket _bucket = _Bucket.overdue;
+  bool _bucketPicked = false;
+  _Filter _filter = _Filter.all;
+  String _query = '';
+  final _busy = <String>{}; // lead ids with a save in flight (blocks double taps)
+  final _service = FollowUpsService();
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
-  Future<void> _openWhatsApp(BuildContext context, LeadModel lead) async {
-    final launched = await WhatsAppUtils.openWhatsAppChat(
-      context,
-      phone: lead.phone,
-    );
-    if (launched && context.mounted) {
-      LogCallDialog.show(context, lead: lead, initialChannel: 'WhatsApp');
+  // ── Data ────────────────────────────────────────────────────────────
+
+  _Bucket _bucketOf(LeadModel l, DateTime today) {
+    final d = l.followUpDateTime?.toLocal();
+    if (d == null) return _Bucket.upcoming;
+    final day = _day(d);
+    if (day.isBefore(today)) return _Bucket.overdue;
+    if (day == today) return _Bucket.today;
+    return _Bucket.upcoming;
+  }
+
+  bool _matches(LeadModel l) {
+    switch (_filter) {
+      case _Filter.hot:
+        if (!_hotStages.contains(l.status.toLowerCase().trim())) return false;
+        break;
+      case _Filter.priority:
+        final p = l.priority.toLowerCase();
+        if (p == 'normal' || p == 'low' || p.isEmpty) return false;
+        break;
+      case _Filter.all:
+        break;
+    }
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return l.name.toLowerCase().contains(q) || l.phone.contains(q) || (l.project?.toLowerCase().contains(q) ?? false);
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────
+
+  Future<void> _guard(String leadId, Future<void> Function() run) async {
+    if (_busy.contains(leadId)) return; // double tap
+    setState(() => _busy.add(leadId));
+    try {
+      await run();
+    } finally {
+      if (mounted) setState(() => _busy.remove(leadId));
     }
   }
 
-  Future<void> _markDone(BuildContext context, LeadModel lead) async {
-    final provider = context.read<LeadsProvider>();
-    await provider.addNote(
-      lead.id,
-      'Follow-up marked completed on ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
+  Future<void> _markDone(LeadModel lead) => _guard(lead.id, () async {
+        final provider = context.read<LeadsProvider>();
+        final previous = lead.followUpDue;
+        tapFeedback();
+        try {
+          await provider.updateLead(lead.id, {'follow_up_due': null});
+          // Close the follow-up row too, so the dashboard and calendar agree with this screen.
+          await _service.closeForLead(lead.id);
+        } catch (e) {
+          if (mounted) showAppSnack(context, tr('Could not mark it done. Try again.', 'معرفناش نقفلها. جرّب تاني.'), error: true);
+          return;
+        }
+        await provider.addNote(lead.id, 'Follow-up done on ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}');
+        if (!mounted) return;
+        showAppSnack(
+          context,
+          tr('Done: ${lead.name}', 'تمت المتابعة: ${lead.name}'),
+          actionLabel: tr('Undo', 'تراجع'),
+          onAction: () => _setDue(lead, previous, quiet: true),
+        );
+      });
+
+  /// Set (or clear with null) the next action date.
+  Future<void> _setDue(LeadModel lead, String? ymd, {bool quiet = false}) => _guard(lead.id, () async {
+        try {
+          await context.read<LeadsProvider>().updateLead(lead.id, {'follow_up_due': ymd});
+          if (ymd == null) await _service.closeForLead(lead.id, status: 'Cancelled');
+          tapFeedback();
+          if (!mounted || quiet) return;
+          showAppSnack(
+            context,
+            ymd == null
+                ? tr('Follow-up removed', 'اتشالت المتابعة')
+                : tr('Moved to ${_fmtDay(DateTime.parse(ymd))}', 'اتأجلت لـ ${_fmtDay(DateTime.parse(ymd))}'),
+          );
+        } catch (_) {
+          if (mounted) showAppSnack(context, tr('Could not save. Check the connection.', 'محصلش حفظ. اتأكد من النت.'), error: true);
+        }
+      });
+
+  Future<void> _reschedule(LeadModel lead) async {
+    final picked = await _pickDate(context, title: tr('Move follow-up', 'تأجيل المتابعة'), subtitle: lead.name, current: lead.followUpDateTime);
+    if (picked != null && mounted) await _setDue(lead, DateFormat('yyyy-MM-dd').format(picked));
+  }
+
+  Future<void> _remove(LeadModel lead) async {
+    final ok = await confirmAction(
+      context,
+      title: tr('Remove follow-up?', 'تشيل المتابعة؟'),
+      message: tr('${lead.name} will have no next action date.', '${lead.name} مش هيبقى ليه ميعاد إجراء جاي.'),
+      confirmLabel: tr('Remove', 'شيل'),
+      destructive: true,
     );
-    try {
-      await provider.updateLead(lead.id, {'follow_up_due': null});
-    } catch (_) {}
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Follow-up marked done for ${lead.name}'),
-          backgroundColor: AppColors.neonLime,
-          duration: const Duration(seconds: 2),
-        ),
+    if (ok && mounted) await _setDue(lead, null);
+  }
+
+  Future<void> _call(LeadModel lead) => LogCallDialog.dialAndTrack(context, lead: lead);
+
+  Future<void> _whatsApp(LeadModel lead) async {
+    final launched = await WhatsAppUtils.openWhatsAppChat(context, phone: lead.phone);
+    if (launched && mounted) LogCallDialog.show(context, lead: lead, initialChannel: 'WhatsApp');
+  }
+
+  void _note(LeadModel lead) => QuickNoteDialog.show(
+        context,
+        leadName: lead.name,
+        onSaveNote: (note) => context.read<LeadsProvider>().addNote(lead.id, note),
+      );
+
+  void _open(LeadModel lead) => Navigator.push(context, MaterialPageRoute(builder: (_) => LeadDetailScreen(leadId: lead.id)));
+
+  Future<void> _more(LeadModel lead) async {
+    final p = context.palette;
+    await showPremiumSheet<void>(context, builder: (ctx) {
+      Widget item(IconData icon, String label, VoidCallback onTap, {Color? color}) => ListTile(
+            leading: Icon(icon, color: color ?? p.text),
+            title: Text(label, style: TextStyle(color: color ?? p.text, fontWeight: FontWeight.w600)),
+            minTileHeight: AppSpacing.tap + 8,
+            onTap: () {
+              Navigator.pop(ctx);
+              onTap();
+            },
+          );
+      return SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: Row(children: [
+              Expanded(child: Text(lead.name, style: Theme.of(ctx).textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
+              StatusPill(lead.status),
+            ]),
+          ),
+          item(LucideIcons.userRound, tr('Open lead', 'افتح العميل'), () => _open(lead)),
+          item(LucideIcons.circleCheck, tr('Mark done', 'تمت'), () => _markDone(lead), color: p.accent),
+          item(LucideIcons.calendarClock, tr('Reschedule', 'تأجيل'), () => _reschedule(lead)),
+          item(LucideIcons.notebookPen, tr('Add note', 'نوتة'), () => _note(lead)),
+          item(LucideIcons.trash2, tr('Remove follow-up', 'شيل المتابعة'), () => _remove(lead), color: p.danger),
+          const SizedBox(height: 8),
+        ]),
+      );
+    });
+  }
+
+  Future<void> _add(List<LeadModel> openLeads) async {
+    final lead = await showPremiumSheet<LeadModel>(context, builder: (ctx) => _LeadPicker(leads: openLeads));
+    if (lead == null || !mounted) return;
+    final date = await _pickDate(context, title: tr('When?', 'إمتى؟'), subtitle: lead.name, current: lead.followUpDateTime);
+    if (date == null || !mounted) return;
+    await _setDue(lead, DateFormat('yyyy-MM-dd').format(date));
+  }
+
+  // ── UI ──────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final t = Theme.of(context).textTheme;
+    final provider = context.watch<LeadsProvider>();
+    final all = provider.allLeads; // unfiltered: a filter left on the Leads tab must not empty this screen
+    final today = _day(DateTime.now());
+
+    final withDue = all.where((l) => (l.followUpDue?.trim().isNotEmpty ?? false) && _isOpen(l)).toList()
+      ..sort((a, b) => (a.followUpDateTime ?? today).compareTo(b.followUpDateTime ?? today));
+    final counts = {for (final b in _Bucket.values) b: 0};
+    for (final l in withDue) {
+      counts[_bucketOf(l, today)] = counts[_bucketOf(l, today)]! + 1;
+    }
+    counts[_Bucket.all] = withDue.length;
+
+    // Open on the first group that has something, once.
+    if (!_bucketPicked && withDue.isNotEmpty) {
+      _bucketPicked = true;
+      _bucket = counts[_Bucket.overdue]! > 0
+          ? _Bucket.overdue
+          : counts[_Bucket.today]! > 0
+              ? _Bucket.today
+              : _Bucket.upcoming;
+    }
+
+    final shown = withDue.where((l) => (_bucket == _Bucket.all || _bucketOf(l, today) == _bucket) && _matches(l)).toList();
+    final loading = provider.isLoading && all.isEmpty;
+    final failed = provider.error != null && all.isEmpty;
+
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _add(all.where(_isOpen).toList()),
+        icon: const Icon(LucideIcons.plus),
+        label: Text(tr('Add follow-up', 'متابعة جديدة')),
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.sm, AppSpacing.sm),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Semantics(header: true, child: Text(tr('Follow-ups', 'المتابعات'), style: t.headlineSmall)),
+                  const SizedBox(height: 2),
+                  Text(
+                    tr('${counts[_Bucket.overdue]} overdue · ${counts[_Bucket.today]} today', '${counts[_Bucket.overdue]} متأخرة · ${counts[_Bucket.today]} النهارده'),
+                    style: t.bodySmall,
+                  ),
+                ]),
+              ),
+              IconButton(
+                tooltip: tr('Refresh', 'تحديث'),
+                onPressed: provider.isLoading ? null : () => provider.fetchLeads(),
+                icon: const Icon(LucideIcons.refreshCw, size: 20),
+              ),
+            ]),
+          ),
+          // Search
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+            child: AppSearchField(
+              controller: _search,
+              hint: tr('Search name, phone or project', 'دوّر بالاسم أو الرقم أو المشروع'),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          // Groups: Overdue / Today / Upcoming / All
+          FilterChipRow<_Bucket>(
+            options: _Bucket.values,
+            selected: _bucket,
+            labelOf: _bucketLabel,
+            countOf: (b) => counts[b],
+            onSelected: (b) => setState(() {
+              _bucket = b;
+              _bucketPicked = true;
+            }),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          // Simple filters
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+              children: [
+                for (final f in _Filter.values) ...[
+                  _FilterPill(
+                    label: _filterLabel(f),
+                    icon: f == _Filter.hot ? LucideIcons.flame : (f == _Filter.priority ? LucideIcons.flag : null),
+                    selected: _filter == f,
+                    onTap: () => setState(() => _filter = f),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          // List
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => provider.fetchLeads(silent: true),
+              child: AnimatedSwitcher(
+                duration: AppMotion.normal,
+                child: loading
+                    ? const SkeletonList(count: 5, height: 132)
+                    : failed
+                        ? _scrollable(ErrorState(
+                            message: tr('Check the connection and try again.', 'اتأكد من النت وجرّب تاني.'),
+                            onRetry: () => provider.fetchLeads(),
+                          ))
+                        : shown.isEmpty
+                            ? _scrollable(_empty(withDue.isNotEmpty))
+                            : ListView.builder(
+                                key: ValueKey('$_bucket$_filter'),
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.listBottom),
+                                itemCount: shown.length,
+                                itemBuilder: (_, i) {
+                                  final lead = shown[i];
+                                  final b = _bucketOf(lead, today);
+                                  final showHeader = _bucket == _Bucket.all && (i == 0 || _bucketOf(shown[i - 1], today) != b);
+                                  return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                                    if (showHeader)
+                                      Padding(
+                                        padding: EdgeInsets.only(top: i == 0 ? 0 : AppSpacing.md, bottom: AppSpacing.sm),
+                                        child: Text('${_bucketLabel(b)} · ${counts[b]}', style: t.labelMedium?.copyWith(color: b == _Bucket.overdue ? p.danger : p.subtext)),
+                                      ),
+                                    _swipeable(lead, b, today),
+                                  ]);
+                                },
+                              ),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _swipeable(LeadModel lead, _Bucket b, DateTime today) {
+    final p = context.palette;
+    Widget bg(Color c, IconData icon, String label, Alignment a) => Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+          alignment: a,
+          decoration: BoxDecoration(color: c.withAlpha(40), borderRadius: AppRadius.card),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, color: c),
+            const SizedBox(width: AppSpacing.sm),
+            Text(label, style: TextStyle(color: c, fontWeight: FontWeight.w700)),
+          ]),
+        );
+    return Dismissible(
+      key: ValueKey('fu-${lead.id}-${lead.followUpDue}'),
+      background: bg(p.accent, LucideIcons.circleCheck, tr('Done', 'تمت'), AlignmentDirectional.centerStart.resolve(Directionality.of(context))),
+      secondaryBackground: bg(p.info, LucideIcons.calendarClock, tr('Later', 'تأجيل'), AlignmentDirectional.centerEnd.resolve(Directionality.of(context))),
+      confirmDismiss: (dir) async {
+        if (dir == DismissDirection.startToEnd) {
+          await _markDone(lead);
+        } else {
+          await _reschedule(lead);
+        }
+        return false; // the list re-renders from the provider; never remove the row optimistically
+      },
+      child: _FollowUpCard(
+        lead: lead,
+        bucket: b,
+        today: today,
+        busy: _busy.contains(lead.id),
+        onOpen: () => _open(lead),
+        onMore: () => _more(lead),
+        onCall: () => _call(lead),
+        onWhatsApp: () => _whatsApp(lead),
+        onNote: () => _note(lead),
+        onLater: () => _reschedule(lead),
+        onDone: () => _markDone(lead),
+      ),
+    );
+  }
+
+  Widget _empty(bool othersHaveItems) {
+    final filtered = _filter != _Filter.all || _query.trim().isNotEmpty;
+    if (filtered) {
+      return EmptyState(
+        icon: LucideIcons.searchX,
+        title: tr('Nothing matches', 'مفيش نتايج'),
+        message: tr('Try another search or filter.', 'جرّب بحث أو فلتر تاني.'),
+        actionLabel: tr('Clear filters', 'امسح الفلاتر'),
+        onAction: () => setState(() {
+          _filter = _Filter.all;
+          _query = '';
+          _search.clear();
+        }),
       );
     }
+    if (othersHaveItems) {
+      return EmptyState(
+        icon: LucideIcons.calendarCheck,
+        title: _bucket == _Bucket.overdue ? tr('Nothing overdue 👏', 'مفيش متأخرات 👏') : tr('Nothing here', 'مفيش حاجة هنا'),
+        message: tr('Other groups still have follow-ups.', 'لسه فيه متابعات في مجموعات تانية.'),
+        actionLabel: tr('Show all', 'اعرض الكل'),
+        onAction: () => setState(() => _bucket = _Bucket.all),
+      );
+    }
+    return EmptyState(
+      icon: LucideIcons.calendarCheck,
+      title: tr('No follow-ups', 'مفيش متابعات'),
+      message: tr('Add one to plan your next call.', 'ضيف متابعة عشان تخطط لمكالمتك الجاية.'),
+    );
   }
 
-  Future<void> _rescheduleFollowUp(BuildContext context, LeadModel lead) async {
-    final now = DateTime.now();
-    final initial = lead.followUpDateTime ?? now.add(const Duration(days: 1));
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial.isBefore(now) ? now.add(const Duration(days: 1)) : initial,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-    );
-    if (picked != null && context.mounted) {
-      final dateStr = DateFormat('yyyy-MM-dd').format(picked);
-      await context.read<LeadsProvider>().updateLead(lead.id, {'follow_up_due': dateStr});
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Rescheduled ${lead.name} to $dateStr'),
-            backgroundColor: AppColors.primary,
+  /// Keeps pull-to-refresh working on empty / error states.
+  Widget _scrollable(Widget child) => LayoutBuilder(
+        builder: (_, c) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(constraints: BoxConstraints(minHeight: c.maxHeight), child: child),
+        ),
+      );
+
+  String _bucketLabel(_Bucket b) => switch (b) {
+        _Bucket.overdue => tr('Overdue', 'متأخرة'),
+        _Bucket.today => tr('Today', 'النهارده'),
+        _Bucket.upcoming => tr('Upcoming', 'الجاية'),
+        _Bucket.all => tr('All', 'الكل'),
+      };
+
+  String _filterLabel(_Filter f) => switch (f) {
+        _Filter.all => tr('All stages', 'كل المراحل'),
+        _Filter.hot => tr('Hot leads', 'عملاء مهمين'),
+        _Filter.priority => tr('High priority', 'أولوية عالية'),
+      };
+}
+
+String _fmtDay(DateTime d) => DateFormat('EEE d MMM').format(d);
+
+/// Bottom sheet with quick choices (Today / Tomorrow / In 3 days / Next week) and a calendar.
+Future<DateTime?> _pickDate(BuildContext context, {required String title, String? subtitle, DateTime? current}) {
+  final today = _day(DateTime.now());
+  final quick = <(String, DateTime)>[
+    (tr('Today', 'النهارده'), today),
+    (tr('Tomorrow', 'بكرة'), today.add(const Duration(days: 1))),
+    (tr('In 3 days', 'بعد 3 أيام'), today.add(const Duration(days: 3))),
+    (tr('Next week', 'الأسبوع الجاي'), today.add(const Duration(days: 7))),
+  ];
+  return showPremiumSheet<DateTime>(context, builder: (ctx) {
+    final t = Theme.of(ctx).textTheme;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(title, style: t.titleLarge),
+          if (subtitle != null) Text(subtitle, style: t.bodySmall),
+          const SizedBox(height: AppSpacing.lg),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: AppSpacing.sm,
+            crossAxisSpacing: AppSpacing.sm,
+            childAspectRatio: 2.6,
+            children: [
+              for (final q in quick)
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, q.$2),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(q.$1),
+                    Text(_fmtDay(q.$2), style: t.bodySmall),
+                  ]),
+                ),
+            ],
           ),
-        );
-      }
-    }
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            tr('Pick a date', 'اختار تاريخ'),
+            icon: LucideIcons.calendarDays,
+            kind: AppButtonKind.ghost,
+            expand: true,
+            onPressed: () async {
+              final init = current != null && !_day(current).isBefore(today) ? current : today.add(const Duration(days: 1));
+              final d = await showDatePicker(context: ctx, initialDate: init, firstDate: today, lastDate: today.add(const Duration(days: 365)));
+              if (d != null && ctx.mounted) Navigator.pop(ctx, d);
+            },
+          ),
+        ]),
+      ),
+    );
+  });
+}
+
+class _FilterPill extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+  const _FilterPill({required this.label, this.icon, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return FilterChip(
+      selected: selected,
+      onSelected: (_) => onTap(),
+      avatar: icon == null ? null : Icon(icon, size: 14, color: selected ? p.accent : p.subtext),
+      label: Text(label),
+      labelStyle: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: selected ? p.text : p.subtext),
+      backgroundColor: p.card,
+      selectedColor: p.accentSoft,
+      side: BorderSide(color: selected ? p.accent.withAlpha(120) : p.border),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+/// One follow-up: who, stage, when (red when late), and one-tap actions.
+class _FollowUpCard extends StatelessWidget {
+  final LeadModel lead;
+  final _Bucket bucket;
+  final DateTime today;
+  final bool busy;
+  final VoidCallback onOpen, onMore, onCall, onWhatsApp, onNote, onLater, onDone;
+
+  const _FollowUpCard({
+    required this.lead,
+    required this.bucket,
+    required this.today,
+    required this.busy,
+    required this.onOpen,
+    required this.onMore,
+    required this.onCall,
+    required this.onWhatsApp,
+    required this.onNote,
+    required this.onLater,
+    required this.onDone,
+  });
+
+  String _when() {
+    final d = lead.followUpDateTime?.toLocal();
+    if (d == null) return '—';
+    final diff = _day(d).difference(today).inDays;
+    if (diff < 0) return tr('${-diff} ${-diff == 1 ? 'day' : 'days'} late', 'متأخرة ${-diff} ${-diff == 1 ? 'يوم' : 'أيام'}');
+    if (diff == 0) return tr('Today', 'النهارده');
+    if (diff == 1) return tr('Tomorrow', 'بكرة');
+    return _fmtDay(d);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final provider = context.watch<LeadsProvider>();
-    // Unfiltered: a stage/search/project filter left on the Leads tab must not empty this screen.
-    final allLeads = provider.allLeads;
+    final p = context.palette;
+    final t = Theme.of(context).textTheme;
+    final late = bucket == _Bucket.overdue;
+    final whenColor = late ? p.danger : (bucket == _Bucket.today ? p.accent : p.subtext);
 
-    // Filter leads with follow-up timestamps
-    final followUpLeads = allLeads.where((l) {
-      if (l.followUpDue == null || l.followUpDue!.trim().isEmpty) return false;
-      final st = l.status.toLowerCase().trim();
-      // Same closed stages as the website: a lead in one of them has no live follow-up.
-      const closed = {
-        'done deal',
-        'won',
-        'lost',
-        'cancellation',
-        'not interested',
-        'duplicate leads',
-        'wrong number',
-        'closed number',
-        'low budget',
-      };
-      return !closed.contains(st);
-    }).toList();
-
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
-
-    final overdueLeads = followUpLeads.where((l) {
-      final d = l.followUpDateTime?.toLocal();
-      return d != null && d.isBefore(todayStart);
-    }).toList();
-
-    final todayLeads = followUpLeads.where((l) {
-      final d = l.followUpDateTime?.toLocal();
-      return d != null && !d.isBefore(todayStart) && !d.isAfter(todayEnd);
-    }).toList();
-
-    final comingLeads = followUpLeads.where((l) {
-      final d = l.followUpDateTime?.toLocal();
-      return d != null && d.isAfter(todayEnd);
-    }).toList();
-
-    // Open on a tab that has something: "Late" when there are overdue ones, else "Today", else "Coming", else "All".
-    // Only once, so a tab the user picks is never switched under them.
-    if (!_segmentPicked && followUpLeads.isNotEmpty) {
-      _segmentPicked = true;
-      _activeSegment = overdueLeads.isNotEmpty
-          ? 0
-          : todayLeads.isNotEmpty
-              ? 1
-              : comingLeads.isNotEmpty
-                  ? 2
-                  : 3;
-    }
-
-    // Segment filtering
-    List<LeadModel> displayed;
-    switch (_activeSegment) {
-      case 0:
-        displayed = overdueLeads;
-        break;
-      case 1:
-        displayed = todayLeads;
-        break;
-      case 2:
-        displayed = comingLeads;
-        break;
-      default:
-        displayed = followUpLeads;
-        break;
-    }
-
-    // Secondary chip filtering
-    if (_activeChip == 'vip') {
-      displayed = displayed.where((l) => (l.budgetMax ?? 0) >= 3000000 || (l.budgetMin ?? 0) >= 2000000).toList();
-    } else if (_activeChip == 'hot') {
-      displayed = displayed.where((l) => l.status == 'Meeting' || l.status == 'Interested').toList();
-    } else if (_activeChip == 're-engagement') {
-      displayed = displayed.where((l) => l.status == 'Not Interested' || l.status == 'Pending Leads').toList();
-    }
-
-    // Search query
-    if (_searchQuery.trim().isNotEmpty) {
-      final q = _searchQuery.toLowerCase().trim();
-      displayed = displayed.where((l) {
-        return l.name.toLowerCase().contains(q) ||
-            l.phone.contains(q) ||
-            (l.project?.toLowerCase().contains(q) ?? false);
-      }).toList();
-    }
-
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0E14) : const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── 1. Page Header & Live Queue Banner ───────────────
+    return Semantics(
+      label: '${lead.name}, ${lead.status}, ${_when()}',
+      child: PremiumCard(
+        padding: EdgeInsets.zero,
+        borderColor: late ? p.danger.withAlpha(90) : null,
+        onTap: onOpen,
+        onLongPress: onMore,
+        child: AnimatedOpacity(
+          duration: AppMotion.fast,
+          opacity: busy ? 0.5 : 1,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'PIPELINE ENGINE',
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                              color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.neonLime.withAlpha(25),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.neonLime.withAlpha(80)),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 5,
-                                  height: 5,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: AppColors.neonLime,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(width: 5),
-                                Text(
-                                  'Live queue',
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.neonLime,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Follow-ups',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${todayLeads.length + overdueLeads.length} actionable interactions pending today',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                        ),
-                      ),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.xs, 0),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(lead.name.isEmpty ? tr('No name', 'بدون اسم') : lead.name, style: t.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: AppSpacing.sm, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                      StatusPill(lead.status),
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(late ? LucideIcons.alarmClock : LucideIcons.calendar, size: 14, color: whenColor),
+                        const SizedBox(width: 4),
+                        Text(_when(), style: t.labelMedium?.copyWith(color: whenColor, fontWeight: FontWeight.w700)),
+                      ]),
+                    ]),
+                    if ((lead.project ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(lead.project!, style: t.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
-                  ),
-                  // Refresh Button
-                  InkWell(
-                    onTap: () => provider.fetchLeads(),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isDark ? const Color(0xFF161B22) : Colors.white,
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF282D38) : AppColors.lightBorder,
-                        ),
-                      ),
-                      child: const Center(
-                        child: Icon(LucideIcons.refreshCw, size: 16, color: AppColors.neonLime),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                  ]),
+                ),
+                IconButton(tooltip: tr('More', 'المزيد'), onPressed: onMore, icon: Icon(LucideIcons.ellipsisVertical, size: 20, color: p.subtext)),
+              ]),
             ),
-
-            // ── 2. Curved KPI Pill Cards Strip (Total, Overdue, Today, Coming)
+            const SizedBox(height: AppSpacing.sm),
+            Divider(height: 1, color: p.border),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildKpiPill(
-                      title: 'TOTAL',
-                      count: followUpLeads.length,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                      isDark: isDark,
-                      onTap: () => setState(() => _activeSegment = 3),
-                      isActive: _activeSegment == 3,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: _buildKpiPill(
-                      title: 'OVERDUE',
-                      count: overdueLeads.length,
-                      color: AppColors.alertRed,
-                      isDark: isDark,
-                      onTap: () => setState(() => _activeSegment = 0),
-                      isActive: _activeSegment == 0,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: _buildKpiPill(
-                      title: 'TODAY',
-                      count: todayLeads.length,
-                      color: AppColors.amber,
-                      isDark: isDark,
-                      onTap: () => setState(() => _activeSegment = 1),
-                      isActive: _activeSegment == 1,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: _buildKpiPill(
-                      title: 'COMING',
-                      count: comingLeads.length,
-                      color: const Color(0xFF38BDF8),
-                      isDark: isDark,
-                      onTap: () => setState(() => _activeSegment = 2),
-                      isActive: _activeSegment == 2,
-                    ),
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: 2),
+              child: Row(children: [
+                Expanded(child: QuickAction(icon: LucideIcons.phone, label: tr('Call', 'اتصال'), onTap: busy ? null : onCall, color: p.accent)),
+                Expanded(child: QuickAction(icon: LucideIcons.messageCircle, label: 'WhatsApp', onTap: busy ? null : onWhatsApp, color: p.whatsapp)),
+                Expanded(child: QuickAction(icon: LucideIcons.notebookPen, label: tr('Note', 'نوتة'), onTap: busy ? null : onNote)),
+                Expanded(child: QuickAction(icon: LucideIcons.calendarClock, label: tr('Later', 'تأجيل'), onTap: busy ? null : onLater)),
+                Expanded(child: QuickAction(icon: LucideIcons.circleCheck, label: tr('Done', 'تمت'), onTap: busy ? null : onDone, color: p.accent)),
+              ]),
             ),
-            const SizedBox(height: 6),
-
-            // ── 3. Search Bar ─────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF12161D) : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF282D38) : AppColors.lightBorder,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(LucideIcons.search, size: 16, color: Color(0xFF8B949E)),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        onChanged: (val) => setState(() => _searchQuery = val),
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: isDark ? Colors.white : Colors.black,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'Search follow-ups, leads, projects...',
-                          hintStyle: TextStyle(fontSize: 12, color: Color(0xFF8B949E)),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // ── 4. Segmented Time Tabs (Rounded-full Pill Bar) ─────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF12161D) : const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF21262D) : const Color(0xFFCBD5E1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    _buildSegmentTab(
-                      index: 0,
-                      label: 'Late',
-                      count: overdueLeads.length,
-                      color: AppColors.alertRed,
-                      isDark: isDark,
-                    ),
-                    _buildSegmentTab(
-                      index: 1,
-                      label: 'Today',
-                      count: todayLeads.length,
-                      color: AppColors.amber,
-                      isDark: isDark,
-                    ),
-                    _buildSegmentTab(
-                      index: 2,
-                      label: 'Coming',
-                      count: comingLeads.length,
-                      color: const Color(0xFF38BDF8),
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // ── 5. Secondary Filter Chips (Horizontal Scroll) ─────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip(
-                      id: 'all',
-                      label: 'All Items',
-                      icon: LucideIcons.layers,
-                      color: AppColors.neonLime,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 6),
-                    _buildFilterChip(
-                      id: 'vip',
-                      label: 'High Priority VIP',
-                      icon: LucideIcons.badgeCheck,
-                      color: AppColors.neonLime,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 6),
-                    _buildFilterChip(
-                      id: 'hot',
-                      label: 'Hot Buyers',
-                      icon: LucideIcons.flame,
-                      color: AppColors.alertRed,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 6),
-                    _buildFilterChip(
-                      id: 're-engagement',
-                      label: 'Re-engagement (Cold)',
-                      icon: LucideIcons.history,
-                      color: AppColors.amber,
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // ── 6. Follow-up Cards List ───────────────────────────
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => provider.fetchLeads(silent: true),
-                child: displayed.isEmpty
-                    ? _buildEmptyState(
-                        context,
-                        isDark,
-                        loading: provider.isLoading && allLeads.isEmpty,
-                        failed: provider.error != null && allLeads.isEmpty,
-                        otherTabsHaveItems: followUpLeads.isNotEmpty,
-                        onRetry: () => provider.fetchLeads(),
-                        onShowAll: () => setState(() {
-                          _activeSegment = 3;
-                          _activeChip = 'all';
-                        }),
-                      )
-                    : ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                        itemCount: displayed.length,
-                        itemBuilder: (context, index) {
-                          final lead = displayed[index];
-                          return _buildFollowUpQueueCard(context, lead, isDark);
-                        },
-                      ),
-              ),
-            ),
-          ],
+          ]),
         ),
       ),
     );
   }
+}
 
-  // ── Sub-widget: KPI Pill
-  Widget _buildKpiPill({
-    required String title,
-    required int count,
-    required Color color,
-    required bool isDark,
-    required VoidCallback onTap,
-    required bool isActive,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF161B22) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isActive ? color.withAlpha(160) : (isDark ? const Color(0xFF282D38) : AppColors.lightBorder),
-            width: isActive ? 1.5 : 1,
-          ),
+/// Searchable list of open leads for "Add follow-up".
+class _LeadPicker extends StatefulWidget {
+  final List<LeadModel> leads;
+  const _LeadPicker({required this.leads});
+
+  @override
+  State<_LeadPicker> createState() => _LeadPickerState();
+}
+
+class _LeadPickerState extends State<_LeadPicker> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final q = _q.trim().toLowerCase();
+    final list = (q.isEmpty
+            ? widget.leads
+            : widget.leads.where((l) => l.name.toLowerCase().contains(q) || l.phone.contains(q) || (l.project?.toLowerCase().contains(q) ?? false)))
+        .take(60)
+        .toList();
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.75,
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(tr('Who to follow up?', 'متابعة مع مين؟'), style: t.titleLarge),
+            const SizedBox(height: AppSpacing.md),
+            AppSearchField(hint: tr('Search name or phone', 'دوّر بالاسم أو الرقم'), onChanged: (v) => setState(() => _q = v)),
+          ]),
         ),
-        child: Column(
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w800,
-                color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              count.toString(),
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
-          ],
+        Expanded(
+          child: list.isEmpty
+              ? EmptyState(icon: LucideIcons.searchX, title: tr('No leads found', 'مفيش عملاء'))
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 2),
+                  itemBuilder: (_, i) {
+                    final l = list[i];
+                    return ListTile(
+                      minTileHeight: AppSpacing.tap + 8,
+                      title: Text(l.name.isEmpty ? tr('No name', 'بدون اسم') : l.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(l.phone, textDirection: TextDirection.ltr),
+                      trailing: StatusPill(l.status),
+                      onTap: () => Navigator.pop(context, l),
+                    );
+                  },
+                ),
         ),
-      ),
-    );
-  }
-
-  // ── Sub-widget: Segment Tab
-  Widget _buildSegmentTab({
-    required int index,
-    required String label,
-    required int count,
-    required Color color,
-    required bool isDark,
-  }) {
-    final isSelected = _activeSegment == index;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _activeSegment = index),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          decoration: BoxDecoration(
-            color: isSelected ? color.withAlpha(isDark ? 40 : 25) : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            border: isSelected ? Border.all(color: color.withAlpha(80)) : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (isSelected) ...[
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-                ),
-                const SizedBox(width: 5),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected
-                      ? color
-                      : (isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B)),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected ? color : (isDark ? const Color(0xFF282D38) : const Color(0xFFCBD5E1)),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  count.toString(),
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: isSelected ? Colors.black : (isDark ? Colors.white : Colors.black),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Sub-widget: Filter Chip
-  Widget _buildFilterChip({
-    required String id,
-    required String label,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-  }) {
-    final isSelected = _activeChip == id;
-
-    return InkWell(
-      onTap: () => setState(() => _activeChip = id),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withAlpha(isDark ? 35 : 20)
-              : (isDark ? const Color(0xFF161B22) : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? color.withAlpha(90) : (isDark ? const Color(0xFF282D38) : AppColors.lightBorder),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 12, color: isSelected ? color : (isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B))),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                color: isSelected ? color : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Sub-widget: Follow-up Queue Card (Harmonized Action Suite)
-  /// Empty area under the tabs. Tells apart "still loading", "could not load" (with Retry) and "nothing in this
-  /// tab while other tabs have follow-ups" (with Show all), so a blank screen never looks like "no follow-ups".
-  Widget _buildEmptyState(
-    BuildContext context,
-    bool isDark, {
-    required bool loading,
-    required bool failed,
-    required bool otherTabsHaveItems,
-    required VoidCallback onRetry,
-    required VoidCallback onShowAll,
-  }) {
-    final muted = isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B);
-    final strong = isDark ? AppColors.darkForeground : AppColors.lightForeground;
-
-    Widget body;
-    if (loading) {
-      body = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 12),
-          Text(tr('Loading follow-ups…', 'بنحمّل المتابعات…'), style: TextStyle(fontSize: 13, color: muted)),
-        ],
-      );
-    } else if (failed) {
-      body = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.wifi_off_rounded, size: 40, color: muted),
-          const SizedBox(height: 12),
-          Text(
-            tr('Could not load follow-ups', 'مش قادرين نحمّل المتابعات'),
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: strong),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            tr('Check the connection and try again.', 'اتأكد من النت وجرّب تاني.'),
-            style: TextStyle(fontSize: 12, color: muted),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(LucideIcons.refreshCw, size: 16),
-            label: Text(tr('Retry', 'حاول تاني')),
-          ),
-        ],
-      );
-    } else {
-      body = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(LucideIcons.calendarCheck, size: 44, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-          const SizedBox(height: 12),
-          Text(
-            tr('No follow-ups in this tab', 'مفيش متابعات في التاب ده'),
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: strong),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            otherTabsHaveItems
-                ? tr('Other tabs have follow-ups.', 'في متابعات في تابات تانية.')
-                : tr('All scheduled follow-ups are clear.', 'مفيش متابعات متسجلة.'),
-            style: TextStyle(fontSize: 12, color: muted),
-          ),
-          if (otherTabsHaveItems) ...[
-            const SizedBox(height: 12),
-            OutlinedButton(onPressed: onShowAll, child: Text(tr('Show all', 'اعرض الكل'))),
-          ],
-        ],
-      );
-    }
-
-    // Scrollable so pull-to-refresh works on the empty state too.
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          child: Center(child: Padding(padding: const EdgeInsets.all(24), child: body)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFollowUpQueueCard(BuildContext context, LeadModel lead, bool isDark) {
-    final initials = lead.name.trim().isNotEmpty
-        ? (lead.name.trim().split(' ').length > 1
-            ? '${lead.name.trim().split(' ')[0][0]}${lead.name.trim().split(' ')[1][0]}'.toUpperCase()
-            : lead.name.trim()[0].toUpperCase())
-        : 'L';
-
-    final isOverdue = lead.followUpDateTime?.isBefore(DateTime.now()) ?? false;
-    final isVip = (lead.budgetMax ?? 0) >= 3000000;
-
-    // Tapping anywhere on the card opens the lead profile; the buttons inside keep their own actions.
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => LeadDetailScreen(leadId: lead.id)),
-      ),
-      child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161B22) : Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isOverdue
-              ? AppColors.alertRed.withAlpha(80)
-              : (isDark ? const Color(0xFF282D38) : AppColors.lightBorder),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 70 : 12),
-            blurRadius: 14,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top subtle urgent line
-          if (isOverdue)
-            Container(
-              height: 2.5,
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    AppColors.alertRed.withAlpha(180),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Header: Avatar + Lead info + Urgency badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Avatar Circle
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isDark ? const Color(0xFF12161D) : const Color(0xFFF1F5F9),
-                        border: Border.all(
-                          color: isOverdue ? AppColors.alertRed : AppColors.neonLime,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: isOverdue ? AppColors.alertRed : AppColors.neonLime,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-
-                    // Name + VIP Pill + View Profile link
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  lead.name,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (isVip) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.neonLime.withAlpha(25),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: AppColors.neonLime.withAlpha(70)),
-                                  ),
-                                  child: const Text(
-                                    'VIP BUYER',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.neonLime,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => LeadDetailScreen(leadId: lead.id),
-                                ),
-                              );
-                            },
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'View Profile',
-                                  style: TextStyle(fontSize: 10.5, color: Color(0xFF8B949E)),
-                                ),
-                                SizedBox(width: 2),
-                                Icon(LucideIcons.arrowRight, size: 10, color: Color(0xFF8B949E)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Urgency Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isOverdue
-                            ? AppColors.alertRed.withAlpha(25)
-                            : AppColors.neonLime.withAlpha(25),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isOverdue
-                              ? AppColors.alertRed.withAlpha(70)
-                              : AppColors.neonLime.withAlpha(70),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isOverdue ? LucideIcons.alarmClock : LucideIcons.clock,
-                            size: 11,
-                            color: isOverdue ? AppColors.alertRed : AppColors.neonLime,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isOverdue ? 'Overdue' : 'Due Today',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: isOverdue ? AppColors.alertRed : AppColors.neonLime,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // 2. Project & Budget Details
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0E1217) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(LucideIcons.building, size: 13, color: AppColors.neonLime),
-                          const SizedBox(width: 6),
-                          Text(
-                            lead.project?.isNotEmpty == true ? lead.project! : 'Private Residential Unit',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (lead.budgetMax != null || lead.budgetMin != null)
-                        Text(
-                          CurrencyFormatter.formatRange(lead.budgetMin, lead.budgetMax),
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : Colors.black,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // 3. Dual Action Buttons: Call Lead & WhatsApp (Stitch Curved Pill style)
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _makeCall(context, lead),
-                        borderRadius: BorderRadius.circular(24),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.neonLime,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.neonLime.withAlpha(90),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(LucideIcons.phone, size: 14, color: Color(0xFF0E1601)),
-                              SizedBox(width: 6),
-                              Text(
-                                'Call Lead',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0E1601),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _openWhatsApp(context, lead),
-                        borderRadius: BorderRadius.circular(24),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF13231B) : const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: const Color(0xFF22C55E).withAlpha(120),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(LucideIcons.messageCircle, size: 14, color: Color(0xFF22C55E)),
-                              SizedBox(width: 6),
-                              Text(
-                                'WhatsApp',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF22C55E),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // 4. Footer Actions (Reschedule, Add Note, Mark Done)
-                Container(
-                  padding: const EdgeInsets.only(top: 8),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                        color: isDark ? const Color(0xFF21262D) : AppColors.lightBorder,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Reschedule
-                      InkWell(
-                        onTap: () => _rescheduleFollowUp(context, lead),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          children: [
-                            const Icon(LucideIcons.calendar, size: 12, color: Color(0xFF8B949E)),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Reschedule',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Add Note
-                      InkWell(
-                        onTap: () {
-                          QuickNoteDialog.show(
-                            context,
-                            leadName: lead.name,
-                            onSaveNote: (note) => context.read<LeadsProvider>().addNote(lead.id, note),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Row(
-                          children: [
-                            const Icon(LucideIcons.fileText, size: 12, color: Color(0xFF8B949E)),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Add Note',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Mark Done
-                      InkWell(
-                        onTap: () => _markDone(context, lead),
-                        borderRadius: BorderRadius.circular(8),
-                        child: const Row(
-                          children: [
-                            Icon(LucideIcons.checkCircle2, size: 13, color: AppColors.neonLime),
-                            SizedBox(width: 4),
-                            Text(
-                              'Mark Done',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.neonLime,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      ),
+      ]),
     );
   }
 }

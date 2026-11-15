@@ -34,7 +34,7 @@ class AppRadius {
   static final BorderRadius card = BorderRadius.circular(lg);
   static final BorderRadius button = BorderRadius.circular(lg);
   static final BorderRadius input = BorderRadius.circular(lg);
-  static final BorderRadius sheet = const BorderRadius.vertical(top: Radius.circular(xl));
+  static const BorderRadius sheet = BorderRadius.vertical(top: Radius.circular(xl));
 }
 
 /// Motion: short and calm (200–300 ms).

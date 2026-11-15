@@ -254,6 +254,21 @@ class FollowUpsService {
     }
   }
 
+  /// Set the status of the open follow-up row(s) of one lead ('Completed' or 'Cancelled').
+  /// Throws on failure so the screen can tell the user (unlike [markComplete]).
+  Future<void> closeForLead(String leadId, {String status = 'Completed'}) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _client
+        .from('follow_ups')
+        .update({
+          'follow_up_status': status,
+          if (status == 'Completed') 'completed_at': now,
+          'updated_at': now,
+        })
+        .eq('lead_id', leadId)
+        .not('follow_up_status', 'in', '("Completed","Cancelled")');
+  }
+
   /// Create a new follow-up
   Future<FollowUpModel> create(FollowUpModel followUp) async {
     final user = _client.auth.currentUser;
