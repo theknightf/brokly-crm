@@ -463,6 +463,11 @@ export default function LeadsManagementScreen({
         updated.actionTaken = actionTakenParam;
         changed = true;
       }
+      // Reports → Sales Performance "Late" deep link.
+      if (params.get('overdue') === '1' && !prev.overdue) {
+        updated.overdue = true;
+        changed = true;
+      }
       return changed ? updated : prev;
     });
 

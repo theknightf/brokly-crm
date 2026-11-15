@@ -1,0 +1,20 @@
+-- Reports → Sales Performance (أداء المبيعات). Applied to the live project on 2026-11-15 as Supabase
+-- migrations `sales_performance_rpc` and `sales_performance_v2_late` (full SQL is in the project's
+-- migration history). Summary of what exists:
+--
+-- public.sales_perf_visible(p_user uuid) -> boolean           SECURITY DEFINER
+--   admin/owner: everyone · team leader: self + team (is_leader_of_assignee) · others: only self.
+--
+-- public.sales_performance_v2(p_from date, p_to date)            SECURITY DEFINER, Cairo days
+--   one row per active non-admin user the caller may see:
+--   assigned   = distinct leads assigned to them in the period (lead_events type 'assigned')
+--   duplicates = duplicate_leads rows in the period whose ORIGINAL lead they own
+--   calls      = period_leaderboard.calls
+--   actions    = period_leaderboard.total_actions (notes; calls when user_profiles.actions_from_calls)
+--   late       = open leads assigned to them with follow_up_due < today (now, not tied to dates)
+--
+-- public.sales_performance_leads(p_user, p_kind, p_from, p_to)   SECURITY DEFINER
+--   drill-down rows for p_kind in (assigned, duplicates, calls, actions, late); returns nothing
+--   when sales_perf_visible(p_user) is false.
+--
+-- (public.sales_performance(date,date) — first version without `late` — is unused by the app.)
