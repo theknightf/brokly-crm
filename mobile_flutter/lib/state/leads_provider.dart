@@ -202,7 +202,7 @@ class LeadsProvider extends ChangeNotifier {
         // into one reload (longer on low-RAM phones) so the list is not rebuilt and re-parsed constantly.
         _refetchTimer?.cancel();
         _refetchTimer = Timer(
-          Duration(seconds: MemoryGuard.isLowRam ? 8 : 3),
+          Duration(seconds: MemoryGuard.isLowRam ? 20 : 12),
           () => fetchLeads(silent: true),
         );
       }, assignedTo: admin ? null : uid);

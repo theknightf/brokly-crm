@@ -96,7 +96,7 @@ export default function DeductionAlertProvider() {
       } catch {}
     };
     poll();
-    const interval = setInterval(poll, 60000);
+    const interval = setInterval(poll, 300000); // realtime delivers new alerts; this is only a fallback
 
     // Realtime via Supabase (when publication enabled)
     try {

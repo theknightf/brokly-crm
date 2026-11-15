@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useCallback } from 'react';
 
-const HEARTBEAT_INTERVAL_MS = 30_000; // 30 seconds
+const HEARTBEAT_INTERVAL_MS = 60_000; // 60 seconds (online = heartbeat in the last 2 minutes)
 const SESSION_STORAGE_KEY = 'brokly_session_id';
 const ACTIVITY_API = '/api/auth/session';
 const HEARTBEAT_API = '/api/auth/heartbeat';

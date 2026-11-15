@@ -398,7 +398,7 @@ export default function NotificationBell() {
     }
     const poll = setInterval(() => {
       if (document.visibilityState !== 'hidden') load();
-    }, 30000);
+    }, 120000); // 2 min: each refresh runs several queries per open tab
     return () => {
       clearInterval(poll);
       if (debounce) clearTimeout(debounce);
