@@ -12,14 +12,14 @@ class AppColors {
   static const Color lightInput = Color(0xFFE5E7EB);
 
   // ── Dark Theme Base (OLED Dark UI) ──────────────────────────────────
-  static const Color darkBackground = Color(0xFF0B0E14);
+  static const Color darkBackground = Color(0xFF0F1115);
   static const Color darkForeground = Color(0xFFE7E9EE);
-  static const Color darkCard = Color(0xFF161B22);
-  static const Color darkCardElevated = Color(0xFF1A1F29);
-  static const Color darkMuted = Color(0xFF13171F);
-  static const Color darkMutedForeground = Color(0xFF9CA3AF);
-  static const Color darkBorder = Color(0xFF21262D);
-  static const Color darkInput = Color(0xFF21262D);
+  static const Color darkCard = Color(0xFF14171D);
+  static const Color darkCardElevated = Color(0xFF1A1D23);
+  static const Color darkMuted = Color(0xFF1A1D23);
+  static const Color darkMutedForeground = Color(0xFF9AA1AB);
+  static const Color darkBorder = Color(0xFF262A31);
+  static const Color darkInput = Color(0xFF262A31);
 
   // ── Brand Lime Palette & Accents ───────────────────────────────────
   static const Color primary = Color(0xFF65A30D); // Lime 600
@@ -33,7 +33,7 @@ class AppColors {
   static const Color tealCyan = Color(0xFF06B6D4);
   static const Color mutedText = Color(0xFF9CA3AF);
   static const Color secondary = Color(0xFFF2F7E8); // Soft Lime Tint
-  static const Color secondaryDark = Color(0xFF1A2612); // Dark Lime Tint
+  static const Color secondaryDark = Color(0xFF1C2416); // Dark Lime Tint
   static const Color secondaryForeground = Color(0xFF3F6212); // Deep Lime Ink
 
   // ── Semantic Status Colors (PWA Pipeline) ─────────────────────────
@@ -83,7 +83,58 @@ class AppColors {
   static const Color outcomeBusy = Color(0xFFF59E0B);
   static const Color outcomeWhatsApp = Color(0xFF25D366);
 
-  /// Helper to get background and text colors for any lead status
+  /// One Tailwind colour family: 500 (dot / tint), 700 (text on light), 300 (text on dark).
+  static const Map<String, List<Color>> _families = {
+    'rose': [Color(0xFFF43F5E), Color(0xFFBE123C), Color(0xFFFDA4AF)],
+    'red': [Color(0xFFEF4444), Color(0xFFB91C1C), Color(0xFFFCA5A5)],
+    'fuchsia': [Color(0xFFD946EF), Color(0xFFA21CAF), Color(0xFFF0ABFC)],
+    'orange': [Color(0xFFF97316), Color(0xFFC2410C), Color(0xFFFDBA74)],
+    'teal': [Color(0xFF14B8A6), Color(0xFF0F766E), Color(0xFF5EEAD4)],
+    'zinc': [Color(0xFF71717A), Color(0xFF3F3F46), Color(0xFFD4D4D8)],
+    'blue': [Color(0xFF3B82F6), Color(0xFF1D4ED8), Color(0xFF93C5FD)],
+    'indigo': [Color(0xFF6366F1), Color(0xFF4338CA), Color(0xFFA5B4FC)],
+    'violet': [Color(0xFF8B5CF6), Color(0xFF6D28D9), Color(0xFFC4B5FD)],
+    'amber': [Color(0xFFF59E0B), Color(0xFFB45309), Color(0xFFFCD34D)],
+    'cyan': [Color(0xFF06B6D4), Color(0xFF0E7490), Color(0xFF67E8F9)],
+    'sky': [Color(0xFF0EA5E9), Color(0xFF0369A1), Color(0xFF7DD3FC)],
+    'green': [Color(0xFF22C55E), Color(0xFF15803D), Color(0xFF86EFAC)],
+    'lime': [Color(0xFF84CC16), Color(0xFF4D7C0F), Color(0xFFBEF264)],
+    'emerald': [Color(0xFF10B981), Color(0xFF047857), Color(0xFF6EE7B7)],
+  };
+
+  /// Same stage → colour rule as the website's StatusPill (first match wins).
+  static String _familyFor(String status) {
+    final s = status.toLowerCase();
+    if (RegExp(r'not interested|low budget').hasMatch(s)) return 'rose';
+    if (s.contains('cancel')) return 'red';
+    if (s.contains('duplicate')) return 'fuchsia';
+    if (RegExp(r'wrong|closed number').hasMatch(s)) return 'orange';
+    if (s.contains('rotation')) return 'teal';
+    if (s.contains('no answer')) return 'zinc';
+    if (s.contains('reschedule')) return 'blue';
+    if (s.contains('meeting')) return 'indigo';
+    if (s.contains('follow')) return 'violet';
+    if (s.contains('pending')) return 'amber';
+    if (s.contains('cold')) return 'cyan';
+    if (RegExp(r'fresh|new').hasMatch(s)) return 'sky';
+    if (s.contains('reservation')) return 'green';
+    if (RegExp(r'done deal|won').hasMatch(s)) return 'lime';
+    if (s.contains('interested')) return 'emerald';
+    return 'zinc';
+  }
+
+  /// Text, background, border and dot colours for a lead stage — matches the website.
+  static ({Color text, Color bg, Color border, Color dot}) stageTone(String? status, {bool isDark = false}) {
+    final f = _families[_familyFor(status ?? '')]!;
+    return (
+      text: isDark ? f[2] : f[1],
+      bg: f[0].withAlpha(38), // 15 %
+      border: f[0].withAlpha(77), // 30 %
+      dot: f[0],
+    );
+  }
+
+  /// Helper to get background and text colors for any lead status (kept for existing callers).
   static ({Color text, Color bg}) getStatusColors(String? status, {bool isDark = false}) {
     if (status == null || status.isEmpty) {
       return (
@@ -91,76 +142,8 @@ class AppColors {
         bg: isDark ? darkMuted : lightMuted,
       );
     }
-
-    switch (status) {
-      case 'Fresh Leads':
-      case 'New':
-        return (
-          text: isDark ? const Color(0xFFA3E635) : statusFreshLeads,
-          bg: isDark ? const Color(0xFF1C2416) : statusFreshLeadsBg,
-        );
-      case 'Cold Calls':
-        return (
-          text: isDark ? const Color(0xFF4ADE80) : statusColdCalls,
-          bg: isDark ? const Color(0xFF11261A) : statusColdCallsBg,
-        );
-      case 'Pending Leads':
-        return (
-          text: isDark ? const Color(0xFF94A3B8) : statusPendingLeads,
-          bg: isDark ? const Color(0xFF1E293B) : statusPendingLeadsBg,
-        );
-      case 'Following Up':
-      case 'Follow Up After Meeting':
-        return (
-          text: isDark ? const Color(0xFF38BDF8) : statusFollowingUp,
-          bg: isDark ? const Color(0xFF0C4A6E) : statusFollowingUpBg,
-        );
-      case 'Meeting':
-      case 'Site Visit Scheduled':
-        return (
-          text: isDark ? const Color(0xFF4ADE80) : statusMeeting,
-          bg: isDark ? const Color(0xFF11261A) : statusMeetingBg,
-        );
-      case 'Interested':
-      case 'Qualified':
-        return (
-          text: isDark ? const Color(0xFF34D399) : statusInterested,
-          bg: isDark ? const Color(0xFF064E3B) : statusInterestedBg,
-        );
-      case 'Done Deal':
-      case 'Won':
-        return (
-          text: isDark ? const Color(0xFFD9F99D) : statusDoneDeal,
-          bg: isDark ? const Color(0xFF22300F) : statusDoneDealBg,
-        );
-      case 'Reservation':
-        return (
-          text: isDark ? const Color(0xFFBEF264) : statusReservation,
-          bg: isDark ? const Color(0xFF1A2E05) : statusReservationBg,
-        );
-      case 'Cancellation':
-        return (
-          text: const Color(0xFFEF4444),
-          bg: isDark ? const Color(0xFF450A0A) : statusCancellationBg,
-        );
-      case 'No Answer':
-      case 'No Answer At All':
-      case 'Reschedule Meeting':
-        return (
-          text: isDark ? const Color(0xFFFDE047) : statusNoAnswer,
-          bg: isDark ? const Color(0xFF422006) : statusNoAnswerBg,
-        );
-      case 'Not Interested':
-      case 'Wrong Number':
-      case 'Closed Number':
-      case 'Duplicate Leads':
-      case 'Low Budget':
-      default:
-        return (
-          text: isDark ? darkMutedForeground : statusNotInterested,
-          bg: isDark ? darkMuted : statusNotInterestedBg,
-        );
-    }
+    final t = stageTone(status, isDark: isDark);
+    return (text: t.text, bg: t.bg);
   }
 
   /// Helper to get outcome color
