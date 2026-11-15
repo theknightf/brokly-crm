@@ -43,7 +43,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
   LeadModel? _lead;
   List<CallLogModel> _calls = [];
-  List<Map<String, dynamic>> _comments = [];
+  List<_NoteItem> _notes = [];
   bool _isLoading = true;
   int _tab = 0; // 0 Info, 1 Notes, 2 Activity
 
@@ -77,11 +77,64 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       fetchedComments = (res as List<dynamic>).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {}
 
+    // Stage changes (trigger-written history) to show next to the note written with them.
+    List<Map<String, dynamic>> stageEvents = [];
+    try {
+      final res = await _client
+          .from('lead_events')
+          .select('actor_id, old_value, new_value, created_at')
+          .eq('lead_id', widget.leadId)
+          .eq('type', 'stage')
+          .order('created_at', ascending: false)
+          .limit(60);
+      stageEvents = (res as List<dynamic>).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {}
+
+    // Who wrote each note.
+    final names = <String, String>{};
+    final authorIds = fetchedComments.map((c) => c['user_id']?.toString()).whereType<String>().toSet().toList();
+    if (authorIds.isNotEmpty) {
+      try {
+        final res = await _client.from('user_profiles').select('id, full_name').inFilter('id', authorIds);
+        for (final r in res as List<dynamic>) {
+          final m = r as Map;
+          names[m['id'].toString()] = (m['full_name'] ?? '').toString();
+        }
+      } catch (_) {}
+    }
+
+    final notes = <_NoteItem>[];
+    for (final c in fetchedComments) {
+      final body = c['body']?.toString().trim() ?? '';
+      if (body.isEmpty) continue;
+      final at = DateTime.tryParse(c['created_at']?.toString() ?? '')?.toLocal();
+      final author = c['user_id']?.toString();
+      // A stage change by the same person within 2 minutes belongs to this note.
+      Map<String, dynamic>? stage;
+      if (at != null) {
+        for (final e in stageEvents) {
+          final et = DateTime.tryParse(e['created_at']?.toString() ?? '')?.toLocal();
+          if (et == null || e['actor_id']?.toString() != author) continue;
+          if (et.difference(at).inSeconds.abs() <= 120) {
+            stage = e;
+            break;
+          }
+        }
+      }
+      notes.add(_NoteItem(
+        body: body,
+        at: at,
+        author: author == null ? null : names[author],
+        stageFrom: stage?['old_value']?.toString(),
+        stageTo: stage?['new_value']?.toString(),
+      ));
+    }
+
     if (mounted) {
       setState(() {
         _lead = leadData;
         _calls = callData;
-        _comments = fetchedComments;
+        _notes = notes;
         _isLoading = false;
       });
     }
@@ -348,19 +401,21 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     );
   }
 
-  List<String> _noteLines(LeadModel lead) {
-    final lines = <String>[];
-    for (final c in _comments) {
-      final body = c['body']?.toString().trim() ?? '';
-      if (body.isNotEmpty) lines.add(body);
-    }
+  /// Notes newest first (text, date + time, author, stage change), then older lines kept only in the
+  /// lead's notes field (no date known) that are not already a note.
+  List<_NoteItem> _noteLines(LeadModel lead) {
+    final items = [..._notes];
+    final bodies = items.map((n) => n.body).toSet();
     if (lead.notes != null && lead.notes!.trim().isNotEmpty) {
       for (final line in lead.notes!.split('\n')) {
         final l = line.trim();
-        if (l.isNotEmpty && !lines.any((x) => x.contains(l))) lines.add(l);
+        // addNote also writes "[yyyy-mm-dd hh:mm:ss] text" into the field; skip those copies.
+        final stripped = l.replaceFirst(RegExp(r'^\[[^\]]*\]\s*'), '');
+        if (l.isEmpty || bodies.contains(stripped) || bodies.contains(l)) continue;
+        items.add(_NoteItem(body: l));
       }
     }
-    return lines;
+    return items;
   }
 }
 
@@ -567,8 +622,18 @@ class _Group extends StatelessWidget {
 
 // ── Notes ────────────────────────────────────────────────────────────
 
+/// One note as written, with when, who and the stage change made with it (if any).
+class _NoteItem {
+  final String body;
+  final DateTime? at;
+  final String? author;
+  final String? stageFrom;
+  final String? stageTo;
+  const _NoteItem({required this.body, this.at, this.author, this.stageFrom, this.stageTo});
+}
+
 class _NotesTab extends StatelessWidget {
-  final List<String> lines;
+  final List<_NoteItem> lines;
   final VoidCallback onAdd;
   const _NotesTab({super.key, required this.lines, required this.onAdd});
 
@@ -587,12 +652,46 @@ class _NotesTab extends StatelessWidget {
       ]);
     }
     final t = Theme.of(context).textTheme;
+    final p = context.palette;
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.xxl),
       itemCount: lines.length,
-      itemBuilder: (_, i) => PremiumCard(
-        child: Text(NoteFormatter.pretty(lines[i]), style: t.bodyMedium?.copyWith(height: 1.5)),
-      ),
+      itemBuilder: (_, i) {
+        final n = lines[i];
+        final hasStage = (n.stageTo ?? '').isNotEmpty;
+        final when = n.at == null ? null : DateFormat('d MMM yyyy · hh:mm a').format(n.at!);
+        return PremiumCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            // 1. What they wrote
+            Text(NoteFormatter.pretty(n.body), style: t.bodyMedium?.copyWith(height: 1.5)),
+            // 2. Date and time (and who)
+            if (when != null || (n.author ?? '').isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Row(children: [
+                Icon(LucideIcons.clock, size: 13, color: p.subtext),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    [if (when != null) when, if ((n.author ?? '').isNotEmpty) n.author!].join(' · '),
+                    style: t.bodySmall,
+                  ),
+                ),
+              ]),
+            ],
+            // 3. The stage change made with this note
+            if (hasStage) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                if ((n.stageFrom ?? '').isNotEmpty) ...[
+                  StatusPill(n.stageFrom!),
+                  Icon(Directionality.of(context) == TextDirection.rtl ? LucideIcons.arrowLeft : LucideIcons.arrowRight, size: 14, color: p.subtext),
+                ],
+                StatusPill(n.stageTo!),
+              ]),
+            ],
+          ]),
+        );
+      },
     );
   }
 }
