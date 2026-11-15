@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { normalizePhone as normalizePhoneKey } from '@/lib/phone';
 import * as XLSX from 'xlsx';
 
@@ -401,7 +402,19 @@ export async function POST(request: Request) {
    * 'Duplicate Leads' stage and hides them from sales. Inserts use no RETURNING, so a duplicate the
    * importer cannot read back never turns into an error.
    */
-  const dupRows: { rowNumber: number; name: string; phone: string }[] = [];
+  type DupRow = {
+    rowNumber: number;
+    name: string;
+    phone: string;
+    existingName?: string;
+    existingPhone?: string;
+    existingStage?: string;
+    existingOwner?: string;
+    existingAddedOn?: string;
+  };
+  const dupRows: DupRow[] = [];
+  const insertedIds: string[] = [];
+  const rowNumById = new Map<string, number>();
   const insertNewRows = async (list: any[]) => {
     if (!list.length) return;
     await insertChunks(list);
@@ -412,6 +425,10 @@ export async function POST(request: Request) {
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const rawChunk = toInsert.slice(i, i + chunkSize);
       const chunk = rawChunk.map(({ _rowNum, ...dbRow }) => ({ ...dbRow, id: dbRow.id || crypto.randomUUID() }));
+      chunk.forEach((c: any, k: number) => {
+        insertedIds.push(c.id);
+        rowNumById.set(c.id, rawChunk[k]._rowNum || 0);
+      });
       const { error } = await supabase.from('leads').insert(chunk);
       if (error) {
         for (let k = 0; k < chunk.length; k++) {
@@ -470,7 +487,69 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
+  // The database flags a row whose phone already exists (is_duplicate + duplicate_of_lead_id) and
+  // moves it to Duplicate Leads. Read those back so the importer sees which rows were duplicates,
+  // which existing lead each matched and who owns it — instead of "imported" for everything.
+  if (insertedIds.length) {
+    try {
+      const sUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const sKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const db: any = sUrl && sKey ? createServiceClient(sUrl, sKey) : supabase;
+      const flagged: any[] = [];
+      for (let i = 0; i < insertedIds.length; i += 200) {
+        const { data } = await db
+          .from('leads')
+          .select('id, name, phone, duplicate_of_lead_id')
+          .in('id', insertedIds.slice(i, i + 200))
+          .eq('is_duplicate', true);
+        flagged.push(...(data || []));
+      }
+      if (flagged.length) {
+        const origIds = Array.from(new Set(flagged.map((f) => f.duplicate_of_lead_id).filter(Boolean)));
+        const { data: originals } = await db
+          .from('leads')
+          .select('id, name, phone, crm_status, assigned_to, created_by, created_at')
+          .in('id', origIds);
+        const origById = new Map<string, any>((originals || []).map((o: any) => [o.id, o]));
+        const ownerIds = Array.from(
+          new Set((originals || []).map((o: any) => o.assigned_to || o.created_by).filter(Boolean))
+        );
+        const { data: owners } = ownerIds.length
+          ? await db.from('user_profiles').select('id, full_name').in('id', ownerIds)
+          : { data: [] };
+        const ownerName = new Map<string, string>((owners || []).map((u: any) => [u.id, u.full_name || '']));
+        for (const f of flagged) {
+          const o = origById.get(f.duplicate_of_lead_id);
+          dupRows.push({
+            rowNumber: rowNumById.get(f.id) || 0,
+            name: f.name || '',
+            phone: f.phone || '',
+            existingName: o?.name || '',
+            existingPhone: o?.phone || '',
+            existingStage: o?.crm_status || '',
+            existingOwner: o ? ownerName.get(o.assigned_to || o.created_by) || '' : '',
+            existingAddedOn: o?.created_at ? String(o.created_at).slice(0, 10) : '',
+          });
+        }
+        dupRows.sort((a, b) => a.rowNumber - b.rowNumber);
+        imported = Math.max(0, imported - flagged.length);
+      }
+    } catch {
+      /* best effort: the import itself already succeeded */
+    }
+  }
+
   const routedDuplicates = dupRows.length;
+  // Keep the duplicate details with the import, so Import History shows them too.
+  for (const d of dupRows) {
+    structuredErrorDetails.push({
+      rowNumber: d.rowNumber,
+      name: d.name,
+      phone: d.phone,
+      type: 'duplicate_routed',
+      reason: `Duplicate of "${d.existingName || '-'}" — owner: ${d.existingOwner || '-'}, stage: ${d.existingStage || '-'}, added ${d.existingAddedOn || '-'}`,
+    });
+  }
 
   const totalProcessed = rows.length;
   const totalFailedOrInvalid = invalid + errors.length;
@@ -524,7 +603,7 @@ export async function POST(request: Request) {
     imported,
     routedDuplicates,
     duplicatesFound: routedDuplicates,
-    duplicateRows: dupRows.slice(0, 50),
+    duplicateRows: dupRows.slice(0, 1000),
     updated,
     skipped,
     invalid,

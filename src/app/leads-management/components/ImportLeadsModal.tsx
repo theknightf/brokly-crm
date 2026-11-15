@@ -67,6 +67,8 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  // After an import that hit existing phones: which rows were duplicates and of whom.
+  const [dupResult, setDupResult] = useState<{ imported: number; rows: DuplicateRow[] } | null>(null);
 
   const [sources, setSources] = useState<{ id: string; name: string }[]>([]);
   const [stages, setStages] = useState<{ id: string; name: string; color?: string }[]>([]);
@@ -152,6 +154,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const handleClose = () => {
     if (importing) return;
     reset();
+    setDupResult(null);
     onClose();
   };
 
@@ -402,10 +405,10 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       const imported = Number(j.imported || 0);
       const routedDuplicates = Number(j.routedDuplicates || 0);
       if (routedDuplicates > 0) {
-        toast.success(
-          `Imported ${imported} new lead${imported === 1 ? '' : 's'}. ${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} found and not added — sent to the lead owner${routedDuplicates === 1 ? '' : 's'} for review. File saved to Import History.`,
-          { duration: 8000 }
-        );
+        // Keep the window open on a result screen listing every duplicate and who owns it.
+        setDupResult({ imported, rows: Array.isArray(j.duplicateRows) ? j.duplicateRows : [] });
+        onImported();
+        return;
       } else {
         toast.success(`Successfully imported ${imported} leads. File saved to Import History.`, {
           duration: 5000,
@@ -421,6 +424,14 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   };
 
   if (!open) return null;
+
+  if (dupResult) {
+    return (
+      <Modal open={open} onClose={handleClose} title="Import finished" subtitle="Some rows already exist — تفاصيل المكرر" size="xl">
+        <DuplicateResult imported={dupResult.imported} rows={dupResult.rows} onClose={handleClose} />
+      </Modal>
+    );
+  }
 
   const hasFile = rows.length > 0;
 
@@ -944,5 +955,115 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
         </div>
       </div>
     </Modal>
+  );
+}
+
+type DuplicateRow = {
+  rowNumber: number;
+  name: string;
+  phone: string;
+  existingName?: string;
+  existingPhone?: string;
+  existingStage?: string;
+  existingOwner?: string;
+  existingAddedOn?: string;
+};
+
+/** Result screen after an import that hit phones already in the CRM. */
+function DuplicateResult({ imported, rows, onClose }: { imported: number; rows: DuplicateRow[]; onClose: () => void }) {
+  const byOwner = rows.reduce<Record<string, number>>((acc, r) => {
+    const k = r.existingOwner || '—';
+    acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+
+  const downloadCsv = () => {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['Row', 'Name in sheet', 'Phone', 'Duplicated with (existing lead)', 'Owner', 'Stage', 'Existing added on'];
+    const lines = rows.map((r) =>
+      [r.rowNumber, esc(r.name), `="${r.phone}"`, esc(r.existingName), esc(r.existingOwner), esc(r.existingStage), r.existingAddedOn || ''].join(',')
+    );
+    const blob = new Blob(['\ufeff' + [head.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `import-duplicates-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  return (
+    <div className="space-y-5 p-6 sm:p-8">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">New leads added</p>
+          <p className="text-2xl font-extrabold tabular-nums text-foreground">{imported}</p>
+        </div>
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <p className="text-xs text-amber-700 dark:text-amber-300">Already in the CRM (duplicates)</p>
+          <p className="text-2xl font-extrabold tabular-nums text-amber-700 dark:text-amber-300">{rows.length}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Duplicated with</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {Object.entries(byOwner)
+              .sort((a, b) => b[1] - a[1])
+              .map(([o, n]) => `${o} (${n})`)
+              .join(' · ')}
+          </p>
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        These rows were not added as new leads: each phone already belongs to the lead below. They are waiting in{' '}
+        <a href="/duplicates" className="font-semibold text-primary hover:underline">Duplicates</a> for review.
+        <span className="block" dir="rtl">الأرقام دي موجودة قبل كده — قدام كل رقم العميل الموجود والمسؤول عنه.</span>
+      </p>
+
+      <div className="max-h-[50vh] overflow-auto rounded-xl border border-border">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead className="sticky top-0 bg-muted/80 backdrop-blur">
+            <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2">Row</th>
+              <th className="px-3 py-2">Name in sheet</th>
+              <th className="px-3 py-2">Phone</th>
+              <th className="px-3 py-2">Duplicated with</th>
+              <th className="px-3 py-2">Owner</th>
+              <th className="px-3 py-2">Stage</th>
+              <th className="px-3 py-2">Added on</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={`${r.phone}-${i}`} className="border-t border-border">
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">{r.rowNumber || '—'}</td>
+                <td className="px-3 py-2" dir="auto">{r.name || '—'}</td>
+                <td className="px-3 py-2 tabular-nums" dir="ltr">{r.phone}</td>
+                <td className="px-3 py-2 font-medium" dir="auto">
+                  {r.existingName || '—'}
+                  {r.existingName && r.name && r.existingName.trim() !== r.name.trim() ? (
+                    <span className="ms-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300">different name</span>
+                  ) : null}
+                </td>
+                <td className="px-3 py-2 font-semibold">{r.existingOwner || '—'}</td>
+                <td className="px-3 py-2">{r.existingStage || '—'}</td>
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">{r.existingAddedOn || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-wrap justify-end gap-2">
+        <button type="button" onClick={downloadCsv} className="btn-secondary inline-flex min-h-[44px] items-center gap-2">
+          <FileSpreadsheet size={16} /> Download list
+        </button>
+        <a href="/duplicates" className="btn-secondary inline-flex min-h-[44px] items-center gap-2">
+          Open Duplicates
+        </a>
+        <button type="button" onClick={onClose} className="btn-primary inline-flex min-h-[44px] items-center gap-2">
+          <Check size={16} /> Done
+        </button>
+      </div>
+    </div>
   );
 }
