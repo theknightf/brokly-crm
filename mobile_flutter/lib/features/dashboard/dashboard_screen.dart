@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../data/models/dashboard_summary_model.dart';
 import '../../data/models/follow_up_model.dart';
@@ -177,7 +176,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadDashboard,
-      color: AppColors.neonLime,
       child: (!_loaded && leadsCount == 0)
           ? const DashboardSkeleton()
           : ListView(
@@ -228,7 +226,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: _gap),
                 ],
-                const PipelineOverview(),
+                // Today's work first: tasks and activity, then the pipeline views.
+                TasksCard(
+                  tasks: _tasks,
+                  onToggle: _toggleTaskItem,
+                  onOpenLead: _openLead,
+                ),
+                const SizedBox(height: _gap),
+                ActivityCard(
+                  callsToday: s.callsToday,
+                  targetCalls: s.targetCallsToday,
+                  callsThisMonth: s.callsThisMonth,
+                  slaScorePct: s.slaScorePct,
+                  overdueFollowUps: s.overdueFollowUps,
+                  rank: s.currentUserRank,
+                  online: s.onlineUsersCount,
+                ),
                 const SizedBox(height: _gap),
                 LeadsByStageSection(
                   onCall: (l) => _callFollowUpOrLead(phone: l.phone, lead: l),
@@ -249,21 +262,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onViewAllLeads: () => widget.onNavigateTab?.call(1),
                 ),
                 const SizedBox(height: _gap),
-                TasksCard(
-                  tasks: _tasks,
-                  onToggle: _toggleTaskItem,
-                  onOpenLead: _openLead,
-                ),
-                const SizedBox(height: _gap),
-                ActivityCard(
-                  callsToday: s.callsToday,
-                  targetCalls: s.targetCallsToday,
-                  callsThisMonth: s.callsThisMonth,
-                  slaScorePct: s.slaScorePct,
-                  overdueFollowUps: s.overdueFollowUps,
-                  rank: s.currentUserRank,
-                  online: s.onlineUsersCount,
-                ),
+                const PipelineOverview(),
                 const SizedBox(height: _gap),
                 LeaderboardCard(entries: s.leaderboard),
                 const SizedBox(height: 8),
