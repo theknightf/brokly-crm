@@ -4,6 +4,7 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/constants/lead_stages.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/tr.dart';
@@ -49,7 +50,10 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
   String? _selectedBudget; // '3-5', '5-10', '10+'
 
   String _stage = 'Fresh Leads';
-  static const _stages = ['Fresh Leads', 'Cold Calls', 'Following Up', 'Meeting'];
+  // Every stage the website offers (Duplicate Leads is set by the system, not by hand).
+  static const _pipelineStages = LeadStages.pipelineStages;
+  static final _outcomeStages = LeadStages.outcomeStages.where((s) => s != 'Duplicate Leads').toList();
+  final _actionNoteController = TextEditingController();
 
   /// null = nobody (unassigned, same default as before).
   String? _assignedToId;
@@ -112,6 +116,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     _secondaryPhoneController.dispose();
     _emailController.dispose();
     _notesController.dispose();
+    _actionNoteController.dispose();
     _newSourceController.dispose();
     super.dispose();
   }
@@ -209,7 +214,11 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     );
 
     try {
-      await context.read<LeadsProvider>().createLead(lead);
+      final provider = context.read<LeadsProvider>();
+      final created = await provider.createLead(lead);
+      // Optional action note: saved as a note on the new lead (counts as the first action).
+      final actionNote = _actionNoteController.text.trim();
+      if (actionNote.isNotEmpty && created.id.isNotEmpty) await provider.addNote(created.id, actionNote);
       tapFeedback();
       if (!mounted) return;
       if (launchWhatsAppAfter) await WhatsAppUtils.openWhatsAppChat(context, phone: fullPhone);
@@ -389,7 +398,25 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
 
             // 3. Stage
             _Section(title: tr('Stage', 'المرحلة'), children: [
-              _ChipWrap(options: _stages, selected: _stage, onSelected: (v) => setState(() => _stage = v)),
+              _Label(tr('Pipeline', 'مراحل البيع')),
+              _ChipWrap(options: _pipelineStages, selected: _stage, onSelected: (v) => setState(() => _stage = v)),
+              const SizedBox(height: AppSpacing.md),
+              _Label(tr('Outcome', 'نتيجة التواصل')),
+              _ChipWrap(options: _outcomeStages, selected: _stage, onSelected: (v) => setState(() => _stage = v)),
+            ]),
+
+            // 3b. Optional action note — what happened on the first contact
+            _Section(title: tr('Action note', 'نوتة الإجراء'), children: [
+              TextField(
+                controller: _actionNoteController,
+                minLines: 2,
+                maxLines: 5,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.newline,
+                decoration: InputDecoration(
+                  hintText: tr('Optional — e.g. called, interested in a 3BR, call back Sunday', 'اختياري — مثلاً: كلمته، مهتم بـ 3 غرف، يتكلم الحد'),
+                ),
+              ),
             ]),
 
             // 4. Next follow-up
