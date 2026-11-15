@@ -81,21 +81,56 @@ const getToken = () =>
   (canUseCookies() ? fromCookies() : fromStorage()).find((c) => c.name.includes('auth-token'))
     ?.value ?? null;
 
+/**
+ * One renewal at a time for the whole tab. The server never renews the session (see server.ts), so an
+ * API call made with an expired access token answers 401; we renew here once and retry that call.
+ * supabase-js also holds a cross-tab lock while refreshing, so tabs do not race each other.
+ */
+let renewing: Promise<boolean> | null = null;
+function renewSession(): Promise<boolean> {
+  if (!renewing) {
+    renewing = (async () => {
+      try {
+        const { data, error } = await createClient().auth.getSession(); // refreshes only if expired
+        return !error && !!data.session;
+      } catch {
+        return false;
+      } finally {
+        setTimeout(() => {
+          renewing = null;
+        }, 2000);
+      }
+    })();
+  }
+  return renewing;
+}
+
 if (typeof window !== 'undefined' && !(window as any).__sb_patched__) {
   (window as any).__sb_patched__ = true;
   const orig = window.fetch.bind(window);
-  window.fetch = (input, init) => {
+  const withToken = (init?: RequestInit) => {
     const token = getToken();
+    return token ? { ...(init || {}), headers: { ...(init?.headers || {}), 'x-sb-token': token } } : init;
+  };
+  window.fetch = async (input, init) => {
     const url =
       typeof input === 'string'
         ? input
         : input instanceof URL
           ? input.href
           : (input as Request).url;
-    if (token && (url.startsWith('/') || url.startsWith(window.location.origin))) {
-      init = { ...(init || {}), headers: { ...(init?.headers || {}), 'x-sb-token': token } };
+    const sameOrigin = url.startsWith('/') || url.startsWith(window.location.origin);
+    if (!sameOrigin) return orig(input, init);
+    const res = await orig(input, withToken(init));
+    // Expired access token → renew once, then retry this call with the new token.
+    const isApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`);
+    const body = init?.body;
+    const replayable = body == null || typeof body === 'string' || body instanceof URLSearchParams;
+    if (res.status === 401 && isApi && replayable && !(input instanceof Request) && getToken()) {
+      const ok = await renewSession();
+      if (ok) return orig(input, withToken(init));
     }
-    return orig(input, init);
+    return res;
   };
 }
 

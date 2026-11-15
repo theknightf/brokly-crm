@@ -1,8 +1,7 @@
-import { createServerClient } from '@supabase/ssr';
+import { hasSessionCookie } from '@/lib/supabase/sessionCookie';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
 
 function getProjectRef(): string {
   const url = SUPABASE_URL;
@@ -31,33 +30,11 @@ export async function middleware(request: NextRequest) {
     !!request.headers.get('x-sb-token') ||
     request.cookies.getAll().some((c) => c.name.includes('auth-token'));
 
-  let user = null;
-  if (hasAuthToken) {
-    const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              request.cookies.set(name, value);
-              supabaseResponse.cookies.set(name, value, options);
-            });
-          },
-        },
-      }
-    );
-
-    // Use getSession() (local JWT decode from the cookie) instead of getUser()
-    // (a network round-trip to the auth server) on every navigation. This
-    // removes the biggest per-request latency cost. Actual session ownership
-    // is still validated with getUser() inside the API routes and AuthProvider.
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    user = session?.user ?? null;
-  }
+  // Page gate only: a stored session (even with an expired access token) counts as signed in.
+  // The middleware must NOT refresh the token — server-side refreshes racing the browser's own
+  // refresh got 409/429 from Supabase and logged people out. The browser renews the token, and
+  // every API route still validates the user with getUser().
+  const user = hasAuthToken && hasSessionCookie(request.cookies.getAll()) ? { signedIn: true } : null;
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();

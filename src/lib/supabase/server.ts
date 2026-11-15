@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies, headers } from 'next/headers';
+import { hasExpiredSession } from './sessionCookie';
 
 /** True when the app is served over HTTPS (Vercel prod or explicit https site url). */
 function isSecureApp(): boolean {
@@ -34,10 +35,17 @@ export async function createClient() {
     }
   }
 
+  // Never refresh the session on the server: concurrent server refreshes of the same refresh token
+  // get 409 / 429 from Supabase and log the user out. With an expired access token the request is
+  // treated as signed-out (401); the browser renews the token once and retries (see client.ts).
+  const allCookies = cookieStore.getAll();
+  const expired = hasExpiredSession(allCookies);
+
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
+          if (expired) return cookieStore.getAll().filter((c) => !/-auth-token(\.\d+)?$/.test(c.name));
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
