@@ -5,7 +5,6 @@ import '../../../core/utils/tr.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../data/models/follow_up_model.dart';
-import 'dash_kit.dart';
 
 /// Hero card for the next priority follow-up (Call / WhatsApp / Mark done).
 class PriorityFollowUpCard extends StatelessWidget {
