@@ -278,7 +278,7 @@ class AppTheme {
         modalBackgroundColor: p.card,
         showDragHandle: false,
         dragHandleColor: p.border,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.sheet),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheet),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: p.card,
