@@ -46,6 +46,13 @@ const DealStatusModal = dynamic(() => import('./DealStatusModal'), { ssr: false 
 const QuickPaymentPlanModal = dynamic(() => import('./QuickPaymentPlanModal'), { ssr: false });
 const LogCallModal = dynamic(() => import('./LogCallModal'), { ssr: false });
 
+/** Shown right after adding a lead the database flagged as a duplicate. */
+type DupNotice = {
+  added: { name: string; phone: string };
+  newLeadId: string;
+  existing: { id: string; name: string; phone: string; stage: string; owner: string; addedOn: string };
+};
+
 export interface FilterState {
   search: string;
   status: LeadStatus | '';
@@ -299,6 +306,7 @@ export default function LeadsManagementScreen({
       document.body.style.paddingRight = originalPaddingRight;
     };
   }, [viewLead]);
+  const [dupNotice, setDupNotice] = useState<DupNotice | null>(null);
   const [dupWarning, setDupWarning] = useState<{
     existing: any;
     pendingLead: Lead;
@@ -1230,6 +1238,43 @@ export default function LeadsManagementScreen({
     }
   };
 
+  /** If the just-created lead was flagged as a duplicate, the lead it matched and that lead's owner. */
+  const findDuplicateMatch = async (leadId: string): Promise<Omit<DupNotice, 'added'> | null> => {
+    try {
+      const supabase = createClient();
+      const { data: row } = await supabase
+        .from('leads')
+        .select('id, is_duplicate, duplicate_of_lead_id')
+        .eq('id', leadId)
+        .maybeSingle();
+      if (!row?.is_duplicate || !row.duplicate_of_lead_id) return null;
+      const { data: orig } = await supabase
+        .from('leads')
+        .select('id, name, phone, crm_status, created_at, assigned_to, created_by')
+        .eq('id', row.duplicate_of_lead_id)
+        .maybeSingle();
+      let owner = '';
+      const ownerId = orig?.assigned_to || orig?.created_by;
+      if (ownerId) {
+        const { data: p } = await supabase.from('user_profiles').select('full_name').eq('id', ownerId).maybeSingle();
+        owner = p?.full_name || '';
+      }
+      return {
+        newLeadId: leadId,
+        existing: {
+          id: orig?.id || row.duplicate_of_lead_id,
+          name: orig?.name || '',
+          phone: orig?.phone || '',
+          stage: orig?.crm_status || '',
+          owner,
+          addedOn: orig?.created_at ? String(orig.created_at).slice(0, 10) : '',
+        },
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const handleAddLead = async (lead: Lead, options?: { keepOpen?: boolean }): Promise<boolean> => {
     setDupChecking(false);
     setDupWarning(null);
@@ -1250,6 +1295,13 @@ export default function LeadsManagementScreen({
       }
       void loadStatusCounts();
       void fetchLeads();
+      // The database moves a lead whose phone already exists to "Duplicate Leads". Tell the person who
+      // added it right away which lead it matched and who owns it (owners/admins can read both).
+      const dup = createdLead?.id ? await findDuplicateMatch(createdLead.id) : null;
+      if (dup) {
+        setDupNotice({ added: { name: lead.name, phone: lead.phone }, ...dup });
+        return true;
+      }
       toast.success(`${t('leadForm.created')} — ${lead.name}`, {
         action: createdLead?.id
           ? {
@@ -1951,6 +2003,52 @@ export default function LeadsManagementScreen({
         variant="drawer"
       >
         <AddLeadForm onSubmit={handleAddLead} onCancel={() => setAddModalOpen(false)} />
+      </Modal>
+
+      {/* Shown right after adding a lead that turned out to be a duplicate */}
+      <Modal
+        open={!!dupNotice}
+        onClose={() => setDupNotice(null)}
+        title="This lead already exists"
+        subtitle="العميل ده موجود قبل كده — اتسجل في المكررات"
+        size="md"
+      >
+        {dupNotice && (
+          <div className="space-y-4 p-6">
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+              <p className="font-semibold text-amber-800 dark:text-amber-200">
+                <span dir="auto">{dupNotice.added.name || 'The lead'}</span> (<span className="font-mono" dir="ltr">{dupNotice.added.phone}</span>) was saved as a
+                duplicate and moved to <b>Duplicate Leads</b>.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border p-4 text-sm">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Duplicated with</p>
+              <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5">
+                <dt className="text-muted-foreground">Lead</dt>
+                <dd className="font-semibold text-foreground" dir="auto">{dupNotice.existing.name || '—'}</dd>
+                <dt className="text-muted-foreground">Phone</dt>
+                <dd className="font-mono text-foreground" dir="ltr">{dupNotice.existing.phone || '—'}</dd>
+                <dt className="text-muted-foreground">Owner</dt>
+                <dd className="font-semibold text-foreground">{dupNotice.existing.owner || 'Unassigned'}</dd>
+                <dt className="text-muted-foreground">Stage</dt>
+                <dd className="text-foreground">{dupNotice.existing.stage || '—'}</dd>
+                <dt className="text-muted-foreground">Added on</dt>
+                <dd className="text-foreground">{dupNotice.existing.addedOn || '—'}</dd>
+              </dl>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => router.push(`/leads/${dupNotice.existing.id}`)} className="btn-secondary">
+                Open existing lead
+              </button>
+              <button type="button" onClick={() => router.push('/duplicates')} className="btn-secondary">
+                Open Duplicates
+              </button>
+              <button type="button" onClick={() => setDupNotice(null)} className="btn-primary">
+                OK
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Duplicate Lead Warning */}
