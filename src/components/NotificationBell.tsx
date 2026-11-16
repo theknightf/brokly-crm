@@ -391,7 +391,7 @@ export default function NotificationBell() {
         .channel('notif-bell')
         // No realtime on activity_log: it gets a row for nearly every action, and each open tab cost the database
         // one security check per row. The 30s poll below covers it.
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups', filter: `created_by=eq.${user.id}` }, refresh)
         .subscribe();
     } catch {
       // realtime unavailable — polling covers updates

@@ -154,7 +154,7 @@ export default function WorkspaceScreen() {
     try {
       channel = client
         .channel('workspace-followups')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' }, () =>
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups', ...(isSales && profile?.id ? { filter: `created_by=eq.${profile.id}` } : {}) }, () =>
           fetchList(filters)
         )
         .subscribe();
@@ -167,7 +167,7 @@ export default function WorkspaceScreen() {
       if (channel) client.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchList]);
+  }, [fetchList, isSales, profile?.id]);
 
   const applyTab = (key: string, preset: Filters) => {
     setTab(key);
