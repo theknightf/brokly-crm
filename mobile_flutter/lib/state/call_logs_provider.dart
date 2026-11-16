@@ -26,12 +26,16 @@ class CallLogsProvider extends ChangeNotifier {
   CallLogsProvider() {
     fetchCalls();
     _setupRealtime();
+    RealtimePause.resumed.addListener(() {
+      _subscription?.unsubscribe();
+      _setupRealtime();
+      fetchCalls(silent: true);
+    });
   }
 
   Timer? _refetchTimer;
 
   Future<void> _setupRealtime() async {
-    RealtimePause.resumed.addListener(() => fetchCalls(silent: true));
     // Owners/admins watch all calls; everyone else only their own (far cheaper for the database).
     final admin = await StageNoteGuard.isAdmin();
     final uid = SupabaseService().currentUser?.id;

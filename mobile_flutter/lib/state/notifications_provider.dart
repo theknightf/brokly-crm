@@ -94,7 +94,9 @@ class NotificationsProvider extends ChangeNotifier {
       if (!_resumeHooked) {
         _resumeHooked = true;
         RealtimePause.resumed.addListener(() {
-          if (_client.auth.currentUser != null) refresh();
+          if (_client.auth.currentUser == null) return;
+          _setupRealtime();
+          refresh();
         });
       }
       _channel = _service.subscribeToRealtimeAlerts(

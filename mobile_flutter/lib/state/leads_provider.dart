@@ -197,7 +197,9 @@ class LeadsProvider extends ChangeNotifier {
     if (_resumeHooked) return;
     _resumeHooked = true;
     RealtimePause.resumed.addListener(() {
-      if (_activeUserId != null) fetchLeads(silent: true);
+      if (_activeUserId == null) return;
+      _setupRealtime();
+      fetchLeads(silent: true);
     });
   }
 

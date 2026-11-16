@@ -36,10 +36,14 @@ class AttendanceProvider extends ChangeNotifier {
   AttendanceProvider() {
     init();
     _setupRealtime();
+    RealtimePause.resumed.addListener(() {
+      _subscription?.unsubscribe();
+      _setupRealtime();
+      fetchToday();
+    });
   }
 
   void _setupRealtime() {
-    RealtimePause.resumed.addListener(fetchToday);
     _subscription = _service.subscribeToChanges(() {
       fetchToday();
     });

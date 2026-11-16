@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// when the app comes back. A phone left with the app in the background otherwise keeps its subscriptions open
 /// for hours, and the database checks every change against each of them.
 ///
-/// Providers listen to [resumed] and reload once when the connection comes back, so nothing is missed.
+/// Providers listen to [resumed]: they subscribe again and reload once, so nothing is missed.
 class RealtimePause with WidgetsBindingObserver {
   RealtimePause._();
   static final RealtimePause instance = RealtimePause._();
@@ -31,16 +31,13 @@ class RealtimePause with WidgetsBindingObserver {
       _timer = null;
       if (!_paused) return;
       _paused = false;
-      try {
-        Supabase.instance.client.realtime.connect();
-      } catch (_) {}
       resumed.value++;
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
       if (_timer != null || _paused) return;
       _timer = Timer(const Duration(seconds: 60), () {
         _timer = null;
         try {
-          Supabase.instance.client.realtime.disconnect();
+          unawaited(Supabase.instance.client.removeAllChannels());
           _paused = true;
         } catch (_) {}
       });
