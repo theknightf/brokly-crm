@@ -5,7 +5,10 @@ import 'package:provider/provider.dart';
 import '../../core/memory/memory_guard.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/sales_role.dart';
 import '../../core/utils/tr.dart';
+import '../../state/auth_provider.dart';
+import 'sales_target_bar.dart';
 import '../../data/services/device_call_sync_service.dart';
 import '../../data/services/pending_call_saves.dart';
 import '../../state/call_logs_provider.dart';
@@ -76,7 +79,13 @@ class _MainShellState extends State<MainShell> {
 
   String get _currentTitle => titleForPage(_currentIndex);
 
+  /// Sales agents only get these pages.
+  static const _salesPages = [Pg.leads, Pg.followUps];
+
+  bool get _isAgent => isSalesAgent(context.read<AuthProvider>().profile);
+
   void _goTo(int page) {
+    if (_isAgent && !_salesPages.contains(page)) return;
     setState(() {
       _currentIndex = page;
       _visited.add(page);
@@ -112,8 +121,9 @@ class _MainShellState extends State<MainShell> {
   static const _tabs = [Pg.home, Pg.leads, Pg.followUps, Pg.attendance];
 
   Future<void> _onBottomNavTapped(int index) async {
-    if (index < _tabs.length) {
-      _goTo(_tabs[index]);
+    final tabs = _isAgent ? _salesPages : _tabs;
+    if (index < tabs.length) {
+      _goTo(tabs[index]);
       return;
     }
     final page = await showMoreSheet(context, currentPage: _currentIndex);
@@ -123,7 +133,16 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final tabIndex = _tabs.indexOf(_currentIndex);
+    final isAgent = isSalesAgent(context.watch<AuthProvider>().profile);
+    if (isAgent && !_salesPages.contains(_currentIndex)) {
+      // Agents land on Leads, and the dashboard (or any other page) is never built for them.
+      _currentIndex = Pg.leads;
+      _visited
+        ..removeWhere((pg) => !_salesPages.contains(pg))
+        ..add(Pg.leads);
+    }
+    final tabs = isAgent ? _salesPages : _tabs;
+    final tabIndex = tabs.indexOf(_currentIndex);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -135,31 +154,44 @@ class _MainShellState extends State<MainShell> {
         selectedIndex: _currentIndex,
         onSelectTab: _goTo,
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: List.generate(
-          Pg.importHistory + 1,
-          (i) => _visited.contains(i) ? _buildPage(i) : const SizedBox.shrink(),
-        ),
+      body: Column(
+        children: [
+          if (isAgent) const SalesTargetBar(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: List.generate(
+                Pg.importHistory + 1,
+                (i) => _visited.contains(i) ? _buildPage(i) : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(border: Border(top: BorderSide(color: p.border))),
         child: NavigationBar(
           // A page reached from "More" highlights the More tab.
-          selectedIndex: tabIndex >= 0 ? tabIndex : _tabs.length,
+          selectedIndex: tabIndex >= 0 ? tabIndex : tabs.length,
           onDestinationSelected: _onBottomNavTapped,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),
-            NavigationDestination(icon: const Icon(LucideIcons.users), label: pageLabel(Pg.leads)),
-            NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: pageLabel(Pg.followUps)),
-            NavigationDestination(icon: const Icon(LucideIcons.calendarCheck2), label: pageLabel(Pg.attendance)),
-            NavigationDestination(icon: const Icon(LucideIcons.layoutGrid), label: tr('More', 'المزيد')),
-          ],
+          destinations: isAgent
+              ? [
+                  NavigationDestination(icon: const Icon(LucideIcons.users), label: pageLabel(Pg.leads)),
+                  NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: pageLabel(Pg.followUps)),
+                ]
+              : [
+                  NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),
+                  NavigationDestination(icon: const Icon(LucideIcons.users), label: pageLabel(Pg.leads)),
+                  NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: pageLabel(Pg.followUps)),
+                  NavigationDestination(icon: const Icon(LucideIcons.calendarCheck2), label: pageLabel(Pg.attendance)),
+                  NavigationDestination(icon: const Icon(LucideIcons.layoutGrid), label: tr('More', 'المزيد')),
+                ],
         ),
       ),
-      // Leads: add a lead. Follow-ups has its own "Add follow-up" button. Elsewhere: the AI assistant.
-      floatingActionButton: switch (_currentIndex) {
+      // Leads: add a lead. Follow-ups has its own "Add follow-up" button. Elsewhere: the AI assistant
+      // (not for sales agents, who only have Leads and Follow-ups).
+      floatingActionButton: isAgent && _currentIndex != Pg.leads ? null : switch (_currentIndex) {
         Pg.leads => FloatingActionButton(
             tooltip: tr('Add lead', 'عميل جديد'),
             child: const Icon(LucideIcons.plus),

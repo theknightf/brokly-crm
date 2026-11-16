@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../features/agent/agent_controller.dart';
-import '../../features/agent/agent_shell.dart';
-import '../../state/auth_provider.dart';
 import '../../features/assistant/assistant_chat_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/calculator/unit_calculator_screen.dart';
 import '../../features/leads/add_lead_screen.dart';
 import '../../features/leads/lead_detail_screen.dart';
 import '../../features/shell/main_shell.dart';
+import '../../state/auth_provider.dart';
+import '../utils/sales_role.dart';
 
 /// Global root navigator key for deep linking from push/in-app notifications
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -27,9 +26,9 @@ GoRouter buildRouter({required Listenable refreshListenable}) {
       if (!loggedIn && !onLogin) return '/login';
       if (loggedIn && onLogin) return '/home';
 
-      // Sales agents only have the two-tab agent app at /home. Any other route (deep link, notification,
-      // calculator, assistant, lead details…) sends them back there.
-      if (loggedIn && state.matchedLocation != '/home') {
+      // Sales agents only use Leads and Follow-ups (plus lead details / add lead): no calculator or assistant.
+      final loc = state.matchedLocation;
+      if (loggedIn && (loc == '/calculator' || loc == '/assistant')) {
         final profile = Provider.of<AuthProvider>(context, listen: false).profile;
         if (isSalesAgent(profile)) return '/home';
       }
@@ -42,15 +41,7 @@ GoRouter buildRouter({required Listenable refreshListenable}) {
       ),
       GoRoute(
         path: '/home',
-        builder: (context, state) => Consumer<AuthProvider>(
-          builder: (context, auth, _) {
-            // Wait for the role before choosing the app, so an agent never sees the full app for a moment.
-            if (auth.profile == null && auth.isLoading) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
-            }
-            return isSalesAgent(auth.profile) ? const AgentShell() : const MainShell();
-          },
-        ),
+        builder: (context, state) => const MainShell(),
       ),
       GoRoute(
         path: '/leads/:id',

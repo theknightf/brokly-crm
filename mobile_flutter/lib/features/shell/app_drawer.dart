@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/sales_role.dart';
 import '../../state/auth_provider.dart';
 import '../assistant/assistant_chat_screen.dart';
 import 'shell_destinations.dart';
@@ -21,6 +22,7 @@ class AppDrawer extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = context.watch<AuthProvider>();
     final profile = auth.profile;
+    final salesAgent = isSalesAgent(profile);
 
     return Drawer(
       backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
@@ -82,6 +84,20 @@ class AppDrawer extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                 children: [
+                  // Sales agents: only Leads and Follow-ups.
+                  if (salesAgent) ...[
+                    for (final e in drawerSections.expand((s) => s.entries).where((e) => e.page == Pg.leads || e.page == Pg.followUps))
+                      _buildDrawerItem(
+                        icon: e.icon,
+                        label: e.label,
+                        isSelected: selectedIndex == e.page,
+                        onTap: () {
+                          onSelectTab(e.page);
+                          Navigator.pop(context);
+                        },
+                        isDark: isDark,
+                      ),
+                  ] else ...[
                   _buildDrawerItem(
                     icon: LucideIcons.house,
                     label: 'Home',
@@ -119,6 +135,7 @@ class AppDrawer extends StatelessWidget {
                         ),
                       if (section.title == 'MANAGEMENT') ...[_buildCopilotItem(), _buildCalculatorItem(isDark)],
                     ],
+                  ],
                   ],
                 ],
               ),
