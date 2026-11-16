@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -20,20 +20,20 @@ class AgentOutcome {
   final String? stage;
   final IconData icon;
   final Color color;
-  final _FollowUpDefault followUp;
+  final FollowUpDefault followUp;
 
   const AgentOutcome(this.key, this.label, this.note, this.stage, this.icon, this.color, this.followUp);
 }
 
-enum _FollowUpDefault { none, retryToday, inOneHour, tomorrow }
+enum FollowUpDefault { none, retryToday, inOneHour, tomorrow }
 
 const agentOutcomes = <AgentOutcome>[
-  AgentOutcome('Interested', 'رد · مهتم', 'مهتم', 'Interested', LucideIcons.sparkles, Color(0xFF16A34A), _FollowUpDefault.tomorrow),
-  AgentOutcome('Not Interested', 'رد · مش مهتم', 'مش مهتم', 'Not Interested', LucideIcons.thumbsDown, Color(0xFFEF4444), _FollowUpDefault.none),
-  AgentOutcome('No Answer', 'مردّش', 'مردّش', 'No Answer', LucideIcons.phoneMissed, Color(0xFFF59E0B), _FollowUpDefault.retryToday),
-  AgentOutcome('Busy', 'مشغول', 'مشغول', null, LucideIcons.phoneOff, Color(0xFFF97316), _FollowUpDefault.retryToday),
-  AgentOutcome('Wrong Phone', 'رقم غلط', 'رقم غلط', 'Wrong Number', LucideIcons.ban, Color(0xFF64748B), _FollowUpDefault.none),
-  AgentOutcome('Follow-up', 'كلّمه بعدين', 'هنكلمه تاني', 'Following Up', LucideIcons.calendarClock, Color(0xFF3B82F6), _FollowUpDefault.inOneHour),
+  AgentOutcome('Interested', 'رد · مهتم', 'مهتم', 'Interested', LucideIcons.sparkles, Color(0xFF16A34A), FollowUpDefault.tomorrow),
+  AgentOutcome('Not Interested', 'رد · مش مهتم', 'مش مهتم', 'Not Interested', LucideIcons.thumbsDown, Color(0xFFEF4444), FollowUpDefault.none),
+  AgentOutcome('No Answer', 'مردّش', 'مردّش', 'No Answer', LucideIcons.phoneMissed, Color(0xFFF59E0B), FollowUpDefault.retryToday),
+  AgentOutcome('Busy', 'مشغول', 'مشغول', null, LucideIcons.phoneOff, Color(0xFFF97316), FollowUpDefault.retryToday),
+  AgentOutcome('Wrong Phone', 'رقم غلط', 'رقم غلط', 'Wrong Number', LucideIcons.ban, Color(0xFF64748B), FollowUpDefault.none),
+  AgentOutcome('Follow-up', 'كلّمه بعدين', 'هنكلمه تاني', 'Following Up', LucideIcons.calendarClock, Color(0xFF3B82F6), FollowUpDefault.inOneHour),
 ];
 
 /// Full-screen calling flow: one lead at a time → Call → outcome sheet → Save & Next.
@@ -328,18 +328,18 @@ class _OutcomeSheetState extends State<OutcomeSheet> {
       if (_note.text.trim().isEmpty || _note.text.trim() == prevNote) _note.text = o.note;
       final now = DateTime.now();
       switch (o.followUp) {
-        case _FollowUpDefault.none:
+        case FollowUpDefault.none:
           _followUp = null;
           _followUpLabel = '';
-        case _FollowUpDefault.retryToday:
+        case FollowUpDefault.retryToday:
           // Same-day retry in 2 hours; after 7 pm it moves to tomorrow morning.
           final t = now.add(const Duration(hours: 2));
           _followUp = t.hour >= 21 || t.day != now.day ? DateTime(now.year, now.month, now.day + 1, 11) : t;
           _followUpLabel = t.hour >= 21 || t.day != now.day ? 'بكرة 11 الصبح' : 'إعادة اتصال كمان ساعتين';
-        case _FollowUpDefault.inOneHour:
+        case FollowUpDefault.inOneHour:
           _followUp = now.add(const Duration(hours: 1));
           _followUpLabel = 'كمان ساعة';
-        case _FollowUpDefault.tomorrow:
+        case FollowUpDefault.tomorrow:
           _followUp = DateTime(now.year, now.month, now.day + 1, 11);
           _followUpLabel = 'بكرة 11 الصبح';
       }
