@@ -62,8 +62,8 @@ export async function POST(request: Request) {
     // Accumulate active seconds since the previous heartbeat.
     const lastHeartbeat = new Date(session.last_heartbeat_at);
     let diffSec = Math.floor((now.getTime() - lastHeartbeat.getTime()) / 1000);
-    // Cap at 2 minutes to avoid counting long periods of inactivity/sleep.
-    if (diffSec > 120) diffSec = 120;
+    // Cap at 5 minutes to avoid counting long periods of inactivity/sleep.
+    if (diffSec > 300) diffSec = 300;
     if (diffSec < 0) diffSec = 0;
     const newDuration = (session.duration_seconds || 0) + diffSec;
 

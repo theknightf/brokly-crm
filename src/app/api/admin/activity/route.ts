@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     const { data: daily, error: dailyErr } = await dailyQuery;
 
     // 4. Online status — active sessions with heartbeat in last 2 minutes
-    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const twoMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString(); // heartbeat every 2.5 min
     const { data: activeSessions } = await db
       .from('user_sessions')
       .select('user_id, last_heartbeat_at, duration_seconds, login_at')
