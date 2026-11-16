@@ -94,14 +94,25 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
               <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-sm tabular-nums ${rank===1?'bg-gradient-to-br from-amber-300 to-amber-500 text-white': rank===2?'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800': rank===3?'bg-gradient-to-br from-orange-300 to-orange-500 text-white':'bg-muted text-muted-foreground'}`}>{rank}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{r.full_name || 'User'}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  <span className="font-semibold text-foreground">{r.calls ?? 0}</span> calls / مكالمات · <span className="font-semibold text-foreground">{r.statusUpdates ?? 0}</span> status updates / تحديثات · <span className="text-emerald-500 font-semibold">{r.answered ?? 0} answered / تم الرد</span>
-                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">
+                    <span className="font-bold text-foreground tabular-nums">{r.calls ?? 0}</span> Calls
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400">
+                    <span className="font-bold tabular-nums">{r.answered ?? 0}</span> Answered
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">
+                    <span className="font-bold text-foreground tabular-nums">{r.statusUpdates ?? 0}</span> Stage updates
+                  </span>
+                </div>
                 <div className="mt-1.5 h-1 rounded-full bg-muted overflow-hidden" aria-hidden>
                   <div className="h-full rounded-full bg-lime-500" style={{ width: `${Math.round(((r.totalActions || 0) / topActions) * 100)}%` }} />
                 </div>
               </div>
-              <span title="Actions = notes written (calls and status updates are counted separately)" className="text-sm font-extrabold text-primary tabular-nums shrink-0">{(r.totalActions || 0).toLocaleString()} actions</span>
+              <span title="Actions = notes written (calls and status updates are counted separately)" className="shrink-0 flex flex-col items-end leading-none">
+                <span className="text-lg font-extrabold text-primary tabular-nums">{(r.totalActions || 0).toLocaleString()}</span>
+                <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Actions</span>
+              </span>
             </div>
             );
           })}
