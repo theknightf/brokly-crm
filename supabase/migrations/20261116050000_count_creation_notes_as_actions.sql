@@ -1,4 +1,4 @@
--- One-time adjustment (approved 2026-11-16): leads created by aya up to the end of 2026-11-16 (Cairo) count as actions.
+-- One-time adjustment (approved 2026-11-16): leads created by aya ON 2026-11-16 (Cairo) count as actions.
 -- Each such lead adds +1 to aya's `notes`, and therefore to total_actions (unless her profile counts actions from calls).
 -- Nobody else is affected, and leads created from 2026-11-17 on are not counted.
 -- (An earlier version of this migration counted creation-form notes for everyone; it was replaced before release,
@@ -59,14 +59,15 @@ AS $function$
     WHERE a.created_at >= win.s AND a.created_at < win.e AND a.user_id IS NOT NULL
     GROUP BY a.user_id
   ),
-  -- ONE-TIME ADJUSTMENT (approved 2026-11-16): every lead aya created up to the end of 2026-11-16 (Cairo) counts as
-  -- one action. Applies to aya only; leads created from 2026-11-17 on are not counted for anyone.
+  -- ONE-TIME ADJUSTMENT (approved 2026-11-16): every lead aya created on 2026-11-16 (Cairo) counts as
+  -- one action. Applies to aya only, that day only.
   created_notes AS (
     SELECT l.created_by AS user_id, count(*)::int AS n
     FROM public.leads l, win
     WHERE l.created_at >= win.s AND l.created_at < win.e
       AND l.created_by = '5e27ce5e-a6e0-40b7-9ed1-1dbdce984e53'::uuid  -- aya
-      AND l.created_at < ('2026-11-17'::timestamp AT TIME ZONE 'Africa/Cairo')
+      AND l.created_at >= ('2026-11-16'::timestamp AT TIME ZONE 'Africa/Cairo')
+      AND l.created_at <  ('2026-11-17'::timestamp AT TIME ZONE 'Africa/Cairo')
     GROUP BY l.created_by
   ),
   visits AS (
