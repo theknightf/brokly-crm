@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/models/attendance_model.dart';
 import '../data/services/attendance_service.dart';
+import '../core/realtime_pause.dart';
 
 class AttendanceProvider extends ChangeNotifier {
   final AttendanceService _service = AttendanceService();
@@ -38,6 +39,7 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   void _setupRealtime() {
+    RealtimePause.resumed.addListener(fetchToday);
     _subscription = _service.subscribeToChanges(() {
       fetchToday();
     });

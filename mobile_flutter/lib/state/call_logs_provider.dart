@@ -5,6 +5,7 @@ import '../core/utils/stage_note_guard.dart';
 import '../data/models/call_log_model.dart';
 import '../data/services/call_logs_service.dart';
 import '../data/services/supabase_service.dart';
+import '../core/realtime_pause.dart';
 
 class CallLogsProvider extends ChangeNotifier {
   final CallLogsService _service = CallLogsService();
@@ -30,6 +31,7 @@ class CallLogsProvider extends ChangeNotifier {
   Timer? _refetchTimer;
 
   Future<void> _setupRealtime() async {
+    RealtimePause.resumed.addListener(() => fetchCalls(silent: true));
     // Owners/admins watch all calls; everyone else only their own (far cheaper for the database).
     final admin = await StageNoteGuard.isAdmin();
     final uid = SupabaseService().currentUser?.id;

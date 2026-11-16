@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, RESUME_EVENT } from '@/lib/supabase/client';
 import dynamic from 'next/dynamic';
 import { SiteVisitSheet } from '@/components/mobile/SiteVisitSheet';
 import LeadsTable from './LeadsTable';
@@ -569,6 +569,13 @@ export default function LeadsManagementScreen({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, currentPage, pageSize, sortKey, sortDir, fetchLeads]);
+
+  // Back from a background tab whose realtime was paused: reload once.
+  useEffect(() => {
+    const onResume = () => fetchLeads();
+    window.addEventListener(RESUME_EVENT, onResume);
+    return () => window.removeEventListener(RESUME_EVENT, onResume);
+  }, [fetchLeads]);
 
   // Real-time two-way stage synchronization with Mobile App & other active sessions
   useEffect(() => {

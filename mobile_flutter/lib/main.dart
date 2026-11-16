@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'core/app.dart';
 import 'core/memory/memory_guard.dart';
+import 'core/realtime_pause.dart';
 import 'core/services/telephony_service.dart';
 import 'data/services/device_call_sync_service.dart';
 import 'data/services/pending_call_saves.dart';
@@ -16,6 +17,8 @@ Future<void> main() async {
 
   // Initialize Supabase client
   await SupabaseService.initialize();
+  // Realtime closes after a minute in the background and reopens on return (far less database work).
+  RealtimePause.init();
 
   // Initialize native telephony & live caller ID background service
   await TelephonyService().init();

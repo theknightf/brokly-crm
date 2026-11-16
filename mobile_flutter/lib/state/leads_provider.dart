@@ -9,6 +9,7 @@ import '../data/models/last_call_info.dart';
 import '../data/models/lead_model.dart';
 import '../data/services/leads_service.dart';
 import '../data/services/supabase_service.dart';
+import '../core/realtime_pause.dart';
 
 class LeadsProvider extends ChangeNotifier {
   final LeadsService _service = LeadsService();
@@ -191,9 +192,19 @@ class LeadsProvider extends ChangeNotifier {
     });
   }
 
+  bool _resumeHooked = false;
+  void _hookResume() {
+    if (_resumeHooked) return;
+    _resumeHooked = true;
+    RealtimePause.resumed.addListener(() {
+      if (_activeUserId != null) fetchLeads(silent: true);
+    });
+  }
+
   Future<void> _setupRealtime() async {
     try {
       _subscription?.unsubscribe();
+      _hookResume();
       // Owners/admins watch everything; everyone else only their own leads (much cheaper for the database).
       final admin = await StageNoteGuard.isAdmin();
       final uid = SupabaseService().currentUser?.id;

@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, CheckCheck, Loader2, UserPlus, AlarmClockOff, BellRing, MapPin, AlertTriangle, Wallet, Copy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, RESUME_EVENT } from '@/lib/supabase/client';
 import { isAdminRole } from '@/lib/roles';
 import { toast } from 'sonner';
 
@@ -371,6 +371,13 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (user) load();
+  }, [user, load]);
+
+  useEffect(() => {
+    if (!user) return;
+    const onResume = () => load();
+    window.addEventListener(RESUME_EVENT, onResume);
+    return () => window.removeEventListener(RESUME_EVENT, onResume);
   }, [user, load]);
 
   // Realtime refresh (graceful fallback to 30s polling when publication is off).

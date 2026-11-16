@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, RESUME_EVENT } from '@/lib/supabase/client';
 import { filtersToQuery, getJson } from './utils';
 import type {
   AssignedData,
@@ -152,7 +152,10 @@ export function useAnalyticsData(filters: FilterState, active: boolean) {
         else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setLive('offline');
         else setLive('connecting');
       });
+    const onResume = () => setRefreshKey((k) => k + 1);
+    window.addEventListener(RESUME_EVENT, onResume);
     return () => {
+      window.removeEventListener(RESUME_EVENT, onResume);
       window.clearTimeout(timer);
       void supabase.removeChannel(channel);
     };

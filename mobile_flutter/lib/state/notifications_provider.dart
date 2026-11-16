@@ -7,6 +7,7 @@ import '../core/services/local_push_notification_service.dart';
 import '../data/models/app_notification_model.dart';
 import '../data/services/notifications_service.dart';
 import '../data/services/supabase_service.dart';
+import '../core/realtime_pause.dart';
 
 class NotificationsProvider extends ChangeNotifier {
   final NotificationsService _service = NotificationsService();
@@ -85,9 +86,17 @@ class NotificationsProvider extends ChangeNotifier {
     });
   }
 
+  bool _resumeHooked = false;
+
   void _setupRealtime() {
     try {
       _channel?.unsubscribe();
+      if (!_resumeHooked) {
+        _resumeHooked = true;
+        RealtimePause.resumed.addListener(() {
+          if (_client.auth.currentUser != null) refresh();
+        });
+      }
       _channel = _service.subscribeToRealtimeAlerts(
         onEvent: (immediateAlert) {
           if (immediateAlert != null) {

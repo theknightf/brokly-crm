@@ -138,7 +138,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholde
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
 
 export function createClient() {
-  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY,
+  const client = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY,
     {
       global: { fetch: resilientFetch },
       cookies: {
@@ -167,4 +167,42 @@ export function createClient() {
       },
     }
   );
+  pauseRealtimeInBackground(client);
+  return client;
+}
+
+/** Fired on window when a tab comes back and its realtime connection had been paused. Screens reload on it. */
+export const RESUME_EVENT = 'brokly:realtime-resumed';
+
+let pauseInstalled = false;
+/**
+ * A tab left in the background keeps its realtime subscriptions open all day, and the database checks
+ * every change against each of them. After 60 s hidden the socket is closed; when the tab is shown again
+ * it reconnects (the channels rejoin by themselves) and RESUME_EVENT tells screens to reload once.
+ */
+function pauseRealtimeInBackground(client: any) {
+  if (pauseInstalled || typeof document === 'undefined' || !client?.realtime) return;
+  pauseInstalled = true;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let paused = false;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          client.realtime.disconnect();
+          paused = true;
+        } catch {}
+      }, 60_000);
+      return;
+    }
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (!paused) return;
+    paused = false;
+    try {
+      client.realtime.connect();
+    } catch {}
+    window.dispatchEvent(new Event(RESUME_EVENT));
+  });
 }

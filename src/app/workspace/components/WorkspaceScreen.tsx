@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { CalendarClock, Check, Circle, Filter, Loader2, RefreshCw, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { followUpsService } from '@/lib/services/crmService';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, RESUME_EVENT } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { followUpStatusClass } from '@/lib/ui';
@@ -161,9 +161,12 @@ export default function WorkspaceScreen() {
     } catch {
       // realtime unavailable — polling covers updates
     }
+    const onResume = () => fetchList(filters);
+    window.addEventListener(RESUME_EVENT, onResume);
     const poll = setInterval(() => fetchList(filters), 30000);
     return () => {
       clearInterval(poll);
+      window.removeEventListener(RESUME_EVENT, onResume);
       if (channel) client.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
