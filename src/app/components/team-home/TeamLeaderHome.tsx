@@ -12,6 +12,7 @@ import { KpiRow } from './KpiRow';
 import { FollowUpsPanel } from './FollowUpsPanel';
 import { TeamPanel } from './TeamPanel';
 import { RecentCalls } from './RecentCalls';
+import { TeamActions } from './TeamActions';
 import { PipelinePanel, SourcePanel } from './PipelinePanel';
 import { HomeContext, useDailyCallsTarget, useFollowUps, useHomeState, useStageCounts, useTeamStats } from './useHomeData';
 
@@ -65,6 +66,8 @@ export default function TeamLeaderHome() {
             />
           </div>
         </div>
+
+        {members.length > 0 && <TeamActions members={members} range={range} token={token} member={member} />}
 
         {members.length > 0 && (
           <RecentCalls

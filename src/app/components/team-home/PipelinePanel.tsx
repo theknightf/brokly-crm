@@ -28,7 +28,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, EmptyState, ErrorState, SectionHeader, Skeleton, useFmt } from './ui';
 import type { StageCounts } from './useHomeData';
 
-type Bucket = 'active' | 'lost' | 'unreached';
+export type Bucket = 'active' | 'lost' | 'unreached';
 
 const BUCKET_OF: Record<string, Bucket> = {
   'Not Interested': 'lost',
@@ -41,7 +41,7 @@ const BUCKET_OF: Record<string, Bucket> = {
   'No Answer At All': 'unreached',
 };
 // Every other stage (Fresh, Cold Calls, Following Up, Meeting, Interested, Reservation, Done Deal, Data Rotation…) is active.
-const bucketOf = (stage: string): Bucket => BUCKET_OF[stage] || 'active';
+export const bucketOf = (stage: string): Bucket => BUCKET_OF[stage] || 'active';
 
 /** Order stages appear in within their bucket when counts tie, matching the leads screen. */
 const STAGES = [
@@ -73,7 +73,7 @@ const ICON: Record<string, LucideIcon> = {
   'No Answer At All': PhoneMissed,
 };
 
-const TONE: Record<Bucket, { bar: string; text: string; dot: string }> = {
+export const TONE: Record<Bucket, { bar: string; text: string; dot: string }> = {
   active: { bar: 'bg-lime-500', text: 'text-lime-600 dark:text-lime-400', dot: 'bg-lime-500' },
   lost: { bar: 'bg-red-400', text: 'text-red-500 dark:text-red-400', dot: 'bg-red-400' },
   unreached: { bar: 'bg-zinc-400', text: 'text-zinc-500 dark:text-zinc-400', dot: 'bg-zinc-400' },
