@@ -27,6 +27,7 @@ import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
 import CalledBadge from './CalledBadge';
+import DuplicateAttemptsBadge from './DuplicateAttemptsBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import StageMenuList from './StageMenuList';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
@@ -244,6 +245,7 @@ function MobileLeadCardInner({
                   {t('leads.duplicate')}
                 </span>
               )}
+              <DuplicateAttemptsBadge lead={lead} />
             </span>
             {lead.name?.trim() && lead.phone && (
               <span className="mt-0.5 block truncate text-xs tabular-nums text-muted-foreground" dir="ltr">

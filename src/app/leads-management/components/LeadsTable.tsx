@@ -30,6 +30,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { LeadQuickActions } from '@/components/mobile/LeadQuickActions';
 import MobileLeadCard from './MobileLeadCard';
+import DuplicateAttemptsBadge from './DuplicateAttemptsBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import StageMenuList from './StageMenuList';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -348,6 +349,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
               >
                 {title}
               </a>
+              <DuplicateAttemptsBadge lead={lead} />
               {shortId && (
                 <button
                   type="button"
