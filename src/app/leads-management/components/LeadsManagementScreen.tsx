@@ -1313,8 +1313,13 @@ export default function LeadsManagementScreen({
       return true;
     } catch (err: any) {
       if (err?.code === 'DUPLICATE_LEAD') {
-        // Deliberately generic: never reveal who owns the original lead.
-        toast.info('This lead already exists');
+        // Not added: the phone already exists. The owner of the original lead / admins get the details;
+        // anyone else only learns that it exists (never who owns it).
+        if (err.existing) {
+          setDupNotice({ added: { name: lead.name, phone: lead.phone }, newLeadId: '', existing: err.existing });
+        } else {
+          toast.info('This lead already exists — it was not added again. العميل ده موجود قبل كده.');
+        }
         return false;
       }
       toast.error(err?.message || 'Failed to add lead');
@@ -2010,15 +2015,14 @@ export default function LeadsManagementScreen({
         open={!!dupNotice}
         onClose={() => setDupNotice(null)}
         title="This lead already exists"
-        subtitle="العميل ده موجود قبل كده — اتسجل في المكررات"
+        subtitle="العميل ده موجود قبل كده — ما اتضافش، واتسجل في المكررات"
         size="md"
       >
         {dupNotice && (
           <div className="space-y-4 p-6">
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
               <p className="font-semibold text-amber-800 dark:text-amber-200">
-                <span dir="auto">{dupNotice.added.name || 'The lead'}</span> (<span className="font-mono" dir="ltr">{dupNotice.added.phone}</span>) was saved as a
-                duplicate and moved to <b>Duplicate Leads</b>.
+                <span dir="auto">{dupNotice.added.name || 'The lead'}</span> (<span className="font-mono" dir="ltr">{dupNotice.added.phone}</span>) was <b>not added</b> — the phone already exists. The attempt is saved in <b>Duplicates</b> for admins.
               </p>
             </div>
             <div className="rounded-xl border border-border p-4 text-sm">

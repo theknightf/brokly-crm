@@ -11,6 +11,7 @@ import '../../core/utils/tr.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../core/widgets/premium.dart';
 import '../../data/models/lead_model.dart';
+import '../../data/services/leads_service.dart' show DuplicateLeadException;
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/supabase_service.dart';
 import '../../data/services/users_service.dart';
@@ -225,11 +226,46 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
       if (!mounted) return;
       showAppSnack(context, tr('Lead "$resolvedName" added', 'اتضاف "$resolvedName"'));
       Navigator.pop(context);
+    } on DuplicateLeadException catch (d) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      await _showDuplicate(d.existing, resolvedName, fullPhone);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       showAppSnack(context, e.toString().replaceAll('Exception: ', ''), error: true);
     }
+  }
+
+  /// The phone already exists: nothing was added. Owner/admin see which lead it matched.
+  Future<void> _showDuplicate(Map<String, dynamic>? existing, String name, String phone) {
+    final t = Theme.of(context).textTheme;
+    Widget row(String label, String? value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(width: 90, child: Text(label, style: t.bodySmall)),
+            Expanded(child: Text((value ?? '').isEmpty ? '—' : value!, style: t.titleSmall)),
+          ]),
+        );
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('This lead already exists', 'العميل ده موجود قبل كده')),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('$name ($phone) was not added. The attempt was saved for the admins.',
+              '$name ($phone) ما اتضافش. المحاولة اتسجلت للإدارة.')),
+          if (existing != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            row(tr('Lead', 'العميل'), existing['name']?.toString()),
+            row(tr('Phone', 'الرقم'), existing['phone']?.toString()),
+            row(tr('Owner', 'المسؤول'), existing['owner']?.toString()),
+            row(tr('Stage', 'المرحلة'), existing['stage']?.toString()),
+            row(tr('Added on', 'اتضاف'), existing['addedOn']?.toString()),
+          ],
+        ]),
+        actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('OK', 'تمام')))],
+      ),
+    );
   }
 
   // ── Pickers ────────────────────────────────────────────────────────

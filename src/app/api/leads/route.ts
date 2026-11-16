@@ -58,6 +58,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
   const { data: visible } = await db.from('leads').select().eq('id', row.id).maybeSingle();
+  if (!visible) {
+    // The database's duplicate gate stored it in duplicate_leads instead of inserting it.
+    const { data: info } = await db.rpc('lead_duplicate_info', { p_lead_id: row.id });
+    if (info?.duplicate) {
+      return NextResponse.json(
+        { error: 'This lead already exists', code: 'DUPLICATE_LEAD', existing: info.existing || null },
+        { status: 409 }
+      );
+    }
+  }
   const data = visible || { ...row, created_at: new Date().toISOString() };
 
   return NextResponse.json({ lead: data, message: 'Lead created' }, { status: 201 });

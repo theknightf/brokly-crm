@@ -115,6 +115,18 @@ class LeadsService {
 
     await _client.from('leads').insert(row);
     final visible = await _client.from('leads').select().eq('id', row['id']).maybeSingle();
+    if (visible == null) {
+      // The database's duplicate gate stores a lead whose phone already exists in duplicate_leads
+      // instead of inserting it. Details only come back for the original's owner and admins.
+      try {
+        final info = await _client.rpc('lead_duplicate_info', params: {'p_lead_id': row['id']});
+        if (info is Map && info['duplicate'] == true) {
+          throw DuplicateLeadException(info['existing'] is Map ? Map<String, dynamic>.from(info['existing'] as Map) : null);
+        }
+      } on DuplicateLeadException {
+        rethrow;
+      } catch (_) {}
+    }
     return LeadModel.fromJson(visible ??
         {...row, 'created_at': DateTime.now().toUtc().toIso8601String()});
   }
@@ -218,4 +230,14 @@ class LeadsService {
         )
         .subscribe();
   }
+}
+
+/// Thrown by [LeadsService.create] when the phone already exists: the lead was not added and the
+/// attempt was stored for admins. [existing] is only filled for
+/// admins/managers (name, phone, stage, owner, addedOn, id).
+class DuplicateLeadException implements Exception {
+  final Map<String, dynamic>? existing;
+  DuplicateLeadException(this.existing);
+  @override
+  String toString() => 'This lead already exists';
 }

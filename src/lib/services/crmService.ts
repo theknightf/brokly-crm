@@ -356,9 +356,12 @@ async function guardClaim(supabase: any, leadIds: string[], targetUserIds: strin
 /** Thrown when the server reports that the lead already exists (see duplicate_leads). */
 export class DuplicateLeadError extends Error {
   code = 'DUPLICATE_LEAD' as const;
-  constructor() {
+  /** The existing lead it matched — only filled for its owner and admins/managers. */
+  existing: { id: string; name: string; phone: string; stage: string; owner: string; addedOn: string } | null;
+  constructor(existing: DuplicateLeadError['existing'] = null) {
     super('This lead already exists');
     this.name = 'DuplicateLeadError';
+    this.existing = existing;
   }
 }
 
@@ -809,7 +812,11 @@ export const leadsService = {
       .eq('id', rowPayload.id)
       .maybeSingle();
     if (!visible) {
-      // Hidden duplicate: show the normal "added" result and skip side effects (assignees, follow-ups).
+      // The database's duplicate gate stores a lead whose phone already exists in duplicate_leads
+      // instead of inserting it. Ask whether that happened (details only for the owner/admins).
+      const { data: info } = await supabase.rpc('lead_duplicate_info', { p_lead_id: rowPayload.id });
+      if (info?.duplicate) throw new DuplicateLeadError(info.existing || null);
+      // Otherwise it was saved but this user cannot read it back: show the normal "added" result.
       return rowToLead({ ...rowPayload, created_at: new Date().toISOString() });
     }
     const data: any = visible;

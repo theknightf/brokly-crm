@@ -497,10 +497,26 @@ export async function POST(request: Request) {
       const db: any = sUrl && sKey ? createServiceClient(sUrl, sKey) : supabase;
       const flagged: any[] = [];
       for (let i = 0; i < insertedIds.length; i += 200) {
+        const slice = insertedIds.slice(i, i + 200);
+        // New model: the database's duplicate gate does not insert the row; it stores it in
+        // duplicate_leads (attempted_data.id = the id we sent).
+        const { data: gated } = await db
+          .from('duplicate_leads')
+          .select('original_lead_id, attempted_data')
+          .in('attempted_data->>id', slice);
+        for (const g of gated || []) {
+          flagged.push({
+            id: g.attempted_data?.id,
+            name: g.attempted_data?.name || '',
+            phone: g.attempted_data?.phone || '',
+            duplicate_of_lead_id: g.original_lead_id,
+          });
+        }
+        // Legacy model (rows inserted and flagged), kept while old triggers may still run.
         const { data } = await db
           .from('leads')
           .select('id, name, phone, duplicate_of_lead_id')
-          .in('id', insertedIds.slice(i, i + 200))
+          .in('id', slice)
           .eq('is_duplicate', true);
         flagged.push(...(data || []));
       }
