@@ -3,7 +3,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import AppLayout from '@/components/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { isAdminRole } from '@/lib/roles';
+import { isAdminRole, TEAM_LEAD_ROLE } from '@/lib/roles';
 
 const DashboardHeader = dynamic(() => import('./components/DashboardHeader'));
 const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
@@ -57,6 +57,7 @@ export default function DashboardPage() {
   const { profile, loading, user } = useAuth();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [tab, setTab] = React.useState<'team' | 'mine'>('team');
   const refresh = () => {
     setRefreshing(true);
     setRefreshKey((k) => k + 1);
@@ -84,6 +85,9 @@ export default function DashboardPage() {
     );
   }
 
+  const roleKey = String(profile?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const isTeamLeader = roleKey === TEAM_LEAD_ROLE || roleKey === 'team_lead';
+
   // Sales-user home: KPIs first, then today's work (follow-ups/calls + attendance), targets,
   // pipeline stages, leaderboard, charts and activity. Refresh remounts the data sections.
   return (
@@ -91,8 +95,31 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         <DashboardHeader onRefresh={refresh} refreshing={refreshing} />
 
-        {/* Team leaders only: renders nothing for everyone else (the database returns no team members). */}
-        <TeamOverview key={`team-${refreshKey}`} />
+        {isTeamLeader && (
+          <div role="tablist" aria-label="Dashboard view" className="flex w-full rounded-xl bg-black/[0.04] p-1 dark:bg-white/[0.06] sm:w-fit">
+            {([['team', 'My Team / فريقي'], ['mine', 'My Work / شغلي']] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={tab === k}
+                onClick={() => setTab(k)}
+                className={`h-9 flex-1 rounded-lg px-5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 sm:flex-none ${
+                  tab === k
+                    ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isTeamLeader && tab === 'team' ? (
+          <TeamOverview key={`team-${refreshKey}`} showEmpty />
+        ) : (
+        <>
 
         <Section title="Today" hint="Check in and work your follow-ups">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -131,6 +158,8 @@ export default function DashboardPage() {
             <GettingStarted />
           </div>
         </Section>
+        </>
+        )}
       </div>
     </AppLayout>
   );
