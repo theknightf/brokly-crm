@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import { useActivityTracker } from '@/hooks/useActivityTracker';
 import { normalizeAuthError } from '@/lib/authErrors';
 
 const AuthContext = createContext<any>({});
@@ -57,7 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   userRef.current = user;
 
   // Activity tracking — automatically tracks login/session/heartbeat/logout
-  useActivityTracker(user?.id || null);
+  // Online/session time tracking (user_sessions, user_activity_log, refresh_daily_activity) is switched off: not used, and it wrote to the database every few minutes for every open tab.
 
   // Sign-out that can never hang: every network step has a short timeout, and the browser state is
   // always wiped and the page hard-navigated to the login screen in `finally`.
