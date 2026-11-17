@@ -18,7 +18,10 @@ import '../leads/widgets/quick_note_dialog.dart';
 /// Swipe right = done (with undo), swipe left = reschedule, long-press = more. "Add follow-up" is always visible.
 /// Source of truth is the lead's `follow_up_due` (same rule as the website).
 class FollowUpsScreen extends StatefulWidget {
-  const FollowUpsScreen({super.key});
+  /// Sales agents: only two filters, Overdue and Today (no Upcoming / All, no extra filter pills).
+  final bool overdueTodayOnly;
+
+  const FollowUpsScreen({super.key, this.overdueTodayOnly = false});
 
   @override
   State<FollowUpsScreen> createState() => _FollowUpsScreenState();
@@ -229,7 +232,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
           ? _Bucket.overdue
           : counts[_Bucket.today]! > 0
               ? _Bucket.today
-              : _Bucket.upcoming;
+              : (widget.overdueTodayOnly ? _Bucket.today : _Bucket.upcoming);
     }
 
     final shown = withDue.where((l) => (_bucket == _Bucket.all || _bucketOf(l, today) == _bucket) && _matches(l)).toList();
@@ -278,7 +281,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
           const SizedBox(height: AppSpacing.md),
           // Groups: Overdue / Today / Upcoming / All
           FilterChipRow<_Bucket>(
-            options: _Bucket.values,
+            options: widget.overdueTodayOnly ? const [_Bucket.overdue, _Bucket.today] : _Bucket.values,
             selected: _bucket,
             labelOf: _bucketLabel,
             countOf: (b) => counts[b],
@@ -289,7 +292,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
           ),
           const SizedBox(height: AppSpacing.sm),
           // Simple filters
-          SizedBox(
+          if (!widget.overdueTodayOnly) SizedBox(
             height: 40,
             child: ListView(
               scrollDirection: Axis.horizontal,
@@ -406,13 +409,23 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
         }),
       );
     }
-    if (othersHaveItems) {
+    if (othersHaveItems && !widget.overdueTodayOnly) {
       return EmptyState(
         icon: LucideIcons.calendarCheck,
         title: _bucket == _Bucket.overdue ? tr('Nothing overdue 👏', 'مفيش متأخرات 👏') : tr('Nothing here', 'مفيش حاجة هنا'),
         message: tr('Other groups still have follow-ups.', 'لسه فيه متابعات في مجموعات تانية.'),
         actionLabel: tr('Show all', 'اعرض الكل'),
         onAction: () => setState(() => _bucket = _Bucket.all),
+      );
+    }
+    if (othersHaveItems && widget.overdueTodayOnly) {
+      final other = _bucket == _Bucket.overdue ? _Bucket.today : _Bucket.overdue;
+      return EmptyState(
+        icon: LucideIcons.calendarCheck,
+        title: _bucket == _Bucket.overdue ? tr('Nothing overdue 👏', 'مفيش متأخرات 👏') : tr('Nothing for today', 'مفيش حاجة النهارده'),
+        message: tr('Your other follow-ups are scheduled for later.', 'باقي متابعاتك متحددة بعدين.'),
+        actionLabel: _bucketLabel(other),
+        onAction: () => setState(() => _bucket = other),
       );
     }
     return EmptyState(

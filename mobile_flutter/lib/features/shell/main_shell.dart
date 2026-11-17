@@ -8,7 +8,9 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/sales_role.dart';
 import '../../core/utils/tr.dart';
 import '../../state/auth_provider.dart';
+import 'sales_home_screen.dart';
 import 'sales_target_bar.dart';
+import '../follow_ups/follow_ups_screen.dart';
 import '../../data/services/device_call_sync_service.dart';
 import '../../data/services/pending_call_saves.dart';
 import '../../state/call_logs_provider.dart';
@@ -80,7 +82,7 @@ class _MainShellState extends State<MainShell> {
   String get _currentTitle => titleForPage(_currentIndex);
 
   /// Sales agents only get these pages.
-  static const _salesPages = [Pg.leads, Pg.followUps];
+  static const _salesPages = [Pg.home, Pg.leads, Pg.followUps];
 
   bool get _isAgent => isSalesAgent(context.read<AuthProvider>().profile);
 
@@ -99,10 +101,23 @@ class _MainShellState extends State<MainShell> {
     _goTo(Pg.leads);
   }
 
-  Widget _buildPage(int page) {
+  Widget _buildPage(int page, {required bool isAgent}) {
     switch (page) {
       case Pg.home:
+        if (isAgent) {
+          return SalesHomeScreen(
+            onOpenLeads: () {
+              context.read<LeadsProvider>().setStatusFilter(''); // the Leads button shows all leads
+              _goTo(Pg.leads);
+            },
+            onOpenFollowUps: () => _goTo(Pg.followUps),
+            onOpenStage: (stage) => _openLeads(stage: stage),
+          );
+        }
         return DashboardScreen(onNavigateTab: _goTo);
+      case Pg.followUps:
+        // Sales agents: only the Overdue and Today filters.
+        return FollowUpsScreen(overdueTodayOnly: isAgent);
       case Pg.attendance:
         return const AttendanceScreen();
       case Pg.reports:
@@ -135,11 +150,11 @@ class _MainShellState extends State<MainShell> {
     final p = context.palette;
     final isAgent = isSalesAgent(context.watch<AuthProvider>().profile);
     if (isAgent && !_salesPages.contains(_currentIndex)) {
-      // Agents land on Leads, and the dashboard (or any other page) is never built for them.
-      _currentIndex = Pg.leads;
+      // Agents land on their home page; the full dashboard (or any other page) is never built for them.
+      _currentIndex = Pg.home;
       _visited
         ..removeWhere((pg) => !_salesPages.contains(pg))
-        ..add(Pg.leads);
+        ..add(Pg.home);
     }
     final tabs = isAgent ? _salesPages : _tabs;
     final tabIndex = tabs.indexOf(_currentIndex);
@@ -162,7 +177,7 @@ class _MainShellState extends State<MainShell> {
               index: _currentIndex,
               children: List.generate(
                 Pg.importHistory + 1,
-                (i) => _visited.contains(i) ? _buildPage(i) : const SizedBox.shrink(),
+                (i) => _visited.contains(i) ? _buildPage(i, isAgent: isAgent) : const SizedBox.shrink(),
               ),
             ),
           ),
@@ -177,6 +192,7 @@ class _MainShellState extends State<MainShell> {
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: isAgent
               ? [
+                  NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),
                   NavigationDestination(icon: const Icon(LucideIcons.users), label: pageLabel(Pg.leads)),
                   NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: pageLabel(Pg.followUps)),
                 ]
