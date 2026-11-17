@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { Trophy } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Row {
   user_id: string;
@@ -19,7 +20,11 @@ interface Row {
 // for the first hours after midnight in Cairo.
 const localToday = () => new Date().toLocaleDateString('en-CA');
 
-export default function DailyLeaderboard({ date }: { date?: string }) {
+export default function DailyLeaderboard({ date, variant = 'default' }: { date?: string; variant?: 'default' | 'agent' }) {
+  // variant="agent": i18n copy + clearer empty state on the sales-agent dashboard. Default is unchanged.
+  const agent = variant === 'agent';
+  const { t } = useLanguage();
+  const L = (key: string, fallback: string) => (agent ? t(key) : fallback);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -65,7 +70,7 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
       <div className="p-4 border-b border-border flex items-center justify-between gap-2">
         <h2 className="font-bold flex items-center gap-2 text-foreground">
           <span className="dash-icon-chip bg-amber-500/10 text-amber-500"><Trophy size={16} aria-hidden /></span>
-          Daily Leaderboard
+          {L('agent.lb.title', 'Daily Leaderboard')}
         </h2>
         <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} className="input-base !w-auto h-9 text-xs px-3 [@media(pointer:coarse)]:h-11" aria-label="Leaderboard date" />
       </div>
@@ -79,11 +84,11 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
           ))}
         </div>
       ) : error ? (
-        <p className="flex-1 flex items-center justify-center text-sm text-muted-foreground py-10 px-4 text-center">Couldn’t load the leaderboard. Pick the date again to retry.</p>
+        <p className="flex-1 flex items-center justify-center text-sm text-muted-foreground py-10 px-4 text-center">{L('agent.lb.error', 'Couldn’t load the leaderboard. Pick the date again to retry.')}</p>
       ) : active.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-2 py-10 px-4 text-center text-muted-foreground">
+        <div className={`flex-1 flex flex-col items-center justify-center gap-2 ${agent ? 'min-h-[96px] py-4' : 'py-10'} px-4 text-center text-muted-foreground`}>
           <span className="dash-icon-chip bg-muted"><Trophy size={16} aria-hidden /></span>
-          <p className="text-sm">No activity recorded for this date</p>
+          <p className="text-sm">{L('agent.lb.empty', 'No activity recorded for this date')}</p>
         </div>
       ) : (
         <div className="divide-y divide-border flex-1">
@@ -96,13 +101,13 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
                 <p className="text-sm font-semibold text-foreground truncate">{r.full_name || 'User'}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
                   <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">
-                    <span className="font-bold text-foreground tabular-nums">{r.calls ?? 0}</span> Calls
+                    <span className="font-bold text-foreground tabular-nums">{r.calls ?? 0}</span> {L('agent.lb.calls', 'Calls')}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400">
-                    <span className="font-bold tabular-nums">{r.answered ?? 0}</span> Answered
+                    <span className="font-bold tabular-nums">{r.answered ?? 0}</span> {L('agent.lb.answered', 'Answered')}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">
-                    <span className="font-bold text-foreground tabular-nums">{r.statusUpdates ?? 0}</span> Stage updates
+                    <span className="font-bold text-foreground tabular-nums">{r.statusUpdates ?? 0}</span> {L('agent.lb.updates', 'Stage updates')}
                   </span>
                 </div>
                 <div className="mt-1.5 h-1 rounded-full bg-muted overflow-hidden" aria-hidden>
@@ -111,14 +116,16 @@ export default function DailyLeaderboard({ date }: { date?: string }) {
               </div>
               <span title="Actions = notes written (calls and status updates are counted separately)" className="shrink-0 flex flex-col items-end leading-none">
                 <span className="text-lg font-extrabold text-primary tabular-nums">{(r.totalActions || 0).toLocaleString()}</span>
-                <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Actions</span>
+                <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{L('agent.lb.actions', 'Actions')}</span>
               </span>
             </div>
             );
           })}
         </div>
       )}
-      <p className="text-xs text-center text-muted-foreground py-2.5 border-t border-border">Resets daily at 00:00 (Cairo time)</p>
+      {!(agent && !loading && !error && active.length === 0) && (
+      <p className="text-xs text-center text-muted-foreground py-2.5 border-t border-border">{L('agent.lb.footer', 'Resets daily at 00:00 (Cairo time)')}</p>
+      )}
     </div>
   );
 }

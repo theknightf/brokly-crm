@@ -20,6 +20,7 @@ import { QuickNoteSheet } from '@/components/mobile/QuickNoteSheet';
 import { useCallOutcome, CallChannel } from '@/components/mobile/CallOutcomeSheet';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { toast } from 'sonner';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export interface FollowUpItem {
   id: string;
@@ -103,7 +104,24 @@ function waLink(phone: string, name?: string): string {
   return getWhatsAppLinkForLead(phone, name);
 }
 
-export default function SalesFollowUpsWidget() {
+export default function SalesFollowUpsWidget({ variant = 'default' }: { variant?: 'default' | 'agent' } = {}) {
+  // variant="agent": sales-agent dashboard copy (i18n), All tab on mobile, highlighted Overdue tab, compact empty state.
+  // Without it the widget renders exactly as before (team leader "My Work" view).
+  const agent = variant === 'agent';
+  const { t, lang } = useLanguage();
+  // Localized due label for the agent view ("Today · 3:00 PM" / "النهارده · 3:00 م").
+  const agentWhen = (dateStr: string, timeStr?: string) => {
+    const loc = lang === 'ar' ? 'ar-EG' : 'en-US';
+    const d = new Date(`${dateStr}T00:00:00`);
+    const day = dateStr === todayStr() ? t('agent.fu.today') : Number.isNaN(d.getTime()) ? dateStr : d.toLocaleDateString(loc, { month: 'short', day: 'numeric' });
+    if (!timeStr || !timeStr.includes(':')) return day;
+    const [h, m] = timeStr.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return day;
+    const at = new Date();
+    at.setHours(h, m, 0, 0);
+    return `${day} · ${at.toLocaleTimeString(loc, { hour: 'numeric', minute: '2-digit' })}`;
+  };
+  const L = (key: string, fallback: string, vars?: Record<string, string | number>) => (agent ? t(key, vars) : fallback);
   const [activeTab, setActiveTab] = useState<TabKey>('today');
   const [allFollowUps, setAllFollowUps] = useState<FollowUpItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,17 +219,17 @@ export default function SalesFollowUpsWidget() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-foreground leading-tight">
-                Scheduled Follow-ups
+                {L('agent.fu.title', 'Scheduled Follow-ups')}
               </h2>
               {counts.overdue > 0 && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 animate-pulse">
                   <AlertTriangle size={10} />
-                  {counts.overdue} overdue
+                  {L('agent.fu.overdueBadge', `${counts.overdue} overdue`, { n: counts.overdue })}
                 </span>
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Live pipeline queue synchronized with your lead activities
+              {L('agent.fu.subtitle', 'Live pipeline queue synchronized with your lead activities')}
             </p>
           </div>
         </div>
@@ -220,7 +238,7 @@ export default function SalesFollowUpsWidget() {
           href={`/follow-ups?tab=${activeTab === 'all' ? 'today' : activeTab}`}
           className="text-xs font-semibold text-primary hover:text-primary/80 flex items-center gap-1 group py-1"
         >
-          <span>See all follow-ups</span>
+          <span>{L('agent.fu.seeAll', 'See all follow-ups')}</span>
           <ArrowUpRight
             size={13}
             className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
@@ -233,14 +251,14 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('today')}
-          className={`flex-1 min-w-[100px] min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex-1 ${agent ? 'min-w-0' : 'min-w-[100px]'} min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'today'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Clock size={13} />
-          <span>Today</span>
+          <span>{L('agent.fu.today', 'Today')}</span>
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
               activeTab === 'today'
@@ -255,14 +273,16 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('overdue')}
-          className={`flex-1 min-w-[100px] min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex-1 ${agent ? 'min-w-0' : 'min-w-[100px]'} min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'overdue'
               ? 'bg-card text-foreground shadow-sm'
+              : agent && counts.overdue > 0
+              ? 'text-red-600 dark:text-red-400 ring-1 ring-red-500/40 bg-red-500/5'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <AlertTriangle size={13} className={counts.overdue > 0 ? 'text-red-500' : ''} />
-          <span>Overdue</span>
+          <span>{L('agent.fu.overdue', 'Overdue')}</span>
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
               counts.overdue > 0
@@ -277,14 +297,14 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('upcoming')}
-          className={`flex-1 min-w-[100px] min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex-1 ${agent ? 'min-w-0' : 'min-w-[100px]'} min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'upcoming'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <Calendar size={13} />
-          <span>Upcoming</span>
+          <span>{L('agent.fu.upcoming', 'Upcoming')}</span>
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
               activeTab === 'upcoming'
@@ -299,13 +319,13 @@ export default function SalesFollowUpsWidget() {
         <button
           type="button"
           onClick={() => setActiveTab('all')}
-          className={`hidden sm:flex flex-1 min-w-[80px] min-h-[44px] items-center justify-center gap-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+          className={`${agent ? 'flex' : 'hidden sm:flex'} flex-1 min-w-[80px] min-h-[44px] items-center justify-center gap-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'all'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <span>All Active</span>
+          <span>{L('agent.fu.all', 'All Active')}</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-muted text-muted-foreground">
             {counts.all}
           </span>
@@ -316,6 +336,19 @@ export default function SalesFollowUpsWidget() {
       {loading ? (
         <div className="flex items-center justify-center h-36">
           <Loader2 size={24} className="animate-spin text-primary" />
+        </div>
+      ) : currentList.length === 0 && agent ? (
+        <div className="flex min-h-[88px] flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-4 text-center">
+          <p className="text-sm font-semibold text-foreground">
+            {activeTab === 'today'
+              ? t('agent.fu.emptyTodayTitle')
+              : activeTab === 'overdue'
+              ? t('agent.fu.emptyOverdue')
+              : activeTab === 'upcoming'
+              ? t('agent.fu.emptyUpcoming')
+              : t('agent.fu.emptyAll')}
+          </p>
+          {activeTab === 'today' && <p className="text-xs text-muted-foreground">{t('agent.fu.emptyTodayBody')}</p>}
         </div>
       ) : currentList.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 px-4 text-center rounded-xl border border-dashed border-border bg-muted/20">
@@ -394,7 +427,7 @@ export default function SalesFollowUpsWidget() {
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${due.cls}`}
                     >
                       {due.isOverdue && <AlertTriangle size={9} />}
-                      {formatDisplayDate(item.dueDate, item.dueTime)}
+                      {agent ? agentWhen(item.dueDate, item.dueTime) : formatDisplayDate(item.dueDate, item.dueTime)}
                     </span>
                   </div>
 
@@ -424,7 +457,7 @@ export default function SalesFollowUpsWidget() {
                           target="_blank"
                           rel="noreferrer"
                           onClick={() => armCall(item, 'WhatsApp')}
-                          className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white active:scale-90 transition-all"
+                          className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white active:scale-90 transition-all ${agent ? 'flex items-center justify-center dark:bg-emerald-500/15 dark:text-emerald-400' : ''}`}
                           title="Message on WhatsApp"
                           aria-label="Message on WhatsApp"
                         >
@@ -439,7 +472,7 @@ export default function SalesFollowUpsWidget() {
                       title="Add note"
                     >
                       <StickyNote size={12} />
-                      <span className="hidden sm:inline">Note</span>
+                      <span className="hidden sm:inline">{L('agent.fu.note', 'Note')}</span>
                     </button>
                   </div>
 
@@ -454,7 +487,7 @@ export default function SalesFollowUpsWidget() {
                     ) : (
                       <CheckCircle2 size={12} />
                     )}
-                    <span>Done</span>
+                    <span>{L('agent.fu.done', 'Done')}</span>
                   </button>
                 </div>
               </div>

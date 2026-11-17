@@ -11,6 +11,7 @@ import {
   Cell,
 } from 'recharts';
 import { reportsService } from '@/lib/services/crmService';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const sourceColors = [
   '#6366F1',
@@ -43,7 +44,11 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
   );
 }
 
-export default function LeadSourceChart() {
+export default function LeadSourceChart({ variant = 'default' }: { variant?: 'default' | 'agent' } = {}) {
+  // variant="agent": sans heading + i18n copy on the sales-agent dashboard. Default is unchanged.
+  const agent = variant === 'agent';
+  const { t } = useLanguage();
+  const L = (key: string, fallback: string) => (agent ? t(key) : fallback);
   const [data, setData] = useState<{ source: string; count: number; pct: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -67,16 +72,16 @@ export default function LeadSourceChart() {
   return (
     <div className="card-base h-full">
       <div className="mb-5">
-        <h2 className="section-header">Leads by Source</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Where your leads come from</p>
+        <h2 className={agent ? 'text-base font-semibold text-foreground' : 'section-header'}>{L('agent.src.title', 'Leads by Source')}</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">{L('agent.src.subtitle', 'Where your leads come from')}</p>
       </div>
       {loading ? (
         <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
-          Loading…
+          {L('common.loading', 'Loading…')}
         </div>
       ) : data.length === 0 ? (
         <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
-          No data yet
+          {L('agent.chart.empty', 'No data yet')}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={220}>

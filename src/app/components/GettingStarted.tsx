@@ -13,7 +13,9 @@ const STEPS = [
   { key: 'dashboard.step3', href: '/projects', icon: <Building size={18} /> },
 ] as const;
 
-export default function GettingStarted() {
+export default function GettingStarted({ variant = 'default' }: { variant?: 'default' | 'agent' } = {}) {
+  // variant="agent": same sans heading as the rest of the agent dashboard. Default is unchanged.
+  const agent = variant === 'agent';
   const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
 
@@ -47,7 +49,7 @@ export default function GettingStarted() {
         <X size={16} />
       </button>
       <div className="pr-8">
-        <h2 className="text-lg font-semibold text-foreground font-display">
+        <h2 className={agent ? 'text-base font-semibold text-foreground' : 'text-lg font-semibold text-foreground font-display'}>
           {t('dashboard.startHere')}
         </h2>
         <p className="text-sm text-muted-foreground mt-0.5 mb-4">

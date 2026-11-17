@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { LogIn, LogOut, Loader2, MapPin, MapPinOff, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPositionWithFallback, readJsonSafe, type GeoOutcome } from '@/lib/geolocation';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface AttendanceRow {
   id: string;
@@ -15,7 +16,10 @@ interface AttendanceRow {
 
 // Self-service attendance card: employee checks in/out with staged GPS.
 // Dark Slate & Neon Lime hero. Uses /api/attendance/self.
-export default function AttendanceSelfCard() {
+export default function AttendanceSelfCard({ variant = 'default' }: { variant?: 'default' | 'agent' } = {}) {
+  // variant="agent": compact card with single-language copy for the sales-agent dashboard. Default is unchanged.
+  const agent = variant === 'agent';
+  const { t } = useLanguage();
   const [today, setToday] = useState<AttendanceRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -104,8 +108,8 @@ export default function AttendanceSelfCard() {
     iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#181b22] p-4 sm:p-5 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.7)]">
-      <div className="flex items-center gap-4">
+    <div className={`rounded-2xl border border-white/10 bg-[#181b22] ${agent ? 'p-3 sm:p-4' : 'p-4 sm:p-5'} shadow-[0_18px_50px_-20px_rgba(0,0,0,0.7)]`}>
+      <div className={`flex items-center ${agent ? 'gap-3' : 'gap-4'}`}>
         <div
           className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border ${
             checkedIn && !checkedOut
@@ -125,6 +129,20 @@ export default function AttendanceSelfCard() {
             <LogIn size={20} />
           )}
         </div>
+        {agent ? (
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-zinc-100">{t('agent.att.title')}</p>
+            <p className="truncate text-xs text-zinc-400">
+              {loading
+                ? t('common.loading')
+                : checkedOut
+                  ? t('agent.att.out', { in: fmt(today?.check_in_time), out: fmt(today?.check_out_time) })
+                  : checkedIn
+                    ? t('agent.att.in', { time: fmt(today?.check_in_time) })
+                    : t('agent.att.none')}
+            </p>
+          </div>
+        ) : (
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-zinc-100" dir="rtl">
             {loading ? 'جارٍ التحميل…' : checkedOut ? 'تم تسجيل الانصراف' : checkedIn ? 'تم تسجيل الحضور' : 'تسجيل الحضور'}
@@ -148,6 +166,7 @@ export default function AttendanceSelfCard() {
             )}
           </p>
         </div>
+        )}
         <button
           onClick={toggle}
           disabled={loading || busy || checkedOut}
@@ -158,7 +177,13 @@ export default function AttendanceSelfCard() {
           }`}
         >
           {busy ? <Loader2 size={15} className="animate-spin" /> : checkedIn && !checkedOut ? <LogOut size={15} /> : <LogIn size={15} />}
-          {busy ? 'Working…' : checkedIn && !checkedOut ? 'Check out' : 'Check in'}
+          {agent
+            ? busy
+              ? t('agent.att.working')
+              : checkedIn && !checkedOut
+                ? t('agent.att.checkOut')
+                : t('agent.att.checkIn')
+            : busy ? 'Working…' : checkedIn && !checkedOut ? 'Check out' : 'Check in'}
         </button>
       </div>
 

@@ -17,6 +17,7 @@ const GettingStarted = dynamic(() => import('./components/GettingStarted'));
 const UnifiedMasterDashboard = dynamic(() => import('./components/UnifiedMasterDashboard'));
 const DailyLeaderboard = dynamic(() => import('./components/DailyLeaderboard'));
 const TeamOverview = dynamic(() => import('./components/TeamOverview'));
+const AgentDashboard = dynamic(() => import('./components/agent-home/AgentDashboard'));
 const AttendanceSelfCard = dynamic(() => import('@/components/AttendanceSelfCard'));
 
 function DashboardSkeleton() {
@@ -87,6 +88,16 @@ export default function DashboardPage() {
 
   const roleKey = String(profile?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   const isTeamLeader = roleKey === TEAM_LEAD_ROLE || roleKey === 'team_lead';
+
+  // Sales agents (everyone who is not an admin/owner or team leader) get the agent dashboard.
+  // Team leaders keep the layout below unchanged.
+  if (!isTeamLeader) {
+    return (
+      <AppLayout>
+        <AgentDashboard />
+      </AppLayout>
+    );
+  }
 
   // Sales-user home: KPIs first, then today's work (follow-ups/calls + attendance), targets,
   // pipeline stages, leaderboard, charts and activity. Refresh remounts the data sections.

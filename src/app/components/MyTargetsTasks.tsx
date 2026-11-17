@@ -12,6 +12,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { kpiTargetsService, tasksService, type KpiProgress, type TaskItem } from '@/lib/services/peopleOpsService';
 
 const METRIC_UNIT: Record<string, string> = {
@@ -43,7 +44,11 @@ const PRIORITY_CLS: Record<string, string> = {
   Low: 'bg-muted text-muted-foreground',
 };
 
-export default function MyTargetsTasks() {
+export default function MyTargetsTasks({ variant = 'default' }: { variant?: 'default' | 'agent' } = {}) {
+  // variant="agent": stacked (it sits inside the Today column), i18n copy. Default is unchanged.
+  const agent = variant === 'agent';
+  const { t: tr } = useLanguage();
+  const L = (key: string, fallback: string, vars?: Record<string, string | number>) => (agent ? tr(key, vars) : fallback);
   const { profile } = useAuth();
   const [kpis, setKpis] = useState<KpiProgress[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -107,22 +112,22 @@ export default function MyTargetsTasks() {
   const doneCount = tasks.filter((t) => t.doneByMe).length;
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div className={agent ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 xl:grid-cols-2 gap-4'}>
       {/* My Targets */}
       <div className="card-base !p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Target size={15} className="text-primary" /> My targets
+            <Target size={15} className="text-primary" /> {L('agent.targets.title', 'My targets')}
           </h3>
           {kpis.length > 0 && (
             <span className="text-[11px] font-medium text-muted-foreground">
-              {kpis.filter((k) => k.pct >= 100).length}/{kpis.length} met
+              {L('agent.targets.met', `${kpis.filter((k) => k.pct >= 100).length}/${kpis.length} met`, { n: kpis.filter((k) => k.pct >= 100).length, total: kpis.length })}
             </span>
           )}
         </div>
         {kpis.length === 0 ? (
           <p className="text-xs text-muted-foreground py-3">
-            No targets assigned to your role yet.
+            {L('agent.targets.empty', 'No targets assigned to your role yet.')}
           </p>
         ) : (
           <div className="flex flex-col gap-3">
@@ -132,7 +137,7 @@ export default function MyTargetsTasks() {
                   <span className="font-semibold text-foreground truncate">{k.label}</span>
                   <span className="text-muted-foreground tabular-nums whitespace-nowrap ml-2">
                       {k.actual.toLocaleString()} / {k.targetValue.toLocaleString()}{' '}
-                      {METRIC_UNIT[k.metric] || ''}
+                      {agent && METRIC_UNIT[k.metric] ? tr(`agent.unit.${k.metric}`) : METRIC_UNIT[k.metric] || ''}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -160,11 +165,11 @@ export default function MyTargetsTasks() {
       <div className="card-base !p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <ClipboardList size={15} className="text-primary" /> My tasks
+            <ClipboardList size={15} className="text-primary" /> {L('agent.tasks.title', 'My tasks')}
           </h3>
           {tasks.length > 0 && (
             <span className="text-[11px] font-medium text-muted-foreground">
-              {doneCount}/{tasks.length} done
+              {L('agent.tasks.done', `${doneCount}/${tasks.length} done`, { n: doneCount, total: tasks.length })}
             </span>
           )}
         </div>
@@ -173,7 +178,7 @@ export default function MyTargetsTasks() {
             <Loader2 size={20} className="animate-spin text-primary" />
           </div>
         ) : tasks.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-3">No tasks assigned to your role yet.</p>
+          <p className="text-xs text-muted-foreground py-3">{L('agent.tasks.empty', 'No tasks assigned to your role yet.')}</p>
         ) : (
           <div className="flex flex-col gap-2">
             {sortedTasks.map((t) => {

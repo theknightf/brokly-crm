@@ -11,6 +11,7 @@ import {
   Cell,
 } from 'recharts';
 import { reportsService } from '@/lib/services/crmService';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const stageColors: Record<string, string> = {
   New: '#84cc16',
@@ -50,7 +51,11 @@ function CustomTooltip({
   );
 }
 
-export default function CustomerLifecycleChart() {
+export default function CustomerLifecycleChart({ variant = 'default' }: { variant?: 'default' | 'agent' } = {}) {
+  // variant="agent": i18n copy and the "Your leads at each stage." subtitle on the sales-agent dashboard. Default is unchanged.
+  const agent = variant === 'agent';
+  const { t } = useLanguage();
+  const L = (key: string, fallback: string, vars?: Record<string, string | number>) => (agent ? t(key, vars) : fallback);
   const [data, setData] = useState<{ stage: string; count: number; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,23 +81,23 @@ export default function CustomerLifecycleChart() {
     <div className="card-base flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-foreground text-sm">Leads by Stage</h3>
+          <h3 className={agent ? 'text-base font-semibold text-foreground' : 'font-semibold text-foreground text-sm'}>{L('agent.stage.title', 'Leads by Stage')}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Leads at each stage — New → Negotiation → Closed
+            {L('agent.stage.subtitle', 'Leads at each stage — New → Negotiation → Closed')}
           </p>
         </div>
         <span className="text-xs font-medium bg-muted text-muted-foreground px-2 py-1 rounded-full">
-          {total} total
+          {L('agent.stage.total', `${total} total`, { n: total })}
         </span>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-44 text-muted-foreground text-sm">
-          Loading…
+          {L('common.loading', 'Loading…')}
         </div>
       ) : data.length === 0 ? (
         <div className="flex items-center justify-center h-44 text-muted-foreground text-sm">
-          No data yet
+          {L('agent.chart.empty', 'No data yet')}
         </div>
       ) : (
         <div className="h-44">
