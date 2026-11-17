@@ -26,9 +26,9 @@ GoRouter buildRouter({required Listenable refreshListenable}) {
       if (!loggedIn && !onLogin) return '/login';
       if (loggedIn && onLogin) return '/home';
 
-      // Sales agents only use Leads and Follow-ups (plus lead details / add lead): no calculator or assistant.
+      // Sales agents only use Dashboard, Workspace and the AI assistant (plus lead details / add lead): no calculator.
       final loc = state.matchedLocation;
-      if (loggedIn && (loc == '/calculator' || loc == '/assistant')) {
+      if (loggedIn && loc == '/calculator') {
         final profile = Provider.of<AuthProvider>(context, listen: false).profile;
         if (isSalesAgent(profile)) return '/home';
       }

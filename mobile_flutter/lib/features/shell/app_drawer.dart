@@ -97,6 +97,7 @@ class AppDrawer extends StatelessWidget {
                         },
                         isDark: isDark,
                       ),
+                    _buildCopilotItem(),
                   ] else ...[
                   _buildDrawerItem(
                     icon: LucideIcons.house,

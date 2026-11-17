@@ -214,9 +214,9 @@ class _MainShellState extends State<MainShell> {
                 ],
         ),
       ),
-      // Leads: add a lead. Follow-ups has its own "Add follow-up" button. Elsewhere: the AI assistant
-      // (not for sales agents, who only have Leads and Follow-ups).
-      floatingActionButton: isAgent && _currentIndex != Pg.leads ? null : switch (_currentIndex) {
+      // Leads (Dashboard for sales): add a lead. Follow-ups (Workspace) has its own "Add follow-up" button.
+      // Elsewhere (Home): the AI assistant, for sales agents too.
+      floatingActionButton: switch (_currentIndex) {
         Pg.leads => FloatingActionButton(
             tooltip: tr('Add lead', 'عميل جديد'),
             child: const Icon(LucideIcons.plus),
