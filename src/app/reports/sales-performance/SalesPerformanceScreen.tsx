@@ -19,22 +19,27 @@ type Row = {
   full_name: string;
   role: string;
   assigned: number;
+  created: number;
   duplicates: number;
   calls: number;
   actions: number;
   late: number;
 };
-type Kind = 'assigned' | 'duplicates' | 'calls' | 'actions' | 'late';
+type Kind = 'assigned' | 'created' | 'duplicates' | 'calls' | 'actions' | 'late';
 type SortKey = 'full_name' | Kind;
 
 const COLUMNS: { key: SortKey; label: string; ar: string; hint?: string }[] = [
   { key: 'full_name', label: 'Sales name', ar: 'اسم السيلز' },
   { key: 'assigned', label: 'Assigned leads', ar: 'العملاء المتوزعة', hint: 'Leads assigned to them in the period' },
+  { key: 'created', label: 'Created leads', ar: 'العملاء المضافة', hint: 'Leads they added themselves in the period (duplicates that were blocked are not counted)' },
   { key: 'duplicates', label: 'Duplicate', ar: 'المكرر', hint: 'Duplicate attempts in the period on leads they own' },
   { key: 'calls', label: 'Total calls', ar: 'المكالمات', hint: 'Calls they logged in the period' },
   { key: 'actions', label: 'Total actions', ar: 'الإجراءات', hint: 'Same as the leaderboard: written notes (calls for people set to count calls)' },
   { key: 'late', label: 'Late', ar: 'متأخر', hint: 'Open leads whose next-action date has passed (right now, not tied to the dates)' },
 ];
+
+// Numeric columns, in table order.
+const NUMBER_KINDS: Kind[] = ['assigned', 'created', 'duplicates', 'calls', 'actions', 'late'];
 
 const DAY_MS = 86_400_000;
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T12:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
@@ -96,12 +101,13 @@ export default function SalesPerformanceScreen() {
       rows.reduce(
         (t, r) => ({
           assigned: t.assigned + r.assigned,
+          created: t.created + (r.created || 0),
           duplicates: t.duplicates + r.duplicates,
           calls: t.calls + r.calls,
           actions: t.actions + r.actions,
           late: t.late + r.late,
         }),
-        { assigned: 0, duplicates: 0, calls: 0, actions: 0, late: 0 }
+        { assigned: 0, created: 0, duplicates: 0, calls: 0, actions: 0, late: 0 }
       ),
     [rows]
   );
@@ -141,7 +147,7 @@ export default function SalesPerformanceScreen() {
       {/* Table */}
       <div className="card-base !p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[880px] text-sm">
             <thead className="bg-muted/50">
               <tr>
                 {COLUMNS.map((c) => {
@@ -187,9 +193,9 @@ export default function SalesPerformanceScreen() {
                       {r.full_name}
                       <span className="block text-[11px] font-normal capitalize text-muted-foreground">{r.role.replace('_', ' ')}</span>
                     </td>
-                    {(['assigned', 'duplicates', 'calls', 'actions', 'late'] as Kind[]).map((k) => (
+                    {NUMBER_KINDS.map((k) => (
                       <td key={k} className="px-4 py-3 text-end">
-                        <NumberCell value={r[k]} tone={k === 'late' ? 'red' : k === 'duplicates' ? 'amber' : undefined} onClick={() => setDrill({ user: r, kind: k })} />
+                        <NumberCell value={r[k] || 0} tone={k === 'late' ? 'red' : k === 'duplicates' ? 'amber' : undefined} onClick={() => setDrill({ user: r, kind: k })} />
                       </td>
                     ))}
                   </tr>
@@ -200,7 +206,7 @@ export default function SalesPerformanceScreen() {
               <tfoot className="border-t-2 border-border bg-muted/40 font-bold">
                 <tr>
                   <td className="px-4 py-3 text-foreground">Total · الإجمالي</td>
-                  {(['assigned', 'duplicates', 'calls', 'actions', 'late'] as Kind[]).map((k) => (
+                  {NUMBER_KINDS.map((k) => (
                     <td key={k} className="px-4 py-3 text-end tabular-nums text-foreground">{totals[k].toLocaleString()}</td>
                   ))}
                 </tr>
@@ -210,7 +216,7 @@ export default function SalesPerformanceScreen() {
         </div>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Assigned = leads given to them in the period · Duplicate = duplicate attempts in the period on leads they own · Actions = same rule as the dashboard leaderboard · Late = overdue right now (not tied to the dates).
+        Assigned = leads given to them in the period · Created = leads they added themselves in the period · Duplicate = duplicate attempts in the period on leads they own · Actions = same rule as the dashboard leaderboard · Late = overdue right now (not tied to the dates).
       </p>
 
       {drill && <DrillModal drill={drill} from={from} to={to} onClose={() => setDrill(null)} />}
@@ -230,6 +236,7 @@ function NumberCell({ value, onClick, tone }: { value: number; onClick: () => vo
 
 const KIND_TITLE: Record<Kind, string> = {
   assigned: 'Assigned leads',
+  created: 'Created leads',
   duplicates: 'Duplicates',
   calls: 'Leads called',
   actions: 'Leads with actions',
@@ -276,9 +283,12 @@ function DrillModal({ drill, from, to, onClose }: { drill: { user: Row; kind: Ki
               {drill.kind === 'late' ? 'Right now' : `${fmtDate(from)} – ${fmtDate(to)}`} · {list ? `${list.length} lead${list.length === 1 ? '' : 's'}` : 'Loading…'}
             </p>
           </div>
-          <Link href={leadsLink} className="btn-secondary inline-flex h-10 items-center gap-1.5 text-sm">
-            {drill.kind === 'duplicates' ? 'Open Duplicates' : 'Open in Leads'} <ExternalLink size={14} />
-          </Link>
+          {/* The Leads page filters by owner, which would not match "created by", so no shortcut for that column. */}
+          {drill.kind !== 'created' && (
+            <Link href={leadsLink} className="btn-secondary inline-flex h-10 items-center gap-1.5 text-sm">
+              {drill.kind === 'duplicates' ? 'Open Duplicates' : 'Open in Leads'} <ExternalLink size={14} />
+            </Link>
+          )}
           <button type="button" onClick={onClose} aria-label="Close" className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted">
             <X size={18} />
           </button>
@@ -297,7 +307,7 @@ function DrillModal({ drill, from, to, onClose }: { drill: { user: Row; kind: Ki
                   <th className="px-4 py-2 text-start">Lead</th>
                   <th className="px-4 py-2 text-start">Stage</th>
                   <th className="px-4 py-2 text-start">Owner</th>
-                  <th className="px-4 py-2 text-start">{drill.kind === 'late' ? 'Was due' : 'When'}</th>
+                  <th className="px-4 py-2 text-start">{drill.kind === 'late' ? 'Was due' : drill.kind === 'created' ? 'Created' : 'When'}</th>
                   <th className="px-4 py-2 text-start">Detail</th>
                 </tr>
               </thead>
