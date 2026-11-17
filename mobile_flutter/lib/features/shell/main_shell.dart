@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/sales_role.dart';
 import '../../core/utils/tr.dart';
 import '../../state/auth_provider.dart';
+import 'sales_dashboard_screen.dart';
 import 'sales_home_screen.dart';
 import 'sales_target_bar.dart';
 import '../follow_ups/follow_ups_screen.dart';
@@ -79,7 +80,10 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
-  String get _currentTitle => titleForPage(_currentIndex);
+  // Bumped to send the sales Dashboard back to its stage picker.
+  int _dashEpoch = 0;
+
+  String _titleFor(bool isAgent) => isAgent ? salesPageLabel(_currentIndex) : titleForPage(_currentIndex);
 
   /// Sales agents only get these pages.
   static const _salesPages = [Pg.home, Pg.leads, Pg.followUps];
@@ -107,14 +111,19 @@ class _MainShellState extends State<MainShell> {
         if (isAgent) {
           return SalesHomeScreen(
             onOpenLeads: () {
-              context.read<LeadsProvider>().setStatusFilter(''); // the Leads button shows all leads
+              // The Dashboard button always opens on the stage picker.
+              context.read<LeadsProvider>().setStatusFilter('');
+              setState(() => _dashEpoch++);
               _goTo(Pg.leads);
             },
             onOpenFollowUps: () => _goTo(Pg.followUps),
-            onOpenStage: (stage) => _openLeads(stage: stage),
           );
         }
         return DashboardScreen(onNavigateTab: _goTo);
+      case Pg.leads:
+        // Sales agents: stage cards first, then the lead list for the stage they pick.
+        if (isAgent) return SalesDashboardScreen(key: ValueKey(_dashEpoch), active: _currentIndex == Pg.leads);
+        break;
       case Pg.followUps:
         // Sales agents: only the Overdue and Today filters.
         return FollowUpsScreen(overdueTodayOnly: isAgent);
@@ -162,7 +171,7 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppTopBar(
-        title: _currentTitle,
+        title: _titleFor(isAgent),
         onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
       ),
       drawer: AppDrawer(
@@ -193,8 +202,8 @@ class _MainShellState extends State<MainShell> {
           destinations: isAgent
               ? [
                   NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),
-                  NavigationDestination(icon: const Icon(LucideIcons.users), label: pageLabel(Pg.leads)),
-                  NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: pageLabel(Pg.followUps)),
+                  NavigationDestination(icon: const Icon(LucideIcons.users), label: salesPageLabel(Pg.leads)),
+                  NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: salesPageLabel(Pg.followUps)),
                 ]
               : [
                   NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),

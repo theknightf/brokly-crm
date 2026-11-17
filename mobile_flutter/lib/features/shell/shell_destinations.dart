@@ -225,6 +225,13 @@ const _titlesAr = <int, String>{
 /// Page name in the device language (Arabic or English).
 String pageLabel(int page, [String? fallback]) => tr(_titles[page] ?? fallback ?? 'Brokly CRM', _titlesAr[page] ?? fallback ?? 'Brokly CRM');
 
+/// Page names for sales agents: the Leads page is their "Dashboard" and Follow-ups is their "Workspace".
+String salesPageLabel(int page) => switch (page) {
+      Pg.leads => tr('Dashboard', 'لوحة التحكم'),
+      Pg.followUps => tr('Workspace', 'مساحة العمل'),
+      _ => pageLabel(page),
+    };
+
 String sectionLabel(String title) => switch (title) {
       'PIPELINE' => tr('PIPELINE', 'المبيعات'),
       'MANAGEMENT' => tr('MANAGEMENT', 'الإدارة'),

@@ -89,7 +89,7 @@ class AppDrawer extends StatelessWidget {
                     for (final e in drawerSections.expand((s) => s.entries).where((e) => e.page == Pg.leads || e.page == Pg.followUps))
                       _buildDrawerItem(
                         icon: e.icon,
-                        label: e.label,
+                        label: salesPageLabel(e.page),
                         isSelected: selectedIndex == e.page,
                         onTap: () {
                           onSelectTab(e.page);

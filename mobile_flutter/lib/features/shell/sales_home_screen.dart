@@ -2,9 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/lead_stages.dart';
 import '../../core/realtime_pause.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/tr.dart';
@@ -19,18 +17,16 @@ const _closedStages = {
   'done deal', 'won', 'lost', 'cancellation', 'not interested', 'duplicate leads', 'wrong number', 'closed number', 'low budget',
 };
 
-/// Home for sales agents: today's action counter, two big buttons (Leads, Follow-ups), and a card per stage that
-/// opens the Leads page filtered to that stage.
+/// Home for sales agents: today's action counter and two big buttons, Dashboard (the stage picker / leads) and Workspace
+/// (follow-ups).
 class SalesHomeScreen extends StatefulWidget {
   final VoidCallback onOpenLeads;
   final VoidCallback onOpenFollowUps;
-  final ValueChanged<String> onOpenStage;
 
   const SalesHomeScreen({
     super.key,
     required this.onOpenLeads,
     required this.onOpenFollowUps,
-    required this.onOpenStage,
   });
 
   @override
@@ -94,10 +90,7 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
     final today = DateTime(now.year, now.month, now.day);
     var overdue = 0;
     var dueToday = 0;
-    final stageCounts = <String, int>{};
     for (final l in leads.allLeads) {
-      final stage = LeadStages.normalize(l.status);
-      stageCounts[stage] = (stageCounts[stage] ?? 0) + 1;
       if (_closedStages.contains(l.status.toLowerCase().trim())) continue;
       final d = l.followUpDateTime?.toLocal();
       if (d == null) continue;
@@ -109,8 +102,6 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
       }
     }
     final loading = leads.isLoading && leads.allLeads.isEmpty;
-    // Every stage, in canonical pipeline order (empty ones show 0).
-    const stages = LeadStages.allStatuses;
 
     final greeting = now.hour < 12
         ? tr('Good morning', 'صباح الخير')
@@ -163,35 +154,19 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
 
             _HomeButton(
               icon: LucideIcons.users,
-              title: tr('Leads', 'العملاء'),
+              title: tr('Dashboard', 'لوحة التحكم'),
               subtitle: loading ? tr('Loading…', 'جاري التحميل…') : tr('${leads.allLeads.length} leads', '${leads.allLeads.length} عميل'),
               onTap: widget.onOpenLeads,
             ),
             _HomeButton(
               icon: LucideIcons.calendarClock,
-              title: tr('Follow-ups', 'المتابعات'),
+              title: tr('Workspace', 'مساحة العمل'),
               subtitle: loading
                   ? tr('Loading…', 'جاري التحميل…')
                   : tr('$overdue late · $dueToday today', '$overdue متأخرة · $dueToday النهارده'),
               highlight: overdue > 0,
               onTap: widget.onOpenFollowUps,
             ),
-
-            // Stage cards → Leads filtered by that stage
-            if (stages.isNotEmpty) ...[
-              SectionHeader(title: tr('Stages', 'المراحل'), subtitle: tr('Tap a stage to open its leads', 'دوس على مرحلة تفتح عملاءها')),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: AppSpacing.sm,
-                crossAxisSpacing: AppSpacing.sm,
-                childAspectRatio: 2.3,
-                children: [
-                  for (final s in stages) _StageCard(stage: s, count: stageCounts[s] ?? 0, onTap: () => widget.onOpenStage(s)),
-                ],
-              ),
-            ],
           ],
         ),
       ),
@@ -213,49 +188,6 @@ class _MiniStat extends StatelessWidget {
         Text(value == null ? '–' : '$value', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
         Text(label, style: t.bodySmall),
       ],
-    );
-  }
-}
-
-class _StageCard extends StatelessWidget {
-  final String stage;
-  final int count;
-  final VoidCallback onTap;
-  const _StageCard({required this.stage, required this.count, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    final tone = AppColors.stageTone(stage, isDark: context.isDark);
-    return Opacity(
-      // Empty stages stay visible (and tappable) but step back.
-      opacity: count == 0 ? 0.55 : 1,
-      child: PremiumCard(
-      onTap: onTap,
-      margin: EdgeInsets.zero,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(color: tone.bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
-            child: Icon(LeadStages.iconFor(stage), size: 18, color: tone.text),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$count', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                Text(LeadStages.label(stage), maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
-    )
     );
   }
 }

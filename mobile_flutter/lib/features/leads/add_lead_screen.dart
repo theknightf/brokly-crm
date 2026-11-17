@@ -11,7 +11,7 @@ import '../../core/utils/tr.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../core/widgets/premium.dart';
 import '../../data/models/lead_model.dart';
-import '../../data/services/leads_service.dart' show DuplicateLeadException;
+import '../../data/services/leads_service.dart' show DuplicateLeadException, LeadsService;
 import '../../data/models/user_profile_model.dart';
 import '../../data/services/supabase_service.dart';
 import '../../data/services/users_service.dart';
@@ -217,14 +217,35 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     try {
       final provider = context.read<LeadsProvider>();
       final created = await provider.createLead(lead);
-      // Optional action note: saved as a note on the new lead (counts as the first action).
+      // A note written while adding the lead counts as an action: it is saved as a lead comment, which the
+      // leaderboard counts. The "Action note" is also appended to the lead's notes (addNote). The longer "Notes"
+      // field (more details) is already in the lead's notes, so for it only the comment is added. Several notes
+      // within two minutes still count as one action.
       final actionNote = _actionNoteController.text.trim();
-      if (actionNote.isNotEmpty && created.id.isNotEmpty) await provider.addNote(created.id, actionNote);
+      final moreNotes = _notesController.text.trim();
+      var noteSaved = true;
+      if (created.id.isNotEmpty && (actionNote.isNotEmpty || moreNotes.isNotEmpty)) {
+        try {
+          if (actionNote.isNotEmpty) {
+            await provider.addNote(created.id, actionNote);
+          } else {
+            await LeadsService().addComment(created.id, moreNotes);
+          }
+        } catch (_) {
+          noteSaved = false;
+        }
+      }
       tapFeedback();
       if (!mounted) return;
       if (launchWhatsAppAfter) await WhatsAppUtils.openWhatsAppChat(context, phone: fullPhone);
       if (!mounted) return;
-      showAppSnack(context, tr('Lead "$resolvedName" added', 'اتضاف "$resolvedName"'));
+      showAppSnack(
+        context,
+        noteSaved
+            ? tr('Lead "$resolvedName" added', 'اتضاف "$resolvedName"')
+            : tr('Lead "$resolvedName" added, but its note was not saved as an action', 'اتضاف "$resolvedName" بس النوتة متسجلتش كإجراء'),
+        error: !noteSaved,
+      );
       Navigator.pop(context);
     } on DuplicateLeadException catch (d) {
       if (!mounted) return;
@@ -442,7 +463,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
             ]),
 
             // 3b. Optional action note — what happened on the first contact
-            _Section(title: tr('Action note', 'نوتة الإجراء'), children: [
+            _Section(title: tr('Note · counts as an action', 'نوتة · بتتحسب إجراء'), children: [
               TextField(
                 controller: _actionNoteController,
                 minLines: 2,
@@ -536,7 +557,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                       textDirection: TextDirection.ltr,
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    _Label(tr('Notes', 'ملاحظات')),
+                    _Label(tr('Notes · counts as an action', 'ملاحظات · بتتحسب إجراء')),
                     TextField(
                       controller: _notesController,
                       minLines: 3,
