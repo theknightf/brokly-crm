@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/phone_utils.dart';
 import '../../../core/utils/stage_note_guard.dart';
 import '../../../core/utils/tr.dart';
 import '../../../core/utils/whatsapp_utils.dart';
@@ -154,10 +155,20 @@ class LeadCard extends StatelessWidget {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(lead.name.isNotEmpty ? lead.name : tr('No name', 'بدون اسم'), maxLines: 1, overflow: TextOverflow.ellipsis, style: t.titleMedium),
                   if (lead.phone.isNotEmpty)
-                    Text(lead.phone,
-                        maxLines: 1,
-                        textDirection: TextDirection.ltr,
-                        style: t.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+                    Row(children: [
+                      Flexible(
+                        child: Text(lead.phone,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textDirection: TextDirection.ltr,
+                            style: t.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+                      ),
+                      // Non-Egyptian numbers are tagged "International" (with the country code when known).
+                      if (PhoneUtils.isInternational(lead.phone)) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        _IntlTag(code: PhoneUtils.countryCodeOf(lead.phone)),
+                      ],
+                    ]),
                 ]),
               ),
               _buildMenu(context, p.subtext),
@@ -314,6 +325,29 @@ class _MenuRow extends StatelessWidget {
         const SizedBox(width: 10),
         Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color)),
       ],
+    );
+  }
+}
+
+/// Small "International" tag shown next to a non-Egyptian number.
+class _IntlTag extends StatelessWidget {
+  final String? code;
+  const _IntlTag({required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(color: p.info.withAlpha(30), borderRadius: BorderRadius.circular(AppRadius.pill)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(LucideIcons.globe, size: 11, color: p.info),
+        const SizedBox(width: 3),
+        Text(
+          code == null ? tr('Intl', 'دولي') : '${tr('Intl', 'دولي')} +$code',
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: p.info),
+        ),
+      ]),
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../core/constants/lead_stages.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/tr.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../core/utils/whatsapp_utils.dart';
 import '../../core/widgets/premium.dart';
 import '../../data/models/lead_model.dart';
@@ -122,13 +123,8 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     super.dispose();
   }
 
-  String _buildFullPhone() {
-    final raw = _phoneController.text.trim();
-    if (raw.isEmpty) return '';
-    if (raw.startsWith('+')) return raw;
-    if (_countryCode == '+20' && raw.startsWith('0')) return raw;
-    return '$_countryCode$raw';
-  }
+  // A number that already carries its own country code (966…, +971…) is never given the dropdown's code on top.
+  String _buildFullPhone() => PhoneUtils.fromAddLead(_phoneController.text, _countryCode);
 
   Future<void> _createCustomSource() async {
     final name = _newSourceController.text.trim();

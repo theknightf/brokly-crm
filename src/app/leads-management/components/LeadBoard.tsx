@@ -8,6 +8,7 @@ import { isAdminRole } from '@/lib/roles';
 import ContactedBadge, { ActionTakenBadge } from './ContactedBadge';
 import CalledBadge from './CalledBadge';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
+import { IntlBadge } from '@/components/ui/IntlBadge';
 
 interface LeadBoardProps {
   leads: Lead[];
@@ -125,6 +126,8 @@ const BoardCard = React.memo(function BoardCard({
           </span>
         </div>
       )}
+
+      <IntlBadge phone={lead.phone} className="mt-1.5" />
 
       {lead.phone && (
         <div className="mt-2 flex items-center gap-1.5">

@@ -31,6 +31,7 @@ import DuplicateAttemptsBadge from './DuplicateAttemptsBadge';
 import ViewportPopover from '@/components/ui/ViewportPopover';
 import StageMenuList from './StageMenuList';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
+import { IntlBadge } from '@/components/ui/IntlBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -246,6 +247,7 @@ function MobileLeadCardInner({
                 </span>
               )}
               <DuplicateAttemptsBadge lead={lead} />
+              <IntlBadge phone={lead.phone} />
             </span>
             {lead.name?.trim() && lead.phone && (
               <span className="mt-0.5 block truncate text-xs tabular-nums text-muted-foreground" dir="ltr">

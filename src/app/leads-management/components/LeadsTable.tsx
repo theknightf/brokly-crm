@@ -39,6 +39,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
+import { IntlBadge } from '@/components/ui/IntlBadge';
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -390,6 +391,7 @@ const LeadTableRow = React.memo(function LeadTableRow({
         {hasPhone && (
           <span className="inline-flex max-w-full items-center gap-1.5 font-mono text-[12px] text-zinc-600 dark:text-zinc-300">
             <span dir="ltr">{lead.phone}</span>
+            <IntlBadge phone={lead.phone} />
             <button
               type="button"
               onClick={() => copyText(lead.phone, t('leads.phoneCopied'))}

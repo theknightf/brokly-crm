@@ -5,6 +5,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/premium.dart';
 import '../../core/utils/note_formatter.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../core/utils/stage_note_guard.dart';
 import '../../core/utils/tr.dart';
 import '../../data/models/lead_model.dart';
@@ -169,7 +170,7 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
 
     final updates = {
       'name': _nameController.text.trim(),
-      'phone': _phoneController.text.trim(),
+      'phone': PhoneUtils.withPlusIfInternational(_phoneController.text),
       'crm_status': _status,
       'email': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
       'project': _projectController.text.trim().isNotEmpty ? _projectController.text.trim() : null,
