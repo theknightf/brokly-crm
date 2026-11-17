@@ -17,6 +17,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { sanitizeEgyptPhone } from '@/lib/whatsapp';
 import { addDays, addFollowUpNote, cairoToday, completeFollowUp, rescheduleFollowUp } from './followUpOps';
 import type { FollowUp } from './mockFollowUps';
 
@@ -147,10 +148,8 @@ function buildTemplate(fu: FollowUp, sig: Signal, tone: Tone, lang: Lang): strin
 }
 
 function waLink(phone: string, text: string): string {
-  let digits = (phone || '').replace(/\D/g, '');
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  else if (digits.startsWith('01') && digits.length === 11) digits = `2${digits}`; // Egyptian mobile -> +20
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  // Same number rule as every other WhatsApp button: Egyptian numbers get 20, international ones never do.
+  return `https://wa.me/${sanitizeEgyptPhone(phone)}?text=${encodeURIComponent(text)}`;
 }
 
 /* Writes live in followUpOps.ts (they keep the lead date and the follow-up row in sync). */

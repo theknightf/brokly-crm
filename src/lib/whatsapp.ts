@@ -3,26 +3,29 @@
 const DEFAULT_TEMPLATE = 'مساء الخير مع حضرتك {username} من شركة onpoint للتسويق العقاري بتواصل معاك حابب اعرفك العروض المتاحة';
 
 /**
- * Sanitize Egyptian phone for wa.me: strip non-digits, handle leading 0,
- * ensure +20 country code without plus.
- * Examples: 01012345678 -> 201012345678, +20 1012345678 -> 201012345678, 201012345678 -> 201012345678
+ * Number for a wa.me link (digits only, with the country code).
+ *  - Egyptian numbers get Egypt's 20: 01012345678 -> 201012345678, 1012345678 -> 201012345678, 0222345678 -> 20222345678,
+ *    and 201012345678 stays as is.
+ *  - International numbers are NEVER given the Egypt code: "+971 50 123 4567", "00971501234567" and the plain
+ *    "971501234567" (how most international leads are stored, without the +) all stay 971501234567.
  */
 export function sanitizeEgyptPhone(phone?: string | null): string {
   if (!phone) return '';
   const raw = String(phone).trim();
-  let digits = raw.replace(/\D/g, '');
+  const digits = raw.replace(/\D/g, '');
   if (!digits) return '';
-  // International: written with "+" or "00" → already has its country code (+971…, 00966…).
-  if (raw.startsWith('+') || digits.startsWith('00')) {
-    return digits.replace(/^00/, '');
+  // Written with "+" or "00": it already carries its country code.
+  if (raw.startsWith('+') || digits.startsWith('00')) return digits.replace(/^00/, '');
+  // Domestic format with a leading 0 (01012345678, 0222345678): Egyptian.
+  if (digits.startsWith('0')) {
+    const national = digits.replace(/^0+/, '');
+    return national.startsWith('20') ? national : `20${national}`;
   }
-  // Local format: remove leading zeros
-  digits = digits.replace(/^0+/, '');
-  // If already starts with 20 (Egypt), keep; otherwise prepend 20
-  if (!digits.startsWith('20')) {
-    // Handle 10-digit local without leading 0 (e.g., 1012345678)
-    digits = '20' + digits;
-  }
+  // Already has Egypt's code (201012345678, or an Egyptian landline with the code).
+  if (digits.startsWith('20')) return digits;
+  // Egyptian mobile typed without the leading 0 (1012345678).
+  if (/^1[0125]\d{8}$/.test(digits)) return `20${digits}`;
+  // Anything else already includes its own country code (966…, 971…, 965…, 44…, 1… for US/Canada).
   return digits;
 }
 

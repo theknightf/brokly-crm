@@ -5,29 +5,32 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../state/auth_provider.dart';
 
 class WhatsAppUtils {
-  /// Sanitizes Egyptian & international phone numbers for wa.me links
-  /// Matches `sanitizeEgyptPhone` in `src/lib/whatsapp.ts`
+  /// Number for a wa.me link (digits only, with the country code). Matches `sanitizeEgyptPhone` in `src/lib/whatsapp.ts`.
+  /// Egyptian numbers get Egypt's 20 (01012345678, 1012345678, 0222345678); international numbers never do:
+  /// "+971501234567", "00971501234567" and the plain "971501234567" all stay 971501234567.
   static String sanitizeEgyptPhone(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
-    String digits = raw.replaceAll(RegExp(r'\D'), '');
+    final text = raw.trim();
+    final digits = text.replaceAll(RegExp(r'\D'), '');
     if (digits.isEmpty) return '';
 
-    if (digits.startsWith('00')) {
-      digits = digits.substring(2);
+    // Written with "+" or "00": it already carries its country code.
+    if (digits.startsWith('00')) return digits.substring(2);
+    if (text.startsWith('+')) return digits;
+
+    // Domestic format with a leading 0 (01012345678, 0222345678): Egyptian.
+    if (digits.startsWith('0')) {
+      final national = digits.replaceFirst(RegExp(r'^0+'), '');
+      return national.startsWith('20') ? national : '20$national';
     }
 
-    if (digits.startsWith('20') && digits.length == 12) {
-      return digits;
-    }
+    // Already has Egypt's code (201012345678, or an Egyptian landline with the code).
+    if (digits.startsWith('20')) return digits;
 
-    if (digits.startsWith('0') && digits.length == 11) {
-      return '2$digits';
-    }
+    // Egyptian mobile typed without the leading 0 (1012345678).
+    if (RegExp(r'^1[0125]\d{8}$').hasMatch(digits)) return '20$digits';
 
-    if (digits.length == 10 && digits.startsWith('1')) {
-      return '20$digits';
-    }
-
+    // Anything else already includes its own country code (966…, 971…, 965…, 44…, 1… for US/Canada).
     return digits;
   }
 
