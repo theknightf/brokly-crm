@@ -109,8 +109,8 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
       }
     }
     final loading = leads.isLoading && leads.allLeads.isEmpty;
-    // Canonical pipeline order; only stages that have leads.
-    final stages = LeadStages.allStatuses.where((s) => (stageCounts[s] ?? 0) > 0).toList();
+    // Every stage, in canonical pipeline order (empty ones show 0).
+    const stages = LeadStages.allStatuses;
 
     final greeting = now.hour < 12
         ? tr('Good morning', 'صباح الخير')
@@ -172,7 +172,7 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
               title: tr('Follow-ups', 'المتابعات'),
               subtitle: loading
                   ? tr('Loading…', 'جاري التحميل…')
-                  : tr('$overdue overdue · $dueToday today', '$overdue متأخرة · $dueToday النهارده'),
+                  : tr('$overdue late · $dueToday today', '$overdue متأخرة · $dueToday النهارده'),
               highlight: overdue > 0,
               onTap: widget.onOpenFollowUps,
             ),
@@ -227,7 +227,10 @@ class _StageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final tone = AppColors.stageTone(stage, isDark: context.isDark);
-    return PremiumCard(
+    return Opacity(
+      // Empty stages stay visible (and tappable) but step back.
+      opacity: count == 0 ? 0.55 : 1,
+      child: PremiumCard(
       onTap: onTap,
       margin: EdgeInsets.zero,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
@@ -252,6 +255,7 @@ class _StageCard extends StatelessWidget {
           ),
         ],
       ),
+    )
     );
   }
 }

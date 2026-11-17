@@ -257,7 +257,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
                   Semantics(header: true, child: Text(tr('Follow-ups', 'المتابعات'), style: t.headlineSmall)),
                   const SizedBox(height: 2),
                   Text(
-                    tr('${counts[_Bucket.overdue]} overdue · ${counts[_Bucket.today]} today', '${counts[_Bucket.overdue]} متأخرة · ${counts[_Bucket.today]} النهارده'),
+                    tr('${counts[_Bucket.overdue]} ${widget.overdueTodayOnly ? 'late' : 'overdue'} · ${counts[_Bucket.today]} today', '${counts[_Bucket.overdue]} متأخرة · ${counts[_Bucket.today]} النهارده'),
                     style: t.bodySmall,
                   ),
                 ]),
@@ -422,7 +422,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
       final other = _bucket == _Bucket.overdue ? _Bucket.today : _Bucket.overdue;
       return EmptyState(
         icon: LucideIcons.calendarCheck,
-        title: _bucket == _Bucket.overdue ? tr('Nothing overdue 👏', 'مفيش متأخرات 👏') : tr('Nothing for today', 'مفيش حاجة النهارده'),
+        title: _bucket == _Bucket.overdue ? tr('Nothing late 👏', 'مفيش متأخرات 👏') : tr('Nothing for today', 'مفيش حاجة النهارده'),
         message: tr('Your other follow-ups are scheduled for later.', 'باقي متابعاتك متحددة بعدين.'),
         actionLabel: _bucketLabel(other),
         onAction: () => setState(() => _bucket = other),
@@ -444,7 +444,7 @@ class _FollowUpsScreenState extends State<FollowUpsScreen> {
       );
 
   String _bucketLabel(_Bucket b) => switch (b) {
-        _Bucket.overdue => tr('Overdue', 'متأخرة'),
+        _Bucket.overdue => widget.overdueTodayOnly ? tr('Late', 'متأخرة') : tr('Overdue', 'متأخرة'),
         _Bucket.today => tr('Today', 'النهارده'),
         _Bucket.upcoming => tr('Upcoming', 'الجاية'),
         _Bucket.all => tr('All', 'الكل'),
