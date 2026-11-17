@@ -249,7 +249,7 @@ class _StageCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('$count', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                Text(stage, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall),
+                Text(LeadStages.label(stage), maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall),
               ],
             ),
           ),

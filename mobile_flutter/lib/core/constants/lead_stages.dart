@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../utils/tr.dart';
 
 /// Canonical Sales Pipeline & Outcome Stages synchronized with the Brokly CRM Web Platform
 /// (`src/lib/ui.ts` & `src/app/leads-management/components/leadStages.ts`).
@@ -46,6 +47,32 @@ class LeadStages {
     allLeads,
     ...allStatuses,
   ];
+
+  /// Arabic stage names (same as the lead_stages table in the database).
+  static const Map<String, String> _arabic = {
+    'Fresh Leads': 'عملاء جدد',
+    'Cold Calls': 'مكالمات باردة',
+    'Pending Leads': 'معلّق',
+    'Following Up': 'متابعة',
+    'Meeting': 'مقابلة',
+    'Follow Up After Meeting': 'متابعة بعد المقابلة',
+    'Interested': 'مهتم',
+    'Reservation': 'حجز',
+    'Done Deal': 'صفقة تمت',
+    'No Answer': 'مردّش',
+    'No Answer At All': 'مردّش خالص',
+    'Reschedule Meeting': 'إعادة جدولة مقابلة',
+    'Not Interested': 'مش مهتم',
+    'Cancellation': 'إلغاء',
+    'Low Budget': 'ميزانية قليلة',
+    'Wrong Number': 'رقم غلط',
+    'Closed Number': 'رقم مقفول',
+    'Data Rotation': 'تدوير بيانات',
+    'Duplicate Leads': 'مكرر',
+  };
+
+  /// Stage name in the device language (Arabic or English). The stored value stays the English key.
+  static String label(String stage) => tr(stage, _arabic[stage] ?? stage);
 
   /// Normalize legacy or shorthand status values to their canonical stage name
   static String normalize(String? rawStatus) {
