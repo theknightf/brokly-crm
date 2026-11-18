@@ -85,7 +85,9 @@ export async function POST(request: Request) {
         ? 'application/vnd.ms-excel'
         : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-  if (!globalSource) {
+  // The sheet's own source/channel column wins per row; the picked source is the fallback. Either is enough.
+  const sheetHasSource = rows.some((r) => String(r?.source || '').trim() !== '');
+  if (!globalSource && !sheetHasSource) {
     return NextResponse.json(
       { error: 'Source selection is required for import batch' },
       { status: 400 }
@@ -176,7 +178,7 @@ export async function POST(request: Request) {
         uploaded_by_name: uploaderName,
         uploaded_by_role: uploaderRole,
         status: 'Processing',
-        source_name: globalSource,
+        source_name: globalSource || 'Sheet channel column',
         target_stage: globalStage,
         assignment_mode: assignmentModeLabel,
         total_rows: rows.length,
@@ -249,6 +251,28 @@ export async function POST(request: Request) {
       }
     }
   } catch {}
+
+  // Per-row sources: match the sheet's channel text to a lead_sources row (case/space/underscore-insensitive).
+  const sourceKey = (s: string) => s.toLowerCase().replace(/[\s_\-]+/g, '');
+  const sourceByKey = new Map<string, { id: string; name: string }>();
+  try {
+    const { data: allSources } = await supabase.from('lead_sources').select('id, name, is_active');
+    for (const s of (allSources || []) as any[]) {
+      const k = sourceKey(String(s.name || ''));
+      if (k && (!sourceByKey.has(k) || s.is_active)) sourceByKey.set(k, { id: s.id, name: s.name });
+    }
+  } catch {}
+  const unmatchedSources = new Set<string>();
+  const sourceForRow = (row: any): { name: string; id: string | null } => {
+    const raw = String(row?.source || '').trim();
+    if (raw) {
+      const hit = sourceByKey.get(sourceKey(raw));
+      if (hit) return { name: hit.name, id: hit.id };
+      unmatchedSources.add(raw);
+      if (!globalSource) return { name: raw, id: null };
+    }
+    return { name: resolvedSource, id: resolvedSourceId };
+  };
 
   // Pre-resolve single assignee name once if globalAssignedTo is a user id
   let preResolvedAssigneeName = '';
@@ -367,13 +391,14 @@ export async function POST(request: Request) {
 
     const rawNotes = String(row.notes || '').trim();
 
+    const rowSource = sourceForRow(row);
     const insertPayload: any = {
       name,
       phone: phoneRaw,
       phone2: String(row.phone2 || '').trim() || null,
       email: row.email || null,
-      source: resolvedSource,
-      lead_source_id: resolvedSourceId,
+      source: rowSource.name,
+      lead_source_id: rowSource.id,
       crm_status: globalStage,
       lead_status: 'New',
       notes: rawNotes,
@@ -576,7 +601,7 @@ export async function POST(request: Request) {
         ? 'Partially Imported'
         : 'Completed';
 
-  const summary = `Successfully imported ${imported} leads${routedDuplicates > 0 ? `, ${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} sent to owners for review` : ''}${updated > 0 ? `, ${updated} updated` : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}${invalid > 0 ? `, ${invalid} invalid` : ''}.`;
+  const summary = `Successfully imported ${imported} leads${routedDuplicates > 0 ? `, ${routedDuplicates} duplicate${routedDuplicates === 1 ? '' : 's'} sent to owners for review` : ''}${updated > 0 ? `, ${updated} updated` : ''}${skipped > 0 ? `, ${skipped} skipped` : ''}${invalid > 0 ? `, ${invalid} invalid` : ''}${unmatchedSources.size > 0 ? `. Sources not on the site (kept as typed or set to the picked source): ${Array.from(unmatchedSources).slice(0, 8).join(", ")}` : ''}.`;
 
   // Finalize import_logs record
   if (importLogId) {

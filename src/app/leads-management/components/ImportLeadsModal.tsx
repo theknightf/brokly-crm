@@ -365,14 +365,15 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     }
   };
 
-  const canConfirm = rows.length > 0 && source.trim().length > 0 && stage.trim().length > 0 && !parsing && !importing;
+  const sheetHasSource = rows.some((r) => String((r as any).source || '').trim() !== '');
+  const canConfirm = rows.length > 0 && (source.trim().length > 0 || sheetHasSource) && stage.trim().length > 0 && !parsing && !importing;
 
   const handleConfirm = async () => {
     if (!rows.length) {
       toast.error('Please choose a file first');
       return;
     }
-    if (!source.trim()) {
+    if (!source.trim() && !sheetHasSource) {
       toast.error('Please select a Source');
       return;
     }
@@ -525,7 +526,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
                   className="w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-3 pe-10 text-sm text-start focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none flex items-center justify-between gap-2 disabled:opacity-60"
                 >
                   <span className={source ? 'font-medium' : 'text-zinc-400'}>
-                    {source || 'Select source…'}
+                    {source || (sheetHasSource ? 'From the sheet (channel column)' : 'Select source…')}
                   </span>
                   <ChevronDown
                     size={15}

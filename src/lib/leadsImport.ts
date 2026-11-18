@@ -194,7 +194,7 @@ export function downloadLeadsTemplate() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-const SOURCE_FALLBACK = 'Other';
+
 const DEFAULT_STATUS: LeadStatus = 'Fresh Leads';
 
 function normalizeHeader(h: string): string {
@@ -525,7 +525,7 @@ export async function parseLeadFile(
       phone: normalizedPhone,
       phone2: normalizedPhone2 || undefined,
       status: statusNorm || statusRaw || DEFAULT_STATUS,
-      source: cellToStr(getMapped(obj, headers, mapping, 'source')) || SOURCE_FALLBACK,
+      source: cellToStr(getMapped(obj, headers, mapping, 'source')) || undefined,
       email: cellToStr(getMapped(obj, headers, mapping, 'email')) || undefined,
       date: isoDate || undefined,
       developer: cellToStr(getMapped(obj, headers, mapping, 'developer')) || undefined,
