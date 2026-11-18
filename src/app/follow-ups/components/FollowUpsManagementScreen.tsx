@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
 import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePwaAgentRestriction } from '@/hooks/usePwaAgentRestriction';
 import { useFollowUpSync } from '@/hooks/useFollowUpSync';
 import { followUpsService } from '@/lib/services/crmService';
 import FollowUpForm from './FollowUpForm';
@@ -111,6 +112,10 @@ function readUrl(): { tab: Tab; view: View; filters: Filters; openNew: boolean }
 export default function FollowUpsManagementScreen() {
   const { user, profile } = useAuth();
   const isAdmin = isAdminRole((profile as any)?.role);
+  // Installed app + sales agent (the phone app's Workspace): only Late and Today.
+  const pwaAgent = usePwaAgentRestriction();
+  const visibleTabs: Tab[] = pwaAgent ? ['overdue', 'today'] : TABS;
+  const tabLabel = (t: Tab) => (pwaAgent && t === 'overdue' ? 'Late' : TAB_LABEL[t]);
 
   const initial = useRef(readUrl());
   const [items, setItems] = useState<FollowUp[]>([]);
@@ -118,6 +123,9 @@ export default function FollowUpsManagementScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(initial.current.tab);
+  useEffect(() => {
+    if (pwaAgent && tab !== 'overdue' && tab !== 'today') setTab('overdue');
+  }, [pwaAgent, tab]);
   const [view, setView] = useState<View>(initial.current.view);
   const [filters, setFilters] = useState<Filters>(initial.current.filters);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -339,7 +347,7 @@ export default function FollowUpsManagementScreen() {
 
       {/* KPI cards = shortcuts to the tabs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {kpis.map((k) => (
+        {kpis.filter((k) => !pwaAgent || k.tab === 'overdue' || k.tab === 'today').map((k) => (
           <button
             key={k.tab}
             type="button"
@@ -352,7 +360,7 @@ export default function FollowUpsManagementScreen() {
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${k.tone}`}>{k.icon}</span>
             <span>
               <span className="block text-xl font-bold tabular-nums text-foreground">{loading ? '—' : counts[k.tab]}</span>
-              <span className="block text-xs text-muted-foreground">{k.label}</span>
+              <span className="block text-xs text-muted-foreground">{pwaAgent && k.tab === 'overdue' ? 'Late' : k.label}</span>
             </span>
           </button>
         ))}
@@ -361,7 +369,7 @@ export default function FollowUpsManagementScreen() {
       {/* Tabs + view switch */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border">
         <div className="-mb-px flex overflow-x-auto" role="tablist">
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t}
               role="tab"
@@ -371,7 +379,7 @@ export default function FollowUpsManagementScreen() {
                 tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {TAB_LABEL[t]}
+              {tabLabel(t)}
               <span
                 className={`rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${
                   tab === t ? 'bg-primary text-primary-foreground' : t === 'overdue' && counts.overdue ? 'bg-red-500/15 text-red-600' : 'bg-muted text-muted-foreground'

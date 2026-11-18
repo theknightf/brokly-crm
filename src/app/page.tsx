@@ -5,6 +5,8 @@ import AppLayout from '@/components/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole, TEAM_LEAD_ROLE } from '@/lib/roles';
 
+import { usePwaAgentRestriction } from '@/hooks/usePwaAgentRestriction';
+const PwaAgentHome = dynamic(() => import('./components/PwaAgentHome'));
 const DashboardHeader = dynamic(() => import('./components/DashboardHeader'));
 const KPIBentoGrid = dynamic(() => import('./components/KPIBentoGrid'));
 const DashboardKpis = dynamic(() => import('./components/DashboardKpis'));
@@ -56,6 +58,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 export default function DashboardPage() {
   const { profile, loading, user } = useAuth();
+  const pwaAgent = usePwaAgentRestriction();
   const [refreshKey, setRefreshKey] = React.useState(0);
   const [refreshing, setRefreshing] = React.useState(false);
   const [tab, setTab] = React.useState<'team' | 'mine'>('team');
@@ -72,6 +75,15 @@ export default function DashboardPage() {
     return (
       <AppLayout>
         <DashboardSkeleton />
+      </AppLayout>
+    );
+  }
+
+  // Installed app + plain sales agent: the two-button home (Dashboard / Workspace), like the phone app.
+  if (pwaAgent) {
+    return (
+      <AppLayout>
+        <PwaAgentHome />
       </AppLayout>
     );
   }
