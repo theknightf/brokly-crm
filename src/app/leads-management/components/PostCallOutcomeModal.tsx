@@ -372,7 +372,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
             </p>
           </div>
           {nativeDuration != null && (
-            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold">
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 px-2.5 py-1 text-[11px] font-semibold">
               <PhoneCall size={11} /> {nativeDuration}s saved
             </span>
           )}
@@ -411,7 +411,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
                           active ? 'border-current ring-2 ring-current shadow-md' : 'border-transparent hover:brightness-95'
                         }`}
                       >
-                        <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${active ? 'bg-white/60' : 'bg-white/70 shadow-sm'}`}>
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${active ? 'bg-white/60 dark:bg-white/15' : 'bg-white/70 shadow-sm dark:bg-white/10 dark:shadow-none'}`}>
                           {o.icon}
                         </span>
                         <span className="leading-tight min-w-0">
@@ -429,8 +429,8 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
 
           {/* 2. Next action, only when the outcome needs one. Presets + exact date/time. */}
           {needsSchedule && (
-            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3 space-y-2.5 animate-in fade-in">
-              <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5">
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 dark:border-violet-500/30 dark:bg-violet-500/10 p-3 space-y-2.5 animate-in fade-in">
+              <p className="text-xs font-bold text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
                 <CalendarCheck size={13} />
                 {scheduleTitle}
               </p>
@@ -446,7 +446,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
                         setFollowUpTime(p.time);
                       }}
                       className={`h-8 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
-                        active ? 'bg-violet-600 text-white shadow-sm' : 'bg-white text-violet-700 border border-violet-200 hover:bg-violet-50'
+                        active ? 'bg-violet-600 text-white shadow-sm' : 'bg-white text-violet-700 border border-violet-200 hover:bg-violet-50 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/30 dark:hover:bg-violet-500/20'
                       }`}
                     >
                       {p.label}
