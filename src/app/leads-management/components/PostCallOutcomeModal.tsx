@@ -5,6 +5,7 @@ import { Check, PhoneOff, ThumbsUp, ThumbsDown, CalendarClock, CalendarCheck, Al
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdminRole } from '@/lib/roles';
+import { STATUS_COLORS } from '@/lib/ui';
 import { leadsService, followUpsService } from '@/lib/services/crmService';
 import type { Lead } from './mockLeads';
 
@@ -328,7 +329,9 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
     if (outcome && !saving && !(noteRequired && !notes.trim())) void handleSave();
   };
 
-  const byValue = (v: PostCallOutcome) => OUTCOMES.find((o) => o.value === v)!;
+  // Same colours as the stage badges everywhere else (lib/ui STATUS_COLORS), taken from the stage the outcome sets.
+  const stageCls = (v: PostCallOutcome) => STATUS_COLORS[OUTCOME_TO_STATUS[v]] || 'bg-muted text-muted-foreground';
+  const byValue = (v: PostCallOutcome) =>OUTCOMES.find((o) => o.value === v)!;
   const GROUPS: { key: string; titleEn: string; titleAr: string; values: PostCallOutcome[] }[] = [
     { key: 'reached', titleEn: 'Reached', titleAr: 'تم التواصل', values: ['Answered', 'Interested', 'Not Interested'] },
     { key: 'missed', titleEn: 'Not reached', titleAr: 'لم يتم التواصل', values: ['No Answer', 'No Answer At All', 'Wrong Phone', 'Closed Number'] },
@@ -404,11 +407,11 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
                         role="radio"
                         aria-checked={active}
                         onClick={() => setOutcome(v)}
-                        className={`relative min-h-[52px] rounded-xl border-2 flex items-center gap-2 px-2.5 py-1.5 text-left text-xs font-bold transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                          active ? o.activeCls : `${o.cls}`
+                        className={`relative min-h-[52px] rounded-xl border-2 flex items-center gap-2 px-2.5 py-1.5 text-left text-xs font-bold transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${stageCls(v)} ${
+                          active ? 'border-current ring-2 ring-current shadow-md' : 'border-transparent hover:brightness-95'
                         }`}
                       >
-                        <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${active ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${active ? 'bg-white/60' : 'bg-white/70 shadow-sm'}`}>
                           {o.icon}
                         </span>
                         <span className="leading-tight min-w-0">
@@ -487,7 +490,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
           <p className="hidden sm:block flex-1 min-w-0 text-[11px] text-muted-foreground truncate">
             {selected ? (
               <>
-                Stage → <span className="font-semibold text-foreground">{OUTCOME_TO_STATUS[selected.value]}</span>
+                Stage → <span className={`rounded-full px-2 py-0.5 font-semibold ${stageCls(selected.value)}`}>{OUTCOME_TO_STATUS[selected.value]}</span>
                 {needsSchedule && followUpDate ? ` · next action ${followUpDate}${followUpTime ? ` ${followUpTime}` : ''}` : ''}
               </>
             ) : (
