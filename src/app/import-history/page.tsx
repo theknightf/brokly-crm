@@ -235,7 +235,7 @@ export default function ImportHistoryPage() {
       toast.info('No error or duplicate row details to export for this import.');
       return;
     }
-    const headers = ['Row Number', 'Lead Name', 'Phone Number', 'Category', 'First Owner', 'Owner Now', 'Details / Reason'];
+    const headers = ['Row Number', 'Lead Name', 'Phone Number', 'Category', 'Was With First', 'With Now', 'Details / Reason'];
     const csvRows = [
       headers.join(','),
       ...details.map((d) =>
@@ -881,8 +881,8 @@ export default function ImportHistoryPage() {
                         <th className="py-2.5 px-3">Lead Name</th>
                         <th className="py-2.5 px-3">Phone</th>
                         <th className="py-2.5 px-3">Type</th>
-                        <th className="py-2.5 px-3">First owner</th>
-                        <th className="py-2.5 px-3">Owner now</th>
+                        <th className="py-2.5 px-3">Was with first <span className="font-normal">· كانت عند مين الأول</span></th>
+                        <th className="py-2.5 px-3">With now <span className="font-normal">· عند مين دلوقتي</span></th>
                         <th className="py-2.5 px-3">Details / Resolution</th>
                       </tr>
                     </thead>

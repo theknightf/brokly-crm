@@ -50,7 +50,7 @@ const LogCallModal = dynamic(() => import('./LogCallModal'), { ssr: false });
 type DupNotice = {
   added: { name: string; phone: string };
   newLeadId: string;
-  existing: { id: string; name: string; phone: string; stage: string; owner: string; addedOn: string };
+  existing: { id: string; name: string; phone: string; stage: string; owner: string; addedOn: string } | null;
 };
 
 export interface FilterState {
@@ -1322,11 +1322,7 @@ export default function LeadsManagementScreen({
       if (err?.code === 'DUPLICATE_LEAD') {
         // Not added: the phone already exists. The owner of the original lead / admins get the details;
         // anyone else only learns that it exists (never who owns it).
-        if (err.existing) {
-          setDupNotice({ added: { name: lead.name, phone: lead.phone }, newLeadId: '', existing: err.existing });
-        } else {
-          toast.info('This lead already exists — it was not added again. العميل ده موجود قبل كده.');
-        }
+        setDupNotice({ added: { name: lead.name, phone: lead.phone }, newLeadId: '', existing: err.existing || null });
         return false;
       }
       toast.error(err?.message || 'Failed to add lead');
@@ -2032,6 +2028,12 @@ export default function LeadsManagementScreen({
                 <span dir="auto">{dupNotice.added.name || 'The lead'}</span> (<span className="font-mono" dir="ltr">{dupNotice.added.phone}</span>) was <b>not added</b> — the phone already exists. The attempt is saved in <b>Duplicates</b> for admins.
               </p>
             </div>
+            {!dupNotice.existing && (
+              <p className="text-sm text-muted-foreground" dir="auto">
+                This number is already in the system, so it was not added again. الرقم ده موجود في السيستم قبل كده، فما اتضافش تاني.
+              </p>
+            )}
+            {dupNotice.existing && (
             <div className="rounded-xl border border-border p-4 text-sm">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Duplicated with</p>
               <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5">
@@ -2047,13 +2049,18 @@ export default function LeadsManagementScreen({
                 <dd className="text-foreground">{dupNotice.existing.addedOn || '—'}</dd>
               </dl>
             </div>
+            )}
             <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={() => router.push(`/leads/${dupNotice.existing.id}`)} className="btn-secondary">
-                Open existing lead
-              </button>
-              <button type="button" onClick={() => router.push('/duplicates')} className="btn-secondary">
-                Open Duplicates
-              </button>
+              {dupNotice.existing && (
+                <>
+                  <button type="button" onClick={() => router.push(`/leads/${dupNotice.existing!.id}`)} className="btn-secondary">
+                    Open existing lead
+                  </button>
+                  <button type="button" onClick={() => router.push('/duplicates')} className="btn-secondary">
+                    Open Duplicates
+                  </button>
+                </>
+              )}
               <button type="button" onClick={() => setDupNotice(null)} className="btn-primary">
                 OK
               </button>
