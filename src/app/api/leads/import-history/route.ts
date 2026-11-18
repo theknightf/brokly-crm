@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -175,6 +176,44 @@ export async function GET(request: Request) {
     completedAt: r.completed_at,
     downloadUrl: `/api/leads/import-history/${r.id}/download`,
   }));
+
+  // Duplicates: attach who owned the existing lead FIRST and who owns it NOW (works for old imports too).
+  try {
+    const phones = Array.from(
+      new Set(
+        logs.flatMap((l: any) =>
+          l.errorDetails.filter((d: any) => d?.type === 'duplicate_routed' && d.phone).map((d: any) => String(d.phone))
+        )
+      )
+    );
+    const sUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const sKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (phones.length && sUrl && sKey) {
+      const db: any = createServiceClient(sUrl, sKey);
+      const { data: owners } = await db.rpc('import_duplicate_owners', { p_phones: phones });
+      const norm = (v: string) => v.replace(/\D/g, '').replace(/^(00)?20/, '').replace(/^0/, '');
+      const byKey = new Map<string, any>();
+      for (const o of owners || []) byKey.set(norm(String(o.phone_key || '')), o);
+      for (const l of logs as any[]) {
+        l.errorDetails = l.errorDetails.map((d: any) => {
+          if (d?.type !== 'duplicate_routed') return d;
+          const o = byKey.get(norm(String(d.phone || '')));
+          return o
+            ? {
+                ...d,
+                firstOwner: o.first_owner || '',
+                currentOwner: o.current_owner || '',
+                existingStage: o.stage || '',
+                existingAddedOn: o.added_on || '',
+                existingName: o.lead_name || '',
+              }
+            : d;
+        });
+      }
+    }
+  } catch {
+    /* enrichment is best effort */
+  }
 
   return NextResponse.json({
     logs,

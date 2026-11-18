@@ -39,6 +39,11 @@ interface ErrorDetailItem {
   phone?: string;
   type: 'invalid' | 'skipped' | 'duplicate_routed' | 'error';
   reason: string;
+  firstOwner?: string;
+  currentOwner?: string;
+  existingStage?: string;
+  existingAddedOn?: string;
+  existingName?: string;
 }
 
 interface ImportLogRecord {
@@ -230,7 +235,7 @@ export default function ImportHistoryPage() {
       toast.info('No error or duplicate row details to export for this import.');
       return;
     }
-    const headers = ['Row Number', 'Lead Name', 'Phone Number', 'Category', 'Details / Reason'];
+    const headers = ['Row Number', 'Lead Name', 'Phone Number', 'Category', 'First Owner', 'Owner Now', 'Details / Reason'];
     const csvRows = [
       headers.join(','),
       ...details.map((d) =>
@@ -239,6 +244,8 @@ export default function ImportHistoryPage() {
           `"${String(d.name || '').replace(/"/g, '""')}"`,
           `"${String(d.phone || '').replace(/"/g, '""')}"`,
           `"${String(d.type || '').replace(/"/g, '""')}"`,
+          `"${String(d.firstOwner || '').replace(/"/g, '""')}"`,
+          `"${String(d.currentOwner || '').replace(/"/g, '""')}"`,
           `"${String(d.reason || '').replace(/"/g, '""')}"`,
         ].join(',')
       ),
@@ -874,6 +881,8 @@ export default function ImportHistoryPage() {
                         <th className="py-2.5 px-3">Lead Name</th>
                         <th className="py-2.5 px-3">Phone</th>
                         <th className="py-2.5 px-3">Type</th>
+                        <th className="py-2.5 px-3">First owner</th>
+                        <th className="py-2.5 px-3">Owner now</th>
                         <th className="py-2.5 px-3">Details / Resolution</th>
                       </tr>
                     </thead>
@@ -894,7 +903,19 @@ export default function ImportHistoryPage() {
                               </span>
                             )}
                           </td>
-                          <td className="py-2 px-3 text-muted-foreground">{d.reason}</td>
+                          <td className="py-2 px-3 font-medium">{d.type === 'duplicate_routed' ? d.firstOwner || '—' : ''}</td>
+                          <td className="py-2 px-3 font-medium">
+                            {d.type === 'duplicate_routed' ? (
+                              <span className={d.currentOwner && d.currentOwner !== d.firstOwner ? 'text-primary' : ''}>
+                                {d.currentOwner || '—'}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-2 px-3 text-muted-foreground">
+                            {d.type === 'duplicate_routed' && d.existingStage
+                              ? `${d.existingStage}${d.existingAddedOn ? ` · ${d.existingAddedOn}` : ''}`
+                              : d.reason}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
