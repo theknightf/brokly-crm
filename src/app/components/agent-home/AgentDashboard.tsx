@@ -14,7 +14,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { followUpsService } from '@/lib/services/crmService';
 
 const AttendanceSelfCard = dynamic(() => import('@/components/AttendanceSelfCard'));
-const SalesFollowUpsWidget = dynamic(() => import('../SalesFollowUpsWidget'));
 const MyTargetsTasks = dynamic(() => import('../MyTargetsTasks'));
 const AgentPipeline = dynamic(() => import('./AgentPipeline'));
 const DailyLeaderboard = dynamic(() => import('../DailyLeaderboard'));
@@ -123,13 +122,8 @@ export default function AgentDashboard() {
       {/* 2. Today */}
       <Section title={t('agent.today.title')} subtitle={t('agent.today.subtitle')}>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="flex min-w-0 flex-col gap-4">
-            <AttendanceSelfCard variant="agent" />
-            <MyTargetsTasks key={`tt-${refreshKey}`} variant="agent" />
-          </div>
-          <div className="min-w-0">
-            <SalesFollowUpsWidget key={`fu-${refreshKey}`} variant="agent" />
-          </div>
+          <AttendanceSelfCard variant="agent" />
+          <MyTargetsTasks key={`tt-${refreshKey}`} variant="agent" />
         </div>
       </Section>
 
