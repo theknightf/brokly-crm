@@ -1,5 +1,5 @@
--- A lead is NOT a duplicate only when the OWNER (role owner) re-adds a lead he already owns / added himself
--- (e.g. gives it to another agent). Anyone else re-adding an existing phone is a duplicate, as before.
+-- A lead is NOT a duplicate only when the existing lead is CURRENTLY ASSIGNED to the owner (role owner) and the owner
+-- adds it again (e.g. for another agent). Any other re-add of an existing phone is a duplicate, as before.
 CREATE OR REPLACE FUNCTION public.leads_route_duplicate_before_insert()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
 AS $function$
@@ -16,7 +16,7 @@ begin
     return new;
   end if;
 
-  select l.id, coalesce(l.assigned_to, l.created_by) as owner_id, l.created_by
+  select l.id, coalesce(l.assigned_to, l.created_by) as owner_id, l.created_by, l.assigned_to
     into v_orig
   from public.leads l
   where l.phone_normalized = v_phone
@@ -29,7 +29,7 @@ begin
   end if;
 
   -- the owner / adder of the existing lead adding it again is not a duplicate
-  if v_actor is not null and (v_actor = v_orig.owner_id or v_actor = v_orig.created_by)
+  if v_actor is not null and v_actor = v_orig.assigned_to
      and exists (select 1 from public.user_profiles up where up.id = v_actor and up.role::text = 'owner') then
     return new;
   end if;
@@ -81,7 +81,7 @@ BEGIN
   END IF;
 
   IF char_length(NEW.phone_normalized) >= 8 THEN
-    SELECT id, coalesce(assigned_to, created_by), created_by INTO v_original, v_o_owner, v_o_by
+    SELECT id, assigned_to, created_by INTO v_original, v_o_owner, v_o_by
     FROM public.leads
     WHERE phone_normalized = NEW.phone_normalized
       AND id <> NEW.id
@@ -90,7 +90,7 @@ BEGIN
     LIMIT 1;
 
     IF v_original IS NOT NULL
-       AND NOT (TG_OP = 'INSERT' AND v_actor IS NOT NULL AND (v_actor = v_o_owner OR v_actor = v_o_by)
+       AND NOT (TG_OP = 'INSERT' AND v_actor IS NOT NULL AND v_actor = v_o_owner
            AND EXISTS (SELECT 1 FROM public.user_profiles up WHERE up.id = v_actor AND up.role::text = 'owner')) THEN
       NEW.is_duplicate := true;
       NEW.duplicate_of_lead_id := v_original;
