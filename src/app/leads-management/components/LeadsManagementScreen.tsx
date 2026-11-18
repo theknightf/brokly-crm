@@ -36,7 +36,7 @@ import { duplicateLeadsService } from '@/lib/services/peopleOpsService';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { isAdminRole } from '@/lib/roles';
+import { isAdminRole, canDeleteLeads } from '@/lib/roles';
 import StatusNoteModal from './StatusNoteModal';
 import LeadProfileDrawer, { scheduleLeadFollowUp } from './LeadProfileDrawer';
 import PostCallOutcomeModal from './PostCallOutcomeModal';
@@ -889,7 +889,7 @@ export default function LeadsManagementScreen({
   };
 
   const handleDeleteLead = useCallback(async (id: string) => {
-    if (!isAdminRole(profile?.role)) {
+    if (!canDeleteLeads(profile?.role)) {
       toast.error('Only owner and admin can delete leads.');
       return;
     }

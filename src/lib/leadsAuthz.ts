@@ -1,5 +1,5 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js';
-import { isAdminRole } from '@/lib/roles';
+import { canDeleteLeads } from '@/lib/roles';
 
 /**
  * Build a Supabase client using the service-role key so server-side deletes can
@@ -27,6 +27,6 @@ export async function canDeleteLead(
   actor: { id: string; role: string },
   lead: { id: string; created_by?: string | null; assigned_to?: string | null }
 ): Promise<boolean> {
-  // Only owner and admin can delete leads; sales/agents cannot delete.
-  return isAdminRole(actor.role);
+  // Only owner and admin can delete leads; limited_admin, sales and agents cannot.
+  return canDeleteLeads(actor.role);
 }

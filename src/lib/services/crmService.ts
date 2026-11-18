@@ -182,7 +182,7 @@ async function getRotationState() {
     if (enabled) {
       const all = await teamsService.getAssignableUsers();
       agents = (all as any[])
-        .filter((u) => u.role !== 'admin' && u.role !== 'owner')
+        .filter((u) => u.role !== 'admin' && u.role !== 'owner' && u.role !== 'limited_admin')
         .map((u) => ({ id: u.id, name: u.name }));
     }
     rotationStateCache = { at: Date.now(), enabled, agents };
@@ -2543,7 +2543,7 @@ export const teamsService = {
 
         if (!profile) return [];
 
-        const isAdmin = profile.role === 'admin' || profile.role === 'owner';
+        const isAdmin = profile.role === 'admin' || profile.role === 'owner' || profile.role === 'limited_admin';
 
         if (isAdmin) {
           const { data, error } = await supabase

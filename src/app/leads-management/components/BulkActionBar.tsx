@@ -25,7 +25,7 @@ import ViewportPopover from '@/components/ui/ViewportPopover';
 import { teamsService, messageLogsService } from '@/lib/services/crmService';
 import { sanitizeEgyptPhone } from '@/lib/whatsapp';
 import { useAuth } from '@/contexts/AuthContext';
-import { isAdminRole } from '@/lib/roles';
+import { isAdminRole, canDeleteLeads } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { PIPELINE_STAGES, OUTCOME_STAGES } from './leadStages';
@@ -110,7 +110,7 @@ export default function BulkActionBar({
   const [statusOpen, setStatusOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const statusBtnRef = useRef<HTMLButtonElement>(null);
-  const canDelete = isAdminRole(profile?.role);
+  const canDelete = canDeleteLeads(profile?.role);
   const [open, setOpen] = useState<'none' | 'whatsapp' | 'team'>('none');
   const [composer, setComposer] = useState<'none' | 'email' | 'sms'>('none');
   const [confirmDelete, setConfirmDelete] = useState(false);

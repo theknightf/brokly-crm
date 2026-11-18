@@ -6,8 +6,8 @@
 // Case-insensitive + OWNER_ADMIN-tolerant: role strings arrive in mixed case
 // ('ADMIN', 'OWNER', 'OWNER_ADMIN') from legacy rows and signup metadata. A
 // case-sensitive check silently demoted those users to the employee view.
-export const ADMIN_ROLES = ['owner', 'admin'];
-export const USER_MANAGEMENT_ROLES = ['owner', 'admin'];
+export const ADMIN_ROLES = ['owner', 'admin', 'limited_admin'];
+export const USER_MANAGEMENT_ROLES = ['owner', 'admin', 'limited_admin'];
 export const TEAM_LEAD_ROLE = 'team_leader';
 
 function normalizeRole(role?: string | null): string {
@@ -16,7 +16,7 @@ function normalizeRole(role?: string | null): string {
 
 export function isAdminRole(role?: string | null): boolean {
   const r = normalizeRole(role);
-  return r === 'owner' || r === 'admin' || r === 'owner_admin' || r === 'owneradmin';
+  return r === 'owner' || r === 'admin' || r === 'owner_admin' || r === 'owneradmin' || r === 'limited_admin';
 }
 
 export function canManageUsers(role?: string | null): boolean {
@@ -36,4 +36,9 @@ export function canViewTeams(role?: string | null): boolean {
 /** Owners & admins can manage (add/edit/remove) all members. Leaders view only. */
 export function canManageTeams(role?: string | null): boolean {
   return isAdminRole(role);
+}
+
+/** limited_admin has every admin permission EXCEPT deleting leads (enforced in the database too). */
+export function canDeleteLeads(role?: string | null): boolean {
+  return isAdminRole(role) && normalizeRole(role) !== 'limited_admin';
 }

@@ -36,7 +36,7 @@ import StageMenuList from './StageMenuList';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { isAdminRole } from '@/lib/roles';
+import { canDeleteLeads } from '@/lib/roles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getWhatsAppLinkForLead } from '@/lib/whatsapp';
 import { IntlBadge } from '@/components/ui/IntlBadge';
@@ -657,7 +657,7 @@ export default function LeadsTable({
 }: LeadsTableProps) {
   const { user, profile } = useAuth();
   const { t, lang } = useLanguage();
-  const canDelete = isAdminRole(profile?.role);
+  const canDelete = canDeleteLeads(profile?.role);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
 

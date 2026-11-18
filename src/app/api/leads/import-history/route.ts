@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 const AUTHORIZED_ROLES = new Set([
   'owner',
   'admin',
+  'limited_admin',
   'owner_admin',
   'owneradmin',
   'branch_manager',

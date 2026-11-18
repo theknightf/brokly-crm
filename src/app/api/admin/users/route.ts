@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 const ALLOWED_ROLES = [
   'admin',
+  'limited_admin',
   'owner',
   'broker',
   'branch_manager',
@@ -46,6 +47,9 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+  if (role === 'limited_admin' && guard.actor.role !== 'owner') {
+    return NextResponse.json({ error: 'Only an owner can create a limited admin' }, { status: 403 });
+  }
   if (role === 'admin' && guard.actor.role !== 'owner' && guard.actor.role !== 'admin') {
     return NextResponse.json(
       { error: 'Only an owner or admin can create an admin' },
@@ -69,7 +73,7 @@ export async function POST(request: Request) {
     .select('id, role')
     .eq('id', adminId)
     .maybeSingle();
-  if (!targetAdmin || (targetAdmin.role !== 'admin' && targetAdmin.role !== 'owner')) {
+  if (!targetAdmin || (targetAdmin.role !== 'admin' && targetAdmin.role !== 'owner' && targetAdmin.role !== 'limited_admin')) {
     return NextResponse.json(
       { error: 'Assigned admin must be an admin or owner' },
       { status: 400 }
@@ -188,7 +192,7 @@ export async function PATCH(request: Request) {
 
   const targetId = String(body.id);
   const actorRole = guard.actor.role;
-  if (actorRole !== 'owner' && actorRole !== 'admin') {
+  if (actorRole !== 'owner' && actorRole !== 'admin' && actorRole !== 'limited_admin') {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
 
@@ -205,6 +209,9 @@ export async function PATCH(request: Request) {
     }
     if (role === 'admin' && actorRole !== 'owner') {
       return NextResponse.json({ error: 'Only an owner can grant admin' }, { status: 403 });
+    }
+    if (role === 'limited_admin' && actorRole !== 'owner') {
+      return NextResponse.json({ error: 'Only an owner can grant limited_admin' }, { status: 403 });
     }
     payload.role = role;
   }

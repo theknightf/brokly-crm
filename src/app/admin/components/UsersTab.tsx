@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 const ROLES = [
   { value: 'owner', label: 'Owner', color: 'bg-purple-100 text-purple-700' },
   { value: 'admin', label: 'Admin', color: 'bg-blue-100 text-blue-700' },
+  { value: 'limited_admin', label: 'Limited Admin (no lead delete)', color: 'bg-sky-100 text-sky-700' },
   { value: 'broker', label: 'Broker', color: 'bg-indigo-100 text-indigo-700' },
   { value: 'branch_manager', label: 'Branch Manager', color: 'bg-cyan-100 text-cyan-700' },
   { value: 'team_leader', label: 'Team Leader', color: 'bg-teal-100 text-teal-700' },
@@ -609,7 +610,7 @@ function CreateUserModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const isAdminRole = role === 'admin' || role === 'owner';
+  const isAdminRole = role === 'admin' || role === 'owner' || role === 'limited_admin';
   const showTeamLeaderSection = isSalesStructureRole(role);
   const selectedLeader = leaders.find((l) => l.id === teamLeaderId) || null;
   const selectedTeamId = selectedLeader?.teamId || '';

@@ -17,7 +17,7 @@ class StageNoteGuard {
       if (uid == null) return false;
       final row = await SupabaseService().client.from('user_profiles').select('role').eq('id', uid).maybeSingle();
       final r = (row?['role']?.toString() ?? '').toLowerCase().trim().replaceAll('-', '_');
-      _isAdmin = r == 'owner' || r == 'admin' || r == 'owner_admin' || r == 'owneradmin';
+      _isAdmin = r == 'owner' || r == 'admin' || r == 'owner_admin' || r == 'owneradmin' || r == 'limited_admin';
       return _isAdmin!;
     } catch (_) {
       return false;

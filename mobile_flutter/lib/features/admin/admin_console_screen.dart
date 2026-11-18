@@ -79,7 +79,7 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
     if (!profile.isAdmin) return const AdminAccessDenied();
 
     final role = profile.role.trim().toLowerCase();
-    final canUsers = role == 'owner' || role == 'admin';
+    final canUsers = role == 'owner' || role == 'admin' || role == 'limited_admin';
     final sections = AdminSection.values.where((s) => s != AdminSection.users || canUsers).toList();
     final groupSections = sections.where((s) => s.group == _group).toList();
     // Keep the selection valid if the group changed or Users is hidden.

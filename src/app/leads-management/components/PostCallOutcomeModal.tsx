@@ -212,6 +212,26 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
     };
   }, [open, onClose]);
 
+  // Keyboard: 1-9 and 0 pick an outcome (not while typing), Ctrl/Cmd+Enter saves.
+  const saveRef = React.useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        saveRef.current();
+        return;
+      }
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || !/^[0-9]$/.test(e.key)) return;
+      const idx = e.key === '0' ? 9 : Number(e.key) - 1;
+      if (OUTCOMES[idx]) setOutcome(OUTCOMES[idx].value);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
   if (!open || !lead || !mounted) return null;
 
   // Follow-up / Meeting / No Answer all need a next-action date. For No Answer
@@ -228,6 +248,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
   const retryPresets: { label: string; days: number; time: string }[] = [
     { label: 'Tomorrow 10:00', days: 1, time: '10:00' },
     { label: 'In 2 days', days: 2, time: '12:00' },
+    { label: 'In 3 days', days: 3, time: '12:00' },
     { label: 'Next week', days: 7, time: '12:00' },
   ];
 
@@ -303,160 +324,183 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
       });
   };
 
+  saveRef.current = () => {
+    if (outcome && !saving && !(noteRequired && !notes.trim())) void handleSave();
+  };
+
+  const byValue = (v: PostCallOutcome) => OUTCOMES.find((o) => o.value === v)!;
+  const GROUPS: { key: string; titleEn: string; titleAr: string; values: PostCallOutcome[] }[] = [
+    { key: 'reached', titleEn: 'Reached', titleAr: 'تم التواصل', values: ['Answered', 'Interested', 'Not Interested'] },
+    { key: 'missed', titleEn: 'Not reached', titleAr: 'لم يتم التواصل', values: ['No Answer', 'No Answer At All', 'Wrong Phone', 'Closed Number'] },
+    { key: 'next', titleEn: 'Next step', titleAr: 'الخطوة التالية', values: ['Follow-up', 'Meeting', 'Follow Up After Meeting'] },
+  ];
+  const keyOf = (v: PostCallOutcome) => OUTCOMES.findIndex((o) => o.value === v) + 1; // 1..9, 0 for the 10th
+  const selected = outcome ? byValue(outcome) : null;
+
+  const scheduleTitle =
+    outcome === 'Schedule Meeting' || outcome === 'Meeting'
+      ? 'Meeting schedule'
+      : outcome === 'No Answer' || outcome === 'No Answer At All'
+        ? 'Retry — remind me to call back'
+        : 'Follow-up schedule';
+
   const modalContent = (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4"
+      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="post-call-title"
     >
       <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="relative z-[81] w-full max-w-lg bg-card rounded-2xl shadow-modal flex flex-col overflow-hidden slide-up-enter max-h-[92dvh] sm:max-h-[85vh]">
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 sm:p-6 border-b border-border flex-shrink-0 bg-card">
+      <div className="relative z-[81] w-full sm:max-w-2xl bg-card rounded-t-2xl sm:rounded-2xl shadow-modal flex flex-col overflow-hidden slide-up-enter max-h-[96dvh] sm:max-h-[90vh]">
+        {/* Header: who was called, duration, close */}
+        <div className="flex items-center gap-3 px-4 py-3 sm:px-5 border-b border-border flex-shrink-0">
+          <span className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+            <PhoneCall size={16} />
+          </span>
           <div className="min-w-0 flex-1">
-            <h2 id="post-call-title" className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                <PhoneCall size={15} />
-              </span>
-              Call Outcome
+            <h2 id="post-call-title" className="text-sm sm:text-base font-bold text-foreground leading-tight">
+              Call outcome <span className="font-normal text-muted-foreground text-xs">· نتيجة المكالمة</span>
             </h2>
-            <p className="text-sm text-muted-foreground mt-1 truncate">
-              {lead.name || `Lead ${lead.id}`} {lead.phone ? `· ${lead.phone}` : ''}
+            <p className="text-xs text-muted-foreground truncate">
+              {lead.name || `Lead ${lead.id}`}
+              {lead.phone ? ` · ${lead.phone}` : ''}
+              {nativeDuration != null ? ` · ${nativeDuration}s` : ''}
             </p>
           </div>
+          {nativeDuration != null && (
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold">
+              <PhoneCall size={11} /> {nativeDuration}s saved
+            </span>
+          )}
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0 ml-3"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0"
             aria-label="Close"
+            type="button"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 overscroll-contain min-h-0 p-5 sm:p-6 space-y-5">
-          {nativeDuration != null && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2 text-xs flex items-center gap-2 animate-in fade-in">
-              <PhoneCall size={13} />
-              <span>
-                Native duration captured: <span className="font-bold">{nativeDuration}s</span> — will be saved with this log.
-              </span>
-            </div>
-          )}
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3">Select outcome *</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {OUTCOMES.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => setOutcome(o.value)}
-                  className={`h-[68px] rounded-xl border-2 flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all active:scale-[0.98] px-2 ${
-                    outcome === o.value ? o.activeCls : `${o.cls} border-border`
-                  }`}
-                >
-                  <span className={`w-7 h-7 rounded-full flex items-center justify-center ${outcome === o.value ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
-                    {o.icon}
-                  </span>
-                  <span className="leading-tight text-center">
-                    {o.labelEn}
-                    <span className="block text-[10px] font-normal opacity-80">{o.labelAr}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {needsSchedule && (
-            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 space-y-3 animate-in fade-in slide-in-from-top-2">
-              <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5">
-                <CalendarCheck size={13} />
-                {outcome === 'Schedule Meeting'
-                  ? 'Meeting schedule'
-                  : outcome === 'No Answer'
-                    ? 'Retry schedule — remind me to call back'
-                    : 'Follow-up schedule'}
-              </p>
-              {outcome === 'No Answer' && (
-                <div className="flex flex-wrap gap-1.5">
-                  {retryPresets.map((p) => {
-                    const active =
-                      followUpDate === addDays(formatToday(), p.days) && followUpTime === p.time;
+        {/* Body: everything on one screen. Only scrolls on very small phones. */}
+        <div className="overflow-y-auto flex-1 overscroll-contain min-h-0 px-4 py-3 sm:px-5 space-y-3">
+          {/* 1. Outcome, grouped. Keys 1-9, 0 pick an outcome. */}
+          <div role="radiogroup" aria-label="Call outcome" className="space-y-2.5">
+            {GROUPS.map((g) => (
+              <div key={g.key}>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  {g.titleEn} <span className="font-normal normal-case">· {g.titleAr}</span>
+                </p>
+                <div className={`grid gap-1.5 ${g.values.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+                  {g.values.map((v) => {
+                    const o = byValue(v);
+                    const active = outcome === v;
+                    const k = keyOf(v);
                     return (
                       <button
-                        key={p.label}
+                        key={v}
                         type="button"
-                        onClick={() => {
-                          setFollowUpDate(addDays(formatToday(), p.days));
-                          setFollowUpTime(p.time);
-                        }}
-                        className={`h-8 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
-                          active
-                            ? 'bg-violet-600 text-white shadow-sm'
-                            : 'bg-white text-violet-700 border border-violet-200 hover:bg-violet-50'
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setOutcome(v)}
+                        className={`relative min-h-[52px] rounded-xl border-2 flex items-center gap-2 px-2.5 py-1.5 text-left text-xs font-bold transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                          active ? o.activeCls : `${o.cls}`
                         }`}
                       >
-                        {p.label}
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${active ? 'bg-white/20' : 'bg-white shadow-sm'}`}>
+                          {o.icon}
+                        </span>
+                        <span className="leading-tight min-w-0">
+                          <span className="block truncate">{o.labelEn}</span>
+                          <span className="block text-[10px] font-normal opacity-80 truncate">{o.labelAr}</span>
+                        </span>
+                        <kbd className={`hidden sm:flex absolute top-1 right-1.5 text-[9px] font-semibold opacity-50`}>{k === 10 ? 0 : k}</kbd>
                       </button>
                     );
                   })}
                 </div>
-              )}
-              <div className="grid grid-cols-2 gap-3">
+              </div>
+            ))}
+          </div>
+
+          {/* 2. Next action, only when the outcome needs one. Presets + exact date/time. */}
+          {needsSchedule && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3 space-y-2.5 animate-in fade-in">
+              <p className="text-xs font-bold text-violet-700 flex items-center gap-1.5">
+                <CalendarCheck size={13} />
+                {scheduleTitle}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {retryPresets.map((p) => {
+                  const active = followUpDate === addDays(formatToday(), p.days) && followUpTime === p.time;
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        setFollowUpDate(addDays(formatToday(), p.days));
+                        setFollowUpTime(p.time);
+                      }}
+                      className={`h-8 px-3 rounded-full text-[11px] font-bold transition-all active:scale-95 ${
+                        active ? 'bg-violet-600 text-white shadow-sm' : 'bg-white text-violet-700 border border-violet-200 hover:bg-violet-50'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">Next action date</span>
-                  <input
-                    type="date"
-                    value={followUpDate}
-                    min={formatToday()}
-                    onChange={(e) => setFollowUpDate(e.target.value)}
-                    className="input-base h-9 text-sm"
-                  />
+                  <span className="text-[11px] font-semibold text-muted-foreground">Date · التاريخ</span>
+                  <input type="date" value={followUpDate} min={formatToday()} onChange={(e) => setFollowUpDate(e.target.value)} className="input-base h-9 text-sm" />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-muted-foreground">Time</span>
-                  <input
-                    type="time"
-                    value={followUpTime}
-                    onChange={(e) => setFollowUpTime(e.target.value)}
-                    className="input-base h-9 text-sm"
-                  />
+                  <span className="text-[11px] font-semibold text-muted-foreground">Time · الوقت</span>
+                  <input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} className="input-base h-9 text-sm" />
                 </label>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                {outcome === 'Schedule Meeting'
-                  ? 'This meeting will appear on Calendar & Follow-ups.'
-                  : outcome === 'No Answer'
-                    ? 'We’ll remind you to retry this lead on this date (Follow-ups & Workspace).'
-                    : 'A follow-up will be created for this date.'}
-              </p>
             </div>
           )}
 
-          <label className="flex flex-col gap-1.5">
+          {/* 3. Notes */}
+          <label className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-foreground">
-              Call Notes <span className="font-normal text-muted-foreground text-[11px]">{noteRequired ? '(required — the stage changes with it)' : '(optional)'}</span>
+              Call notes · ملاحظات{' '}
+              <span className="font-normal text-muted-foreground text-[11px]">
+                {noteRequired ? '(required — the stage changes with it)' : '(optional)'}
+              </span>
             </span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={3}
+              rows={2}
               placeholder="Quick remarks — e.g. wants 3BR in New Zayed, budget 2M..."
-              className="input-base resize-none min-h-[84px] py-2.5 text-sm"
+              className="input-base resize-none min-h-[64px] py-2 text-sm"
             />
           </label>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-4 sm:p-5 border-t border-border bg-card flex-shrink-0">
-          <button onClick={onClose} className="btn-secondary h-11 px-5 text-sm font-semibold" type="button">
+        {/* Footer: always visible. Shows what will be saved. */}
+        <div className="flex items-center gap-2 px-4 py-3 sm:px-5 border-t border-border bg-card flex-shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <p className="hidden sm:block flex-1 min-w-0 text-[11px] text-muted-foreground truncate">
+            {selected ? (
+              <>
+                Stage → <span className="font-semibold text-foreground">{OUTCOME_TO_STATUS[selected.value]}</span>
+                {needsSchedule && followUpDate ? ` · next action ${followUpDate}${followUpTime ? ` ${followUpTime}` : ''}` : ''}
+              </>
+            ) : (
+              'Pick an outcome · Ctrl+Enter to save'
+            )}
+          </p>
+          <button onClick={onClose} className="btn-secondary h-11 px-4 text-sm font-semibold flex-shrink-0 max-sm:flex-1" type="button">
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!outcome || saving || (noteRequired && !notes.trim())}
-            className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_6px_20px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_10px_28px_-6px_rgba(132,204,22,0.8)] hover:-translate-y-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2 min-w-[124px]"
+            className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-[0_6px_20px_-6px_rgba(132,204,22,0.65)] hover:shadow-[0_10px_28px_-6px_rgba(132,204,22,0.8)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[124px] flex-shrink-0 max-sm:flex-[2]"
             type="button"
           >
             {saving ? (
@@ -467,7 +511,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
             ) : (
               <>
                 <Check size={16} strokeWidth={2.5} />
-                Save Log
+                Save log
               </>
             )}
           </button>

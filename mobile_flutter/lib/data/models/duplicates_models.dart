@@ -19,7 +19,7 @@ String normalizeRoleKey(String? role) =>
 
 bool isAdminRoleKey(String? role) {
   final r = normalizeRoleKey(role);
-  return r == 'owner' || r == 'admin' || r == 'owner_admin' || r == 'owneradmin';
+  return r == 'owner' || r == 'admin' || r == 'owner_admin' || r == 'owneradmin' || r == 'limited_admin';
 }
 
 /// Same set as the SQL helper is_duplicate_reviewer(): owner / admin / manager.

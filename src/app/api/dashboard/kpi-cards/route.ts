@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
   const normalizedRole = String(actor.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   const isOwner = normalizedRole === 'owner' || normalizedRole === 'owner_admin' || normalizedRole === 'owneradmin';
-  const isAdmin = normalizedRole === 'admin' || isOwner;
+  const isAdmin = normalizedRole === 'admin' || normalizedRole === 'limited_admin' || isOwner;
 
   // ── Role-scoped RBAC ───────────────────────────────────────────────
   let assignedFilter: string | null = null;
@@ -213,7 +213,7 @@ export async function GET(request: Request) {
     teams,
     agents,
     period: { from: from || 'all-time', to: cairoDate(new Date()) },
-    scope: isOwner ? 'owner-global' : normalizedRole === 'admin' ? 'admin-team' : teamMemberIds ? 'team' : assignedFilter ? 'sales-assigned' : 'unknown',
+    scope: isOwner ? 'owner-global' : (normalizedRole === 'admin' || normalizedRole === 'limited_admin') ? 'admin-team' : teamMemberIds ? 'team' : assignedFilter ? 'sales-assigned' : 'unknown',
   };
   kpiServerCache.set(cacheKey, { expiresAt: Date.now() + 10_000, payload });
   return NextResponse.json(payload);

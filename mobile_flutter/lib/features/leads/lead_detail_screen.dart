@@ -18,6 +18,7 @@ import '../../data/models/lead_model.dart';
 import '../../data/services/call_logs_service.dart';
 import '../../data/services/leads_service.dart';
 import '../../data/services/supabase_service.dart';
+import '../../state/auth_provider.dart';
 import '../../state/leads_provider.dart';
 import '../calculator/unit_calculator_screen.dart';
 import 'edit_lead_screen.dart';
@@ -307,7 +308,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
           item(LucideIcons.calculator, tr('Unit calculator', 'حاسبة الوحدات'),
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UnitCalculatorScreen()))),
           item(LucideIcons.refreshCw, tr('Sync calls from phone', 'اسحب المكالمات من التليفون'), _syncDeviceCalls),
-          item(LucideIcons.trash2, tr('Delete lead', 'امسح العميل'), _confirmDelete, color: p.danger),
+          if (!(context.read<AuthProvider>().profile?.isLimitedAdmin ?? false))
+            item(LucideIcons.trash2, tr('Delete lead', 'امسح العميل'), _confirmDelete, color: p.danger),
           const SizedBox(height: 8),
         ]),
       );

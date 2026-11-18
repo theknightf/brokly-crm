@@ -13,6 +13,7 @@ import '../../../core/utils/whatsapp_utils.dart';
 import '../../../core/widgets/premium.dart';
 import '../../../data/models/last_call_info.dart';
 import '../../../data/models/lead_model.dart';
+import '../../../state/auth_provider.dart';
 import '../../../state/leads_provider.dart';
 import '../edit_lead_screen.dart';
 import 'log_call_dialog.dart';
@@ -289,10 +290,11 @@ class LeadCard extends StatelessWidget {
           value: _CardMenu.edit,
           child: _MenuRow(LucideIcons.pencil, 'Edit lead', null),
         ),
-        PopupMenuItem(
-          value: _CardMenu.delete,
-          child: _MenuRow(LucideIcons.trash2, 'Delete lead', Color(0xFFEF4444)),
-        ),
+        if (!(context.read<AuthProvider>().profile?.isLimitedAdmin ?? false))
+          PopupMenuItem(
+            value: _CardMenu.delete,
+            child: _MenuRow(LucideIcons.trash2, 'Delete lead', Color(0xFFEF4444)),
+          ),
       ],
     );
   }

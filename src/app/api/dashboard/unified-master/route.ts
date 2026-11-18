@@ -96,7 +96,7 @@ export async function GET(request: Request) {
   ]);
 
   const profiles = (profilesRes.data || []).filter((p: any) => p.is_active !== false);
-  const employees = profiles.filter((p: any) => p.role !== 'owner' && p.role !== 'admin');
+  const employees = profiles.filter((p: any) => p.role !== 'owner' && p.role !== 'admin' && p.role !== 'limited_admin');
   const totalEmployees = employees.length;
 
   // Friday is a weekly holiday — nobody is absent or late, hours still count.

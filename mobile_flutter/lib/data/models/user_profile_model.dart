@@ -26,7 +26,15 @@ class UserProfileModel {
 
   bool get isAdmin {
     final r = role.toLowerCase().trim().replaceAll('-', '_');
-    return r == 'admin' || r == 'owner' || r == 'owner_admin' || r == 'owneradmin';
+    return r == 'admin' || r == 'owner' || r == 'owner_admin' || r == 'owneradmin' || r == 'limited_admin';
+  }
+
+  /// limited_admin is an admin in everything except deleting leads (also enforced in the database).
+  bool get isLimitedAdmin => role.toLowerCase().trim().replaceAll('-', '_') == 'limited_admin';
+
+  bool get canDeleteLeads {
+    final r = role.toLowerCase().trim().replaceAll('-', '_');
+    return isAdmin && r != 'limited_admin';
   }
 
   bool get isTeamLeader {

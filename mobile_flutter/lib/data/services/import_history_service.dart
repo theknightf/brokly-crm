@@ -11,7 +11,7 @@ class ImportHistoryException implements Exception {
 }
 
 /// Roles allowed to open Import History (web /api/leads/import-history).
-const _authorizedRoles = {'owner', 'admin', 'owner_admin', 'owneradmin', 'branch_manager', 'team_leader'};
+const _authorizedRoles = {'owner', 'admin', 'limited_admin', 'owner_admin', 'owneradmin', 'branch_manager', 'team_leader'};
 
 bool canViewImportHistory(String? role) => _authorizedRoles.contains(normalizeRoleKey(role));
 

@@ -115,7 +115,7 @@ export async function GET(request: Request) {
       ? createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
       : supabase;
     const { data: usersRaw } = await db.from('user_profiles').select('id, full_name, email, role, is_active, created_at').eq('is_active', true).order('full_name');
-    const users = (usersRaw || []).filter((u: any) => u.role !== 'owner' && u.role !== 'admin');
+    const users = (usersRaw || []).filter((u: any) => u.role !== 'owner' && u.role !== 'admin' && u.role !== 'limited_admin');
     if (!users || users.length === 0) return NextResponse.json({ period: periodParam, range, users: [] });
 
     const userIds = users.map((u: any) => u.id);
