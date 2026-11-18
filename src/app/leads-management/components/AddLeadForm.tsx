@@ -28,7 +28,6 @@ import {
   LeadSource,
   PropertyType,
   ALL_STATUSES,
-  ALL_SOURCES,
   ALL_PROPERTY_TYPES,
 } from './mockLeads';
 import {
@@ -105,7 +104,8 @@ let leadCounter = 13;
 let lastUsedSource = '';
 let lastUsedStatus = '';
 
-const DEFAULT_SOURCE: LeadSource = 'Facebook Ads';
+// Must be a source that exists in lead_sources (the one shared list); replaced by the first active source if it does not.
+const DEFAULT_SOURCE = 'Facebook' as LeadSource;
 const DEFAULT_STATUS: LeadStatus = 'Fresh Leads';
 
 /**
@@ -350,6 +350,12 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
       }));
       setUserList(users);
       setSourceList((sources as any[]).map((s: any) => ({ id: s.id, name: s.name })));
+      // The pre-selected source (default, or the last one used) must be one of the active sources.
+      const names = (sources as any[]).map((s: any) => String(s.name || '').trim()).filter(Boolean);
+      const current = String(getValues('source') || '').toLowerCase();
+      if (names.length > 0 && !names.some((n) => n.toLowerCase() === current) && !initialData?.source) {
+        setValue('source', (names.find((n) => n === 'Facebook') || names[0]) as LeadSource);
+      }
     });
   }, []);
 
@@ -543,26 +549,13 @@ export default function AddLeadForm({ onSubmit, onCancel, initialData }: AddLead
     }
   };
 
-  // Merge database sources with standard canonical sources, preserving IDs when available
+  // The active sources from the shared list (public.lead_sources). A preset source that was retired stays selectable.
   const sourcesToDisplay = useMemo(() => {
-    const seen = new Set<string>();
-    const list: { id?: string; name: string }[] = [];
-    sourceList.forEach((s) => {
-      const lower = s.name.trim().toLowerCase();
-      if (!seen.has(lower)) {
-        seen.add(lower);
-        list.push(s);
-      }
-    });
-    ALL_SOURCES.forEach((s) => {
-      const lower = s.trim().toLowerCase();
-      if (!seen.has(lower)) {
-        seen.add(lower);
-        list.push({ id: '', name: s });
-      }
-    });
+    const list: { id?: string; name: string }[] = [...sourceList];
+    const preset = String(initialData?.source || '').trim();
+    if (preset && !list.some((s) => s.name.trim().toLowerCase() === preset.toLowerCase())) list.unshift({ id: '', name: preset });
     return list;
-  }, [sourceList]);
+  }, [sourceList, initialData?.source]);
 
   const inputBase = 'input-base h-12 min-h-[48px] text-base sm:text-sm border-border/80';
 

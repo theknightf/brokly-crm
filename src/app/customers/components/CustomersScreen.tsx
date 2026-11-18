@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { customersService } from '@/lib/services/crmService';
+import { useLeadSources } from '@/hooks/useLeadSources';
 import { toast } from 'sonner';
 
 interface Customer {
@@ -65,9 +66,11 @@ export default function CustomersScreen() {
     }
   };
 
+  // Same list as every other source filter (public.lead_sources), plus any source a customer carries that is not in it.
+  const { allNames: allSourceNames } = useLeadSources();
   const sources = useMemo(
-    () => [...new Set(customers.map((c) => c.source).filter(Boolean))],
-    [customers]
+    () => [...new Set([...allSourceNames, ...customers.map((c) => c.source).filter(Boolean)])].sort((a, b) => String(a).localeCompare(String(b))),
+    [allSourceNames, customers]
   );
   const propertyTypes = useMemo(
     () => [...new Set(customers.map((c) => c.propertyType).filter(Boolean))],

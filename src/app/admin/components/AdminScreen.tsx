@@ -30,7 +30,7 @@ import {
   Shirt,
   BarChart3,
 } from 'lucide-react';
-import { adminSettingsService, developersService } from '@/lib/services/crmService';
+import { adminSettingsService, developersService, leadSourcesService } from '@/lib/services/crmService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole, canManageUsers } from '@/lib/roles';
@@ -202,8 +202,8 @@ const TAB_ORDER: TabKey[] = [
   'developers',
 ];
 
-const hasColor = (key: TabKey) =>
-  key === 'leadSources' || key === 'pipelineStages' || key === 'priorities';
+// Lead sources live in public.lead_sources (no colour column), the same list every filter and form reads.
+const hasColor = (key: TabKey) => key === 'pipelineStages' || key === 'priorities';
 const hasOrder = (key: TabKey) => key === 'pipelineStages' || key === 'priorities';
 
 function ItemModal({
@@ -431,12 +431,13 @@ export default function AdminScreen() {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const [settingsData, devsData] = await Promise.all([
+      const [settingsData, devsData, sourcesData] = await Promise.all([
         adminSettingsService.getAll(),
         developersService.getAll(),
+        leadSourcesService.getAll(),
       ]);
       setSettings({
-        leadSources: (settingsData as any)['leadSources'] || [],
+        leadSources: (sourcesData as any[]).map((s: any) => ({ id: s.id, name: s.name, active: s.is_active !== false })),
         pipelineStages: (settingsData as any)['pipelineStages'] || [],
         areas: (settingsData as any)['areas'] || [],
         priorities: (settingsData as any)['priorities'] || [],
@@ -507,6 +508,8 @@ export default function AdminScreen() {
     try {
       if (activeTab === 'developers') {
         await developersService.update(id, item.name, newActive);
+      } else if (activeTab === 'leadSources') {
+        await leadSourcesService.update(id, { is_active: newActive });
       } else {
         await adminSettingsService.update(id, { ...item, active: newActive });
       }
@@ -530,6 +533,9 @@ export default function AdminScreen() {
             payload.name || '',
             payload.active !== false
           );
+        } else if (activeTab === 'leadSources') {
+          // Renaming also renames the source on its leads (done in the database), so filters keep matching.
+          await leadSourcesService.update(modalState.editId, { name: payload.name, is_active: payload.active !== false });
         } else {
           await adminSettingsService.update(modalState.editId, payload);
         }
@@ -545,6 +551,10 @@ export default function AdminScreen() {
         if (activeTab === 'developers') {
           const dev = await developersService.create(payload.name || '');
           created = { id: dev.id, name: dev.name, active: dev.isActive };
+        } else if (activeTab === 'leadSources') {
+          const src = await leadSourcesService.create(payload.name || '');
+          if (payload.active === false) await leadSourcesService.update(src.id, { is_active: false });
+          created = { id: src.id, name: src.name, active: payload.active !== false };
         } else {
           created = (await adminSettingsService.create(activeTab, payload)) as AdminItem;
         }
@@ -562,7 +572,19 @@ export default function AdminScreen() {
 
   const handleDelete = async () => {
     try {
-      if (activeTab === 'developers') {
+      if (activeTab === 'leadSources') {
+        const res = await leadSourcesService.remove(deleteState.id);
+        if (res.softDeleted) {
+          // Leads still use it: it is deactivated (kept for filters), not removed.
+          setSettings((prev) => ({
+            ...prev,
+            leadSources: prev.leadSources.map((i) => (i.id === deleteState.id ? { ...i, active: false } : i)),
+          }));
+          toast.success('Leads still use this source, so it was deactivated instead of deleted');
+          setDeleteState({ open: false, id: '', name: '' });
+          return;
+        }
+      } else if (activeTab === 'developers') {
         await developersService.delete(deleteState.id);
       } else {
         await adminSettingsService.delete(deleteState.id);

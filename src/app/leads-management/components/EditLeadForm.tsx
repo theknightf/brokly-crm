@@ -26,7 +26,6 @@ import {
   LeadSource,
   PropertyType,
   ALL_STATUSES,
-  ALL_SOURCES,
   ALL_PROPERTY_TYPES,
 } from './mockLeads';
 import { projectsService, teamsService, teamService } from '@/lib/services/crmService';
@@ -158,14 +157,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
         list.push(s);
       }
     });
-    ALL_SOURCES.forEach((s) => {
-      const lower = s.trim().toLowerCase();
-      if (!seen.has(lower)) {
-        seen.add(lower);
-        list.push({ id: '', name: s });
-      }
-    });
-    return list;
+    return list; // the lead's own source (even if retired) + the active sources of the shared list
   }, [sourceList, lead.source]);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -190,7 +182,7 @@ export default function EditLeadForm({ lead, onSubmit, onCancel }: EditLeadFormP
       location: lead.location || '',
       propertyType: (lead.propertyType as PropertyType) || '2BHK Apartment',
       budgetRange: budgetRangeValue(lead.budgetMin, lead.budgetMax),
-      source: (lead.source as LeadSource) || 'Facebook Ads',
+      source: (lead.source as LeadSource) || ('Facebook' as LeadSource),
       agent: lead.agent || '',
       assignedTo: lead.assignedTo || '',
       status: (lead.status as LeadStatus) || 'Fresh Leads',

@@ -2,9 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { FilterState } from './LeadsManagementScreen';
-import { teamsService, projectsService, adminSettingsService, leadSourcesService } from '@/lib/services/crmService';
+import { teamsService, projectsService, adminSettingsService } from '@/lib/services/crmService';
+import { useLeadSources } from '@/hooks/useLeadSources';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { ALL_STATUSES, ALL_SOURCES, LEAD_ACTIONS, LeadAction } from './mockLeads';
+import { ALL_STATUSES, LEAD_ACTIONS, LeadAction } from './mockLeads';
 
 export interface LeadFilterOptions {
   statusOptions: string[];
@@ -21,49 +22,8 @@ export function useLeadFilterOptions(): LeadFilterOptions {
   const [agentOptions, setAgentOptions] = useState<string[]>([]);
   const [projectOptions, setProjectOptions] = useState<string[]>([]);
   const [statusOptions, setStatusOptions] = useState<string[]>(ALL_STATUSES);
-  const [sourceOptions, setSourceOptions] = useState<string[]>(ALL_SOURCES);
-
-  // Dynamically fetch and synchronize lead sources from database
-  useEffect(() => {
-    let alive = true;
-
-    const loadSources = () => {
-      Promise.all([
-        leadSourcesService.getActive().catch(() => []),
-        adminSettingsService.getAll().catch(() => ({})),
-      ]).then(([apiSources, settings]) => {
-        if (!alive) return;
-        const fromApi = (Array.isArray(apiSources) ? apiSources : [])
-          .map((s: any) => String(s?.name || '').trim())
-          .filter(Boolean);
-        const fromSettings = ((settings as any)?.leadSources || [])
-          .filter((s: any) => s.active !== false)
-          .map((s: any) => String(s?.name || '').trim())
-          .filter(Boolean);
-
-        const seen = new Set<string>();
-        const merged: string[] = [];
-        [...fromApi, ...fromSettings, ...ALL_SOURCES].forEach((s) => {
-          const lower = s.toLowerCase();
-          if (!seen.has(lower)) {
-            seen.add(lower);
-            merged.push(s);
-          }
-        });
-        setSourceOptions(merged.sort((a, b) => a.localeCompare(b)));
-      });
-    };
-
-    loadSources();
-    const unsub = leadSourcesService.onSourcesChanged(() => {
-      if (alive) loadSources();
-    });
-
-    return () => {
-      alive = false;
-      unsub();
-    };
-  }, []);
+  // Sources: the one shared list (public.lead_sources, retired ones included so old leads stay filterable).
+  const { allNames: sourceOptions } = useLeadSources();
 
   useEffect(() => {
     let alive = true;

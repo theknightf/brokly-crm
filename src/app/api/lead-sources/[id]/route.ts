@@ -24,13 +24,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (Object.keys(updates).length===0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
 
-  // check unique if renaming
+  // Renaming goes through rename_lead_source(): it checks the name is free, renames the source AND the leads that carry it
+  // (so filters keep matching), without touching their updated_at or the activity log.
   if (updates.name) {
-    const { data: dup } = await supabase.from('lead_sources').select('id').ilike('name', updates.name).neq('id', id).maybeSingle();
-    if (dup) return NextResponse.json({ error: 'Source name already exists' }, { status: 409 });
+    const { error: renameError } = await supabase.rpc('rename_lead_source', { p_id: id, p_name: updates.name });
+    if (renameError) {
+      const exists = /already exists/i.test(renameError.message);
+      return NextResponse.json({ error: exists ? 'Source name already exists' : renameError.message }, { status: exists ? 409 : 400 });
+    }
+    delete updates.name;
+  }
+  if (Object.keys(updates).length > 0) {
+    const { error: updateError } = await supabase.from('lead_sources').update(updates).eq('id', id);
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
   }
 
-  const { data, error } = await supabase.from('lead_sources').update(updates).eq('id', id).select('id, name, is_active').single();
+  const { data, error } = await supabase.from('lead_sources').select('id, name, is_active').eq('id', id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ source: data });
 }

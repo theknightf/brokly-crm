@@ -1818,6 +1818,29 @@ export const leadSourcesService = {
     }
     return j.source;
   },
+  async update(id: string, patch: { name?: string; is_active?: boolean }) {
+    const res = await fetch(`/api/lead-sources/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.error || 'Failed to update source');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('brokly:lead-sources-changed', { detail: j.source }));
+    }
+    return j.source;
+  },
+  /** Deletes a source, or deactivates it when leads still use it (`softDeleted`). */
+  async remove(id: string): Promise<{ deleted?: boolean; softDeleted?: boolean }> {
+    const res = await fetch(`/api/lead-sources/${id}`, { method: 'DELETE' });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.error || 'Failed to delete source');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('brokly:lead-sources-changed'));
+    }
+    return j || {};
+  },
   onSourcesChanged(callback: (source?: any) => void) {
     if (typeof window === 'undefined') return () => {};
     const handler = (e: Event) => callback((e as CustomEvent).detail);

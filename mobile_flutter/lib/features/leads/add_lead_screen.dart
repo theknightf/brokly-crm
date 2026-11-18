@@ -42,7 +42,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
   static const _countryCodes = [('+20', '🇪🇬'), ('+971', '🇦🇪'), ('+966', '🇸🇦'), ('+974', '🇶🇦')];
 
   String? _selectedSource = 'Facebook';
-  List<String> _sources = ['Facebook', 'Instagram', 'TikTok', 'WhatsApp', 'Website', 'Referral', 'Sales Referral', 'Walk-in', 'Cold Dial', 'Other'];
+  List<String> _sources = ['Facebook', 'Instagram', 'TikTok', 'WhatsApp', 'Website', 'Referral', 'Sales Referral', 'Walk-in', 'Other'];
   bool _isAddingSource = false;
 
   String? _selectedProject;
@@ -102,7 +102,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
       }
       if (live.isNotEmpty && mounted) {
         setState(() {
-          _sources = {..._sources, ...live}.toList();
+          _sources = live; // the active sources of the shared list (public.lead_sources); the built-in names are only an offline fallback
           if (_selectedSource != null && !_sources.contains(_selectedSource)) {
             _selectedSource = _sources.firstWhere((s) => s.toLowerCase() == _selectedSource!.toLowerCase(), orElse: () => _sources.first);
           }

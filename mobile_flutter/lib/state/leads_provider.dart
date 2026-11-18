@@ -143,25 +143,31 @@ class LeadsProvider extends ChangeNotifier {
     return set.toList();
   }
 
-  /// Distinct lead sources available across loaded leads
+  /// Every lead source from the shared list (public.lead_sources, the same one the website and the add / edit screens use;
+  /// retired ones included so old leads stay filterable), plus any value a loaded lead carries that is not in it.
+  List<String> _sourceNames = const [];
+
   List<String> get availableSources {
-    final set = <String>{'All Sources'};
+    final set = <String>{'All Sources', ..._sourceNames};
     for (final l in _allLeads) {
       if (l.source != null && l.source!.trim().isNotEmpty) {
         set.add(l.source!.trim());
       }
     }
-    set.addAll([
-      'Facebook Ads',
-      'Instagram',
-      'WhatsApp',
-      'Cold Call',
-      'Referral',
-      'Website',
-      'Walk-in',
-      'Property Finder',
-    ]);
     return set.toList();
+  }
+
+  Future<void> loadSources() async {
+    try {
+      final res = await _client.from('lead_sources').select('name').order('name', ascending: true);
+      final names = <String>[];
+      for (final raw in (res as List<dynamic>)) {
+        final name = (raw as Map<String, dynamic>)['name']?.toString().trim() ?? '';
+        if (name.isNotEmpty) names.add(name);
+      }
+      _sourceNames = names;
+      notifyListeners();
+    } catch (_) {}
   }
 
   LeadsProvider() {
@@ -173,6 +179,7 @@ class LeadsProvider extends ChangeNotifier {
     if (currentUser != null) {
       _activeUserId = currentUser.id;
       fetchLeads();
+      loadSources();
       _setupRealtime();
     }
 
@@ -200,6 +207,7 @@ class LeadsProvider extends ChangeNotifier {
       if (_activeUserId == null) return;
       _setupRealtime();
       fetchLeads(silent: true);
+      loadSources();
     });
   }
 

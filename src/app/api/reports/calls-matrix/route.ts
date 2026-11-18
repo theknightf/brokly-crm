@@ -292,7 +292,14 @@ export async function GET(request: Request) {
   // Filter options for UI
   const allLeadsForOptions = hasRange ? (leadsRes.data || []).filter((l: any) => inRange(l.created_at)) : (leadsRes.data || []);
   const projectOptions = Array.from(new Set((allLeadsForOptions as any[]).map((l: any) => l.project).filter(Boolean))).sort();
-  const sourceOptions = Array.from(new Set((allLeadsForOptions as any[]).map((l: any) => l.source).filter(Boolean))).sort();
+  // Sources: the one shared list (public.lead_sources, retired ones included), plus any value leads carry that is not in it.
+  const { data: sourceRows } = await supabase.from('lead_sources').select('name').order('name').range(0, 9999);
+  const sourceOptions = Array.from(
+    new Set([
+      ...((sourceRows as any[]) || []).map((r: any) => String(r.name || '').trim()),
+      ...(allLeadsForOptions as any[]).map((l: any) => l.source),
+    ].filter(Boolean))
+  ).sort((a, b) => String(a).localeCompare(String(b)));
 
   return NextResponse.json({
     stages: displayStages,

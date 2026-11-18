@@ -55,7 +55,6 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
     'Referral',
     'Sales Referral',
     'Walk-in',
-    'Cold Dial',
     'Other',
   ];
 
@@ -114,7 +113,9 @@ class _EditLeadScreenState extends State<EditLeadScreen> {
       }
       if (liveSources.isNotEmpty && mounted) {
         setState(() {
-          _sources = {...liveSources, ..._sources}.toList();
+          // The active sources of the shared list (public.lead_sources) replace the built-in fallback; the lead's own
+          // source stays selectable even if it was retired.
+          _sources = {if ((_source ?? '').isNotEmpty) _source!, ...liveSources}.toList();
           if (_source != null && !_sources.contains(_source)) {
             final match = _sources.firstWhere(
               (s) => s.toLowerCase() == _source!.toLowerCase(),
