@@ -34,6 +34,7 @@ import { usePendingDuplicates } from '@/hooks/usePendingDuplicates';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole, canViewTeams } from '@/lib/roles';
+import { usePwaAgentRestriction, isPwaAgentAllowedPath } from '@/hooks/usePwaAgentRestriction';
 
 interface NavItem {
   id: string;
@@ -376,6 +377,7 @@ function SidebarContent({
   const badgeFor = (item: NavItem): number | undefined =>
     item.id === 'nav-duplicates' ? (pendingDuplicates > 0 ? pendingDuplicates : undefined) : item.badge;
 
+  const pwaAgent = usePwaAgentRestriction();
   const isAdminOrOwner = isAdminRole(profile?.role);
   const canWatchTeams = canViewTeams(profile?.role);
   const displayName =
@@ -420,7 +422,8 @@ function SidebarContent({
               (item) =>
                 (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses' && item.id !== 'nav-duplicate-leads' && item.id !== 'nav-claim-conflicts')) &&
                 (isAdminOrOwner || canWatchTeams || item.id !== 'nav-import-history') &&
-                (canWatchTeams || item.id !== 'nav-teams')
+                (canWatchTeams || item.id !== 'nav-teams') &&
+                (!pwaAgent || isPwaAgentAllowedPath(item.href))
             ),
           }))
           .filter((group) => group.items.length > 0)

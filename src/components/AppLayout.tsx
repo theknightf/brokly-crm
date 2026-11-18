@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -11,6 +11,7 @@ import DeductionAlertProvider from './DeductionAlertProvider';
 // The assistant (chat SDK, voice) is only needed once someone opens it, so it is loaded after the page is interactive.
 const AssistantChatWidget = dynamic(() => import('./assistant/AssistantChatWidget'), { ssr: false });
 import { useLanguage } from '@/contexts/LanguageContext';
+import { usePwaAgentRestriction, isPwaAgentAllowedPath, PWA_AGENT_HOME } from '@/hooks/usePwaAgentRestriction';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -25,6 +26,12 @@ export default function AppLayout({ children, fill = false }: AppLayoutProps) {
   const pathname = usePathname();
   const { lang, t } = useLanguage();
   const isDashboard = pathname === '/';
+
+  // Installed app + plain sales agent: only Leads and Follow-ups (same as the phone app).
+  const pwaAgent = usePwaAgentRestriction();
+  useEffect(() => {
+    if (pwaAgent && !isPwaAgentAllowedPath(pathname || '')) router.replace(PWA_AGENT_HOME);
+  }, [pwaAgent, pathname, router]);
 
   const goBack = () => {
     if (window.history.length > 1) router.back();

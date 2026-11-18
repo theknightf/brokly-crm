@@ -7,6 +7,7 @@ import { isAdminRole } from '@/lib/roles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePendingDuplicates } from '@/hooks/usePendingDuplicates';
+import { usePwaAgentRestriction, isPwaAgentAllowedPath } from '@/hooks/usePwaAgentRestriction';
 
 interface MobileBottomNavProps {
   onOpenMenu: () => void;
@@ -26,6 +27,9 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { profile } = useAuth();
   const { t } = useLanguage();
+  const pwaAgent = usePwaAgentRestriction();
+  const leftItems = pwaAgent ? LEFT_ITEMS.filter((i) => isPwaAgentAllowedPath(i.href)) : LEFT_ITEMS;
+  const rightItems = pwaAgent ? RIGHT_ITEMS.filter((i) => isPwaAgentAllowedPath(i.href)) : RIGHT_ITEMS;
   const pendingDuplicates = usePendingDuplicates();
 
   const isActive = (href: string) =>
@@ -44,7 +48,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
         }}
       >
         {/* Left items */}
-        {LEFT_ITEMS.map((item) => {
+        {leftItems.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
@@ -69,7 +73,7 @@ export default function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
         })}
 
         {/* Right items */}
-        {RIGHT_ITEMS.map((item) => {
+        {rightItems.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
