@@ -1,5 +1,5 @@
--- A lead is NOT a duplicate when the person adding it is the one who already owns / added the existing lead
--- (e.g. the owner re-adds his own lead and gives it to another agent). Only other people's re-adds are duplicates.
+-- A lead is NOT a duplicate only when the OWNER (role owner) re-adds a lead he already owns / added himself
+-- (e.g. gives it to another agent). Anyone else re-adding an existing phone is a duplicate, as before.
 CREATE OR REPLACE FUNCTION public.leads_route_duplicate_before_insert()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
 AS $function$
@@ -29,7 +29,8 @@ begin
   end if;
 
   -- the owner / adder of the existing lead adding it again is not a duplicate
-  if v_actor is not null and (v_actor = v_orig.owner_id or v_actor = v_orig.created_by) then
+  if v_actor is not null and (v_actor = v_orig.owner_id or v_actor = v_orig.created_by)
+     and exists (select 1 from public.user_profiles up where up.id = v_actor and up.role::text = 'owner') then
     return new;
   end if;
 
@@ -89,7 +90,8 @@ BEGIN
     LIMIT 1;
 
     IF v_original IS NOT NULL
-       AND NOT (TG_OP = 'INSERT' AND v_actor IS NOT NULL AND (v_actor = v_o_owner OR v_actor = v_o_by)) THEN
+       AND NOT (TG_OP = 'INSERT' AND v_actor IS NOT NULL AND (v_actor = v_o_owner OR v_actor = v_o_by)
+           AND EXISTS (SELECT 1 FROM public.user_profiles up WHERE up.id = v_actor AND up.role::text = 'owner')) THEN
       NEW.is_duplicate := true;
       NEW.duplicate_of_lead_id := v_original;
       NEW.duplicate_released_to := NULL;
