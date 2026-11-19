@@ -66,14 +66,18 @@ class WhatsAppUtils {
     return 'مستشار عقاري';
   }
 
-  /// Builds the required Arabic WhatsApp pitch message with the authenticated user's name:
-  /// "صباح الخير / مساء الخير، أنا [اسم المستخدم الحالي] من شركة On Point للتسويق العقاري، حابب أعرض على حضرتك وحدات سكنية."
-  static String buildDefaultLeadMessage(BuildContext? context, {String? customUserName}) {
+  /// The first message a salesperson sends (same wording as the website): greeting by the time of day, the
+  /// customer's name when known, and the signed-in salesperson's own name.
+  static String buildDefaultLeadMessage(BuildContext? context, {String? customUserName, String? leadName}) {
     final userName = (customUserName != null && customUserName.trim().isNotEmpty)
         ? customUserName.trim()
         : resolveCurrentUserName(context);
-
-    return 'صباح الخير / مساء الخير، أنا $userName من شركة On Point للتسويق العقاري، حابب أعرض على حضرتك وحدات سكنية.';
+    final hour = DateTime.now().toUtc().add(const Duration(hours: 2)).hour; // Cairo (close enough; no DST handling needed for a greeting)
+    final greeting = (hour >= 5 && hour < 12) ? 'صباح الخير' : 'مساء الخير';
+    final lead = (leadName ?? '').trim();
+    final leadPart = lead.isEmpty ? '' : ' يا $lead';
+    return '$greeting$leadPart، معاك $userName من شركة On Point للتسويق العقاري.\n'
+        'حابب أعرّف حضرتك بالوحدات والعروض المتاحة اللي تناسبك، ممكن أعرف إمتى يكون مناسب أكلم حضرتك؟';
   }
 
   /// Launches WhatsApp deep-link with pre-populated message for a phone number

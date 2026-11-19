@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { normalizeAuthError } from '@/lib/authErrors';
+import { setWhatsAppSenderName } from '@/lib/whatsapp';
 
 const AuthContext = createContext<any>({});
 
@@ -289,6 +290,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (error) throw error;
     return data;
   };
+
+  // WhatsApp buttons sign the message with the logged-in salesperson's name.
+  useEffect(() => {
+    setWhatsAppSenderName(profile?.full_name || user?.email?.split('@')[0] || '');
+  }, [profile?.full_name, user?.email]);
 
   const isEmailVerified = () => user?.email_confirmed_at !== null;
 

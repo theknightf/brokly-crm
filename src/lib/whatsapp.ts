@@ -1,6 +1,27 @@
 'use client';
 
-const DEFAULT_TEMPLATE = 'مساء الخير مع حضرتك {username} من شركة onpoint للتسويق العقاري بتواصل معاك حابب اعرفك العروض المتاحة';
+/**
+ * The first message a salesperson sends. {greeting} is صباح/مساء الخير by Cairo time, {lead} is the customer's
+ * name (left out when unknown) and {agent} is the logged-in salesperson. Same wording as the phone app.
+ */
+const DEFAULT_TEMPLATE =
+  '{greeting}{leadPart}، معاك {agent} من شركة On Point للتسويق العقاري.\nحابب أعرّف حضرتك بالوحدات والعروض المتاحة اللي تناسبك، ممكن أعرف إمتى يكون مناسب أكلم حضرتك؟';
+
+// The logged-in salesperson (set from AuthContext), so every WhatsApp button signs the message with their own name.
+let senderName = '';
+export function setWhatsAppSenderName(name?: string | null) {
+  senderName = String(name || '').trim();
+}
+
+function cairoGreeting(): string {
+  try {
+    const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', hour12: false }).format(new Date()));
+    return h >= 5 && h < 12 ? 'صباح الخير' : 'مساء الخير';
+  } catch {
+    return 'مساء الخير';
+  }
+}
+
 
 /**
  * Number for a wa.me link (digits only, with the country code).
@@ -29,9 +50,14 @@ export function sanitizeEgyptPhone(phone?: string | null): string {
   return digits;
 }
 
-export function buildWhatsAppTemplate(username?: string | null, template: string = DEFAULT_TEMPLATE): string {
-  const name = (username || '').trim() || 'حضرتك';
-  return template.replace('{username}', name);
+export function buildWhatsAppTemplate(leadName?: string | null, template: string = DEFAULT_TEMPLATE): string {
+  const lead = (leadName || '').trim();
+  const agent = senderName || 'مستشار عقاري';
+  return template
+    .replace('{greeting}', cairoGreeting())
+    .replace('{leadPart}', lead ? ` يا ${lead}` : '')
+    .replace('{agent}', agent)
+    .replace('{username}', lead || 'حضرتك');
 }
 
 /**
