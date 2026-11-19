@@ -154,6 +154,21 @@ export default function OwnerHome() {
         </div>
       </div>
 
+      {/* 2. Lead stages (tap a card to open those leads) */}
+      <section aria-label={ar ? 'مراحل الليدز' : 'Lead stages'} className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">{ar ? 'الليدز حسب المرحلة' : 'Leads by stage'}</h2>
+            <p className="text-sm text-muted-foreground">{ar ? 'اضغط على أي كارت تفتح ليدز المرحلة دي' : 'Tap a card to open those leads'}</p>
+          </div>
+          <a href="/leads-management" className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+            {ar ? 'كل الليدز' : 'All leads'} <ExternalLink size={13} />
+          </a>
+        </div>
+        <DashboardTeamFilter onChange={(t, a) => { setFilterTeamId(t); setFilterAgentId(a); }} />
+        <KpiCardsGrid teamId={filterTeamId || undefined} agentId={filterAgentId || undefined} />
+      </section>
+
       {/* 1. Today in numbers */}
       <section aria-label={ar ? 'الأرقام' : 'Numbers'}>
         {!data ? (
@@ -213,21 +228,6 @@ export default function OwnerHome() {
             })}
           </div>
         )}
-      </section>
-
-      {/* 2. Lead stages (tap a card to open those leads) */}
-      <section aria-label={ar ? 'مراحل الليدز' : 'Lead stages'} className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">{ar ? 'الليدز حسب المرحلة' : 'Leads by stage'}</h2>
-            <p className="text-sm text-muted-foreground">{ar ? 'اضغط على أي كارت تفتح ليدز المرحلة دي' : 'Tap a card to open those leads'}</p>
-          </div>
-          <a href="/leads-management" className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-            {ar ? 'كل الليدز' : 'All leads'} <ExternalLink size={13} />
-          </a>
-        </div>
-        <DashboardTeamFilter onChange={(t, a) => { setFilterTeamId(t); setFilterAgentId(a); }} />
-        <KpiCardsGrid teamId={filterTeamId || undefined} agentId={filterAgentId || undefined} />
       </section>
 
       {/* 3. Leaderboard */}

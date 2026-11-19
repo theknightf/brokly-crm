@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import EmptyState from '@/components/ui/EmptyState';
 import { exportCSV } from '@/lib/exportReport';
-import { roleLabelOf } from '@/lib/ui';
+import { roleLabelOf, STATUS_COLORS } from '@/lib/ui';
 
 interface Employee {
   id: string;
@@ -152,7 +152,7 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
     const now = new Date();
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   });
-  const [tab, setTab] = useState<'overview' | 'timeline' | 'attendance' | 'calls' | 'visits' | 'leads' | 'followups' | 'expenses'>('overview');
+  const [tab, setTab] = useState<'overview' | 'notes' | 'timeline' | 'attendance' | 'calls' | 'visits' | 'leads' | 'followups' | 'expenses'>('overview');
 
   const { from, to } = useMemo(() => periodRange(period, customFrom, customTo), [period, customFrom, customTo]);
 
@@ -206,6 +206,7 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
 
   const tabs = [
     { key: 'overview' as const, label: 'Overview' },
+    { key: 'notes' as const, label: 'Notes' },
     { key: 'timeline' as const, label: 'Timeline' },
     { key: 'attendance' as const, label: 'Attendance' },
     { key: 'calls' as const, label: 'Calls & WhatsApp' },
@@ -419,6 +420,7 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
             </div>
           )}
 
+          {tab === 'notes' && <NotesTabC employeeId={employeeId} from={from} to={to} />}
           {tab === 'timeline' && <TimelineTab items={data.timeline} />}
           {tab === 'attendance' && <AttendanceTabC rows={data.attendance} />}
           {tab === 'calls' && <CallsTabC rows={data.calls} />}
@@ -672,6 +674,107 @@ function ExpensesTabC({ rows }: { rows: any[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+/* ── Notes: what this employee wrote, the stage change that came with it, and the customer (tap to open the lead) ── */
+interface EmployeeNote {
+  id: string;
+  leadId: string | null;
+  leadName: string | null;
+  body: string;
+  createdAt: string;
+  leadStatus: string | null;
+  callOutcome?: string | null;
+  stageChange?: { from: string | null; to: string | null } | null;
+}
+
+function StageChip({ s }: { s: string | null | undefined }) {
+  if (!s) return <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">—</span>;
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[s] || 'bg-muted text-muted-foreground'}`}>{s}</span>;
+}
+
+function NotesTabC({ employeeId, from, to }: { employeeId: string; from: string; to: string }) {
+  const router = useRouter();
+  const [rows, setRows] = useState<EmployeeNote[] | null>(null);
+  const [err, setErr] = useState('');
+  const [onlyStage, setOnlyStage] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setRows(null);
+    setErr('');
+    fetch(`/api/employees/${employeeId}/notes?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { cache: 'no-store' })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Failed to load notes');
+        if (alive) setRows(Array.isArray(j.notes) ? j.notes : []);
+      })
+      .catch((e) => alive && setErr(e?.message || 'Failed to load notes'));
+    return () => {
+      alive = false;
+    };
+  }, [employeeId, from, to]);
+
+  if (err) return <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">{err}</div>;
+  if (!rows)
+    return (
+      <div className="flex items-center justify-center h-40">
+        <Loader2 size={24} className="animate-spin text-primary" />
+      </div>
+    );
+
+  const shown = onlyStage ? rows.filter((r) => r.stageChange) : rows;
+  const withStage = rows.filter((r) => r.stageChange).length;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4">
+        <h3 className="text-sm font-semibold text-foreground">
+          Notes <span className="font-normal text-muted-foreground">· {rows.length} notes · {withStage} with a stage change</span>
+        </h3>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={onlyStage} onChange={(e) => setOnlyStage(e.target.checked)} />
+          Only notes that changed the stage
+        </label>
+      </div>
+      {shown.length === 0 ? (
+        <div className="p-8 text-center text-sm text-muted-foreground">No notes in this period.</div>
+      ) : (
+        <ul className="divide-y divide-border">
+          {shown.map((n) => (
+            <li key={n.id}>
+              <button
+                type="button"
+                disabled={!n.leadId}
+                onClick={() => n.leadId && router.push(`/leads/${n.leadId}`)}
+                className="w-full text-start p-4 transition-colors hover:bg-muted/50 disabled:cursor-default focus:outline-none focus-visible:bg-muted/50"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-primary" dir="auto">{n.leadName || 'Lead'}</span>
+                  <span className="text-[11px] text-muted-foreground">{fmtDateTime(n.createdAt)}</span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {n.stageChange ? (
+                    <>
+                      <StageChip s={n.stageChange.from} />
+                      <span className="text-xs text-muted-foreground rtl:rotate-180">→</span>
+                      <StageChip s={n.stageChange.to} />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[11px] text-muted-foreground">Stage now:</span>
+                      <StageChip s={n.leadStatus} />
+                    </>
+                  )}
+                  {n.callOutcome ? <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Call: {n.callOutcome}</span> : null}
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-foreground" dir="auto">{n.body}</p>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

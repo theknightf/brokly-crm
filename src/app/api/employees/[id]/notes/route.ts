@@ -74,6 +74,40 @@ export async function GET(request: Request, { params }: Ctx) {
     for (const l of (data || []) as any[]) stages.set(l.id, l.crm_status || '');
   }
 
+  // The stage change this employee made on the same customer around the note (a note is required to change a
+  // stage, so they are written within minutes of each other). Shown as "old → new" next to the note.
+  const stageEvents: { lead_id: string; old_value: string | null; new_value: string | null; t: number }[] = [];
+  for (let i = 0; i < uniq.length; i += 100) {
+    let evQ = ctx.db
+      .from('lead_events')
+      .select('lead_id, old_value, new_value, created_at')
+      .eq('actor_id', employeeId.data)
+      .eq('type', 'stage')
+      .in('lead_id', uniq.slice(i, i + 100));
+    if (q.data.from) evQ = evQ.gte('created_at', `${q.data.from}T00:00:00`);
+    if (q.data.to) evQ = evQ.lte('created_at', `${q.data.to}T23:59:59.999`);
+    const { data } = await evQ;
+    for (const e of (data || []) as any[]) stageEvents.push({ lead_id: e.lead_id, old_value: e.old_value, new_value: e.new_value, t: Date.parse(e.created_at) });
+  }
+  const WINDOW_MS = 20 * 60 * 1000;
+  const used = new Set<number>();
+  const stageChangeFor = (leadId: string, createdAt: string): { from: string | null; to: string | null } | null => {
+    const t = Date.parse(createdAt);
+    let best = -1;
+    let bestGap = Infinity;
+    stageEvents.forEach((e, idx) => {
+      if (used.has(idx) || e.lead_id !== leadId) return;
+      const gap = Math.abs(e.t - t);
+      if (gap <= WINDOW_MS && gap < bestGap) {
+        best = idx;
+        bestGap = gap;
+      }
+    });
+    if (best < 0) return null;
+    used.add(best);
+    return { from: stageEvents[best].old_value, to: stageEvents[best].new_value };
+  };
+
   const author = names.get(employeeId.data) || 'Unknown';
   const merged = [
     ...notes.map((r) => ({
@@ -99,7 +133,8 @@ export async function GET(request: Request, { params }: Ctx) {
     })),
   ]
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .slice(0, 300);
+    .slice(0, 300)
+    .map((n) => ({ ...n, stageChange: n.leadId ? stageChangeFor(n.leadId, n.createdAt) : null }));
 
   return NextResponse.json({ notes: merged });
 }
