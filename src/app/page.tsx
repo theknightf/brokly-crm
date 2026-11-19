@@ -16,7 +16,7 @@ const SalesFollowUpsWidget = dynamic(() => import('./components/SalesFollowUpsWi
 const RecentActivity = dynamic(() => import('./components/RecentActivity'));
 const OwnerDashboard = dynamic(() => import('./components/OwnerDashboard'));
 const GettingStarted = dynamic(() => import('./components/GettingStarted'));
-const UnifiedMasterDashboard = dynamic(() => import('./components/UnifiedMasterDashboard'));
+const OwnerHome = dynamic(() => import('./components/OwnerHome'));
 const DailyLeaderboard = dynamic(() => import('./components/DailyLeaderboard'));
 const TeamOverview = dynamic(() => import('./components/TeamOverview'));
 const AgentDashboard = dynamic(() => import('./components/agent-home/AgentDashboard'));
@@ -93,7 +93,7 @@ export default function DashboardPage() {
   if (isUnified) {
     return (
       <AppLayout>
-        <UnifiedMasterDashboard />
+        <OwnerHome />
       </AppLayout>
     );
   }
