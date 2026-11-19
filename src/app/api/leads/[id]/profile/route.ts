@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { parseCommentBody } from '@/lib/leadNotes';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,41 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       }
     } catch {}
 
+    // Notes (what people wrote) and stage / owner history, with who did it. Shown on the lead profile.
+    const [cmtRes, lnRes, evRes] = await Promise.all([
+      db.from('lead_comments').select('id, user_id, body, created_at').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(200),
+      db.from('lead_notes').select('id, author_id, body, created_at').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(200),
+      db.from('lead_events').select('id, type, old_value, new_value, actor_id, created_at').eq('lead_id', leadId).in('type', ['stage', 'assigned']).order('created_at', { ascending: false }).limit(200),
+    ]);
+    const evRows = (evRes.data || []) as any[];
+    const peopleIds = new Set<string>();
+    for (const c of (cmtRes.data || []) as any[]) if (c.user_id) peopleIds.add(c.user_id);
+    for (const n of (lnRes.data || []) as any[]) if (n.author_id) peopleIds.add(n.author_id);
+    for (const e of evRows) {
+      if (e.actor_id) peopleIds.add(e.actor_id);
+      if (e.type === 'assigned' && /^[0-9a-f-]{36}$/i.test(String(e.new_value || ''))) peopleIds.add(e.new_value);
+      if (e.type === 'assigned' && /^[0-9a-f-]{36}$/i.test(String(e.old_value || ''))) peopleIds.add(e.old_value);
+    }
+    const nameOf = new Map<string, string>();
+    if (peopleIds.size) {
+      const { data: ppl } = await db.from('user_profiles').select('id, full_name').in('id', Array.from(peopleIds));
+      for (const p of (ppl || []) as any[]) nameOf.set(p.id, p.full_name || '');
+    }
+    const who = (id?: string | null) => (id && nameOf.get(id)) || null;
+    const notesList = [
+      ...((cmtRes.data || []) as any[])
+        .map((c) => ({ c, p: parseCommentBody(c.body) }))
+        .filter((x) => x.p.written)
+        .map(({ c, p }) => ({ id: c.id, body: p.text, by: who(c.user_id), at: c.created_at, callOutcome: p.outcome || null })),
+      ...((lnRes.data || []) as any[]).map((n) => ({ id: n.id, body: n.body, by: who(n.author_id), at: n.created_at, callOutcome: null })),
+    ].sort((a, b) => (a.at < b.at ? 1 : -1));
+    const stageHistory = evRows
+      .filter((e) => e.type === 'stage')
+      .map((e) => ({ id: e.id, from: e.old_value, to: e.new_value, by: who(e.actor_id), at: e.created_at }));
+    const ownerHistory = evRows
+      .filter((e) => e.type === 'assigned')
+      .map((e) => ({ id: e.id, from: who(e.old_value) || null, to: who(e.new_value) || (e.new_value ? 'Someone' : 'Unassigned'), by: who(e.actor_id), at: e.created_at }));
+
     // Merge follow-up sources
     const followUps = [
       ...((followUpRes.data || []) as any[]).map((f: any) => ({ source: 'follow_up_tasks', ...f })),
@@ -112,6 +148,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         rotations: (rotationRes.data || []).length,
       },
       callLogs,
+      notes: notesList,
+      stageHistory,
+      ownerHistory,
       followUps,
       followUpTasks: followUpRes.data || [],
       rotations: rotationRes.data || [],

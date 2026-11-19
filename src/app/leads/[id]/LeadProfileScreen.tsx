@@ -32,6 +32,9 @@ interface LeadProfile {
   lead: any;
   metrics: any;
   callLogs: any[];
+  notes?: any[];
+  stageHistory?: any[];
+  ownerHistory?: any[];
   followUps: any[];
   rotations: any[];
   activity: any[];
@@ -69,6 +72,16 @@ function timeAgo(iso: string): string {
   return `${d} day${d === 1 ? '' : 's'} ago`;
 }
 
+/** "19 Nov 2026, 14:36" in Cairo time. */
+function fmtWhen(iso: string): string {
+  if (!iso) return '';
+  try {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  } catch {
+    return String(iso).slice(0, 16).replace('T', ' ');
+  }
+}
+
 function SectionTitle({ icon, children, aside }: { icon: React.ReactNode; children: React.ReactNode; aside?: React.ReactNode }) {
   return (
     <div className="p-4 border-b border-border flex items-center justify-between gap-3">
@@ -91,6 +104,7 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
   const [users, setUsers] = useState<any[]>([]);
   const [showAllCalls, setShowAllCalls] = useState(false);
   const [timelineCount, setTimelineCount] = useState(TIMELINE_STEP);
+  const [tab, setTab] = useState<'notes' | 'calls' | 'stages' | 'owners' | 'timeline'>('notes');
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -156,6 +170,9 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
   if (!data) return null;
 
   const { lead, metrics, callLogs, duplicates, timeline } = data;
+  const notes = data.notes || [];
+  const stageHistory = data.stageHistory || [];
+  const ownerHistory = data.ownerHistory || [];
   const initials = (lead.name || 'L').split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase();
   const stage = lead.stage || lead.crmStatus || '';
   const hasPhone = !!(lead.phone && String(lead.phone).replace(/\D/g, ''));
@@ -324,6 +341,100 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
 
         {/* ── Main column: what has happened with this lead ── */}
         <div className="lg:col-span-2 space-y-5 lg:order-1">
+          {/* What happened with this lead, one tab at a time: notes, calls, stage changes, owners, everything */}
+          <div role="tablist" aria-label="Lead history" className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1">
+            {([
+              { key: 'notes', label: 'Notes', icon: <MessageCircle size={14} aria-hidden />, n: notes.length },
+              { key: 'calls', label: 'Calls', icon: <Phone size={14} aria-hidden />, n: callLogs.length },
+              { key: 'stages', label: 'Stage changes', icon: <TrendingUp size={14} aria-hidden />, n: stageHistory.length },
+              { key: 'owners', label: 'Owners', icon: <UserCheck size={14} aria-hidden />, n: ownerHistory.length },
+              { key: 'timeline', label: 'Everything', icon: <Clock size={14} aria-hidden />, n: timelineTotal },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                role="tab"
+                aria-selected={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  tab === t.key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                {t.icon}
+                {t.label}
+                <span className={`rounded-full px-1.5 text-[11px] font-bold tabular-nums ${tab === t.key ? 'bg-white/25' : 'bg-muted text-muted-foreground'}`}>{t.n}</span>
+              </button>
+            ))}
+          </div>
+
+          {tab === 'notes' && (
+            <section className="dash-card overflow-hidden" aria-label="Notes">
+              {notes.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-10 px-4">No notes yet.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {notes.map((n: any) => (
+                    <li key={n.id} className="p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-foreground">{n.by || 'Someone'}</span>
+                        <span className="text-xs text-muted-foreground">{fmtWhen(n.at)}</span>
+                      </div>
+                      {n.callOutcome && (
+                        <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">Call: {n.callOutcome}</span>
+                      )}
+                      <p className="mt-1.5 whitespace-pre-wrap break-words text-sm text-foreground" dir="auto">{n.body}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {tab === 'stages' && (
+            <section className="dash-card overflow-hidden" aria-label="Stage changes">
+              {stageHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-10 px-4">The stage was never changed.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {stageHistory.map((s: any) => (
+                    <li key={s.id} className="p-4 flex flex-wrap items-center justify-between gap-2">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {s.from ? <StatusPill status={s.from} /> : <span className="text-xs text-muted-foreground">New</span>}
+                        <span className="text-muted-foreground rtl:rotate-180" aria-hidden>→</span>
+                        {s.to ? <StatusPill status={s.to} /> : <span className="text-xs text-muted-foreground">—</span>}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {s.by ? <strong className="font-semibold text-foreground">{s.by}</strong> : 'System'} · {fmtWhen(s.at)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {tab === 'owners' && (
+            <section className="dash-card overflow-hidden" aria-label="Owner history">
+              {ownerHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-10 px-4">No assignments recorded.</p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {ownerHistory.map((o: any) => (
+                    <li key={o.id} className="p-4 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm text-foreground">
+                        {o.from ? <span className="text-muted-foreground">{o.from} → </span> : null}
+                        <strong className="font-semibold">{o.to}</strong>
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {o.by ? `by ${o.by}` : ''} · {fmtWhen(o.at)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {tab === 'calls' && (
           <section className="dash-card overflow-hidden" aria-labelledby="calls-title">
             <SectionTitle
               icon={<Phone size={15} aria-hidden />}
@@ -372,7 +483,9 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
               </>
             )}
           </section>
+          )}
 
+          {tab === 'timeline' && (
           <section className="dash-card overflow-hidden" aria-labelledby="timeline-title">
             <SectionTitle
               icon={<Clock size={15} aria-hidden />}
@@ -408,6 +521,7 @@ export default function LeadProfileScreen({ leadId }: { leadId: string }) {
               </button>
             )}
           </section>
+          )}
         </div>
       </div>
     </div>
