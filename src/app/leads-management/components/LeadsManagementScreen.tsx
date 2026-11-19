@@ -1520,7 +1520,17 @@ export default function LeadsManagementScreen({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `leads-export-${new Date().toISOString().split('T')[0]}.csv`;
+      // File name = whose leads + which stage, e.g. "Naglaa - Following Up - 2026-11-19.csv".
+      const distinct = (vals: (string | undefined | null)[], fallback: string, fromFilter: string) => {
+        const u = Array.from(new Set(vals.map((v) => String(v || '').trim()).filter(Boolean)));
+        if (u.length === 1) return u[0];
+        return fromFilter || (u.length === 0 ? fallback : 'Multiple');
+      };
+      const agentPart = distinct(picked.map((l: any) => l.agent || l.assignedToName), 'Unassigned', String(filtersRef.current?.agent || ''));
+      const statusPart = distinct(picked.map((l: any) => l.status), 'No status', String(filtersRef.current?.status || ''));
+      const safe = (v: string) => v.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+      a.download = `${safe(agentPart)} - ${safe(statusPart)} - ${new Date().toISOString().split('T')[0]}.csv`;
+
       a.click();
       URL.revokeObjectURL(url);
       toast.success(rows.length ? `${rows.length} leads exported to CSV` : t('leads.exportEmpty'));
