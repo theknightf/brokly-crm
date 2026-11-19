@@ -70,9 +70,17 @@ class AssistantService {
   /// A message the agent can act on. The server's own reason (e.g. a Groq model/quota problem) is shown
   /// instead of a generic failure, so a broken setup is diagnosable from the phone. It never contains keys.
   String _friendlyError(int? status, String? serverMsg) {
-    if (status == 401) return 'انتهت الجلسة. سجّل الخروج ثم الدخول مرة أخرى.';
-    if (status == 429) return 'تم الوصول إلى الحد الأقصى للطلبات. برجاء الانتظار ثوانٍ والمحاولة مرة أخرى.';
     final reason = (serverMsg ?? '').trim();
+    if (status == 401) {
+      // 401 is either OUR login (the function could not verify the user) or the AI provider rejecting the
+      // server's key. Only the first one is fixed by signing in again.
+      final isLogin = reason.isEmpty ||
+          reason.contains('authentication session') ||
+          reason.contains('Authorization header');
+      if (isLogin) return 'انتهت الجلسة. سجّل الخروج ثم الدخول مرة أخرى.';
+      return 'خدمة المساعد الذكي مش متاحة دلوقتي (مفتاح الذكاء الاصطناعي على السيرفر مرفوض). بلّغ الأدمن.';
+    }
+    if (status == 429) return 'تم الوصول إلى الحد الأقصى للطلبات. برجاء الانتظار ثوانٍ والمحاولة مرة أخرى.';
     if (reason.isEmpty) return 'حدث خطأ في استلام الرد. برجاء المحاولة مجدداً.';
     final short = reason.length > 160 ? '${reason.substring(0, 160)}…' : reason;
     return 'تعذّر الرد من المساعد: $short';
