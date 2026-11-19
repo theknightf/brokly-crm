@@ -204,16 +204,16 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
     exportCSV(`employee-report-${data.employee.full_name.replace(/\s+/g, '-')}-${from}-${to}`, ['Metric', 'Value'], rows);
   };
 
-  const tabs = [
-    { key: 'overview' as const, label: 'Overview' },
-    { key: 'notes' as const, label: 'Notes' },
-    { key: 'timeline' as const, label: 'Timeline' },
-    { key: 'attendance' as const, label: 'Attendance' },
-    { key: 'calls' as const, label: 'Calls & WhatsApp' },
-    { key: 'visits' as const, label: 'Site Visits' },
-    { key: 'leads' as const, label: 'Leads' },
-    { key: 'followups' as const, label: 'Follow-ups' },
-    { key: 'expenses' as const, label: 'Expenses' },
+  const tabs: { key: typeof tab; label: string; icon: React.ReactNode; count?: number }[] = [
+    { key: 'overview', label: 'Overview', icon: <UserIcon size={14} /> },
+    { key: 'notes', label: 'Notes', icon: <MessageCircle size={14} /> },
+    { key: 'timeline', label: 'Timeline', icon: <Clock size={14} />, count: data?.timeline?.length },
+    { key: 'attendance', label: 'Attendance', icon: <CalendarDays size={14} />, count: data?.attendance?.length },
+    { key: 'calls', label: 'Calls', icon: <PhoneCall size={14} />, count: data?.calls?.length },
+    { key: 'visits', label: 'Visits', icon: <MapPin size={14} />, count: data?.visits?.length },
+    { key: 'leads', label: 'Leads', icon: <Users size={14} />, count: data?.leads?.length },
+    { key: 'followups', label: 'Follow-ups', icon: <Bell size={14} />, count: data?.followups?.length },
+    { key: 'expenses', label: 'Expenses', icon: <Wallet size={14} />, count: data?.expenses?.length },
   ];
 
   return (
@@ -380,20 +380,29 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-            {tabs.map((tb) => (
-              <button
-                key={tb.key}
-                onClick={() => setTab(tb.key)}
-                className={`h-9 px-3.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  tab === tb.key
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {tb.label}
-              </button>
-            ))}
+          <div className="sticky top-0 z-10 -mx-1 bg-background/90 px-1 py-2 backdrop-blur">
+            <div role="tablist" className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1">
+              {tabs.map((tb) => {
+                const on = tab === tb.key;
+                return (
+                  <button
+                    key={tb.key}
+                    role="tab"
+                    aria-selected={on}
+                    onClick={() => setTab(tb.key)}
+                    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-colors [@media(pointer:coarse)]:min-h-[44px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      on ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    {tb.icon}
+                    {tb.label}
+                    {tb.count != null && (
+                      <span className={`rounded-full px-1.5 text-[11px] font-bold tabular-nums ${on ? 'bg-white/25' : 'bg-muted text-muted-foreground'}`}>{tb.count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {tab === 'overview' && (
@@ -440,26 +449,73 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
   );
 }
 
+/* ── Shared look for every tab: one card, a title with a count, then simple rows (no wide tables) ── */
+function ListCard({ title, count, right, children }: { title: string; count: number; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground">
+          {title} <span className="font-normal text-muted-foreground">· {count}</span>
+        </h3>
+        {right}
+      </div>
+      <ul className="divide-y divide-border">{children}</ul>
+    </div>
+  );
+}
+
+function Row({
+  icon,
+  title,
+  meta,
+  right,
+  href,
+}: {
+  icon?: React.ReactNode;
+  title: React.ReactNode;
+  meta?: React.ReactNode;
+  right?: React.ReactNode;
+  href?: string;
+}) {
+  const inner = (
+    <div className="flex items-center gap-3 px-4 py-3">
+      {icon ? <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{icon}</span> : null}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-foreground" dir="auto">{title}</div>
+        {meta ? <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">{meta}</div> : null}
+      </div>
+      {right ? <div className="flex flex-shrink-0 flex-col items-end gap-1 text-end">{right}</div> : null}
+    </div>
+  );
+  return (
+    <li>
+      {href ? (
+        <a href={href} className="block transition-colors hover:bg-muted/50 focus:outline-none focus-visible:bg-muted/50">
+          {inner}
+        </a>
+      ) : (
+        inner
+      )}
+    </li>
+  );
+}
+
+const pill = (cls: string, text: React.ReactNode) => <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}`}>{text}</span>;
+const durationLabel = (a?: string | null, b?: string | null) => {
+  if (!a || !b) return '';
+  const secs = Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 1000));
+  return `${Math.floor(secs / 3600)}h ${Math.round((secs % 3600) / 60)}m`;
+};
+
 function TimelineTab({ items }: { items: any[] }) {
   if (!items.length)
     return <EmptyState icon={<CalendarDays size={22} className="text-muted-foreground" />} title="No activity" description="Nothing logged for this period." />;
   return (
-    <div className="bg-card border border-border rounded-2xl p-5">
-      <div className="space-y-3">
-        {items.map((ev, i) => (
-          <div key={`tl-${i}`} className="flex items-start gap-3">
-            <div className="mt-1.5 w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-foreground">{ev.label}</p>
-                <span className="text-[11px] text-muted-foreground flex-shrink-0">{fmtDateTime(ev.at)}</span>
-              </div>
-              {ev.detail ? <p className="text-xs text-muted-foreground truncate mt-0.5">{ev.detail}</p> : null}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <ListCard title="Timeline" count={items.length}>
+      {items.map((ev, i) => (
+        <Row key={`tl-${i}`} icon={<Clock size={15} />} title={ev.label} meta={ev.detail ? <span className="truncate">{ev.detail}</span> : null} right={<span className="text-[11px] text-muted-foreground">{fmtDateTime(ev.at)}</span>} />
+      ))}
+    </ListCard>
   );
 }
 
@@ -467,76 +523,55 @@ function AttendanceTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<CalendarDays size={22} className="text-muted-foreground" />} title="No attendance" description="No check-ins logged for this period." />;
   return (
-    <div className="bg-card border border-border rounded-xl overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3 font-medium">Date</th>
-            <th className="px-4 py-3 font-medium">Check-in</th>
-            <th className="px-4 py-3 font-medium">Check-out</th>
-            <th className="px-4 py-3 font-medium">Duration</th>
-            <th className="px-4 py-3 font-medium">GPS</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((r, i) => {
-            const secs =
-              r.check_in_time && r.check_out_time
-                ? Math.max(0, Math.round((new Date(r.check_out_time).getTime() - new Date(r.check_in_time).getTime()) / 1000))
-                : 0;
-            const h = Math.floor(secs / 3600);
-            const m = Math.round((secs % 3600) / 60);
-            return (
-              <tr key={r.id || i} className="bg-card">
-                <td className="px-4 py-3 font-medium text-foreground">{r.attendance_date}</td>
-                <td className="px-4 py-3 text-muted-foreground">{fmtTime(r.check_in_time)}</td>
-                <td className="px-4 py-3 text-muted-foreground">{fmtTime(r.check_out_time)}</td>
-                <td className="px-4 py-3">{secs ? `${h}h ${m}m` : '—'}</td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {r.check_in_lat != null ? `${r.check_in_lat.toFixed(4)}, ${r.check_in_lng?.toFixed(4) ?? ''}` : '—'}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <ListCard title="Attendance" count={rows.length}>
+      {rows.map((r, i) => {
+        const d = durationLabel(r.check_in_time, r.check_out_time);
+        return (
+          <Row
+            key={r.id || i}
+            icon={<CalendarDays size={15} />}
+            title={r.attendance_date}
+            meta={
+              <>
+                <span>In {fmtTime(r.check_in_time)}</span>
+                <span>Out {fmtTime(r.check_out_time)}</span>
+                {r.check_in_lat != null ? <span>GPS ✓</span> : null}
+              </>
+            }
+            right={d ? pill('bg-primary/10 text-primary', d) : pill('bg-amber-500/10 text-amber-700 dark:text-amber-300', 'No check-out')}
+          />
+        );
+      })}
+    </ListCard>
   );
 }
 
 function CallsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<PhoneCall size={22} className="text-muted-foreground" />} title="No calls" description="No calls or WhatsApp logged for this period." />;
+  const wa = rows.filter((c) => c.channel === 'WhatsApp').length;
   return (
-    <div className="bg-card border border-border rounded-xl overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3 font-medium">When</th>
-            <th className="px-4 py-3 font-medium">Channel</th>
-            <th className="px-4 py-3 font-medium">Contact</th>
-            <th className="px-4 py-3 font-medium">Duration</th>
-            <th className="px-4 py-3 font-medium">Outcome</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((c, i) => (
-            <tr key={c.id || i} className="bg-card">
-              <td className="px-4 py-3 text-muted-foreground">{fmtDateTime(c.created_at)}</td>
-              <td className="px-4 py-3">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${c.channel === 'WhatsApp' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300'}`}>
-                  {c.channel === 'WhatsApp' ? <MessageCircle size={11} /> : <PhoneCall size={11} />}
-                  {c.channel || 'Call'}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-foreground">{c.contact_name || c.contact_phone || '—'}</td>
-              <td className="px-4 py-3 text-muted-foreground">{c.duration_seconds ? `${Math.round(Number(c.duration_seconds) / 60)} min` : '—'}</td>
-              <td className="px-4 py-3 text-muted-foreground">{c.outcome || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListCard title="Calls & WhatsApp" count={rows.length} right={<span className="text-xs text-muted-foreground">{rows.length - wa} calls · {wa} WhatsApp</span>}>
+      {rows.map((c, i) => {
+        const isWa = c.channel === 'WhatsApp';
+        const leadId = c.lead_id || (c.entity_type === 'lead' ? c.entity_id : null);
+        return (
+          <Row
+            key={c.id || i}
+            href={leadId ? `/leads/${leadId}` : undefined}
+            icon={isWa ? <MessageCircle size={15} /> : <PhoneCall size={15} />}
+            title={c.contact_name || c.contact_phone || '—'}
+            meta={
+              <>
+                <span>{fmtDateTime(c.created_at)}</span>
+                {c.duration_seconds ? <span>{Math.round(Number(c.duration_seconds) / 60)} min</span> : null}
+              </>
+            }
+            right={c.outcome ? pill('bg-muted text-muted-foreground', c.outcome) : null}
+          />
+        );
+      })}
+    </ListCard>
   );
 }
 
@@ -544,39 +579,27 @@ function VisitsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<MapPin size={22} className="text-muted-foreground" />} title="No site visits" description="No site visits recorded for this period." />;
   return (
-    <div className="bg-card border border-border rounded-xl overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3 font-medium">When</th>
-            <th className="px-4 py-3 font-medium">Project / Lead</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 font-medium">Duration</th>
-            <th className="px-4 py-3 font-medium">Verified</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((v, i) => {
-            const secs = v.check_in_at && v.check_out_at ? Math.max(0, Math.round((new Date(v.check_out_at).getTime() - new Date(v.check_in_at).getTime()) / 1000)) : 0;
-            const h = Math.floor(secs / 3600);
-            const m = Math.round((secs % 3600) / 60);
-            return (
-              <tr key={v.id || i} className="bg-card">
-                <td className="px-4 py-3 text-muted-foreground">{fmtDateTime(v.check_in_at)}</td>
-                <td className="px-4 py-3 text-foreground">{v.project_name || v.lead_name || '—'}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${v.status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : v.status === 'in_progress' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-muted text-muted-foreground'}`}>
-                    {v.status || 'in_progress'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{secs ? `${h}h ${m}m` : '—'}</td>
-                <td className="px-4 py-3">{v.verified || v.within_radius ? <CheckCircle2 size={15} className="text-emerald-600" /> : v.check_out_at ? <XCircle size={15} className="text-red-500" /> : '—'}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <ListCard title="Site visits" count={rows.length}>
+      {rows.map((v, i) => {
+        const d = durationLabel(v.check_in_at, v.check_out_at);
+        const done = v.status === 'completed';
+        return (
+          <Row
+            key={v.id || i}
+            icon={<MapPin size={15} />}
+            title={v.project_name || v.lead_name || '—'}
+            meta={
+              <>
+                <span>{fmtDateTime(v.check_in_at)}</span>
+                {d ? <span>{d}</span> : null}
+                {v.verified || v.within_radius ? <span className="text-emerald-600 dark:text-emerald-400">Verified ✓</span> : v.check_out_at ? <span className="text-red-500">Not verified</span> : null}
+              </>
+            }
+            right={pill(done ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-violet-500/10 text-violet-700 dark:text-violet-300', done ? 'Completed' : 'In progress')}
+          />
+        );
+      })}
+    </ListCard>
   );
 }
 
@@ -584,61 +607,65 @@ function LeadsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<Users size={22} className="text-muted-foreground" />} title="No leads" description="No leads associated with this employee for the period." />;
   return (
-    <div className="bg-card border border-border rounded-xl overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3 font-medium">Created</th>
-            <th className="px-4 py-3 font-medium">Name</th>
-            <th className="px-4 py-3 font-medium">Phone</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((l, i) => (
-            <tr key={l.id || i} className="bg-card">
-              <td className="px-4 py-3 text-muted-foreground">{fmtDateTime(l.created_at)}</td>
-              <td className="px-4 py-3 font-medium text-foreground">{l.name || '—'}</td>
-              <td className="px-4 py-3 text-muted-foreground">{l.phone || '—'}</td>
-              <td className="px-4 py-3 text-muted-foreground">{l.crm_status || l.lead_status || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListCard title="Leads" count={rows.length}>
+      {rows.map((l, i) => {
+        const st = l.crm_status || l.lead_status || '';
+        return (
+          <Row
+            key={l.id || i}
+            href={l.id ? `/leads/${l.id}` : undefined}
+            icon={<UserIcon size={15} />}
+            title={l.name || '—'}
+            meta={
+              <>
+                {l.phone ? <span dir="ltr" className="font-mono">{l.phone}</span> : null}
+                <span>{fmtDateTime(l.created_at)}</span>
+              </>
+            }
+            right={st ? pill(STATUS_COLORS[st] || 'bg-muted text-muted-foreground', st) : null}
+          />
+        );
+      })}
+    </ListCard>
   );
 }
 
 function FollowupsTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<Bell size={22} className="text-muted-foreground" />} title="No follow-ups" description="No follow-ups scheduled for this period." />;
+  const today = new Date().toISOString().slice(0, 10);
   return (
-    <div className="bg-card border border-border rounded-xl overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3 font-medium">Due</th>
-            <th className="px-4 py-3 font-medium">Title</th>
-            <th className="px-4 py-3 font-medium">Type</th>
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 font-medium">Completed</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {rows.map((f, i) => (
-            <tr key={f.id || i} className="bg-card">
-              <td className="px-4 py-3 text-muted-foreground">{f.due_date || '—'}</td>
-              <td className="px-4 py-3 font-medium text-foreground">{f.title || '—'}</td>
-              <td className="px-4 py-3 text-muted-foreground">{f.follow_up_type || '—'}</td>
-              <td className="px-4 py-3">
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{f.follow_up_status || '—'}</span>
-              </td>
-              <td className="px-4 py-3 text-muted-foreground">{f.completed_at ? fmtDateTime(f.completed_at) : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListCard title="Follow-ups" count={rows.length}>
+      {rows.map((f, i) => {
+        const open = !['Completed', 'Cancelled'].includes(f.follow_up_status);
+        const late = open && f.due_date && f.due_date < today;
+        const status = late ? 'Late' : f.follow_up_status || '—';
+        const cls =
+          status === 'Late'
+            ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+            : status === 'Completed'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+              : status === 'Cancelled'
+                ? 'bg-muted text-muted-foreground'
+                : 'bg-amber-500/10 text-amber-700 dark:text-amber-300';
+        return (
+          <Row
+            key={f.id || i}
+            href={f.lead_id ? `/leads/${f.lead_id}` : undefined}
+            icon={<Bell size={15} />}
+            title={f.title || '—'}
+            meta={
+              <>
+                <span>Due {f.due_date || '—'}</span>
+                {f.follow_up_type ? <span>{f.follow_up_type}</span> : null}
+                {f.completed_at ? <span>Done {fmtDateTime(f.completed_at)}</span> : null}
+              </>
+            }
+            right={pill(cls, status)}
+          />
+        );
+      })}
+    </ListCard>
   );
 }
 
@@ -647,36 +674,25 @@ function ExpensesTabC({ rows }: { rows: any[] }) {
   if (!rows.length)
     return <EmptyState icon={<Wallet size={22} className="text-muted-foreground" />} title="No expenses" description="No expenses recorded by this employee." />;
   return (
-    <div className="bg-card border border-border rounded-2xl">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-semibold text-foreground">Expenses</h3>
-        <span className="text-sm font-bold text-foreground">{total.toLocaleString()}</span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 font-medium">Date</th>
-              <th className="px-4 py-3 font-medium">Title</th>
-              <th className="px-4 py-3 font-medium">Category</th>
-              <th className="px-4 py-3 font-medium">Amount</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.map((e, i) => (
-              <tr key={e.id || i} className="bg-card">
-                <td className="px-4 py-3 text-muted-foreground">{e.expense_date || fmtDateTime(e.created_at)}</td>
-                <td className="px-4 py-3 font-medium text-foreground">{e.title || '—'}</td>
-                <td className="px-4 py-3 text-muted-foreground">{e.category || 'Other'}</td>
-                <td className="px-4 py-3 font-semibold text-foreground">{Number(e.amount || 0).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <ListCard title="Expenses" count={rows.length} right={<span className="text-sm font-bold text-foreground">Total {total.toLocaleString()}</span>}>
+      {rows.map((e, i) => (
+        <Row
+          key={e.id || i}
+          icon={<Wallet size={15} />}
+          title={e.title || '—'}
+          meta={
+            <>
+              <span>{e.expense_date || fmtDateTime(e.created_at)}</span>
+              <span>{e.category || 'Other'}</span>
+            </>
+          }
+          right={<span className="text-sm font-bold tabular-nums text-foreground">{Number(e.amount || 0).toLocaleString()}</span>}
+        />
+      ))}
+    </ListCard>
   );
 }
+
 /* ── Notes: what this employee wrote, the stage change that came with it, and the customer (tap to open the lead) ── */
 interface EmployeeNote {
   id: string;
