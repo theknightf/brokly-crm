@@ -143,6 +143,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       data: { subscription },
     } = getSupabase().auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
+      // supabase-js re-announces SIGNED_IN for the SAME user whenever the tab regains focus or the token is
+      // re-validated. Treating that as a new login put the whole app back on its loading skeleton (the "site
+      // refreshes by itself" problem). Same user already loaded: nothing changed, do nothing.
+      if (event === 'SIGNED_IN' && session?.user && userRef.current?.id === session.user.id) {
+        setSession(session);
+        return;
+      }
       setSession(session);
       setUser(session?.user ?? null);
       if (!session?.user) {

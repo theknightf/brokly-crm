@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -21,11 +22,17 @@ export function PWAProvider() {
 
     // Register service worker & force immediate update check so mobile PWAs never run stale bundles
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      let refreshing = false;
+      // A new version took over. Never reload the page by itself (it threw people out of whatever they were
+      // doing, on every deploy): offer a one-tap refresh instead and keep working until they choose.
+      let notified = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
+        if (notified) return;
+        notified = true;
+        toast('A new version is ready', {
+          description: 'Refresh when you reach a good stopping point.',
+          duration: Infinity,
+          action: { label: 'Refresh', onClick: () => window.location.reload() },
+        });
       });
       navigator.serviceWorker
         .register(`/sw.js?v=${process.env.NEXT_PUBLIC_BUILD_ID || 'dev'}`, { updateViaCache: 'none' })
