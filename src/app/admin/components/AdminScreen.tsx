@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Plus,
   Pencil,
@@ -35,19 +36,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole, canManageUsers } from '@/lib/roles';
 import { toast } from 'sonner';
-import UsersTab from './UsersTab';
-import { WorkLocationCard } from './AttendanceTab';
-import AdminAttendanceView from '@/app/attendance/components/AdminAttendanceView';
-import ActivityDashboard from './ActivityDashboard';
-import ProductivityDashboard from './ProductivityDashboard';
-import CallLogsTab from './CallLogsTab';
-import EmailTemplatesTab from './EmailTemplatesTab';
-import PayrollTab from './PayrollTab';
-import LeaveTab from './LeaveTab';
-import KpiTargetsTab from './KpiTargetsTab';
-import TasksTab from './TasksTab';
-import RotationTab from './RotationTab';
-import UnifiedMasterDashboard from '@/app/components/UnifiedMasterDashboard';
+// Each tab is its own chunk, loaded only when opened (the page used to ship all of them up front).
+const TabLoading = () => (
+  <div className="flex items-center justify-center py-16 text-muted-foreground">
+    <Loader2 size={20} className="animate-spin" />
+  </div>
+);
+const lazyTab = <T,>(load: () => Promise<{ default: React.ComponentType<T> }>) => dynamic(load, { loading: TabLoading });
+const UsersTab = lazyTab(() => import('./UsersTab'));
+const WorkLocationCard = lazyTab(() => import('./AttendanceTab').then((m) => ({ default: m.WorkLocationCard as React.ComponentType<any> })));
+const AdminAttendanceView = lazyTab(() => import('@/app/attendance/components/AdminAttendanceView'));
+const ActivityDashboard = lazyTab(() => import('./ActivityDashboard'));
+const ProductivityDashboard = lazyTab(() => import('./ProductivityDashboard'));
+const CallLogsTab = lazyTab(() => import('./CallLogsTab'));
+const EmailTemplatesTab = lazyTab(() => import('./EmailTemplatesTab'));
+const PayrollTab = lazyTab(() => import('./PayrollTab'));
+const LeaveTab = lazyTab(() => import('./LeaveTab'));
+const KpiTargetsTab = lazyTab(() => import('./KpiTargetsTab'));
+const TasksTab = lazyTab(() => import('./TasksTab'));
+const RotationTab = lazyTab(() => import('./RotationTab'));
+const UnifiedMasterDashboard = lazyTab(() => import('@/app/components/UnifiedMasterDashboard'));
 
 type TabKey =
   | 'leadSources'
@@ -418,18 +426,36 @@ export default function AdminScreen() {
     name: '',
   });
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
+  // Open on ?tab=, else the tab the admin used last time.
   useEffect(() => {
     try {
-      const t = new URLSearchParams(window.location.search).get('tab') as TabKey | null;
+      const fromUrl = new URLSearchParams(window.location.search).get('tab') as TabKey | null;
+      let t: TabKey | null = fromUrl;
+      if (!t) {
+        try {
+          t = window.localStorage.getItem('brokly:adminTab') as TabKey | null;
+        } catch {
+          t = null;
+        }
+      }
       if (t && TABS.some((x) => x.key === t)) setActiveTab(t);
     } catch {
       /* ignore malformed query */
     }
   }, []);
+
+  const selectTab = (key: TabKey) => {
+    setActiveTab(key);
+    try {
+      window.localStorage.setItem('brokly:adminTab', key);
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', key);
+      window.history.replaceState(null, '', url.toString());
+    } catch {
+      /* storage / history unavailable */
+    }
+  };
+  const [navQuery, setNavQuery] = useState('');
 
   const loadSettings = async () => {
     setLoading(true);
@@ -471,6 +497,15 @@ export default function AdminScreen() {
     activeTab === 'kpiTargets' ||
     activeTab === 'tasks' ||
     activeTab === 'rotation';
+  // The lists (sources, stages, areas, priorities, developers) are fetched the first time one of those tabs opens,
+  // not when the page loads, so the heavy tabs (users, payroll, activity…) open without waiting for them.
+  const settingsLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!isPanelTab && !settingsLoadedRef.current) {
+      settingsLoadedRef.current = true;
+      void loadSettings();
+    }
+  }, [isPanelTab]);
   const items = !isPanelTab
     ? settings[
         activeTab as Exclude<
@@ -638,6 +673,10 @@ export default function AdminScreen() {
     .map((key) => TABS.find((tab) => tab.key === key))
     .filter((tab): tab is (typeof TABS)[number] => Boolean(tab))
     .filter((t) => t.key !== 'users' || canUsers);
+  const q = navQuery.trim().toLowerCase();
+  const shownTabs = q
+    ? visibleTabs.filter((tb) => (tb.label + ' ' + tb.description + ' ' + t(`admin.${tb.key}`)).toLowerCase().includes(q))
+    : visibleTabs;
   const navGroup = (key: TabKey) => {
     if (['users', 'attendance', 'leave', 'payroll', 'productivity', 'performance360', 'kpiTargets', 'activity', 'callLogs'].includes(key)) {
       return t('admin.people');
@@ -668,7 +707,26 @@ export default function AdminScreen() {
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         <div className="w-full md:w-60 flex-shrink-0 border-b md:border-b-0 md:border-r border-border bg-card overflow-y-auto p-3 grid grid-cols-2 md:flex md:flex-col gap-1.5 md:sticky md:top-0">
-          {visibleTabs.map((tab) => {
+          <div className="col-span-2 md:col-span-1 sticky top-0 z-10 -mt-1 bg-card pb-1.5">
+            <input
+              type="search"
+              value={navQuery}
+              onChange={(e) => setNavQuery(e.target.value)}
+              placeholder="Find a setting…  ابحث"
+              aria-label="Search admin sections"
+              className="input-base h-10 w-full text-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && shownTabs[0]) {
+                  selectTab(shownTabs[0].key);
+                  setNavQuery('');
+                }
+              }}
+            />
+          </div>
+          {shownTabs.length === 0 && (
+            <p className="col-span-2 px-2 py-4 text-center text-xs text-muted-foreground">No matching section.</p>
+          )}
+          {shownTabs.map((tab) => {
             const isUsers = tab.key === 'users';
             const isAttendance = tab.key === 'attendance';
             const isActivity = tab.key === 'activity';
@@ -735,13 +793,13 @@ export default function AdminScreen() {
                 ).filter((i) => i.active).length;
             return (
               <React.Fragment key={tab.key}>
-              {(visibleTabs.indexOf(tab) === 0 || navGroup(visibleTabs[visibleTabs.indexOf(tab) - 1].key) !== navGroup(tab.key)) && (
+              {(shownTabs.indexOf(tab) === 0 || navGroup(shownTabs[shownTabs.indexOf(tab) - 1].key) !== navGroup(tab.key)) && (
                 <p className="col-span-2 md:col-span-1 px-2 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70 first:pt-1">
                   {navGroup(tab.key)}
                 </p>
               )}
               <button
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => selectTab(tab.key)}
                 className={`group flex w-full items-center gap-3 px-3 py-3 rounded-2xl text-left transition-all duration-200 ${activeTab === tab.key ? 'bg-primary text-primary-foreground shadow-[0_8px_24px_-12px_rgba(132,204,22,0.9)] scale-[1.01]' : 'text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-0.5'}`}
               >
                 <span className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${activeTab === tab.key ? 'text-primary-foreground' : 'text-primary'}`}>{tab.icon}</span>
