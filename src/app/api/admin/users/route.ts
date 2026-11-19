@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     );
   }
   if (role === 'limited_admin' && guard.actor.role !== 'owner') {
-    return NextResponse.json({ error: 'Only an owner can create a limited admin' }, { status: 403 });
+    return NextResponse.json({ error: 'Only an owner can create an admin manager' }, { status: 403 });
   }
   if (role === 'admin' && guard.actor.role !== 'owner' && guard.actor.role !== 'admin') {
     return NextResponse.json(
@@ -211,7 +211,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Only an owner can grant admin' }, { status: 403 });
     }
     if (role === 'limited_admin' && actorRole !== 'owner') {
-      return NextResponse.json({ error: 'Only an owner can grant limited_admin' }, { status: 403 });
+      return NextResponse.json({ error: 'Only an owner can grant admin manager' }, { status: 403 });
     }
     payload.role = role;
   }

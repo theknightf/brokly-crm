@@ -108,6 +108,7 @@ export function colorClassOf(status: string): string {
 export const ROLE_BADGES: Record<string, { label: string; color: string }> = {
   owner: { label: 'Owner', color: 'bg-dusk-soft text-dusk' },
   admin: { label: 'Admin', color: 'bg-teal-soft text-teal' },
+  limited_admin: { label: 'Admin Manager', color: 'bg-teal-soft text-teal' },
   broker: { label: 'Broker', color: 'bg-sage-soft text-sage' },
   branch_manager: { label: 'Branch Manager', color: 'bg-dusk-soft text-dusk' },
   team_leader: { label: 'Team Leader', color: 'bg-teal-soft text-teal' },

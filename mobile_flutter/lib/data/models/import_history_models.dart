@@ -140,6 +140,7 @@ String importRoleLabel(String? role) {
     'owner': 'Owner',
     'owner_admin': 'Owner',
     'admin': 'Admin',
+    'limited_admin': 'Admin Manager',
     'branch_manager': 'Branch Manager',
     'team_leader': 'Team Leader',
     'senior_agent': 'Senior Agent',
