@@ -50,6 +50,34 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// Which group each page belongs to, in the order it appears. Overview = daily start, Pipeline = the sales work,
+// Management = properties, team and reports, System = admin tools and settings.
+const GROUP_LAYOUT: Record<string, string[]> = {
+  'nav.overview': ['nav-dashboard', 'nav-attendance', 'nav-calendar', 'nav-workspace'],
+  'nav.pipeline': ['nav-leads', 'nav-followups', 'nav-customers', 'nav-reservations', 'nav-deals', 'nav-call-logs', 'nav-duplicates'],
+  'nav.management': ['nav-locations', 'nav-projects', 'nav-units', 'nav-calculator', 'nav-teams', 'nav-reports', 'nav-expenses'],
+  'nav.system': ['nav-duplicate-leads', 'nav-claim-conflicts', 'nav-import-history', 'nav-admin', 'nav-settings'],
+};
+
+function regroup(base: NavGroup[]): NavGroup[] {
+  const byId = new Map<string, NavItem>();
+  for (const g of base) for (const it of g.items) byId.set(it.id, it);
+  const placed = new Set<string>();
+  const out = base.map((g) => {
+    const ids = GROUP_LAYOUT[g.titleKey];
+    if (!ids) return g;
+    const items = ids.map((id) => byId.get(id)).filter((x): x is NavItem => !!x);
+    items.forEach((i) => placed.add(i.id));
+    return { ...g, items };
+  });
+  // Anything not listed above keeps its place at the end of its original group (nothing can disappear).
+  for (const g of base) {
+    const target = out.find((o) => o.titleKey === g.titleKey);
+    for (const it of g.items) if (!placed.has(it.id) && target) target.items = [...target.items, it];
+  }
+  return out;
+}
+
 const navGroups: NavGroup[] = [
   {
     titleKey: 'nav.overview',
@@ -278,8 +306,9 @@ function roleClassOf(role?: string): 'sales' | 'management' | 'admin' {
 
 export function reorderNavForRole(
   role?: string,
-  base: NavGroup[] = navGroups
+  rawBase: NavGroup[] = navGroups
 ): NavGroup[] {
+  const base = regroup(rawBase);
   const cls = roleClassOf(role);
   if (cls === 'admin') return base;
   const priorities = ROLE_ITEM_PRIORITY[cls] || {};

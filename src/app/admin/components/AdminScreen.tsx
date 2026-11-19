@@ -183,18 +183,21 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; description: st
 
 // Keep the most frequently used admin workflows at the top of the rail.
 const TAB_ORDER: TabKey[] = [
+  // People & performance
   'users',
   'attendance',
-  'productivity',
-  'performance360',
-  'activity',
-  'callLogs',
-  'tasks',
-  'kpiTargets',
   'leave',
   'payroll',
+  'productivity',
+  'performance360',
+  'kpiTargets',
+  'activity',
+  'callLogs',
+  // Operations
+  'tasks',
   'rotation',
   'emailTemplates',
+  // CRM setup
   'leadSources',
   'pipelineStages',
   'areas',
@@ -636,10 +639,10 @@ export default function AdminScreen() {
     .filter((tab): tab is (typeof TABS)[number] => Boolean(tab))
     .filter((t) => t.key !== 'users' || canUsers);
   const navGroup = (key: TabKey) => {
-    if (['users', 'attendance', 'productivity', 'activity', 'callLogs'].includes(key)) {
+    if (['users', 'attendance', 'leave', 'payroll', 'productivity', 'performance360', 'kpiTargets', 'activity', 'callLogs'].includes(key)) {
       return t('admin.people');
     }
-    if (['tasks', 'kpiTargets', 'leave', 'payroll', 'rotation'].includes(key)) {
+    if (['tasks', 'rotation', 'emailTemplates'].includes(key)) {
       return t('admin.operations');
     }
     return t('admin.crmSetup');
