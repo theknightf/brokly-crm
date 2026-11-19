@@ -127,11 +127,11 @@ function StatCard({
 }) {
   return (
     <div className="bg-card border border-border rounded-2xl p-4">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="text-primary">{icon}</span>
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>
         {label}
       </div>
-      <p className="text-xl font-bold text-foreground mt-1.5">{value}</p>
+      <p className="text-2xl font-extrabold tabular-nums text-foreground mt-2">{value}</p>
       {sub ? <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p> : null}
     </div>
   );
@@ -220,22 +220,33 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push('/admin')}
-            className="w-9 h-9 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform"
-            aria-label="Back to admin"
+            onClick={() => (window.history.length > 1 ? router.back() : router.push('/'))}
+            className="w-10 h-10 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:bg-muted active:scale-95 transition-transform flex-shrink-0"
+            aria-label="Back"
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft size={17} className="rtl:rotate-180" />
           </button>
-          <div>
-            <h1 className="page-title flex items-center gap-2">
-              <UserIcon size={20} className="text-primary" />
+          <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-lg font-extrabold text-primary">
+            {data?.employee?.full_name
+              ? data.employee.full_name.trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+              : <UserIcon size={22} />}
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground truncate">
               {data?.employee?.full_name || 'Employee report'}
             </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {data
-                ? `${roleLabelOf(data.employee.role)} · ${from} → ${to}`
-                : 'Loading…'}
-            </p>
+            {data ? (
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 font-semibold text-primary">{roleLabelOf(data.employee.role)}</span>
+                <span className={`rounded-full px-2.5 py-0.5 font-semibold ${data.employee.is_active === false ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'}`}>
+                  {data.employee.is_active === false ? 'Inactive' : 'Active'}
+                </span>
+                {data.employee.phone ? <a href={`tel:${data.employee.phone}`} className="rounded-full bg-muted px-2.5 py-0.5 font-mono text-muted-foreground hover:text-foreground" dir="ltr">{data.employee.phone}</a> : null}
+                <span className="text-muted-foreground">{from} → {to}</span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-0.5">Loading…</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

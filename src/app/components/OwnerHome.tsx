@@ -7,6 +7,11 @@ import DashboardTeamFilter from '@/app/components/DashboardTeamFilter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { isAdminRole } from '@/lib/roles';
+import { createClient } from '@/lib/supabase/client';
+import { roleLabelOf } from '@/lib/ui';
+
+const SALES_ROLES = ['agent', 'senior_agent', 'telecaller', 'team_leader', 'broker', 'branch_manager'];
+type SalesPerson = { id: string; full_name: string; role: string };
 
 interface UnifiedData {
   summary: any;
@@ -29,6 +34,22 @@ export default function OwnerHome() {
   const [error, setError] = useState('');
   const [filterTeamId, setFilterTeamId] = useState<string | null>(null);
   const [filterAgentId, setFilterAgentId] = useState<string | null>(null);
+  const [team, setTeam] = useState<SalesPerson[] | null>(null);
+  useEffect(() => {
+    if (authLoading || !profile || !isAdminRole(profile.role)) return;
+    let alive = true;
+    (createClient() as any)
+      .from('user_profiles')
+      .select('id, full_name, role')
+      .in('role', SALES_ROLES)
+      .eq('is_active', true)
+      .order('full_name')
+      .then(({ data }: any) => alive && setTeam(data || []))
+      .catch(() => alive && setTeam([]));
+    return () => {
+      alive = false;
+    };
+  }, [authLoading, profile?.role]);
   const dataRef = useRef<UnifiedData | null>(null);
   dataRef.current = data;
 
@@ -153,6 +174,43 @@ export default function OwnerHome() {
                 <p className="text-[11px] text-muted-foreground">{ar ? c.en : c.ar}</p>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* Sales team: one button per person, opens their profile */}
+      <section aria-label={ar ? 'فريق المبيعات' : 'Sales team'} className="space-y-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+            <Users size={18} className="text-primary" /> {ar ? 'فريق المبيعات' : 'Sales team'}
+            {team && <span className="text-sm font-normal text-muted-foreground">({n(team.length)})</span>}
+          </h2>
+          <p className="text-sm text-muted-foreground">{ar ? 'اضغط على أي اسم تفتح البروفايل بتاعه' : 'Tap a name to open their profile'}</p>
+        </div>
+        {!team ? (
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 animate-pulse">
+            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="dash-card h-[68px]" />)}
+          </div>
+        ) : team.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{ar ? 'مفيش سيلز نشطين.' : 'No active sales people.'}</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+            {team.map((p) => {
+              const initials = String(p.full_name || '?').trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+              return (
+                <a
+                  key={p.id}
+                  href={`/admin/employees/${p.id}`}
+                  className="dash-card dash-card-hover flex items-center gap-3 p-3 min-h-[68px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary">{initials}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-foreground">{p.full_name || '—'}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{roleLabelOf(p.role)}</span>
+                  </span>
+                </a>
+              );
+            })}
           </div>
         )}
       </section>
