@@ -33,7 +33,7 @@ import {
 import { usePendingDuplicates } from '@/hooks/usePendingDuplicates';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { isAdminRole, canViewTeams } from '@/lib/roles';
+import { isAdminRole, canViewTeams, canUseItConsole, isItRole } from '@/lib/roles';
 import { usePwaAgentRestriction, isPwaAgentAllowedPath } from '@/hooks/usePwaAgentRestriction';
 
 interface NavItem {
@@ -56,7 +56,7 @@ const GROUP_LAYOUT: Record<string, string[]> = {
   'nav.overview': ['nav-dashboard', 'nav-attendance', 'nav-calendar', 'nav-workspace'],
   'nav.pipeline': ['nav-leads', 'nav-followups', 'nav-customers', 'nav-reservations', 'nav-deals', 'nav-call-logs', 'nav-duplicates'],
   'nav.management': ['nav-locations', 'nav-projects', 'nav-units', 'nav-calculator', 'nav-teams', 'nav-reports', 'nav-expenses'],
-  'nav.system': ['nav-duplicate-leads', 'nav-claim-conflicts', 'nav-import-history', 'nav-admin', 'nav-settings'],
+  'nav.system': ['nav-duplicate-leads', 'nav-claim-conflicts', 'nav-import-history', 'nav-admin', 'nav-it', 'nav-settings'],
 };
 
 function regroup(base: NavGroup[]): NavGroup[] {
@@ -232,6 +232,12 @@ const navGroups: NavGroup[] = [
         labelKey: 'common.admin',
         icon: <ShieldCheck size={18} />,
         href: '/admin',
+      },
+      {
+        id: 'nav-it',
+        labelKey: 'common.itConsole',
+        icon: <ShieldCheck size={18} />,
+        href: '/it',
       },
       {
         id: 'nav-settings',
@@ -452,7 +458,9 @@ function SidebarContent({
                 (isAdminOrOwner || (item.id !== 'nav-admin' && item.id !== 'nav-expenses' && item.id !== 'nav-duplicate-leads' && item.id !== 'nav-claim-conflicts')) &&
                 (isAdminOrOwner || canWatchTeams || item.id !== 'nav-import-history') &&
                 (canWatchTeams || item.id !== 'nav-teams') &&
-                (!pwaAgent || isPwaAgentAllowedPath(item.href))
+                (!pwaAgent || isPwaAgentAllowedPath(item.href)) &&
+                (item.id !== 'nav-it' || canUseItConsole(profile?.role)) &&
+                (!isItRole(profile?.role) || item.id === 'nav-it' || item.id === 'nav-settings')
             ),
           }))
           .filter((group) => group.items.length > 0)

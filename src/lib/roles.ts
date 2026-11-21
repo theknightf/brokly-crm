@@ -42,3 +42,14 @@ export function canManageTeams(role?: string | null): boolean {
 export function canDeleteLeads(role?: string | null): boolean {
   return isAdminRole(role) && normalizeRole(role) !== 'limited_admin';
 }
+
+/** IT (maintenance) role: sees the IT console and can close / reopen user accounts. No access to lead data. */
+export function isItRole(role?: string | null): boolean {
+  return normalizeRole(role) === 'it';
+}
+
+/** Who may open the IT console: IT staff and the owner. */
+export function canUseItConsole(role?: string | null): boolean {
+  const r = normalizeRole(role);
+  return r === 'it' || r === 'owner';
+}

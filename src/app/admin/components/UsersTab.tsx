@@ -24,6 +24,7 @@ const ROLES = [
   { value: 'owner', label: 'Owner', color: 'bg-purple-100 text-purple-700' },
   { value: 'admin', label: 'Admin', color: 'bg-blue-100 text-blue-700' },
   { value: 'limited_admin', label: 'Admin Manager', color: 'bg-sky-100 text-sky-700' },
+  { value: 'it', label: 'IT', color: 'bg-fuchsia-100 text-fuchsia-700' },
   { value: 'broker', label: 'Broker', color: 'bg-indigo-100 text-indigo-700' },
   { value: 'branch_manager', label: 'Branch Manager', color: 'bg-cyan-100 text-cyan-700' },
   { value: 'team_leader', label: 'Team Leader', color: 'bg-teal-100 text-teal-700' },

@@ -12,6 +12,8 @@ import DeductionAlertProvider from './DeductionAlertProvider';
 const AssistantChatWidget = dynamic(() => import('./assistant/AssistantChatWidget'), { ssr: false });
 import { useLanguage } from '@/contexts/LanguageContext';
 import { usePwaAgentRestriction, isPwaAgentAllowedPath, PWA_AGENT_HOME } from '@/hooks/usePwaAgentRestriction';
+import { useAuth } from '@/contexts/AuthContext';
+import { isItRole } from '@/lib/roles';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -32,6 +34,13 @@ export default function AppLayout({ children, fill = false }: AppLayoutProps) {
   useEffect(() => {
     if (pwaAgent && !isPwaAgentAllowedPath(pathname || '')) router.replace(PWA_AGENT_HOME);
   }, [pwaAgent, pathname, router]);
+
+  // IT staff only get the IT console (and Settings); lead data pages are not theirs.
+  const { profile: itProfile } = useAuth();
+  const itOnly = isItRole(itProfile?.role);
+  useEffect(() => {
+    if (itOnly && !(pathname === '/it' || (pathname || '').startsWith('/settings'))) router.replace('/it');
+  }, [itOnly, pathname, router]);
 
   const goBack = () => {
     if (window.history.length > 1) router.back();

@@ -19,6 +19,7 @@ export const dictionaries: Dict = {
   'common.admin': { en: 'Admin', ar: 'الإدارة' },
   'common.expenses': { en: 'Expenses', ar: 'المصروفات' },
   'common.settings': { en: 'Settings', ar: 'الإعدادات' },
+  'common.itConsole': { en: 'IT Console', ar: 'لوحة الـ IT' },
   'common.dashboard': { en: 'Dashboard', ar: 'لوحة التحكم' },
   'common.unitCalculator': { en: 'Unit Calculator', ar: 'حاسبة الوحدة' },
   'common.locations': { en: 'Locations', ar: 'المواقع' },

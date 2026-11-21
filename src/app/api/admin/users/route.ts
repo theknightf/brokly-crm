@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 const ALLOWED_ROLES = [
   'admin',
   'limited_admin',
+  'it',
   'owner',
   'broker',
   'branch_manager',
@@ -49,6 +50,9 @@ export async function POST(request: Request) {
   }
   if (role === 'limited_admin' && guard.actor.role !== 'owner') {
     return NextResponse.json({ error: 'Only an owner can create an admin manager' }, { status: 403 });
+  }
+  if (role === 'it' && guard.actor.role !== 'owner') {
+    return NextResponse.json({ error: 'Only an owner can create an IT user' }, { status: 403 });
   }
   if (role === 'admin' && guard.actor.role !== 'owner' && guard.actor.role !== 'admin') {
     return NextResponse.json(
@@ -212,6 +216,9 @@ export async function PATCH(request: Request) {
     }
     if (role === 'limited_admin' && actorRole !== 'owner') {
       return NextResponse.json({ error: 'Only an owner can grant admin manager' }, { status: 403 });
+    }
+    if (role === 'it' && actorRole !== 'owner') {
+      return NextResponse.json({ error: 'Only an owner can grant the IT role' }, { status: 403 });
     }
     payload.role = role;
   }
