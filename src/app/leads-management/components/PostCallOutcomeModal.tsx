@@ -243,8 +243,7 @@ export default function PostCallOutcomeModal({ lead, open, onClose, onSaved }: P
     outcome === 'Schedule Meeting' ||
     outcome === 'Meeting' ||
     outcome === 'Follow Up After Meeting' ||
-    outcome === 'No Answer' ||
-    outcome === 'No Answer At All';
+    outcome === 'No Answer'; // "No Answer At All" never gets a follow-up
 
   const retryPresets: { label: string; days: number; time: string }[] = [
     { label: 'Tomorrow 10:00', days: 1, time: '10:00' },

@@ -360,7 +360,9 @@ export async function POST(request: Request) {
       }
 
       // Contacted: the lead leaves the follow-up queue unless the agent scheduled a new date.
-      patch.follow_up_due = body.next_follow_up_date || null;
+      // "No Answer At All" never goes into Follow-ups, whatever date the client sent.
+      const nextFollowUpDate = outcome === 'No Answer At All' ? null : body.next_follow_up_date || null;
+      patch.follow_up_due = nextFollowUpDate;
       try {
         await supabase.from('leads').update(patch).eq('id', entity_id);
       } catch {
@@ -368,7 +370,7 @@ export async function POST(request: Request) {
       }
 
       // Schedule follow-up / meeting row if requested
-      if (body.next_follow_up_date) {
+      if (nextFollowUpDate) {
         try {
           const isMeeting = outcome === 'Schedule Meeting';
           await supabase.from('follow_ups').insert({
@@ -380,7 +382,7 @@ export async function POST(request: Request) {
             type: isMeeting ? 'Meeting' : 'Call',
             status: 'Pending',
             priority: 'Medium',
-            due_date: body.next_follow_up_date,
+            due_date: nextFollowUpDate,
             due_time: body.followUpDateTime?.split('T')[1]?.slice(0, 5) || '12:00',
             notes: notes || '',
           });

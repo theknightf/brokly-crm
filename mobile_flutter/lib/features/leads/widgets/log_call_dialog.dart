@@ -383,8 +383,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
       _outcome == 'Schedule Meeting' ||
       _outcome == 'Site Visit' ||
       _outcome == 'Interested' ||
-      _outcome == 'No Answer' ||
-      _outcome == 'No Answer At All';
+      _outcome == 'No Answer'; // "No Answer At All" never gets a follow-up
 
   Future<void> _pickScheduleDate() async {
     final now = DateTime.now();
