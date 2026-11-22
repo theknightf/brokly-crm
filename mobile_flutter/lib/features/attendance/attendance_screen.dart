@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/sales_role.dart';
 import '../../state/attendance_provider.dart';
+import '../../state/auth_provider.dart';
 import 'widgets/attendance_history_list.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -51,6 +53,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final formattedDate = DateFormat('EEEE, MMM d, yyyy').format(_currentTime);
 
     final history = provider.history;
+    // Sales agents only have their personal check-in (same as the website); the team logger is for managers.
+    final isAgent = isSalesAgent(context.watch<AuthProvider>().profile);
+    final lateDays = history.where((a) => a.delayMinutes > 0).length;
     final daysPresent = history.length;
     final completeDays = history.where((a) => a.isCheckedIn && a.isCheckedOut).length;
     final totalHoursMinutes = history.fold<int>(0, (sum, a) => sum + a.durationMinutes);
@@ -139,7 +144,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 const SizedBox(height: 12),
 
                 // ── 2. Segmented Mode Switcher (Team Shift Logger vs Personal Check-In)
-                Container(
+                if (!isAgent) Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF181C22) : const Color(0xFFE2E8F0),
@@ -167,7 +172,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                if (!isAgent) const SizedBox(height: 14),
 
                 // ── 3. Tactile Hero Shift Card ──────────────────────
                 Container(
@@ -602,6 +607,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           _buildStatColumn('Present', '$daysPresent days', AppColors.neonLime),
                           _buildStatColumn('Completed', '$completeDays days', const Color(0xFF10B981)),
                           _buildStatColumn('Logged', '${totalHours}h', const Color(0xFF38BDF8)),
+                          _buildStatColumn('Late', '$lateDays days', const Color(0xFFF59E0B)),
                         ],
                       ),
                     ],

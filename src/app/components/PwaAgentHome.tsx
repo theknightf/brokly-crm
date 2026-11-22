@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, ClipboardList, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, CalendarCheck2, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -29,6 +29,13 @@ export default function PwaAgentHome() {
       title: ar ? 'مساحة العمل' : 'Workspace',
       sub: ar ? 'المتابعات المتأخرة ومتابعات النهارده' : 'Late and Today follow-ups',
       tone: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+    },
+    {
+      href: '/attendance',
+      icon: CalendarCheck2,
+      title: ar ? 'الحضور' : 'Attendance',
+      sub: ar ? 'سجّل حضورك وانصرافك وشوف سجلك' : 'Check in, check out, see your history',
+      tone: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
     },
   ];
 

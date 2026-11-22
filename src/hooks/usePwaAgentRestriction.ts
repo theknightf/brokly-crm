@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
  * Leads and Follow-ups pages. Everyone else, and agents in a normal browser tab, keep the full site.
  * This only shapes the UI; data access is still enforced by the database.
  */
-export const PWA_AGENT_ALLOWED_PATHS = ['/leads-management', '/leads', '/follow-ups', '/pwa-dashboard'];
+export const PWA_AGENT_ALLOWED_PATHS = ['/leads-management', '/leads', '/follow-ups', '/pwa-dashboard', '/attendance'];
 export const PWA_AGENT_HOME = '/';
 
 export function isPwaAgentAllowedPath(path: string): boolean {

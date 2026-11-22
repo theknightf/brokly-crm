@@ -42,7 +42,7 @@ export default function AttendanceScreen() {
   return (
     <div className="flex flex-col gap-5">
       {/* Admin view switcher — team management default, personal check-in one tap away */}
-      <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#181b22] p-1 w-full sm:w-auto sm:self-start">
+      <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 w-full sm:w-auto sm:self-start">
         {(
           [
             ['team', 'تسجيل سريع للفريق', 'Quick Team Logger', LayoutGrid],
@@ -55,7 +55,7 @@ export default function AttendanceScreen() {
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
               tab === key
                 ? 'bg-lime-500 text-zinc-950 shadow'
-                : 'text-zinc-400 hover:text-zinc-100'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Icon size={13} />

@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/sales_role.dart';
+import '../../core/utils/tr.dart';
 import '../../state/auth_provider.dart';
 import '../assistant/assistant_chat_screen.dart';
 import 'shell_destinations.dart';
@@ -97,6 +98,16 @@ class AppDrawer extends StatelessWidget {
                         },
                         isDark: isDark,
                       ),
+                    _buildDrawerItem(
+                      icon: LucideIcons.calendarCheck2,
+                      label: tr('Attendance', 'الحضور'),
+                      isSelected: selectedIndex == Pg.attendance,
+                      onTap: () {
+                        onSelectTab(Pg.attendance);
+                        Navigator.pop(context);
+                      },
+                      isDark: isDark,
+                    ),
                     _buildCopilotItem(),
                   ] else ...[
                   _buildDrawerItem(

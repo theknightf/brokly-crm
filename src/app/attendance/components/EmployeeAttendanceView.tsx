@@ -198,6 +198,7 @@ export default function EmployeeAttendanceView() {
   const daySummary = useMemo(() => ({
     present: history.filter((h) => h.check_in_time).length,
     complete: history.filter((h) => h.check_in_time && h.check_out_time).length,
+    late: history.filter((h) => Number(h.delay_minutes || 0) > 0).length,
     totalHours: history.reduce((s, h) => s + (h.duration_seconds || 0), 0),
   }), [history]);
 
@@ -218,28 +219,28 @@ export default function EmployeeAttendanceView() {
 
       {loading ? (
         <div className="space-y-3" aria-busy="true">
-          <div className="rounded-2xl border border-white/10 bg-[#181b22] p-6 animate-pulse">
-            <div className="h-10 w-40 mx-auto rounded-lg bg-white/10" />
-            <div className="h-4 w-56 mx-auto rounded bg-white/10 mt-3" />
-            <div className="h-14 rounded-2xl bg-white/10 mt-5" />
+          <div className="rounded-2xl border border-border bg-card p-6 animate-pulse">
+            <div className="h-10 w-40 mx-auto rounded-lg bg-muted" />
+            <div className="h-4 w-56 mx-auto rounded bg-muted mt-3" />
+            <div className="h-14 rounded-2xl bg-muted mt-5" />
           </div>
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-white/10 bg-[#181b22] p-4 animate-pulse">
-              <div className="h-4 w-32 rounded bg-white/10" />
-              <div className="h-3 w-48 rounded bg-white/10 mt-2" />
+            <div key={i} className="rounded-xl border border-border bg-card p-4 animate-pulse">
+              <div className="h-4 w-32 rounded bg-muted" />
+              <div className="h-3 w-48 rounded bg-muted mt-2" />
             </div>
           ))}
         </div>
       ) : (
         <>
           {!user ? (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 mb-4">
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 mb-4">
               Please sign in to use self check-in.
             </div>
           ) : null}
 
           {loadError ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 mb-4 flex items-center justify-between gap-2">
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300 mb-4 flex items-center justify-between gap-2">
               <span className="min-w-0">{loadError}</span>
               <button onClick={() => { setLoading(true); load(localToday().slice(0, 7) + '-01', localToday()); }} className="shrink-0 font-bold underline underline-offset-2">
                 Retry
@@ -248,27 +249,27 @@ export default function EmployeeAttendanceView() {
           ) : null}
 
           {/* ── Status Hero Card ── */}
-          <div className="rounded-2xl border border-white/10 bg-[#181b22] p-5 sm:p-6 mb-4 relative overflow-hidden shadow-[0_18px_50px_-20px_rgba(0,0,0,0.7)]">
+          <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-4 relative overflow-hidden shadow-[0_18px_50px_-20px_rgba(0,0,0,0.7)]">
             <div className="pointer-events-none absolute -top-24 -end-24 w-64 h-64 rounded-full bg-lime-500/10 blur-3xl" />
             <div className="flex flex-col items-center text-center gap-3 relative">
               {/* Live clock */}
-              <p className="text-4xl sm:text-5xl font-black tabular-nums tracking-tight text-zinc-50" dir="ltr">
+              <p className="text-4xl sm:text-5xl font-black tabular-nums tracking-tight text-foreground" dir="ltr">
                 {mounted && now
                   ? now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                   : '--:--:--'}
               </p>
-              <p className="text-xs text-zinc-400" dir="ltr">
+              <p className="text-xs text-muted-foreground" dir="ltr">
                 {mounted && now ? now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) : '…'}
               </p>
 
               {/* Shift + geo status row */}
               <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-zinc-200" dir="ltr">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-[11px] font-bold text-foreground/90" dir="ltr">
                   <Clock size={12} className="text-lime-400" />
                   Shift: {fmtShift12(shift.start)} – {fmtShift12(shift.end)}
                 </span>
                 {gpsVerified ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-500/30 bg-lime-500/10 px-3 py-1.5 text-[11px] font-bold text-lime-300" dir="ltr">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-500/30 bg-lime-500/10 px-3 py-1.5 text-[11px] font-bold text-lime-700 dark:text-lime-300" dir="ltr">
                     <span className="relative flex w-2 h-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-400 opacity-60" />
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-400" />
@@ -276,7 +277,7 @@ export default function EmployeeAttendanceView() {
                     GPS · In Range
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-300" dir="ltr">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-300" dir="ltr">
                     <MapPinOff size={12} />
                     No GPS · Manual
                   </span>
@@ -285,15 +286,15 @@ export default function EmployeeAttendanceView() {
 
               {/* State line */}
               <div>
-                <p className="text-base font-bold text-zinc-100" dir="rtl">
+                <p className="text-base font-bold text-foreground" dir="rtl">
                   {checkedOut ? 'تم تسجيل الانصراف اليوم' : checkedIn ? 'تم تسجيل حضورك' : 'لم تسجّل حضورك بعد'}
                 </p>
-                <p className="text-xs text-zinc-400 mt-0.5" dir="ltr">
+                <p className="text-xs text-muted-foreground mt-0.5" dir="ltr">
                   {checkedOut ? 'Checked out for today' : checkedIn ? 'Checked in' : 'Not checked in yet'}
                 </p>
                 {checkedIn ? (
-                  <p className="text-xs text-zinc-400 mt-1.5" dir="ltr">
-                    In at <span className="font-bold text-zinc-100">{fmtTime(today?.check_in_time)}</span>
+                  <p className="text-xs text-muted-foreground mt-1.5" dir="ltr">
+                    In at <span className="font-bold text-foreground">{fmtTime(today?.check_in_time)}</span>
                     {today?.check_in_lat != null && (
                       <span className="inline-flex items-center gap-1 ml-2 text-lime-400">
                         <MapPin size={11} /> GPS
@@ -301,22 +302,22 @@ export default function EmployeeAttendanceView() {
                     )}
                     {checkedOut ? (
                       <span className="ml-2">
-                        · Out at <span className="font-bold text-zinc-100">{fmtTime(today?.check_out_time)}</span>
+                        · Out at <span className="font-bold text-foreground">{fmtTime(today?.check_out_time)}</span>
                       </span>
                     ) : null}
                   </p>
                 ) : null}
                 {checkedIn && !checkedOut ? (
-                  <p className="text-xs text-zinc-400 mt-1.5 flex items-center justify-center gap-1.5">
+                  <p className="text-xs text-muted-foreground mt-1.5 flex items-center justify-center gap-1.5">
                     <Timer size={12} className="text-lime-400" />
                     <span dir="rtl">ساعات العمل اليوم:</span>
-                    <span className="font-bold text-zinc-100" dir="ltr">{fmtDuration(workedToday)}</span>
+                    <span className="font-bold text-foreground" dir="ltr">{fmtDuration(workedToday)}</span>
                   </p>
                 ) : null}
               </div>
 
               {busy && busyPhase ? (
-                <p className="text-xs text-lime-300 flex items-center gap-1.5">
+                <p className="text-xs text-lime-700 dark:text-lime-300 flex items-center gap-1.5">
                   <Loader2 size={12} className="animate-spin" /> {busyPhase}
                 </p>
               ) : null}
@@ -347,7 +348,7 @@ export default function EmployeeAttendanceView() {
                   {busy ? busyPhase || 'Working…' : checkedIn && !checkedOut ? 'Check-out' : checkedOut ? 'Done for today' : 'Check-in'}
                 </span>
               </button>
-              <p className="text-[11px] text-zinc-500" dir="rtl">
+              <p className="text-[11px] text-foreground0" dir="rtl">
                 لا يمكن تعديل الوقت — يُحفظ تلقائياً من السيرفر
               </p>
             </div>
@@ -356,19 +357,19 @@ export default function EmployeeAttendanceView() {
           {/* Out-of-range banner — exact meters, never a dead end */}
           {rangeError ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4 flex items-start gap-2.5">
-              <AlertTriangle size={16} className="text-red-300 shrink-0 mt-0.5" />
+              <AlertTriangle size={16} className="text-red-700 dark:text-red-300 shrink-0 mt-0.5" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-red-200" dir="rtl">خارج نطاق موقع العمل</p>
-                <p className="text-xs text-red-200/90 leading-snug" dir="ltr">{rangeError.message}</p>
+                <p className="text-xs font-bold text-red-800 dark:text-red-200" dir="rtl">خارج نطاق موقع العمل</p>
+                <p className="text-xs text-red-800 dark:text-red-800 dark:text-red-200/90 leading-snug" dir="ltr">{rangeError.message}</p>
                 <div className="flex flex-wrap items-center gap-2 mt-2">
                   <button
                     onClick={toggle}
                     disabled={busy}
-                    className="h-9 px-4 rounded-xl bg-white/10 border border-white/15 text-xs font-bold text-zinc-100 hover:bg-white/15 disabled:opacity-50"
+                    className="h-9 px-4 rounded-xl bg-muted border border-border text-xs font-bold text-foreground hover:bg-muted/70 disabled:opacity-50"
                   >
                     Retry with GPS
                   </button>
-                  <span className="text-[11px] text-red-200/70" dir="rtl">
+                  <span className="text-[11px] text-red-700/80 dark:text-red-800 dark:text-red-200/70" dir="rtl">
                     أو اطلب حضوراً يدوياً من الإدارة — Manual attendance via admin
                   </span>
                 </div>
@@ -379,11 +380,11 @@ export default function EmployeeAttendanceView() {
           {/* GPS fallback banner */}
           {!busy && geo && !geo.verified && geo.reason && !rangeError ? (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 mb-4 flex items-start gap-2.5">
-              <MapPinOff size={16} className="text-amber-300 shrink-0 mt-0.5" />
+              <MapPinOff size={16} className="text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
               <div className="min-w-0">
-                <p className="text-xs font-bold text-amber-200" dir="rtl">تعذّر تحديد الموقع — تم المتابعة بدونه</p>
-                <p className="text-xs text-amber-200/85 leading-snug">{geo.reason}</p>
-                <p className="text-[11px] text-amber-200/70 mt-1" dir="rtl">
+                <p className="text-xs font-bold text-amber-800 dark:text-amber-200" dir="rtl">تعذّر تحديد الموقع — تم المتابعة بدونه</p>
+                <p className="text-xs text-amber-800 dark:text-amber-800 dark:text-amber-200/85 leading-snug">{geo.reason}</p>
+                <p className="text-[11px] text-amber-700/80 dark:text-amber-800 dark:text-amber-200/70 mt-1" dir="rtl">
                   لتفعيل GPS: فعّل الموقع من إعدادات المتصفح/الهاتف واستخدم HTTPS.
                 </p>
               </div>
@@ -392,27 +393,27 @@ export default function EmployeeAttendanceView() {
 
           {/* ── Quick stat pills ── */}
           <div className="grid grid-cols-3 gap-2.5 mb-4">
-            <div className="rounded-2xl border border-white/10 bg-[#181b22] px-3 py-3 text-center">
+            <div className="rounded-2xl border border-border bg-card px-3 py-3 text-center">
               <Hourglass size={14} className="mx-auto text-lime-400 mb-1" />
-              <p className="text-base font-black text-zinc-50" dir="ltr">{fmtDuration(workedToday)}</p>
-              <p className="text-[11px] font-bold text-zinc-300 mt-0.5" dir="rtl">ساعات اليوم</p>
-              <p className="text-[10px] text-zinc-500" dir="ltr">Hours today</p>
+              <p className="text-base font-black text-foreground" dir="ltr">{fmtDuration(workedToday)}</p>
+              <p className="text-[11px] font-bold text-foreground/80 mt-0.5" dir="rtl">ساعات اليوم</p>
+              <p className="text-[10px] text-foreground0" dir="ltr">Hours today</p>
             </div>
-            <div className={`rounded-2xl border px-3 py-3 text-center ${delayToday > 0 ? 'border-amber-500/30 bg-amber-500/10' : 'border-white/10 bg-[#181b22]'}`}>
-              <Timer size={14} className={`mx-auto mb-1 ${delayToday > 0 ? 'text-amber-300' : 'text-zinc-400'}`} />
-              <p className={`text-base font-black ${delayToday > 0 ? 'text-amber-200' : 'text-zinc-50'}`} dir="ltr">
+            <div className={`rounded-2xl border px-3 py-3 text-center ${delayToday > 0 ? 'border-amber-500/30 bg-amber-500/10' : 'border-border bg-card'}`}>
+              <Timer size={14} className={`mx-auto mb-1 ${delayToday > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`} />
+              <p className={`text-base font-black ${delayToday > 0 ? 'text-amber-800 dark:text-amber-200' : 'text-foreground'}`} dir="ltr">
                 {delayToday > 0 ? `${delayToday}m` : '0m'}
               </p>
-              <p className="text-[11px] font-bold text-zinc-300 mt-0.5" dir="rtl">تأخير اليوم</p>
-              <p className="text-[10px] text-zinc-500" dir="ltr">
+              <p className="text-[11px] font-bold text-foreground/80 mt-0.5" dir="rtl">تأخير اليوم</p>
+              <p className="text-[10px] text-foreground0" dir="ltr">
                 {delayToday > 0 ? 'Delay · deduction may apply' : 'Delay · on time'}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-[#181b22] px-3 py-3 text-center">
+            <div className="rounded-2xl border border-border bg-card px-3 py-3 text-center">
               <CalendarDays size={14} className="mx-auto text-sky-400 mb-1" />
-              <p className="text-base font-black text-zinc-50" dir="ltr">{leavesUsed}d</p>
-              <p className="text-[11px] font-bold text-zinc-300 mt-0.5" dir="rtl">إجازات الشهر</p>
-              <p className="text-[10px] text-zinc-500" dir="ltr">Leave used · month</p>
+              <p className="text-base font-black text-foreground" dir="ltr">{leavesUsed}d</p>
+              <p className="text-[11px] font-bold text-foreground/80 mt-0.5" dir="rtl">إجازات الشهر</p>
+              <p className="text-[10px] text-foreground0" dir="ltr">Leave used · month</p>
             </div>
           </div>
 
@@ -422,13 +423,13 @@ export default function EmployeeAttendanceView() {
               <p className="text-base font-bold text-foreground" dir="rtl">سجل حضوري</p>
               <p className="text-[11px] text-muted-foreground" dir="ltr">My attendance</p>
             </div>
-            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-[#181b22] p-1">
+            <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1">
               {(['week', 'month'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => { setRange(r); setLoading(true); }}
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    range === r ? 'bg-lime-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-100'
+                    range === r ? 'bg-lime-500 text-zinc-950 shadow' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {r === 'week' ? 'Week' : 'Month'}
@@ -438,28 +439,29 @@ export default function EmployeeAttendanceView() {
           </div>
 
           {/* Mini summary */}
-          <div className="grid grid-cols-3 gap-2.5 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
             {[
               { labelAr: 'أيام الحضور', labelEn: 'Days present', value: daySummary.present },
               { labelAr: 'أيام مكتملة', labelEn: 'Days complete', value: daySummary.complete },
               { labelAr: 'إجمالي الساعات', labelEn: 'Total hours', value: fmtDuration(daySummary.totalHours) },
+              { labelAr: 'أيام التأخير', labelEn: 'Late days', value: daySummary.late },
             ].map((s) => (
-              <div key={s.labelEn} className="rounded-xl border border-white/10 bg-[#181b22] px-3 py-2.5 text-center">
-                <p className="text-base font-black text-zinc-50" dir="ltr">{s.value}</p>
-                <p className="text-[11px] font-bold text-zinc-300" dir="rtl">{s.labelAr}</p>
-                <p className="text-[10px] text-zinc-500" dir="ltr">{s.labelEn}</p>
+              <div key={s.labelEn} className="rounded-xl border border-border bg-card px-3 py-2.5 text-center">
+                <p className="text-base font-black text-foreground" dir="ltr">{s.value}</p>
+                <p className="text-[11px] font-bold text-foreground/80" dir="rtl">{s.labelAr}</p>
+                <p className="text-[10px] text-foreground0" dir="ltr">{s.labelEn}</p>
               </div>
             ))}
           </div>
 
           {/* History cards */}
           {history.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-[#181b22] py-14 text-center">
-              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3">
-                <Clock size={20} className="text-zinc-500" />
+            <div className="rounded-xl border border-border bg-card py-14 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted border border-border flex items-center justify-center mx-auto mb-3">
+                <Clock size={20} className="text-foreground0" />
               </div>
-              <p className="text-sm font-bold text-zinc-200" dir="rtl">لا توجد بيانات حضور بعد</p>
-              <p className="text-xs text-zinc-500" dir="ltr">No attendance yet — your check-ins will appear here.</p>
+              <p className="text-sm font-bold text-foreground/90" dir="rtl">لا توجد بيانات حضور بعد</p>
+              <p className="text-xs text-foreground0" dir="ltr">No attendance yet — your check-ins will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -468,9 +470,9 @@ export default function EmployeeAttendanceView() {
                 const partial = !!(row.check_in_time && !row.check_out_time);
                 const late = Number(row.delay_minutes || 0) > 0;
                 return (
-                  <div key={row.id} className="rounded-xl border border-white/10 bg-[#181b22] p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div key={row.id} className="rounded-xl border border-border bg-card p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-zinc-100" dir="ltr">
+                      <p className="text-sm font-bold text-foreground" dir="ltr">
                         {(() => {
                           const d = new Date(row.attendance_date + 'T00:00:00');
                           return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
@@ -479,22 +481,22 @@ export default function EmployeeAttendanceView() {
                       <p className="mt-1 flex flex-wrap items-center gap-1.5">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${
                           done
-                            ? 'bg-lime-500/10 text-lime-300 border-lime-500/30'
+                            ? 'bg-lime-500/10 text-lime-700 dark:text-lime-300 border-lime-500/30'
                             : partial
-                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                              : 'bg-white/5 text-zinc-400 border-white/10'
+                              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                              : 'bg-muted text-muted-foreground border-border'
                         }`}>
                           {done ? <CheckCircle2 size={10} /> : partial ? <Hourglass size={10} /> : null}
                           {done ? 'Complete' : partial ? 'Checked in' : 'Absent'}
                         </span>
                         {late ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-300 border border-amber-500/30" dir="ltr">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30" dir="ltr">
                             <AlertTriangle size={10} /> Late {row.delay_minutes}m
                           </span>
                         ) : null}
                       </p>
                     </div>
-                    <div className="flex-1 md:flex-none flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400" dir="ltr">
+                    <div className="flex-1 md:flex-none flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" dir="ltr">
                       <span className="flex items-center gap-1">
                         <LogIn size={12} className="text-lime-400" /> In {fmtTime(row.check_in_time)}
                       </span>
@@ -503,8 +505,8 @@ export default function EmployeeAttendanceView() {
                       </span>
                     </div>
                     <div className="ml-auto text-right">
-                      <p className="text-sm font-black text-zinc-50" dir="ltr">{fmtDuration(row.duration_seconds || 0)}</p>
-                      <p className="text-[10px] text-zinc-500" dir="ltr">worked</p>
+                      <p className="text-sm font-black text-foreground" dir="ltr">{fmtDuration(row.duration_seconds || 0)}</p>
+                      <p className="text-[10px] text-foreground0" dir="ltr">worked</p>
                     </div>
                   </div>
                 );

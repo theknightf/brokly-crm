@@ -22,11 +22,13 @@ const _closedStages = {
 class SalesHomeScreen extends StatefulWidget {
   final VoidCallback onOpenLeads;
   final VoidCallback onOpenFollowUps;
+  final VoidCallback onOpenAttendance;
 
   const SalesHomeScreen({
     super.key,
     required this.onOpenLeads,
     required this.onOpenFollowUps,
+    required this.onOpenAttendance,
   });
 
   @override
@@ -166,6 +168,12 @@ class _SalesHomeScreenState extends State<SalesHomeScreen> {
                   : tr('$overdue late · $dueToday today', '$overdue متأخرة · $dueToday النهارده'),
               highlight: overdue > 0,
               onTap: widget.onOpenFollowUps,
+            ),
+            _HomeButton(
+              icon: LucideIcons.calendarCheck2,
+              title: tr('Attendance', 'الحضور'),
+              subtitle: tr('Check in, check out, your history', 'سجّل حضورك وانصرافك وشوف سجلك'),
+              onTap: widget.onOpenAttendance,
             ),
           ],
         ),

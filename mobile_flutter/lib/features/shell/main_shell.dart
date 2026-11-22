@@ -86,7 +86,7 @@ class _MainShellState extends State<MainShell> {
   String _titleFor(bool isAgent) => isAgent ? salesPageLabel(_currentIndex) : titleForPage(_currentIndex);
 
   /// Sales agents only get these pages.
-  static const _salesPages = [Pg.home, Pg.leads, Pg.followUps];
+  static const _salesPages = [Pg.home, Pg.leads, Pg.followUps, Pg.attendance];
 
   bool get _isAgent => isSalesAgent(context.read<AuthProvider>().profile);
 
@@ -117,6 +117,7 @@ class _MainShellState extends State<MainShell> {
               _goTo(Pg.leads);
             },
             onOpenFollowUps: () => _goTo(Pg.followUps),
+            onOpenAttendance: () => _goTo(Pg.attendance),
           );
         }
         return DashboardScreen(onNavigateTab: _goTo);
@@ -204,6 +205,7 @@ class _MainShellState extends State<MainShell> {
                   NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),
                   NavigationDestination(icon: const Icon(LucideIcons.users), label: salesPageLabel(Pg.leads)),
                   NavigationDestination(icon: const Icon(LucideIcons.calendarClock), label: salesPageLabel(Pg.followUps)),
+                  NavigationDestination(icon: const Icon(LucideIcons.calendarCheck2), label: pageLabel(Pg.attendance)),
                 ]
               : [
                   NavigationDestination(icon: const Icon(LucideIcons.house), label: pageLabel(Pg.home)),
