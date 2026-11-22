@@ -1,14 +1,19 @@
 import 'dart:async';
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/utils/sales_role.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/utils/tr.dart';
+import '../../core/widgets/premium.dart';
+import '../../data/models/attendance_model.dart';
 import '../../state/attendance_provider.dart';
 import '../../state/auth_provider.dart';
-import 'widgets/attendance_history_list.dart';
 
+/// Attendance, same layout as the website: today in one card with one big button, a four-number summary
+/// (week / month), then one line per day.
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
 
@@ -18,17 +23,14 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   Timer? _clockTimer;
-  DateTime _currentTime = DateTime.now();
-  int _modeTab = 1; // 0: Team Shift Logger, 1: Personal Check-In
-  int _historyTabIndex = 0; // 0: Week, 1: Month
+  DateTime _now = DateTime.now();
+  bool _month = false; // false = last 7 days, true = this month
 
   @override
   void initState() {
     super.initState();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() => _currentTime = DateTime.now());
-      }
+      if (mounted) setState(() => _now = DateTime.now());
     });
   }
 
@@ -38,732 +40,338 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     super.dispose();
   }
 
+  static String _time(String? iso) {
+    if (iso == null) return '—';
+    final d = DateTime.tryParse(iso)?.toLocal();
+    return d == null ? '—' : DateFormat('h:mm a').format(d);
+  }
+
+  static String _hm(int minutes) {
+    if (minutes <= 0) return '—';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    return h > 0 ? '${h}h ${m}m' : '${m}m';
+  }
+
+  List<AttendanceModel> _inRange(List<AttendanceModel> all) {
+    final today = DateTime(_now.year, _now.month, _now.day);
+    return all.where((a) {
+      final d = DateTime.tryParse(a.attendanceDate);
+      if (d == null) return false;
+      return _month
+          ? (d.year == today.year && d.month == today.month)
+          : !d.isBefore(today.subtract(const Duration(days: 6)));
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final p = context.palette;
+    final t = Theme.of(context).textTheme;
     final provider = context.watch<AttendanceProvider>();
-    final isCheckedIn = provider.isCheckedIn;
-    final isCheckedOut = provider.isCheckedOut;
-    final isBusy = provider.isBusy;
-    final busyPhase = provider.busyPhase;
+    final profile = context.watch<AuthProvider>().profile;
+    final firstName = (profile?.fullName ?? '').trim().split(RegExp(r'\s+')).first;
 
-    final hoursMinutes = DateFormat('hh:mm').format(_currentTime);
-    final seconds = DateFormat('ss').format(_currentTime);
-    final period = DateFormat('a').format(_currentTime);
-    final formattedDate = DateFormat('EEEE, MMM d, yyyy').format(_currentTime);
+    final today = provider.today;
+    final checkedIn = provider.isCheckedIn;
+    final checkedOut = provider.isCheckedOut;
+    final busy = provider.isBusy;
 
-    final history = provider.history;
-    // Sales agents only have their personal check-in (same as the website); the team logger is for managers.
-    final isAgent = isSalesAgent(context.watch<AuthProvider>().profile);
-    final lateDays = history.where((a) => a.delayMinutes > 0).length;
-    final daysPresent = history.length;
-    final completeDays = history.where((a) => a.isCheckedIn && a.isCheckedOut).length;
-    final totalHoursMinutes = history.fold<int>(0, (sum, a) => sum + a.durationMinutes);
-    final totalHours = (totalHoursMinutes / 60).toStringAsFixed(1);
+    // Worked time: live while checked in, final once checked out.
+    int workedMin = 0;
+    if (today?.checkInTime != null) {
+      final start = DateTime.tryParse(today!.checkInTime!);
+      final end = today.checkOutTime != null ? DateTime.tryParse(today.checkOutTime!) : _now;
+      if (start != null && end != null) workedMin = end.difference(start).inMinutes.clamp(0, 24 * 60);
+    }
+    final state = checkedOut ? 2 : (checkedIn ? 1 : 0); // 0 idle, 1 working, 2 done
+    final stateText = [tr('Not checked in yet', 'لسه ما سجلتش حضورك'), tr('Working now', 'شغال دلوقتي'), tr('Done for today', 'خلصت النهارده')][state];
+    final stateColor = [p.subtext, p.success, p.info][state];
+
+    final bigText = state == 0
+        ? DateFormat('h:mm').format(_now)
+        : '${(workedMin ~/ 60).toString().padLeft(2, '0')}:${(workedMin % 60).toString().padLeft(2, '0')}';
+    final bigCaption = state == 0 ? tr('Current time', 'الساعة دلوقتي') : tr('Worked today', 'ساعات الشغل النهارده');
+
+    final range = _inRange(provider.history);
+    final present = range.where((a) => a.isCheckedIn).length;
+    final complete = range.where((a) => a.isCheckedIn && a.isCheckedOut).length;
+    final late = range.where((a) => a.delayMinutes > 0).length;
+    final totalMin = range.fold<int>(0, (s, a) => s + a.durationMinutes);
+    final delayToday = today?.delayMinutes ?? 0;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F1216) : const Color(0xFFF8FAFC),
+      backgroundColor: p.background,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => provider.init(),
-          color: AppColors.neonLime,
-          child: SingleChildScrollView(
+          child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── 1. Top Suite Header ─────────────────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.lg, AppSpacing.page, AppSpacing.listBottom),
+            children: [
+              Semantics(
+                header: true,
+                child: Text(firstName.isEmpty ? tr('Attendance', 'الحضور') : tr('Hi $firstName', 'أهلاً $firstName'), style: t.headlineSmall),
+              ),
+              const SizedBox(height: 2),
+              Text(DateFormat('EEEE, d MMMM').format(_now), style: t.bodySmall),
+              const SizedBox(height: AppSpacing.lg),
+
+              // ── Today: one card, one big button ──
+              PremiumCard(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(color: stateColor.withAlpha(36), borderRadius: BorderRadius.circular(20)),
+                      child: Text(stateText, style: t.labelMedium?.copyWith(color: stateColor, fontWeight: FontWeight.w700)),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(bigText, style: t.displayMedium?.copyWith(fontWeight: FontWeight.w900, fontFeatures: const [FontFeature.tabularFigures()])),
+                    Text(bigCaption, style: t.bodySmall),
+                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 64,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: state == 1 ? p.danger : p.accent,
+                          foregroundColor: state == 1 ? Colors.white : p.onAccent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        ),
+                        onPressed: busy || checkedOut
+                            ? null
+                            : () async {
+                                if (checkedIn) {
+                                  await provider.checkOut();
+                                } else {
+                                  await provider.checkIn();
+                                }
+                              },
+                        icon: busy
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+                            : Icon(state == 1 ? LucideIcons.logOut : (state == 2 ? LucideIcons.circleCheck : LucideIcons.logIn), size: 24),
+                        label: Text(
+                          busy
+                              ? (provider.busyPhase.isEmpty ? tr('Working…', 'جاري التنفيذ…') : provider.busyPhase)
+                              : state == 1
+                                  ? tr('Check out', 'سجّل انصراف')
+                                  : state == 2
+                                      ? tr('All done', 'تم النهارده')
+                                      : tr('Check in', 'سجّل حضور'),
+                          style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: state == 1 ? Colors.white : p.onAccent),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Attendance & Shift Suite',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.neonLime.withAlpha(25),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppColors.neonLime.withAlpha(70)),
-                              ),
-                              child: const Text(
-                                'LIVE SYNC',
-                                style: TextStyle(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.neonLime,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Executive CRM • Shift v3.4 Enterprise',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                          ),
-                        ),
+                        _Fact(label: tr('In', 'دخول'), value: _time(today?.checkInTime)),
+                        _Fact(label: tr('Out', 'خروج'), value: _time(today?.checkOutTime)),
+                        _Fact(label: tr('Worked', 'اشتغلت'), value: _hm(workedMin)),
                       ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF181C22) : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF2A323D) : AppColors.lightBorder,
-                        ),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(LucideIcons.mapPin, size: 11, color: Color(0xFF10B981)),
-                          SizedBox(width: 4),
-                          Text(
-                            'Office HQ',
-                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: AppSpacing.md),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (today?.hasGps == true)
+                          _Chip(icon: LucideIcons.mapPin, text: tr('Location OK', 'الموقع تمام'), color: p.success)
+                        else
+                          _Chip(icon: LucideIcons.mapPin, text: tr('No location', 'من غير موقع'), color: p.subtext),
+                        if (delayToday > 0)
+                          _Chip(icon: LucideIcons.triangleAlert, text: tr('Late $delayToday min', 'متأخر $delayToday د'), color: p.warning)
+                        else if (checkedIn)
+                          _Chip(icon: LucideIcons.circleCheck, text: tr('On time', 'في الميعاد'), color: p.success),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+              ),
 
-                // ── 2. Segmented Mode Switcher (Team Shift Logger vs Personal Check-In)
-                if (!isAgent) Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF181C22) : const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF2A323D) : const Color(0xFFCBD5E1),
-                    ),
-                  ),
+              if (provider.error != null && provider.error!.trim().isNotEmpty)
+                PremiumCard(
+                  tint: p.danger.withAlpha(24),
+                  borderColor: p.danger.withAlpha(90),
                   child: Row(
-                    children: [
-                      _buildModeButton(
-                        index: 0,
-                        title: 'Team Shift Logger',
-                        subtitle: 'TEAM LOGGER • ADMIN',
-                        isSelected: _modeTab == 0,
-                        isDark: isDark,
-                      ),
-                      _buildModeButton(
-                        index: 1,
-                        title: 'Personal Check-In',
-                        subtitle: 'INDIVIDUAL ATTENDANCE',
-                        isSelected: _modeTab == 1,
-                        isDark: isDark,
-                      ),
-                    ],
-                  ),
-                ),
-                if (!isAgent) const SizedBox(height: 14),
-
-                // ── 3. Tactile Hero Shift Card ──────────────────────
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: isDark
-                          ? [const Color(0xFF181C22), const Color(0xFF12161C)]
-                          : [Colors.white, const Color(0xFFF1F5F9)],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF2A323D) : AppColors.lightBorder,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(isDark ? 80 : 15),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Date & GPS Verified Bar
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(LucideIcons.calendar, size: 12, color: AppColors.neonLime),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    formattedDate,
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF222831) : const Color(0xFFE2E8F0),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      'SHIFT',
-                                      style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '12:00 PM – 08:00 PM (8h)',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? Colors.white : Colors.black,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withAlpha(20),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF10B981).withAlpha(60)),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(LucideIcons.mapPin, size: 10, color: Color(0xFF10B981)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'GPS Verified',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Monospace Large Digital Clock
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            hoursMinutes,
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 44,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                          ),
-                          const Text(
-                            ':',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w300,
-                              color: AppColors.neonLime,
-                            ),
-                          ),
-                          Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF222831) : const Color(0xFFE2E8F0),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              seconds,
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.neonLime,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            period,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.neonLime,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Server UTC+03:00 • 18ms Ping',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Big Tactile Check-In Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isCheckedOut
-                                ? (isDark ? const Color(0xFF222831) : const Color(0xFFCBD5E1))
-                                : (isCheckedIn ? const Color(0xFFEF4444) : AppColors.neonLime),
-                            foregroundColor: isCheckedIn ? Colors.white : const Color(0xFF0F172A),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: isCheckedOut ? 0 : 6,
-                            shadowColor: isCheckedIn
-                                ? const Color(0xFFEF4444).withAlpha(120)
-                                : AppColors.neonLime.withAlpha(150),
-                          ),
-                          onPressed: isBusy || isCheckedOut
-                              ? null
-                              : () async {
-                                  if (!isCheckedIn) {
-                                    await provider.checkIn();
-                                  } else {
-                                    await provider.checkOut();
-                                  }
-                                },
-                          child: isBusy
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      busyPhase.isNotEmpty ? busyPhase : 'Verifying GPS...',
-                                      style: const TextStyle(fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Container(
-                                      width: 38,
-                                      height: 38,
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withAlpha(20),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Icon(
-                                        isCheckedOut
-                                            ? LucideIcons.circleCheck
-                                            : (isCheckedIn ? LucideIcons.logOut : LucideIcons.fingerprint),
-                                        size: 20,
-                                        color: isCheckedIn ? Colors.white : Colors.black,
-                                      ),
-                                    ),
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          isCheckedOut
-                                              ? 'SHIFT COMPLETED'
-                                              : (isCheckedIn ? 'CLOCK OUT' : 'INSTANT BIOMETRIC CHECK-IN'),
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.3,
-                                            color: isCheckedIn ? Colors.white : Colors.black,
-                                          ),
-                                        ),
-                                        Text(
-                                          isCheckedOut
-                                              ? 'Shift recorded'
-                                              : 'ONE-TAP NFC & GPS AUTHENTICATION',
-                                          style: TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                            color: isCheckedIn ? Colors.white70 : Colors.black87,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const Icon(LucideIcons.arrowRight, size: 18),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // ── 4. Performance Metrics Strip (Hours, Punctual, Balance)
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildMetricTile(
-                        label: 'HOURS',
-                        value: provider.durationString ?? (isCheckedIn ? 'In shift' : '00h 00m'),
-                        target: 'Target: 8.0h',
-                        targetColor: const Color(0xFF10B981),
-                        icon: LucideIcons.clock,
-                        isDark: isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildMetricTile(
-                        label: 'PUNCTUAL',
-                        value: '0m Delay',
-                        target: '100% On Time',
-                        targetColor: AppColors.neonLime,
-                        icon: LucideIcons.zap,
-                        isDark: isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildMetricTile(
-                        label: 'BALANCE',
-                        value: '18.5 d',
-                        target: 'Annual Paid',
-                        targetColor: const Color(0xFF38BDF8),
-                        icon: LucideIcons.badgeCheck,
-                        isDark: isDark,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // ── 5. Weekly Shift & Attendance Log ─────────────────
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF181C22) : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF2A323D) : AppColors.lightBorder,
-                    ),
-                  ),
-                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    'Weekly Shift Log',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.neonLime.withAlpha(25),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text(
-                                      'Week 39',
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.neonLime,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Attendance Analytics & Compliance',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                          // Week / Month toggle
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF12161C) : const Color(0xFFE2E8F0),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                _buildMiniTab('Week', 0, isDark),
-                                _buildMiniTab('Month', 1, isDark),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Shift Target Progress bar
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF222831) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Shift Target Progress',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
-                                Text(
-                                  '${totalHours}h / 40.0h (81%)',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.neonLime,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: const LinearProgressIndicator(
-                                value: 0.81,
-                                backgroundColor: Color(0xFF12161C),
-                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.neonLime),
-                                minHeight: 6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Summary Stats Row: Days present, Complete days, Total hours
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildStatColumn('Present', '$daysPresent days', AppColors.neonLime),
-                          _buildStatColumn('Completed', '$completeDays days', const Color(0xFF10B981)),
-                          _buildStatColumn('Logged', '${totalHours}h', const Color(0xFF38BDF8)),
-                          _buildStatColumn('Late', '$lateDays days', const Color(0xFFF59E0B)),
-                        ],
-                      ),
+                      Icon(LucideIcons.triangleAlert, size: 18, color: p.danger),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(child: Text(provider.error!.replaceAll('Exception: ', ''), style: t.bodySmall?.copyWith(color: p.danger))),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
 
-                // ── 6. History List ──────────────────────────────────
-                AttendanceHistoryList(history: provider.history),
-                const SizedBox(height: 24),
-              ],
-            ),
+              // ── Summary ──
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(child: Text(tr('My record', 'سجلي'), style: t.titleMedium)),
+                  ChoiceChip(label: Text(tr('Week', 'أسبوع')), selected: !_month, onSelected: (_) => setState(() => _month = false)),
+                  const SizedBox(width: 8),
+                  ChoiceChip(label: Text(tr('Month', 'شهر')), selected: _month, onSelected: (_) => setState(() => _month = true)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  _Stat(label: tr('Present', 'حضور'), value: '$present'),
+                  _Stat(label: tr('Complete', 'مكتمل'), value: '$complete'),
+                  _Stat(label: tr('Late', 'تأخير'), value: '$late', color: late > 0 ? p.warning : null),
+                  _Stat(label: tr('Hours', 'ساعات'), value: totalMin <= 0 ? '—' : (totalMin / 60).toStringAsFixed(1)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // ── History: one line per day ──
+              if (provider.isLoading && provider.history.isEmpty)
+                const Padding(padding: EdgeInsets.symmetric(vertical: 32), child: Center(child: CircularProgressIndicator()))
+              else if (range.isEmpty)
+                PremiumCard(
+                  child: Column(
+                    children: [
+                      Icon(LucideIcons.calendarCheck2, size: 30, color: p.subtext),
+                      const SizedBox(height: 8),
+                      Text(tr('No attendance yet', 'مفيش حضور مسجّل لسه'), style: t.titleSmall),
+                      Text(tr('Your days will show up here.', 'أيامك هتظهر هنا.'), style: t.bodySmall),
+                    ],
+                  ),
+                )
+              else
+                PremiumCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < range.length; i++) ...[
+                        if (i > 0) Divider(height: 1, color: p.border),
+                        _DayRow(record: range[i]),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildModeButton({
-    required int index,
-    required String title,
-    required String subtitle,
-    required bool isSelected,
-    required bool isDark,
-  }) {
+class _Fact extends StatelessWidget {
+  final String label;
+  final String value;
+  const _Fact({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
     return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _modeTab = index),
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.neonLime : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: isSelected ? const Color(0xFF0F172A) : (isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B)),
-                ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? const Color(0xFF0F172A).withAlpha(180) : const Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetricTile({
-    required String label,
-    required String value,
-    required String target,
-    required Color targetColor,
-    required IconData icon,
-    required bool isDark,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF181C22) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2A323D) : AppColors.lightBorder,
-        ),
-      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
-                ),
-              ),
-              Icon(icon, size: 12, color: targetColor),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: isDark ? Colors.white : Colors.black,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(label, style: t.bodySmall),
           const SizedBox(height: 2),
-          Text(
-            target,
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w600,
-              color: targetColor,
-            ),
-          ),
+          Text(value, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
         ],
       ),
     );
   }
+}
 
-  Widget _buildMiniTab(String label, int index, bool isDark) {
-    final isSelected = _historyTabIndex == index;
-    return InkWell(
-      onTap: () => setState(() => _historyTabIndex = index),
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.neonLime : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? const Color(0xFF0F172A) : (isDark ? const Color(0xFF8B949E) : const Color(0xFF64748B)),
-          ),
+class _Chip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+  const _Chip({required this.icon, required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: color.withAlpha(28), borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
+          Text(text, style: t.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? color;
+  const _Stat({required this.label, required this.value, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return Expanded(
+      child: PremiumCard(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: 4),
+        child: Column(
+          children: [
+            Text(value, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: color)),
+            Text(label, style: t.bodySmall),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildStatColumn(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: Color(0xFF8B949E)),
-        ),
-      ],
+class _DayRow extends StatelessWidget {
+  final AttendanceModel record;
+  const _DayRow({required this.record});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final t = Theme.of(context).textTheme;
+    final done = record.isCheckedIn && record.isCheckedOut;
+    final partial = record.isCheckedIn && !record.isCheckedOut;
+    final late = record.delayMinutes > 0;
+    final d = DateTime.tryParse(record.attendanceDate);
+    final dayText = d == null ? record.attendanceDate : DateFormat('EEE, d MMM').format(d);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      child: Row(
+        children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(shape: BoxShape.circle, color: done ? p.success : (partial ? p.warning : p.subtext.withAlpha(110)))),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(dayText, style: t.titleSmall),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    Text('${_AttendanceHelpers.time(record.checkInTime)} → ${_AttendanceHelpers.time(record.checkOutTime)}', style: t.bodySmall),
+                    if (late) Text(tr('late ${record.delayMinutes}m', 'متأخر ${record.delayMinutes} د'), style: t.bodySmall?.copyWith(color: p.warning, fontWeight: FontWeight.w700)),
+                    if (partial) Text(tr('no check-out', 'من غير انصراف'), style: t.bodySmall?.copyWith(color: p.warning, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Text(_AttendanceHelpers.hm(record.durationMinutes), style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+        ],
+      ),
     );
   }
+}
+
+class _AttendanceHelpers {
+  static String time(String? iso) => _AttendanceScreenState._time(iso);
+  static String hm(int m) => _AttendanceScreenState._hm(m);
 }

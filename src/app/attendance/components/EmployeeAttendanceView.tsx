@@ -1,11 +1,12 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  LogIn, LogOut, Loader2, MapPin, MapPinOff, Clock, Timer,
-  CheckCircle2, AlertTriangle, CalendarDays, Hourglass,
+  LogIn, LogOut, Loader2, MapPin, MapPinOff, Clock,
+  CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { getPositionWithFallback, readJsonSafe, type GeoOutcome } from '@/lib/geolocation';
 import { companySettingsService } from '@/lib/services/peopleOpsService';
 
@@ -49,6 +50,8 @@ function fmtShift12(hhmm: string): string {
 
 export default function EmployeeAttendanceView() {
   const { user, profile } = useAuth();
+  const { lang } = useLanguage();
+  const isAr = lang === 'ar';
   const [today, setToday] = useState<AttendanceRow | null>(null);
   const [history, setHistory] = useState<AttendanceRow[]>([]);
   const [leavesUsed, setLeavesUsed] = useState(0);
@@ -202,317 +205,238 @@ export default function EmployeeAttendanceView() {
     totalHours: history.reduce((s, h) => s + (h.duration_seconds || 0), 0),
   }), [history]);
 
-  const name = profile?.full_name || '';
+  const name = (profile?.full_name || '').split(' ')[0];
   const gpsVerified = today?.check_in_lat != null || geo?.verified === true;
+  const T = (ar: string, en: string) => (isAr ? ar : en);
+
+  // Time worked so far today (live while checked in, final once checked out).
+  const workedLive = (() => {
+    if (!today?.check_in_time) return 0;
+    if (today.check_out_time) return workedToday || Math.max(0, Math.round((Date.parse(today.check_out_time) - Date.parse(today.check_in_time)) / 1000));
+    return now ? Math.max(0, Math.round((now.getTime() - Date.parse(today.check_in_time)) / 1000)) : workedToday;
+  })();
+  const liveClock = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  const state = checkedOut ? 'done' : checkedIn ? 'working' : 'idle';
+  const stateText = {
+    idle: T('لسه ما سجلتش حضورك', 'Not checked in yet'),
+    working: T('شغال دلوقتي', 'Working now'),
+    done: T('خلصت النهارده', 'Done for today'),
+  }[state];
+  const stateTone = {
+    idle: 'bg-muted text-muted-foreground',
+    working: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    done: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+  }[state];
+
+  const dayLabel = (d: string) =>
+    new Date(d + 'T00:00:00').toLocaleDateString(isAr ? 'ar-EG' : [], { weekday: 'short', day: 'numeric', month: 'short' });
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="mb-5">
-        <p className="text-xl sm:text-2xl font-bold text-foreground" dir="rtl">
-          {name ? `${name.split(' ')[0]} — ` : ''}سجل الحضور اليومي
-        </p>
-        <p className="text-sm text-muted-foreground mt-0.5" dir="ltr">
-          {name ? `${name.split(' ')[0]}'s ` : ''}Attendance — check in on arrival, out on leave.
+    <div className="mx-auto w-full max-w-xl space-y-5">
+      {/* Title */}
+      <div>
+        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
+          {name ? T(`أهلاً ${name}`, `Hi ${name}`) : T('الحضور', 'Attendance')}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {mounted && now ? now.toLocaleDateString(isAr ? 'ar-EG' : [], { weekday: 'long', day: 'numeric', month: 'long' }) : '…'}
         </p>
       </div>
 
+      {!user ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+          {T('سجّل دخول تاني عشان تسجل حضورك.', 'Please sign in again to check in.')}
+        </div>
+      ) : null}
+
+      {loadError ? (
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          <span className="min-w-0">{loadError}</span>
+          <button onClick={() => { setLoading(true); load(localToday().slice(0, 7) + '-01', localToday()); }} className="shrink-0 font-bold underline underline-offset-2">
+            {T('حاول تاني', 'Retry')}
+          </button>
+        </div>
+      ) : null}
+
       {loading ? (
-        <div className="space-y-3" aria-busy="true">
-          <div className="rounded-2xl border border-border bg-card p-6 animate-pulse">
-            <div className="h-10 w-40 mx-auto rounded-lg bg-muted" />
-            <div className="h-4 w-56 mx-auto rounded bg-muted mt-3" />
-            <div className="h-14 rounded-2xl bg-muted mt-5" />
-          </div>
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-4 animate-pulse">
-              <div className="h-4 w-32 rounded bg-muted" />
-              <div className="h-3 w-48 rounded bg-muted mt-2" />
-            </div>
-          ))}
+        <div className="space-y-3 animate-pulse" aria-busy="true">
+          <div className="dash-card h-72" />
+          <div className="dash-card h-24" />
+          <div className="dash-card h-64" />
         </div>
       ) : (
         <>
-          {!user ? (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 mb-4">
-              Please sign in to use self check-in.
-            </div>
-          ) : null}
-
-          {loadError ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300 mb-4 flex items-center justify-between gap-2">
-              <span className="min-w-0">{loadError}</span>
-              <button onClick={() => { setLoading(true); load(localToday().slice(0, 7) + '-01', localToday()); }} className="shrink-0 font-bold underline underline-offset-2">
-                Retry
-              </button>
-            </div>
-          ) : null}
-
-          {/* ── Status Hero Card ── */}
-          <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-4 relative overflow-hidden shadow-[0_18px_50px_-20px_rgba(0,0,0,0.7)]">
-            <div className="pointer-events-none absolute -top-24 -end-24 w-64 h-64 rounded-full bg-lime-500/10 blur-3xl" />
-            <div className="flex flex-col items-center text-center gap-3 relative">
-              {/* Live clock */}
-              <p className="text-4xl sm:text-5xl font-black tabular-nums tracking-tight text-foreground" dir="ltr">
-                {mounted && now
-                  ? now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                  : '--:--:--'}
-              </p>
-              <p className="text-xs text-muted-foreground" dir="ltr">
-                {mounted && now ? now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) : '…'}
-              </p>
-
-              {/* Shift + geo status row */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1.5 text-[11px] font-bold text-foreground/90" dir="ltr">
-                  <Clock size={12} className="text-lime-400" />
-                  Shift: {fmtShift12(shift.start)} – {fmtShift12(shift.end)}
+          {/* ── Today: ONE card with ONE big button ── */}
+          <section className="dash-card overflow-hidden p-5 text-center" aria-label={T('النهارده', 'Today')}>
+            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${stateTone}`}>
+              {state === 'working' ? (
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
-                {gpsVerified ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-lime-500/30 bg-lime-500/10 px-3 py-1.5 text-[11px] font-bold text-lime-700 dark:text-lime-300" dir="ltr">
-                    <span className="relative flex w-2 h-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-400 opacity-60" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-400" />
-                    </span>
-                    GPS · In Range
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-300" dir="ltr">
-                    <MapPinOff size={12} />
-                    No GPS · Manual
-                  </span>
-                )}
-              </div>
-
-              {/* State line */}
-              <div>
-                <p className="text-base font-bold text-foreground" dir="rtl">
-                  {checkedOut ? 'تم تسجيل الانصراف اليوم' : checkedIn ? 'تم تسجيل حضورك' : 'لم تسجّل حضورك بعد'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5" dir="ltr">
-                  {checkedOut ? 'Checked out for today' : checkedIn ? 'Checked in' : 'Not checked in yet'}
-                </p>
-                {checkedIn ? (
-                  <p className="text-xs text-muted-foreground mt-1.5" dir="ltr">
-                    In at <span className="font-bold text-foreground">{fmtTime(today?.check_in_time)}</span>
-                    {today?.check_in_lat != null && (
-                      <span className="inline-flex items-center gap-1 ml-2 text-lime-400">
-                        <MapPin size={11} /> GPS
-                      </span>
-                    )}
-                    {checkedOut ? (
-                      <span className="ml-2">
-                        · Out at <span className="font-bold text-foreground">{fmtTime(today?.check_out_time)}</span>
-                      </span>
-                    ) : null}
-                  </p>
-                ) : null}
-                {checkedIn && !checkedOut ? (
-                  <p className="text-xs text-muted-foreground mt-1.5 flex items-center justify-center gap-1.5">
-                    <Timer size={12} className="text-lime-400" />
-                    <span dir="rtl">ساعات العمل اليوم:</span>
-                    <span className="font-bold text-foreground" dir="ltr">{fmtDuration(workedToday)}</span>
-                  </p>
-                ) : null}
-              </div>
-
-              {busy && busyPhase ? (
-                <p className="text-xs text-lime-700 dark:text-lime-300 flex items-center gap-1.5">
-                  <Loader2 size={12} className="animate-spin" /> {busyPhase}
-                </p>
               ) : null}
+              {stateText}
+            </span>
 
-              {/* Big thumb-friendly action */}
-              <button
-                onClick={toggle}
-                disabled={busy || (checkedIn && checkedOut) || !user}
-                className={`min-h-[56px] w-full px-8 rounded-2xl text-base font-black flex flex-col items-center justify-center gap-0.5 leading-tight disabled:opacity-50 transition-all active:scale-[0.99] ${
-                  checkedIn && !checkedOut
-                    ? 'bg-[#ef4444] hover:bg-red-500 text-white shadow-[0_14px_36px_-12px_rgba(239,68,68,0.65)]'
-                    : 'bg-lime-500 hover:bg-lime-400 text-zinc-950 shadow-[0_14px_36px_-12px_rgba(132,204,22,0.65)]'
-                }`}
-              >
-                <span className="flex items-center gap-2" dir="rtl">
-                  {busy ? (
-                    <Loader2 size={22} className="animate-spin" />
-                  ) : checkedIn && !checkedOut ? (
-                    <LogOut size={22} />
-                  ) : checkedOut ? (
-                    <CheckCircle2 size={22} />
-                  ) : (
-                    <LogIn size={22} />
-                  )}
-                  {busy ? 'جارٍ التنفيذ…' : checkedIn && !checkedOut ? 'تسجيل الانصراف' : 'تسجيل الحضور'}
-                </span>
-                <span className="text-[11px] font-bold opacity-70" dir="ltr">
-                  {busy ? busyPhase || 'Working…' : checkedIn && !checkedOut ? 'Check-out' : checkedOut ? 'Done for today' : 'Check-in'}
-                </span>
-              </button>
-              <p className="text-[11px] text-foreground0" dir="rtl">
-                لا يمكن تعديل الوقت — يُحفظ تلقائياً من السيرفر
-              </p>
+            <p className="mt-3 text-5xl font-black tabular-nums tracking-tight text-foreground" dir="ltr">
+              {state === 'idle'
+                ? mounted && now ? now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'
+                : liveClock(workedLive)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {state === 'idle' ? T('الساعة دلوقتي', 'Current time') : T('ساعات الشغل النهارده', 'Worked today')}
+            </p>
+
+            <button
+              onClick={toggle}
+              disabled={busy || checkedOut || !user}
+              className={`mt-5 flex min-h-[64px] w-full items-center justify-center gap-3 rounded-2xl text-lg font-extrabold transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 ${
+                state === 'working'
+                  ? 'bg-red-600 text-white shadow-[0_14px_36px_-14px_rgba(220,38,38,0.7)] hover:bg-red-700'
+                  : state === 'done'
+                    ? 'bg-muted text-muted-foreground'
+                    : 'bg-primary text-primary-foreground shadow-[0_14px_36px_-14px_rgba(132,204,22,0.8)] hover:brightness-95'
+              }`}
+            >
+              {busy ? <Loader2 size={24} className="animate-spin" /> : state === 'working' ? <LogOut size={24} /> : state === 'done' ? <CheckCircle2 size={24} /> : <LogIn size={24} />}
+              {busy
+                ? busyPhase || T('جاري التنفيذ…', 'Working…')
+                : state === 'working'
+                  ? T('سجّل انصراف', 'Check out')
+                  : state === 'done'
+                    ? T('تم النهارده', 'All done')
+                    : T('سجّل حضور', 'Check in')}
+            </button>
+
+            {/* In / Out / Shift — plain facts under the button */}
+            <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <dt className="text-[11px] text-muted-foreground">{T('دخول', 'In')}</dt>
+                <dd className="text-sm font-bold tabular-nums text-foreground" dir="ltr">{fmtTime(today?.check_in_time)}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-muted-foreground">{T('خروج', 'Out')}</dt>
+                <dd className="text-sm font-bold tabular-nums text-foreground" dir="ltr">{fmtTime(today?.check_out_time)}</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] text-muted-foreground">{T('الشيفت', 'Shift')}</dt>
+                <dd className="text-sm font-bold tabular-nums text-foreground" dir="ltr">{fmtShift12(shift.start)}–{fmtShift12(shift.end)}</dd>
+              </div>
+            </dl>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold">
+              {gpsVerified ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300"><MapPin size={11} /> {T('الموقع تمام', 'Location OK')}</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-muted-foreground"><MapPinOff size={11} /> {T('من غير موقع', 'No location')}</span>
+              )}
+              {delayToday > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-amber-700 dark:text-amber-300"><AlertTriangle size={11} /> {T(`متأخر ${delayToday} د`, `Late ${delayToday} min`)}</span>
+              ) : checkedIn ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300"><CheckCircle2 size={11} /> {T('في الميعاد', 'On time')}</span>
+              ) : null}
             </div>
-          </div>
+          </section>
 
-          {/* Out-of-range banner — exact meters, never a dead end */}
+          {/* Problems, shown only when they happen */}
           {rangeError ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4 flex items-start gap-2.5">
-              <AlertTriangle size={16} className="text-red-700 dark:text-red-300 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-600 dark:text-red-300" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-red-800 dark:text-red-200" dir="rtl">خارج نطاق موقع العمل</p>
-                <p className="text-xs text-red-800 dark:text-red-800 dark:text-red-200/90 leading-snug" dir="ltr">{rangeError.message}</p>
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <button
-                    onClick={toggle}
-                    disabled={busy}
-                    className="h-9 px-4 rounded-xl bg-muted border border-border text-xs font-bold text-foreground hover:bg-muted/70 disabled:opacity-50"
-                  >
-                    Retry with GPS
+                <p className="text-sm font-bold text-red-700 dark:text-red-200">{T('إنت بعيد عن مكان الشغل', 'You are outside the work location')}</p>
+                <p className="text-xs leading-snug text-red-700/90 dark:text-red-200/90">{rangeError.message}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button onClick={toggle} disabled={busy} className="h-9 rounded-xl border border-border bg-card px-4 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50">
+                    {T('جرّب تاني', 'Try again')}
                   </button>
-                  <span className="text-[11px] text-red-700/80 dark:text-red-800 dark:text-red-200/70" dir="rtl">
-                    أو اطلب حضوراً يدوياً من الإدارة — Manual attendance via admin
-                  </span>
+                  <span className="text-[11px] text-red-700/80 dark:text-red-200/70">{T('أو اطلب تسجيل يدوي من الإدارة', 'or ask the admin to log it manually')}</span>
                 </div>
               </div>
             </div>
           ) : null}
 
-          {/* GPS fallback banner */}
           {!busy && geo && !geo.verified && geo.reason && !rangeError ? (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 mb-4 flex items-start gap-2.5">
-              <MapPinOff size={16} className="text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <MapPinOff size={16} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" />
               <div className="min-w-0">
-                <p className="text-xs font-bold text-amber-800 dark:text-amber-200" dir="rtl">تعذّر تحديد الموقع — تم المتابعة بدونه</p>
-                <p className="text-xs text-amber-800 dark:text-amber-800 dark:text-amber-200/85 leading-snug">{geo.reason}</p>
-                <p className="text-[11px] text-amber-700/80 dark:text-amber-800 dark:text-amber-200/70 mt-1" dir="rtl">
-                  لتفعيل GPS: فعّل الموقع من إعدادات المتصفح/الهاتف واستخدم HTTPS.
-                </p>
+                <p className="text-sm font-bold text-amber-800 dark:text-amber-200">{T('مقدرناش نحدد موقعك، كملنا من غيره', 'We could not get your location, continued without it')}</p>
+                <p className="text-xs leading-snug text-amber-800/90 dark:text-amber-200/85">{geo.reason}</p>
               </div>
             </div>
           ) : null}
 
-          {/* ── Quick stat pills ── */}
-          <div className="grid grid-cols-3 gap-2.5 mb-4">
-            <div className="rounded-2xl border border-border bg-card px-3 py-3 text-center">
-              <Hourglass size={14} className="mx-auto text-lime-400 mb-1" />
-              <p className="text-base font-black text-foreground" dir="ltr">{fmtDuration(workedToday)}</p>
-              <p className="text-[11px] font-bold text-foreground/80 mt-0.5" dir="rtl">ساعات اليوم</p>
-              <p className="text-[10px] text-foreground0" dir="ltr">Hours today</p>
+          {/* ── Summary: four plain numbers + week/month switch ── */}
+          <section aria-label={T('ملخصي', 'My summary')} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-foreground">{T('سجلي', 'My record')}</h2>
+              <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">
+                {(['week', 'month'] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => { setRange(r); setLoading(true); }}
+                    aria-pressed={range === r}
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold [@media(pointer:coarse)]:min-h-[40px] ${range === r ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    {r === 'week' ? T('أسبوع', 'Week') : T('شهر', 'Month')}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className={`rounded-2xl border px-3 py-3 text-center ${delayToday > 0 ? 'border-amber-500/30 bg-amber-500/10' : 'border-border bg-card'}`}>
-              <Timer size={14} className={`mx-auto mb-1 ${delayToday > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`} />
-              <p className={`text-base font-black ${delayToday > 0 ? 'text-amber-800 dark:text-amber-200' : 'text-foreground'}`} dir="ltr">
-                {delayToday > 0 ? `${delayToday}m` : '0m'}
-              </p>
-              <p className="text-[11px] font-bold text-foreground/80 mt-0.5" dir="rtl">تأخير اليوم</p>
-              <p className="text-[10px] text-foreground0" dir="ltr">
-                {delayToday > 0 ? 'Delay · deduction may apply' : 'Delay · on time'}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-border bg-card px-3 py-3 text-center">
-              <CalendarDays size={14} className="mx-auto text-sky-400 mb-1" />
-              <p className="text-base font-black text-foreground" dir="ltr">{leavesUsed}d</p>
-              <p className="text-[11px] font-bold text-foreground/80 mt-0.5" dir="rtl">إجازات الشهر</p>
-              <p className="text-[10px] text-foreground0" dir="ltr">Leave used · month</p>
-            </div>
-          </div>
-
-          {/* Range toggle */}
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-base font-bold text-foreground" dir="rtl">سجل حضوري</p>
-              <p className="text-[11px] text-muted-foreground" dir="ltr">My attendance</p>
-            </div>
-            <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1">
-              {(['week', 'month'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => { setRange(r); setLoading(true); }}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    range === r ? 'bg-lime-500 text-zinc-950 shadow' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {r === 'week' ? 'Week' : 'Month'}
-                </button>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { l: T('حضور', 'Present'), v: daySummary.present, tone: 'text-foreground' },
+                { l: T('مكتمل', 'Complete'), v: daySummary.complete, tone: 'text-foreground' },
+                { l: T('تأخير', 'Late'), v: daySummary.late, tone: daySummary.late ? 'text-amber-600 dark:text-amber-300' : 'text-foreground' },
+                { l: T('ساعات', 'Hours'), v: fmtDuration(daySummary.totalHours), tone: 'text-foreground' },
+              ].map((s) => (
+                <div key={s.l} className="dash-card px-2 py-3 text-center">
+                  <p className={`text-xl font-extrabold tabular-nums ${s.tone}`} dir="ltr">{s.v}</p>
+                  <p className="text-[11px] text-muted-foreground">{s.l}</p>
+                </div>
               ))}
             </div>
-          </div>
+            {leavesUsed > 0 ? (
+              <p className="text-xs text-muted-foreground">{T(`إجازات الشهر ده: ${leavesUsed} يوم`, `Leave this month: ${leavesUsed} day(s)`)}</p>
+            ) : null}
+          </section>
 
-          {/* Mini summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
-            {[
-              { labelAr: 'أيام الحضور', labelEn: 'Days present', value: daySummary.present },
-              { labelAr: 'أيام مكتملة', labelEn: 'Days complete', value: daySummary.complete },
-              { labelAr: 'إجمالي الساعات', labelEn: 'Total hours', value: fmtDuration(daySummary.totalHours) },
-              { labelAr: 'أيام التأخير', labelEn: 'Late days', value: daySummary.late },
-            ].map((s) => (
-              <div key={s.labelEn} className="rounded-xl border border-border bg-card px-3 py-2.5 text-center">
-                <p className="text-base font-black text-foreground" dir="ltr">{s.value}</p>
-                <p className="text-[11px] font-bold text-foreground/80" dir="rtl">{s.labelAr}</p>
-                <p className="text-[10px] text-foreground0" dir="ltr">{s.labelEn}</p>
+          {/* ── History: one card, one line per day ── */}
+          <section className="dash-card overflow-hidden" aria-label={T('السجل', 'History')}>
+            {history.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <Clock size={22} className="mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm font-semibold text-foreground">{T('مفيش حضور مسجّل لسه', 'No attendance yet')}</p>
+                <p className="text-xs text-muted-foreground">{T('أيامك هتظهر هنا.', 'Your days will show up here.')}</p>
               </div>
-            ))}
-          </div>
-
-          {/* History cards */}
-          {history.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card py-14 text-center">
-              <div className="w-12 h-12 rounded-full bg-muted border border-border flex items-center justify-center mx-auto mb-3">
-                <Clock size={20} className="text-foreground0" />
-              </div>
-              <p className="text-sm font-bold text-foreground/90" dir="rtl">لا توجد بيانات حضور بعد</p>
-              <p className="text-xs text-foreground0" dir="ltr">No attendance yet — your check-ins will appear here.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {history.map((row) => {
-                const done = !!(row.check_in_time && row.check_out_time);
-                const partial = !!(row.check_in_time && !row.check_out_time);
-                const late = Number(row.delay_minutes || 0) > 0;
-                return (
-                  <div key={row.id} className="rounded-xl border border-border bg-card p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-foreground" dir="ltr">
-                        {(() => {
-                          const d = new Date(row.attendance_date + 'T00:00:00');
-                          return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
-                        })()}
-                      </p>
-                      <p className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                          done
-                            ? 'bg-lime-500/10 text-lime-700 dark:text-lime-300 border-lime-500/30'
-                            : partial
-                              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
-                              : 'bg-muted text-muted-foreground border-border'
-                        }`}>
-                          {done ? <CheckCircle2 size={10} /> : partial ? <Hourglass size={10} /> : null}
-                          {done ? 'Complete' : partial ? 'Checked in' : 'Absent'}
-                        </span>
-                        {late ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30" dir="ltr">
-                            <AlertTriangle size={10} /> Late {row.delay_minutes}m
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                    <div className="flex-1 md:flex-none flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" dir="ltr">
-                      <span className="flex items-center gap-1">
-                        <LogIn size={12} className="text-lime-400" /> In {fmtTime(row.check_in_time)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <LogOut size={12} className="text-red-400" /> Out {fmtTime(row.check_out_time)}
-                      </span>
-                    </div>
-                    <div className="ml-auto text-right">
-                      <p className="text-sm font-black text-foreground" dir="ltr">{fmtDuration(row.duration_seconds || 0)}</p>
-                      <p className="text-[10px] text-foreground0" dir="ltr">worked</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+            ) : (
+              <ul className="divide-y divide-border">
+                {history.map((row) => {
+                  const done = !!(row.check_in_time && row.check_out_time);
+                  const partial = !!(row.check_in_time && !row.check_out_time);
+                  const late = Number(row.delay_minutes || 0) > 0;
+                  return (
+                    <li key={row.id} className="flex items-center gap-3 px-4 py-3">
+                      <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${done ? 'bg-emerald-500' : partial ? 'bg-amber-500' : 'bg-muted-foreground/40'}`} aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground">{dayLabel(row.attendance_date)}</p>
+                        <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground" dir="ltr">
+                          <span>{fmtTime(row.check_in_time)} → {fmtTime(row.check_out_time)}</span>
+                          {late ? <span className="font-semibold text-amber-600 dark:text-amber-300">{T(`متأخر ${row.delay_minutes} د`, `late ${row.delay_minutes}m`)}</span> : null}
+                          {partial ? <span className="font-semibold text-amber-600 dark:text-amber-300">{T('من غير انصراف', 'no check-out')}</span> : null}
+                        </p>
+                      </div>
+                      <p className="flex-shrink-0 text-sm font-extrabold tabular-nums text-foreground" dir="ltr">{fmtDuration(row.duration_seconds || 0)}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
         </>
       )}
     </div>
