@@ -103,10 +103,13 @@ class CallLogsService {
         : cleanTarget;
 
     try {
-      final Iterable<CallLogEntry> entries = await CallLog.get();
       final minEpoch = callStartedAt
           .subtract(const Duration(seconds: 30))
           .millisecondsSinceEpoch;
+      // Ask the phone only for calls since this call started. CallLog.get() loads the WHOLE call history
+      // (thousands of rows) and froze the app ("not responding") right after a call.
+      final Iterable<CallLogEntry> entries = await CallLog.query(dateFrom: minEpoch)
+          .timeout(const Duration(seconds: 4));
 
       CallLogEntry? matched;
       for (final entry in entries.take(15)) {
