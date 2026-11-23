@@ -145,6 +145,8 @@ export default function AdminQuickAttendance() {
 
   // ── Roster ──
   const [rosterQ, setRosterQ] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'in' | 'late' | 'absent' | 'leave'>('all');
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [rowIn, setRowIn] = useState<Record<string, string>>({});
   const [editTarget, setEditTarget] = useState<{ id: string; name: string; in: string; out: string } | null>(null);
   const [editBusy, setEditBusy] = useState(false);
@@ -234,8 +236,15 @@ export default function AdminQuickAttendance() {
     const list = q
       ? activeUsers.filter((u) => (u.full_name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q))
       : activeUsers;
-    return list.map((u) => ({ user: u, ...statusOf(u) }));
-  }, [activeUsers, rosterQ, statusOf]);
+    const rows = list.map((u) => ({ user: u, ...statusOf(u) }));
+    const groups: Record<string, StatusKey[]> = {
+      in: ['complete', 'present', 'late', 'remote'],
+      late: ['late'],
+      absent: ['absent'],
+      leave: ['leave', 'holiday', 'excused'],
+    };
+    return statusFilter === 'all' ? rows : rows.filter((r) => groups[statusFilter].includes(r.key));
+  }, [activeUsers, rosterQ, statusOf, statusFilter]);
 
   const counts = useMemo(() => {
     const c: Record<StatusKey, number> = { complete: 0, present: 0, late: 0, absent: 0, leave: 0, holiday: 0, remote: 0, excused: 0 };
@@ -398,25 +407,17 @@ export default function AdminQuickAttendance() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ── Header: date nav ── */}
-      <div className={`${CARD} p-4 flex flex-wrap items-center gap-3`}>
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-            <Zap size={19} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-base font-extrabold text-gray-900 dark:text-gray-100">Quick Attendance</span>
-            <span className="block text-[11px] text-gray-500 dark:text-zinc-400">Instant admin logging, no GPS required</span>
-          </span>
+      {/* ── Title + date ── */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">Attendance <span className="text-base font-semibold text-gray-500 dark:text-zinc-400">· الحضور</span></h1>
+          <p className="text-sm text-gray-500 dark:text-zinc-400">{fmtDay(date)}{date === todayLocal() ? ' · today' : ''}</p>
         </div>
-        <div className="ms-auto flex items-center gap-2">
-          <button
-            onClick={() => setDate(addDaysStr(date, -1))}
-            className={`h-10 px-3.5 rounded-xl text-xs ${SECONDARY}`}
-          >
-            Yesterday
+        <div className="flex items-center gap-2">
+          <button onClick={() => setDate(addDaysStr(date, -1))} aria-label="Previous day" className={`h-10 w-10 rounded-xl flex items-center justify-center ${SECONDARY}`}>
+            <ChevronDown size={16} className="rotate-90" />
           </button>
-          <span className="flex items-center gap-2 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3 h-10">
+          <span className="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl px-3 h-10">
             <CalendarDays size={14} className="text-primary shrink-0" />
             <input
               type="date"
@@ -427,14 +428,143 @@ export default function AdminQuickAttendance() {
             />
           </span>
           <button
-            onClick={() => setDate(todayLocal())}
-            className={`h-10 px-3.5 rounded-xl text-xs ${PRIMARY}`}
+            onClick={() => date < todayLocal() && setDate(addDaysStr(date, 1))}
+            disabled={date >= todayLocal()}
+            aria-label="Next day"
+            className={`h-10 w-10 rounded-xl flex items-center justify-center disabled:opacity-40 ${SECONDARY}`}
           >
-            Today
+            <ChevronDown size={16} className="-rotate-90" />
           </button>
+          {date !== todayLocal() && (
+            <button onClick={() => setDate(todayLocal())} className={`h-10 px-3.5 rounded-xl text-xs ${PRIMARY}`}>Today</button>
+          )}
         </div>
       </div>
 
+      {/* ── Summary: five numbers, each one filters the list below ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        {([
+          { key: 'all', label: 'Staff', value: activeUsers.length, tone: 'text-gray-900 dark:text-gray-100' },
+          { key: 'in', label: 'In', value: counts.complete + counts.present + counts.late + counts.remote, tone: 'text-emerald-600 dark:text-emerald-400' },
+          { key: 'late', label: 'Late', value: counts.late, tone: 'text-amber-600 dark:text-amber-400' },
+          { key: 'absent', label: 'Absent', value: counts.absent, tone: 'text-red-600 dark:text-red-400' },
+          { key: 'leave', label: 'Leave / holiday', value: counts.leave + counts.holiday + counts.excused, tone: 'text-sky-600 dark:text-sky-400' },
+        ] as const).map((c) => (
+          <button
+            key={c.key}
+            onClick={() => setStatusFilter(c.key)}
+            aria-pressed={statusFilter === c.key}
+            className={`${CARD} px-3 py-3 text-left transition-all ${statusFilter === c.key ? 'ring-2 ring-primary' : 'hover:border-primary/40'}`}
+          >
+            <span className={`block text-3xl font-extrabold tabular-nums ${c.tone}`}>{c.value}</span>
+            <span className="block text-xs font-semibold text-gray-500 dark:text-zinc-400">{c.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Roster ── */}
+      <div className={CARD}>
+        <div className="p-4 border-b border-gray-200 dark:border-zinc-800 flex flex-wrap items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 flex items-center justify-center shrink-0">
+            <Users size={16} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-extrabold text-gray-900 dark:text-gray-100">Daily Roster — {date}</span>
+            <span className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-gray-500 dark:text-zinc-400">
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{counts.complete + counts.present + counts.late} in</span>·
+              <span className="text-red-600 dark:text-red-400 font-bold">{counts.absent} absent</span>·
+              <span>{counts.leave} leave</span>·<span>{counts.holiday} holiday</span>·
+              <span>{activeUsers.length} staff</span>
+            </span>
+          </span>
+          <span className="ms-auto relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <input
+              value={rosterQ}
+              onChange={(e) => setRosterQ(e.target.value)}
+              placeholder="Search staff…"
+              className="bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-primary w-40"
+            />
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="p-4 space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-14 rounded-xl bg-gray-100 dark:bg-zinc-800 animate-pulse" />
+            ))}
+          </div>
+        ) : rosterRows.length === 0 ? (
+          <p className="p-8 text-center text-sm text-gray-500">No matching staff</p>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[820px]">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-zinc-800 text-[11px] text-gray-500 dark:text-zinc-400">
+                    {['Employee', 'Team', 'Check-in', 'Check-out', 'Status', 'Actions'].map((h) => (
+                      <th key={h} className="px-4 py-2.5 text-left font-bold whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-zinc-800/60">
+                  {rosterRows.map(({ user: u, key, rec }) => (
+                    <RosterRowDesktop
+                      key={u.id}
+                      u={u}
+                      statusKey={key}
+                      rec={rec}
+                      team={teamNameById.get(u.team_id || '') || '—'}
+                      rowTime={rowIn[u.id] || nowHHMM()}
+                      onRowTime={(t) => setRowIn((p) => ({ ...p, [u.id]: t }))}
+                      busy={rowBusy}
+                      onCheckIn={() => rowCheckIn(u)}
+                      onCheckOut={() => rowCheckOut(u, rec)}
+                      onEdit={() => setEditTarget({ id: u.id, name: u.full_name || u.email, in: isoToHHMM(rec?.check_in_time), out: isoToHHMM(rec?.check_out_time) })}
+                      onProfile={() => setDrawerUser(u)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-gray-100 dark:divide-zinc-800/60">
+              {rosterRows.map(({ user: u, key, rec }) => (
+                <RosterRowMobile
+                  key={u.id}
+                  u={u}
+                  statusKey={key}
+                  rec={rec}
+                  team={teamNameById.get(u.team_id || '') || '—'}
+                  rowTime={rowIn[u.id] || nowHHMM()}
+                  onRowTime={(t) => setRowIn((p) => ({ ...p, [u.id]: t }))}
+                  busy={rowBusy}
+                  onCheckIn={() => rowCheckIn(u)}
+                  onCheckOut={() => rowCheckOut(u, rec)}
+                  onEdit={() => setEditTarget({ id: u.id, name: u.full_name || u.email, in: isoToHHMM(rec?.check_in_time), out: isoToHHMM(rec?.check_out_time) })}
+                  onProfile={() => setDrawerUser(u)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Tools: log for someone / log many days (closed by default; the list above has one-tap buttons) ── */}
+      <div className={CARD}>
+        <button
+          onClick={() => setToolsOpen((o) => !o)}
+          aria-expanded={toolsOpen}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left"
+        >
+          <span>
+            <span className="block text-sm font-extrabold text-gray-900 dark:text-gray-100">Log attendance for someone</span>
+            <span className="block text-[11px] text-gray-500 dark:text-zinc-400">Pick an employee and times, or approve many days at once. No GPS needed.</span>
+          </span>
+          <ChevronDown size={16} className={`text-gray-400 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {toolsOpen && <div className="flex flex-col gap-4 border-t border-gray-200 dark:border-zinc-800 p-4">
       {/* ── Quick entry bar ── */}
       <div className={`${CARD} p-4 sm:p-5`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_auto] gap-3 items-end">
@@ -627,93 +757,7 @@ export default function AdminQuickAttendance() {
         )}
       </div>
 
-      {/* ── Roster ── */}
-      <div className={CARD}>
-        <div className="p-4 border-b border-gray-200 dark:border-zinc-800 flex flex-wrap items-center gap-2.5">
-          <span className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-300 flex items-center justify-center shrink-0">
-            <Users size={16} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-extrabold text-gray-900 dark:text-gray-100">Daily Roster — {date}</span>
-            <span className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-gray-500 dark:text-zinc-400">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{counts.complete + counts.present + counts.late} in</span>·
-              <span className="text-red-600 dark:text-red-400 font-bold">{counts.absent} absent</span>·
-              <span>{counts.leave} leave</span>·<span>{counts.holiday} holiday</span>·
-              <span>{activeUsers.length} staff</span>
-            </span>
-          </span>
-          <span className="ms-auto relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            <input
-              value={rosterQ}
-              onChange={(e) => setRosterQ(e.target.value)}
-              placeholder="Search staff…"
-              className="bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-primary w-40"
-            />
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="p-4 space-y-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-14 rounded-xl bg-gray-100 dark:bg-zinc-800 animate-pulse" />
-            ))}
-          </div>
-        ) : rosterRows.length === 0 ? (
-          <p className="p-8 text-center text-sm text-gray-500">No matching staff</p>
-        ) : (
-          <>
-            {/* Desktop table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full min-w-[820px]">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-zinc-800 text-[11px] text-gray-500 dark:text-zinc-400">
-                    {['Employee', 'Team', 'Check-in', 'Check-out', 'Status', 'Actions'].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left font-bold whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-zinc-800/60">
-                  {rosterRows.map(({ user: u, key, rec }) => (
-                    <RosterRowDesktop
-                      key={u.id}
-                      u={u}
-                      statusKey={key}
-                      rec={rec}
-                      team={teamNameById.get(u.team_id || '') || '—'}
-                      rowTime={rowIn[u.id] || nowHHMM()}
-                      onRowTime={(t) => setRowIn((p) => ({ ...p, [u.id]: t }))}
-                      busy={rowBusy}
-                      onCheckIn={() => rowCheckIn(u)}
-                      onCheckOut={() => rowCheckOut(u, rec)}
-                      onEdit={() => setEditTarget({ id: u.id, name: u.full_name || u.email, in: isoToHHMM(rec?.check_in_time), out: isoToHHMM(rec?.check_out_time) })}
-                      onProfile={() => setDrawerUser(u)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Mobile cards */}
-            <div className="md:hidden divide-y divide-gray-100 dark:divide-zinc-800/60">
-              {rosterRows.map(({ user: u, key, rec }) => (
-                <RosterRowMobile
-                  key={u.id}
-                  u={u}
-                  statusKey={key}
-                  rec={rec}
-                  team={teamNameById.get(u.team_id || '') || '—'}
-                  rowTime={rowIn[u.id] || nowHHMM()}
-                  onRowTime={(t) => setRowIn((p) => ({ ...p, [u.id]: t }))}
-                  busy={rowBusy}
-                  onCheckIn={() => rowCheckIn(u)}
-                  onCheckOut={() => rowCheckOut(u, rec)}
-                  onEdit={() => setEditTarget({ id: u.id, name: u.full_name || u.email, in: isoToHHMM(rec?.check_in_time), out: isoToHHMM(rec?.check_out_time) })}
-                  onProfile={() => setDrawerUser(u)}
-                />
-              ))}
-            </div>
-          </>
-        )}
+        </div>}
       </div>
 
       {/* ── Edit popover ── */}
