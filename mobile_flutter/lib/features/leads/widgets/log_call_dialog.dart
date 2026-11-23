@@ -451,6 +451,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
         _meta = await widget.metadataFuture!.timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
+    if (!mounted) return;
 
     String? followUpDateStr;
     String? followUpTimeStr;

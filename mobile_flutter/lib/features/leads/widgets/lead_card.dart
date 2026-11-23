@@ -272,26 +272,26 @@ class LeadCard extends StatelessWidget {
             _showDeleteDialog(context);
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
+      itemBuilder: (_) => [
+        const PopupMenuItem(
           value: _CardMenu.brochure,
           child: _MenuRow(LucideIcons.fileText, 'Sent Brochure', Color(0xFF38BDF8)),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: _CardMenu.replied,
           child: _MenuRow(LucideIcons.thumbsUp, 'Replied', Color(0xFF10B981)),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: _CardMenu.noAnswer,
           child: _MenuRow(LucideIcons.phoneOff, 'No Answer', Color(0xFFF59E0B)),
         ),
-        PopupMenuDivider(),
-        PopupMenuItem(
+        const PopupMenuDivider(),
+        const PopupMenuItem(
           value: _CardMenu.edit,
           child: _MenuRow(LucideIcons.pencil, 'Edit lead', null),
         ),
         if (!(context.read<AuthProvider>().profile?.isLimitedAdmin ?? false))
-          PopupMenuItem(
+          const PopupMenuItem(
             value: _CardMenu.delete,
             child: _MenuRow(LucideIcons.trash2, 'Delete lead', Color(0xFFEF4444)),
           ),
