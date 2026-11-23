@@ -71,34 +71,41 @@ class _PostCallLifecycleWaiter with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
 
     if (!context.mounted) return;
-    Future.delayed(const Duration(milliseconds: 550), () async {
-      // Automatically capture and sync device call log metadata (duration, timestamp, status)
-      DeviceCallMetadata? metadata;
-      if (!kIsWeb) {
-        try {
-          metadata = await CallLogsService().captureAndSyncCallForLead(
-            leadId: lead.id,
-            leadName: lead.name,
-            leadPhone: lead.phone,
-            callStartedAt: callStartedAt,
-            projectName: lead.project,
-          );
-        } catch (_) {}
-      }
 
-      if (!context.mounted) return;
-      final resolvedDuration = metadata != null ? metadata.durationSeconds : initialDuration;
+    // The popup opens right away. Reading the phone's call log and saving the call to the server used to run
+    // BEFORE it appeared (a 0.5 s pause + the whole device call log + two network calls), which is what made it
+    // slow. Now that work runs in the background and fills in the duration when it is ready.
+    final Future<DeviceCallMetadata?> metadataFuture = kIsWeb ? Future.value(null) : _captureInBackground();
 
+    unawaited(() async {
       await LogCallDialog.show(
         context,
         lead: lead,
         initialChannel: 'Call',
-        initialDurationSeconds: resolvedDuration,
+        initialDurationSeconds: initialDuration,
         isPostCallPopup: true,
-        capturedMetadata: metadata,
+        metadataFuture: metadataFuture,
       );
       onCompleted?.call();
-    });
+    }());
+  }
+
+  /// The phone writes the finished call to its call log a moment after the call ends: try now, then once more.
+  Future<DeviceCallMetadata?> _captureInBackground() async {
+    for (final wait in const [Duration(milliseconds: 300), Duration(milliseconds: 1400)]) {
+      await Future.delayed(wait);
+      try {
+        final m = await CallLogsService().captureAndSyncCallForLead(
+          leadId: lead.id,
+          leadName: lead.name,
+          leadPhone: lead.phone,
+          callStartedAt: callStartedAt,
+          projectName: lead.project,
+        );
+        if (m != null) return m;
+      } catch (_) {}
+    }
+    return null;
   }
 }
 
@@ -128,6 +135,8 @@ class LogCallDialog extends StatefulWidget {
   final int initialDurationSeconds;
   final bool isPostCallPopup;
   final DeviceCallMetadata? capturedMetadata;
+  /// Filled in later by the post-call flow (the dialog opens first, the device call log is read in the background).
+  final Future<DeviceCallMetadata?>? metadataFuture;
 
   const LogCallDialog({
     super.key,
@@ -136,6 +145,7 @@ class LogCallDialog extends StatefulWidget {
     this.initialDurationSeconds = 60,
     this.isPostCallPopup = false,
     this.capturedMetadata,
+    this.metadataFuture,
   });
 
   /// Dial the lead's phone number via native dialer and automatically pop up
@@ -179,6 +189,7 @@ class LogCallDialog extends StatefulWidget {
     int initialDurationSeconds = 60,
     bool isPostCallPopup = false,
     DeviceCallMetadata? capturedMetadata,
+    Future<DeviceCallMetadata?>? metadataFuture,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -193,6 +204,7 @@ class LogCallDialog extends StatefulWidget {
         initialDurationSeconds: initialDurationSeconds,
         isPostCallPopup: isPostCallPopup,
         capturedMetadata: capturedMetadata,
+        metadataFuture: metadataFuture,
       ),
     );
   }
@@ -205,6 +217,9 @@ class _LogCallDialogState extends State<LogCallDialog> {
   late String _channel;
   String _outcome = 'Answered';
   late int _durationSeconds;
+  DeviceCallMetadata? _meta; // the device call, once read (maybe after the popup is already open)
+  bool _outcomeTouched = false;
+  bool _durationTouched = false;
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
   // Sales users cannot change the stage without a written note (owners and admins can). Strict until the role is known.
@@ -350,10 +365,19 @@ class _LogCallDialogState extends State<LogCallDialog> {
   void initState() {
     super.initState();
     _channel = widget.initialChannel;
-    _durationSeconds = widget.capturedMetadata?.durationSeconds ?? widget.initialDurationSeconds;
-    if (widget.capturedMetadata != null) {
-      _outcome = widget.capturedMetadata!.detectedOutcome;
+    _meta = widget.capturedMetadata;
+    _durationSeconds = _meta?.durationSeconds ?? widget.initialDurationSeconds;
+    if (_meta != null) {
+      _outcome = _meta!.detectedOutcome;
     }
+    widget.metadataFuture?.then((m) {
+      if (!mounted || m == null) return;
+      setState(() {
+        _meta = m;
+        if (!_durationTouched) _durationSeconds = m.durationSeconds;
+        if (!_outcomeTouched) _outcome = m.detectedOutcome;
+      });
+    }).catchError((_) {});
     final defaultPrice = (widget.lead.budgetMax ?? widget.lead.budgetMin ?? 3500000).toInt();
     _calcPriceCtrl = TextEditingController(text: defaultPrice.toString());
 
@@ -421,6 +445,13 @@ class _LogCallDialogState extends State<LogCallDialog> {
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
 
+    // Still reading the phone's call log? Wait a moment for it, so the same call is not saved twice.
+    if (_meta == null && widget.metadataFuture != null) {
+      try {
+        _meta = await widget.metadataFuture!.timeout(const Duration(seconds: 3));
+      } catch (_) {}
+    }
+
     String? followUpDateStr;
     String? followUpTimeStr;
 
@@ -432,18 +463,18 @@ class _LogCallDialogState extends State<LogCallDialog> {
 
     final selectedOpt = _selectedOption;
     final callLog = CallLogModel(
-      id: widget.capturedMetadata?.syncedCallLogId ?? '',
+      id: _meta?.syncedCallLogId ?? '',
       entityType: 'lead',
       entityId: widget.lead.id,
       contactName: widget.lead.name,
       contactPhone: widget.lead.phone,
       channel: _channel,
-      direction: widget.capturedMetadata?.direction ?? 'outgoing',
+      direction: _meta?.direction ?? 'outgoing',
       durationSeconds: _channel == 'Call' ? _durationSeconds : 0,
       outcome: _outcome,
       notes: _notesController.text.trim(),
       // Always carry a client_ref: it makes a retry update the same call-log row instead of adding a duplicate.
-      clientRef: widget.capturedMetadata?.clientRef ??
+      clientRef: _meta?.clientRef ??
           'manual-${widget.lead.id}-${DateTime.now().millisecondsSinceEpoch}',
       projectName: widget.lead.project,
     );
@@ -615,7 +646,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 ),
               ],
             ),
-            if (widget.capturedMetadata != null) ...[
+            if (_meta != null) ...[
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -630,7 +661,7 @@ class _LogCallDialogState extends State<LogCallDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Device Call Synced: ${widget.capturedMetadata!.callTypeLabel} (${widget.capturedMetadata!.detectedOutcome}) • ${widget.capturedMetadata!.durationSeconds}s • ${DateFormat('HH:mm:ss').format(widget.capturedMetadata!.timestamp.toLocal())}',
+                        'Device Call Synced: ${_meta!.callTypeLabel} (${_meta!.detectedOutcome}) • ${_meta!.durationSeconds}s • ${DateFormat('HH:mm:ss').format(_meta!.timestamp.toLocal())}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -726,7 +757,10 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 final opt = _outcomeOptions[index];
                 final isSelected = opt.key == _outcome;
                 return InkWell(
-                  onTap: () => setState(() => _outcome = opt.key),
+                  onTap: () => setState(() {
+                    _outcomeTouched = true;
+                    _outcome = opt.key;
+                  }),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -916,7 +950,10 @@ class _LogCallDialogState extends State<LogCallDialog> {
                 max: 600,
                 divisions: 60,
                 activeColor: AppColors.neonLime,
-                onChanged: (val) => setState(() => _durationSeconds = val.toInt()),
+                onChanged: (val) => setState(() {
+                  _durationTouched = true;
+                  _durationSeconds = val.toInt();
+                }),
               ),
             ],
 
