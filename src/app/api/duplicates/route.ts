@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,12 +30,36 @@ export async function GET(request: Request) {
   const status = url.searchParams.get('status') || 'pending';
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit') || 100)));
 
+  // Source filter / "select all" index: the ORIGINAL lead's source for every duplicate in this status.
+  // Reviewers only (the function checks it); anyone else just gets no filter options.
+  const sourceParam = url.searchParams.get('source');
+  let sources: { name: string; count: number }[] = [];
+  let matchingIds: string[] | null = null;
+  let canBulkAssign = false;
+  {
+    const { data: idx, error: idxErr } = await (supabase as any).rpc('duplicate_leads_index', { p_status: status });
+    if (!idxErr && Array.isArray(idx)) {
+      const counts = new Map<string, number>();
+      for (const r of idx as any[]) counts.set(r.lead_source || '', (counts.get(r.lead_source || '') || 0) + 1);
+      sources = Array.from(counts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+      const wanted = sourceParam === null || sourceParam === 'all' ? null : sourceParam === '__none__' ? '' : sourceParam;
+      matchingIds = (idx as any[]).filter((r) => wanted === null || (r.lead_source || '') === wanted).map((r) => r.id);
+      const { data: me } = await supabase.from('user_profiles').select('role, is_active').eq('id', user.id).maybeSingle();
+      canBulkAssign = !!me && me.is_active !== false && isAdminRole(me.role);
+    }
+  }
+  const filtering = sourceParam !== null && sourceParam !== 'all' && matchingIds !== null;
+  const pageLimit = filtering ? Math.min(limit, 100) : limit;
+
   let q: any = (supabase as any)
     .from('duplicate_leads')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .limit(pageLimit);
   if (status !== 'all') q = q.eq('status', status);
+  if (filtering) q = q.in('id', (matchingIds as string[]).slice(0, pageLimit));
 
   const [{ data: rows, error }, pendingRes] = await Promise.all([
     q,
@@ -108,6 +133,7 @@ export async function GET(request: Request) {
     return {
       id: r.id,
       source: r.source || 'attempt',
+      leadSource: l?.source || '',
       duplicateLead: dl
         ? {
             id: dl.id,
@@ -157,7 +183,13 @@ export async function GET(request: Request) {
     };
   });
 
-  return NextResponse.json({ items, pendingCount: pendingRes?.count ?? 0 });
+  return NextResponse.json({
+    items,
+    pendingCount: pendingRes?.count ?? 0,
+    sources,
+    matchingIds: status === 'pending' ? matchingIds : null,
+    canBulkAssign,
+  });
 }
 
 /**

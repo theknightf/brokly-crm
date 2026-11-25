@@ -235,7 +235,7 @@ export default function ImportHistoryPage() {
       toast.info('No error or duplicate row details to export for this import.');
       return;
     }
-    const headers = ['Row Number', 'Lead Name', 'Phone Number', 'Category', 'Was With First', 'With Now', 'Details / Reason'];
+    const headers = ['Row Number', 'Lead Name', 'Phone Number', 'Category', 'Was With First', 'With Now', 'Tried To Add It', 'Details / Reason'];
     const csvRows = [
       headers.join(','),
       ...details.map((d) =>
@@ -246,6 +246,7 @@ export default function ImportHistoryPage() {
           `"${String(d.type || '').replace(/"/g, '""')}"`,
           `"${String(d.firstOwner || '').replace(/"/g, '""')}"`,
           `"${String(d.currentOwner || '').replace(/"/g, '""')}"`,
+          `"${String(d.type === 'duplicate_routed' ? log.uploadedByName || '' : '').replace(/"/g, '""')}"`,
           `"${String(d.reason || '').replace(/"/g, '""')}"`,
         ].join(',')
       ),
@@ -883,6 +884,7 @@ export default function ImportHistoryPage() {
                         <th className="py-2.5 px-3">Type</th>
                         <th className="py-2.5 px-3">Was with first <span className="font-normal">· كانت عند مين الأول</span></th>
                         <th className="py-2.5 px-3">With now <span className="font-normal">· عند مين دلوقتي</span></th>
+                        <th className="py-2.5 px-3">Tried to add it <span className="font-normal">· مين حاول يدخلها</span></th>
                         <th className="py-2.5 px-3">Details / Resolution</th>
                       </tr>
                     </thead>
@@ -910,6 +912,9 @@ export default function ImportHistoryPage() {
                                 {d.currentOwner || '—'}
                               </span>
                             ) : null}
+                          </td>
+                          <td className="py-2 px-3 font-medium">
+                            {d.type === 'duplicate_routed' ? selectedLog.uploadedByName || '—' : ''}
                           </td>
                           <td className="py-2 px-3 text-muted-foreground">
                             {d.type === 'duplicate_routed' && d.existingStage

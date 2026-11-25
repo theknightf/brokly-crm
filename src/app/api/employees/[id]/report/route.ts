@@ -173,6 +173,16 @@ export async function GET(
     const activeSeconds = daily.reduce((s: number, r: any) => s + (r.total_active_seconds || 0), 0);
     const actions = activity.length;
 
+    // Leads he owns now that have no note and no call log (a call log counts as work).
+    let unworkedLeads = 0;
+    let ownedLeadsTotal = 0;
+    try {
+      const { data: uw } = await supabase.rpc('employee_unworked_leads', { p_user: employeeId });
+      const row = Array.isArray(uw) ? uw[0] : uw;
+      unworkedLeads = Number(row?.unworked_leads) || 0;
+      ownedLeadsTotal = Number(row?.total_leads) || 0;
+    } catch {}
+
     const myLeads = leads;
     const leadsCreated = myLeads.filter((l: any) => l.created_by === employeeId).length;
     const leadsAssigned = myLeads.filter((l: any) => l.assigned_to === employeeId).length;
@@ -363,6 +373,8 @@ export async function GET(
         actions,
         leads_created: leadsCreated,
         leads_assigned: leadsAssigned,
+        leads_owned_total: ownedLeadsTotal,
+        leads_unworked: unworkedLeads,
         calls: callOnlyCount,
         whatsapp: whatsappCount,
         emails: emailCount,

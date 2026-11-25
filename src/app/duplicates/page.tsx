@@ -28,14 +28,17 @@ import {
   type DuplicatePerson,
 } from './duplicateFields';
 
-type Tab = 'pending' | 'merged' | 'separated' | 'dismissed';
+type Tab = 'pending' | 'merged' | 'separated' | 'dismissed' | 'assigned';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'pending', label: 'Pending' },
   { id: 'merged', label: 'Merged' },
   { id: 'separated', label: 'Separated' },
   { id: 'dismissed', label: 'Dismissed' },
+  { id: 'assigned', label: 'Assigned' },
 ];
+
+type Agent = { id: string; name: string; role: string };
 
 function Who({
   icon,
@@ -60,12 +63,18 @@ function Who({
 function DuplicateCard({
   item,
   busy,
+  selectable,
+  selected,
+  onToggle,
   onMerge,
   onSeparate,
   onDismiss,
 }: {
   item: DuplicateItem;
   busy: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
   onMerge: () => void;
   onSeparate: () => void;
   onDismiss: () => void;
@@ -105,7 +114,17 @@ function DuplicateCard({
   return (
     <article className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-start gap-3">
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggle?.()}
+              aria-label="Select this duplicate"
+              className="mt-1 h-5 w-5 flex-shrink-0 cursor-pointer accent-[hsl(var(--primary))]"
+            />
+          )}
+          <div className="min-w-0">
           <h2 className="break-words text-base font-bold text-foreground sm:text-lg">
             {item.existing?.name || item.submitted?.name || 'Lead'}
           </h2>
@@ -121,15 +140,22 @@ function DuplicateCard({
             {!pending && (
               <span
                 className={`rounded-full border px-2 py-0.5 ${
-                  item.status === 'merged' || item.status === 'separated'
+                  item.status === 'merged' || item.status === 'separated' || item.status === 'assigned'
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                     : 'border-border bg-muted text-muted-foreground'
                 }`}
               >
-                {item.status === 'merged' ? 'Merged' : item.status === 'separated' ? 'Separated' : 'Dismissed'}
+                {item.status === 'merged'
+                  ? 'Merged'
+                  : item.status === 'separated'
+                    ? 'Separated'
+                    : item.status === 'assigned'
+                      ? 'Assigned'
+                      : 'Dismissed'}
                 {item.resolvedBy ? ` by ${item.resolvedBy.name}` : ''} · {fmtDateTime(item.resolvedAt)}
               </span>
             )}
+          </div>
           </div>
         </div>
         {pending && (
@@ -331,24 +357,98 @@ export default function DuplicatesPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [mergeItem, setMergeItem] = useState<DuplicateItem | null>(null);
 
+  // Source filter + bulk assign (owner / admin / Admin Manager only; the API and the database enforce it too).
+  const [source, setSource] = useState<string>('all'); // 'all' | '__none__' | a source name
+  const [sources, setSources] = useState<{ name: string; count: number }[]>([]);
+  const [matchingIds, setMatchingIds] = useState<string[]>([]);
+  const [canBulkAssign, setCanBulkAssign] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentId, setAgentId] = useState('');
+  const [confirmStep, setConfirmStep] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/duplicates?status=${tab}`, { cache: 'no-store' });
+      const qs = `status=${tab}${source !== 'all' ? `&source=${encodeURIComponent(source)}` : ''}`;
+      const res = await fetch(`/api/duplicates?${qs}`, { cache: 'no-store' });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error || 'Failed to load duplicates');
       setItems(j.items || []);
       setPendingCount(Number(j.pendingCount || 0));
+      setSources(Array.isArray(j.sources) ? j.sources : []);
+      setMatchingIds(Array.isArray(j.matchingIds) ? j.matchingIds : []);
+      setCanBulkAssign(!!j.canBulkAssign);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load duplicates');
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, source]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // A different tab or source is a different list: start with nothing selected.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [tab, source]);
+
+  const bulkEnabled = canBulkAssign && tab === 'pending';
+  const allSelected = matchingIds.length > 0 && selected.size === matchingIds.length;
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const openAssign = async () => {
+    setConfirmStep(false);
+    setAgentId('');
+    setAssignOpen(true);
+    if (agents.length === 0) {
+      try {
+        const res = await fetch('/api/duplicates/bulk-assign', { cache: 'no-store' });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j?.error || 'Could not load the sales agents');
+        setAgents(j.agents || []);
+      } catch (e: any) {
+        toast.error(e?.message || 'Could not load the sales agents');
+      }
+    }
+  };
+
+  const runBulkAssign = async () => {
+    setAssigning(true);
+    try {
+      const res = await fetch('/api/duplicates/bulk-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selected), agentId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error || 'Assignment failed');
+      const r = j.result || {};
+      toast.success(`${r.leads_moved ?? selected.size} lead(s) moved to ${r.agent || 'the agent'}. Duplicate entries were kept as copies.`);
+      setAssignOpen(false);
+      setSelected(new Set());
+      window.dispatchEvent(new Event(DUPLICATES_CHANGED_EVENT));
+      await load();
+    } catch (e: any) {
+      // The whole operation is one transaction: nothing was changed.
+      toast.error(`${e?.message || 'Assignment failed'} — nothing was changed.`);
+      setConfirmStep(false);
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const chosenAgent = agents.find((a) => a.id === agentId) || null;
 
   const act = async (
     item: DuplicateItem,
@@ -422,6 +522,47 @@ export default function DuplicatesPage() {
           ))}
         </div>
 
+        {tab === 'pending' && sources.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground sm:flex-row sm:items-center sm:gap-2">
+              Source
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                className="min-h-[44px] rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground"
+              >
+                <option value="all">All sources ({sources.reduce((s, x) => s + x.count, 0)})</option>
+                {sources.map((s) => (
+                  <option key={s.name || '__none__'} value={s.name === '' ? '__none__' : s.name}>
+                    {s.name || 'No source'} ({s.count})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {bulkEnabled && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(matchingIds))}
+                    className="h-5 w-5 accent-[hsl(var(--primary))]"
+                  />
+                  Select all ({matchingIds.length})
+                </label>
+                <button
+                  type="button"
+                  disabled={selected.size === 0}
+                  onClick={() => void openAssign()}
+                  className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <UserCheck size={16} /> Assign{selected.size > 0 ? ` (${selected.size})` : ''}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {loading && items.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
             <Loader2 size={28} className="animate-spin text-primary" />
@@ -445,6 +586,9 @@ export default function DuplicatesPage() {
                 key={item.id}
                 item={item}
                 busy={busyId === item.id}
+                selectable={bulkEnabled}
+                selected={selected.has(item.id)}
+                onToggle={() => toggleOne(item.id)}
                 onMerge={() => setMergeItem(item)}
                 onSeparate={() => void act(item, { action: 'separate' }, 'Kept as a separate lead')}
                 onDismiss={() => void act(item, { action: 'dismiss' }, 'Duplicate dismissed')}
@@ -453,6 +597,86 @@ export default function DuplicatesPage() {
           </div>
         )}
       </div>
+
+      {assignOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Assign duplicates"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 sm:items-center"
+          onClick={() => !assigning && setAssignOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {!confirmStep ? (
+              <>
+                <h2 className="text-lg font-bold text-foreground">Assign to one sales agent</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {selected.size} selected. The original lead moves to the agent you pick; the agent who had it loses it.
+                </p>
+                <select
+                  value={agentId}
+                  onChange={(e) => setAgentId(e.target.value)}
+                  className="mt-4 min-h-[44px] w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+                >
+                  <option value="">Choose an agent…</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button type="button" onClick={() => setAssignOpen(false)} className="btn-ghost min-h-[44px]">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!agentId}
+                    onClick={() => setConfirmStep(true)}
+                    className="btn-primary min-h-[44px] disabled:opacity-50"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-bold text-foreground">Confirm assignment</h2>
+                <p className="mt-2 text-sm text-foreground">
+                  Move <strong>{selected.size}</strong> duplicate{selected.size === 1 ? '' : 's'} (the original leads) to{' '}
+                  <strong>{chosenAgent?.name || 'the selected agent'}</strong>?
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                  <li>The agent who had each original lead will no longer have it.</li>
+                  <li>The duplicate entries stay with nobody. A copy is kept in the Assigned tab for review.</li>
+                  <li>Everything happens in one step. If anything fails, nothing is changed.</li>
+                </ul>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={assigning}
+                    onClick={() => setConfirmStep(false)}
+                    className="btn-ghost min-h-[44px]"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={assigning}
+                    onClick={() => void runBulkAssign()}
+                    className="btn-primary inline-flex min-h-[44px] items-center gap-2"
+                  >
+                    {assigning && <Loader2 size={16} className="animate-spin" />} Yes, assign
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <DuplicateMergeDialog
         item={mergeItem}

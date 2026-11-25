@@ -40,6 +40,8 @@ interface Summary {
   actions: number;
   leads_created: number;
   leads_assigned: number;
+  leads_owned_total?: number;
+  leads_unworked?: number;
   calls: number;
   whatsapp: number;
   emails: number;
@@ -188,6 +190,7 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
       ['Active hours', s.active_hours_label],
       ['Leads created', s.leads_created],
       ['Leads assigned', s.leads_assigned],
+      ['Leads with no note or call', s.leads_unworked ?? 0],
       ['Calls', s.calls],
       ['WhatsApp messages', s.whatsapp],
       ['Emails', s.emails],
@@ -369,6 +372,12 @@ export default function EmployeeReportScreen({ employeeId }: { employeeId: strin
               <StatCard icon={<MessageCircle size={14} />} label="WhatsApp" value={data.summary.whatsapp} />
               <StatCard icon={<MapPin size={14} />} label="Site Visits" value={data.summary.site_visits} sub={`${data.summary.site_visits_completed} completed`} />
               <StatCard icon={<Users size={14} />} label="Leads" value={data.summary.leads_created} sub={`${data.summary.leads_assigned} assigned`} />
+              <StatCard
+                icon={<MessageCircle size={14} />}
+                label="Leads with no note / call"
+                value={data.summary.leads_unworked ?? 0}
+                sub={`of ${data.summary.leads_owned_total ?? 0} leads he owns`}
+              />
               <StatCard icon={<Bell size={14} />} label="Follow-ups" value={data.summary.followups} sub={`${data.summary.followups_completed} done`} />
               <StatCard icon={<Clock size={14} />} label="Activity" value={data.summary.actions} />
               <StatCard icon={<Wallet size={14} />} label="Expenses" value={`${data.summary.expenses_total.toLocaleString()}`} />

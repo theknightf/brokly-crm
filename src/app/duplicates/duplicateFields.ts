@@ -35,8 +35,10 @@ export interface DuplicatePerson {
 
 export interface DuplicateItem {
   id: string;
-  status: 'pending' | 'merged' | 'dismissed' | 'separated';
+  status: 'pending' | 'merged' | 'dismissed' | 'separated' | 'assigned';
   source?: 'attempt' | 'existing';
+  /** Source of the ORIGINAL lead (used by the Source filter). */
+  leadSource?: string;
   duplicateLead?: {
     id: string;
     createdAt: string;
