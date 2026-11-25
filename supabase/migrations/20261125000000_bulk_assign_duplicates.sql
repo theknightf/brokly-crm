@@ -65,8 +65,8 @@ BEGIN
   IF v_ids IS NULL OR array_length(v_ids, 1) IS NULL THEN
     RAISE EXCEPTION 'no duplicates selected' USING ERRCODE = '22023';
   END IF;
-  IF array_length(v_ids, 1) > 1000 THEN
-    RAISE EXCEPTION 'too many selected (max 1000)' USING ERRCODE = '22023';
+  IF array_length(v_ids, 1) > 5000 THEN
+    RAISE EXCEPTION 'too many selected (max 5000)' USING ERRCODE = '22023';
   END IF;
 
   SELECT COALESCE(NULLIF(full_name, ''), email), lower(role::text), is_active
@@ -158,5 +158,6 @@ BEGIN
 END;
 $function$;
 
+ALTER FUNCTION public.bulk_assign_duplicates(uuid[], uuid) SET statement_timeout = '120s';
 REVOKE ALL ON FUNCTION public.bulk_assign_duplicates(uuid[], uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bulk_assign_duplicates(uuid[], uuid) TO authenticated;

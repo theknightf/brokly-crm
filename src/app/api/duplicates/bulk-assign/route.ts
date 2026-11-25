@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isAdminRole } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const SALES_ROLES = ['agent', 'senior_agent', 'telecaller', 'team_leader', 'broker', 'branch_manager'];
 
@@ -49,8 +50,8 @@ export async function POST(request: Request) {
   if (!ids.length || !agentId) {
     return NextResponse.json({ error: 'ids and agentId are required' }, { status: 400 });
   }
-  if (ids.length > 1000) {
-    return NextResponse.json({ error: 'Select at most 1000 at a time' }, { status: 400 });
+  if (ids.length > 5000) {
+    return NextResponse.json({ error: 'Select at most 5000 at a time' }, { status: 400 });
   }
   const { data, error } = await (g.supabase as any).rpc('bulk_assign_duplicates', { p_ids: ids, p_agent: agentId });
   if (error) {
