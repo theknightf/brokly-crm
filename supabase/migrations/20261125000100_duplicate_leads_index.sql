@@ -13,7 +13,7 @@ BEGIN
     FROM public.duplicate_leads d
     LEFT JOIN public.leads l ON l.id = d.original_lead_id
     WHERE p_status = 'all' OR d.status = p_status
-    ORDER BY d.created_at DESC;
+    ORDER BY d.created_at DESC, d.id;
 END;
 $f$;
 REVOKE ALL ON FUNCTION public.duplicate_leads_index(text) FROM PUBLIC, anon;

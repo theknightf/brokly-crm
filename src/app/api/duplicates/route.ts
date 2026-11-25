@@ -37,7 +37,21 @@ export async function GET(request: Request) {
   let matchingIds: string[] | null = null;
   let canBulkAssign = false;
   {
-    const { data: idx, error: idxErr } = await (supabase as any).rpc('duplicate_leads_index', { p_status: status });
+    // PostgREST returns at most 1000 rows per request, so read the index in pages until it is complete.
+    let idx: any[] | null = [];
+    let idxErr: any = null;
+    for (let from = 0; from < 20000; from += 1000) {
+      const { data: part, error: e } = await (supabase as any)
+        .rpc('duplicate_leads_index', { p_status: status })
+        .range(from, from + 999);
+      if (e) {
+        idxErr = e;
+        break;
+      }
+      const rows = (part || []) as any[];
+      idx = (idx as any[]).concat(rows);
+      if (rows.length < 1000) break;
+    }
     if (!idxErr && Array.isArray(idx)) {
       const counts = new Map<string, number>();
       for (const r of idx as any[]) counts.set(r.lead_source || '', (counts.get(r.lead_source || '') || 0) + 1);
