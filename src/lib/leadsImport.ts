@@ -441,6 +441,9 @@ export async function parseLeadFile(
     for (const sheetName of wb.SheetNames) {
       const ws = wb.Sheets[sheetName];
       if (!ws) continue;
+      // Hidden sheets are usually helper/archive data, not leads to import.
+      const meta = (wb as any).Workbook?.Sheets?.find((s: any) => s.name === sheetName);
+      if (meta && Number(meta.Hidden) > 0) continue;
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
       if (json.length) {
         sheets.push({ name: sheetName, headers: Object.keys(json[0]), rawRows: json });
@@ -470,6 +473,7 @@ export async function parseLeadFile(
 
   const allRows: ParsedRow[] = [];
   let firstMapping: Record<number, ImportField> = {};
+  const counts: string[] = [];
   for (const sheet of sheets) {
   const { headers, rawRows } = sheet;
   if (!headers.length) continue;
@@ -568,8 +572,12 @@ export async function parseLeadFile(
       sheet: sheet.name || undefined,
     };
   });
-  allRows.push(...rows);
+  // Drop rows that are completely blank (no name, phone, second phone or email): formatted-but-empty
+  // cells would otherwise inflate the total.
+  const kept = rows.filter((r) => r.name || r.phone || r.phone2 || r.email);
+  allRows.push(...kept);
+  if (sheet.name) counts.push(`${sheet.name} (${kept.length})`);
   }
 
-  return { headers: sheets[0].headers, rows: allRows, mapping: firstMapping, sheetNames: sheets.map((s) => s.name).filter(Boolean) };
+  return { headers: sheets[0].headers, rows: allRows, mapping: firstMapping, sheetNames: counts };
 }
