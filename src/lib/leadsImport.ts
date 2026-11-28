@@ -297,6 +297,7 @@ export interface ParsedRow {
   budgetMin?: number;
   budgetMax?: number;
   reasons: string[]; // validation problems (empty = importable)
+  sheet?: string; // workbook sheet the row came from (xlsx only)
 }
 
 export interface ImportParseResult {
@@ -304,6 +305,8 @@ export interface ImportParseResult {
   rows: ParsedRow[];
   /** header index -> mapped field ('' = skip column). */
   mapping: Record<number, ImportField>;
+  /** Names of all sheets that were read (xlsx only). */
+  sheetNames?: string[];
 }
 
 function parseBudget(raw: unknown): { min?: number; max?: number; raw: string } {
@@ -408,6 +411,12 @@ export async function parseLeadFile(
     throw new Error('Unsupported file type. Please upload a .csv, .xlsx, or .xls file.');
   }
 
+  interface SheetData {
+    name: string;
+    headers: string[];
+    rawRows: Record<string, unknown>[];
+  }
+  const sheets: SheetData[] = [];
   let headers: string[] = [];
   let rawRows: Record<string, unknown>[] = [];
 
@@ -427,29 +436,44 @@ export async function parseLeadFile(
     const XLSX = await import('xlsx');
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    if (!ws) throw new Error('The workbook has no sheets.');
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
-    if (json.length) {
-      headers = Object.keys(json[0]);
-      rawRows = json;
-    } else {
-      const matrix = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
-      if (!matrix.length) throw new Error('The file appears to be empty.');
-      headers = (matrix[0] || []).map((h) => String(h).trim()).filter(Boolean);
-      rawRows = matrix.slice(1).map((cells) => {
-        const row: Record<string, unknown> = {};
-        headers.forEach((h, i) => {
-          if (h) row[h] = cells?.[i];
+    if (!wb.SheetNames.length) throw new Error('The workbook has no sheets.');
+    // Import EVERY sheet in the workbook (empty sheets are skipped).
+    for (const sheetName of wb.SheetNames) {
+      const ws = wb.Sheets[sheetName];
+      if (!ws) continue;
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
+      if (json.length) {
+        sheets.push({ name: sheetName, headers: Object.keys(json[0]), rawRows: json });
+      } else {
+        const matrix = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+        if (!matrix.length) continue;
+        const hs = (matrix[0] || []).map((h) => String(h).trim()).filter(Boolean);
+        if (!hs.length) continue;
+        sheets.push({
+          name: sheetName,
+          headers: hs,
+          rawRows: matrix.slice(1).map((cells) => {
+            const row: Record<string, unknown> = {};
+            hs.forEach((h, i) => {
+              if (h) row[h] = cells?.[i];
+            });
+            return row;
+          }),
         });
-        return row;
-      });
+      }
     }
+    if (!sheets.length) throw new Error('The file appears to be empty.');
   }
+  if (isCsv) sheets.push({ name: '', headers, rawRows });
 
-  if (!headers.length) throw new Error('No column headers were found in the file.');
+  if (!sheets.some((s) => s.headers.length)) throw new Error('No column headers were found in the file.');
 
-  const mapping =
+  const allRows: ParsedRow[] = [];
+  let firstMapping: Record<number, ImportField> = {};
+  for (const sheet of sheets) {
+  const { headers, rawRows } = sheet;
+  if (!headers.length) continue;
+  const mapping: Record<number, ImportField> =
     typeof userMapping === 'object' && userMapping !== null && Object.keys(userMapping).length
       ? userMapping
       : detectAutoMapping(headers);
@@ -461,6 +485,7 @@ export async function parseLeadFile(
       if (!mapping[i] && detectField(h) === 'phone') mapping[i] = 'phone';
     });
   }
+  if (!allRows.length) firstMapping = mapping;
 
   const rows: ParsedRow[] = rawRows.map((obj, idx) => {
     const phoneRaw = String(getMapped(obj, headers, mapping, 'phone'));
@@ -540,8 +565,11 @@ export async function parseLeadFile(
       budgetMin: budgetParsed.min,
       budgetMax: budgetParsed.max,
       reasons,
+      sheet: sheet.name || undefined,
     };
   });
+  allRows.push(...rows);
+  }
 
-  return { headers, rows, mapping };
+  return { headers: sheets[0].headers, rows: allRows, mapping: firstMapping, sheetNames: sheets.map((s) => s.name).filter(Boolean) };
 }

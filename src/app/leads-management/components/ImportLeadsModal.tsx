@@ -65,6 +65,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
   const [mimeType, setMimeType] = useState('');
   const [fileBase64, setFileBase64] = useState('');
   const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   // After an import that hit existing phones: which rows were duplicates and of whom.
@@ -135,6 +136,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     setMimeType('');
     setFileBase64('');
     setRows([]);
+    setSheetNames([]);
     setParsing(false);
     setImporting(false);
     setSource('');
@@ -254,6 +256,38 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
+  const handleFiles = async (list: FileList | null) => {
+    const files = Array.from(list || []);
+    if (files.length <= 1) return handleFile(files[0]);
+    setParsing(true);
+    try {
+      const allRows: ParsedRow[] = [];
+      const names: string[] = [];
+      let total = 0;
+      for (const f of files) {
+        const r = await parseLeadFile(f, undefined, agents.length ? agents : undefined);
+        const tag = f.name;
+        r.rows.forEach((row) => allRows.push({ ...row, sheet: [tag, row.sheet].filter(Boolean).join(' / ') }));
+        names.push(...(r.sheetNames?.length ? r.sheetNames.map((s) => `${tag}/${s}`) : [tag]));
+        total += f.size || 0;
+      }
+      if (!allRows.length) {
+        toast.error('No rows found in files');
+        return;
+      }
+      setFileName(`${files.length} files: ${files.map((f) => f.name).join(', ')}`.slice(0, 180));
+      setFileSize(total);
+      setMimeType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      setFileBase64(''); // server archives a combined .xlsx built from all rows
+      setRows(allRows);
+      setSheetNames(names);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to read files');
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
     setParsing(true);
@@ -286,6 +320,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
       );
       setFileBase64(b64);
       setRows(res.rows);
+      setSheetNames(res.sheetNames || []);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to read file');
     } finally {
@@ -468,8 +503,9 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
           ref={fileInputRef}
           type="file"
           accept=".xlsx,.xls,.csv"
+          multiple
           className="hidden"
-          onChange={(e) => handleFile(e.target.files?.[0])}
+          onChange={(e) => handleFiles(e.target.files)}
         />
         {!hasFile ? (
           <button
@@ -485,7 +521,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
               {parsing ? 'Reading file…' : 'Upload / Import Sheet'}
             </span>
             <span className="block text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              Select an Excel (.xlsx) or CSV file
+              Select one or more Excel (.xlsx) / CSV files
             </span>
           </button>
         ) : (
@@ -496,6 +532,7 @@ export default function ImportLeadsModal({ open, onClose, onImported }: ImportLe
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
                 File: {fileName} — Total Leads: {rows.length}
+                {sheetNames.length > 1 ? ` — ${sheetNames.length} sheets (${sheetNames.join(', ')})` : ''}
               </p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">ملف: {fileName} — الإجمالي: {rows.length}</p>
             </div>
